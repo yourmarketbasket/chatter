@@ -189,11 +189,11 @@ class DataController extends GetxController {
             });
           }
         } catch (e) {
-          print('Cloudinary Upload Exception for $filePath: ${e.toString()}');
+          print('Cloudinary Upload Exception for ${file.path}: ${e.toString()}');
           results.add({
             'success': false,
-            'message': 'Upload failed for $filePath: ${e.toString()}',
-            'filePath': filePath,
+            'message': 'Upload failed for ${file.path}: ${e.toString()}',
+            'filePath': file.path,
             'progress': 0.0,
           });
         }
