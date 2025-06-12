@@ -200,8 +200,10 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
     final path = await _audioRecorder.stop();
     if (path != null) {
       final file = File(path);
-      final sizeInMB = file.lengthSync() / (1024 * 1024);
+      print('[NewPostScreen] Audio Recorded: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
+      final sizeInMB = await file.length() / (1024 * 1024); // Use await file.length()
       if (sizeInMB <= 10) {
+        print('[NewPostScreen] Adding to _selectedAttachments: type=audio, path=${file.path}');
         setState(() {
           _selectedAttachments.add(Attachment(file: file, type: "audio"));
           _isRecordingAudio = false;
@@ -227,8 +229,10 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
         );
         if (image != null) {
           final file = File(image.path);
-          final sizeInMB = file.lengthSync() / (1024 * 1024);
+          print('[NewPostScreen] Image Picked: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
+          final sizeInMB = await file.length() / (1024 * 1024); // Use await file.length()
           if (sizeInMB <= 10) {
+            print('[NewPostScreen] Adding to _selectedAttachments: type=image, path=${file.path}');
             setState(() {
               _selectedAttachments.add(Attachment(file: file, type: "image"));
             });
@@ -262,8 +266,10 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
         );
         if (video != null) {
           final file = File(video.path);
-          final sizeInMB = file.lengthSync() / (1024 * 1024);
+          print('[NewPostScreen] Video Picked: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
+          final sizeInMB = await file.length() / (1024 * 1024); // Use await file.length()
           if (sizeInMB <= 10) {
+            print('[NewPostScreen] Adding to _selectedAttachments: type=video, path=${file.path}');
             setState(() {
               _selectedAttachments.add(Attachment(file: file, type: "video"));
             });
@@ -297,8 +303,10 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
       );
       if (result != null && result.files.single.path != null) {
         final file = File(result.files.single.path!);
-        final sizeInMB = file.lengthSync() / (1024 * 1024);
+        print('[NewPostScreen] PDF Picked: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
+        final sizeInMB = await file.length() / (1024 * 1024); // Use await file.length()
         if (sizeInMB <= 10) {
+          print('[NewPostScreen] Adding to _selectedAttachments: type=pdf, path=${file.path}');
           setState(() {
             _selectedAttachments.add(Attachment(file: file, type: "pdf"));
           });
@@ -320,8 +328,10 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
       );
       if (result != null && result.files.single.path != null) {
         final file = File(result.files.single.path!);
-        final sizeInMB = file.lengthSync() / (1024 * 1024);
+        print('[NewPostScreen] Audio Picked: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
+        final sizeInMB = await file.length() / (1024 * 1024); // Use await file.length()
         if (sizeInMB <= 10) {
+          print('[NewPostScreen] Adding to _selectedAttachments: type=audio, path=${file.path}');
           setState(() {
             _selectedAttachments.add(Attachment(file: file, type: "audio"));
           });
@@ -649,6 +659,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
                 child: OutlinedButton(
                   onPressed: () {
                     if (_postController.text.trim().isNotEmpty || _selectedAttachments.isNotEmpty) {
+                      print('[NewPostScreen] Popping with attachments: ${_selectedAttachments.map((a) => 'type=${a.type}, path=${a.file.path}').toList()}');
                       Navigator.pop(context, {
                         'content': _postController.text.trim(),
                         'attachments': _selectedAttachments,

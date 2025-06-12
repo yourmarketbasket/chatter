@@ -97,6 +97,16 @@ class DataController extends GetxController {
   
 
   Future<List<Map<String, dynamic>>> uploadFilesToCloudinary(List<File> files) async {
+    print('[DataController uploadFilesToCloudinary] Received ${files.length} files for upload.');
+    for (int i = 0; i < files.length; i++) {
+      final f = files[i];
+      try {
+        print('[DataController uploadFilesToCloudinary] File ${i+1}: path=${f.path}, exists_sync=${f.existsSync()}, length_sync=${f.lengthSync()}');
+      } catch (e) {
+        print('[DataController uploadFilesToCloudinary] File ${i+1}: path=${f.path}, Error getting sync details: $e');
+      }
+    }
+
     final Dio dio = Dio();
 
     // Validate input
@@ -122,17 +132,22 @@ class DataController extends GetxController {
         try {
           double uploadProgress = 0.0;
           String fileExtension = path.extension(file.path).toLowerCase().replaceFirst('.', '');
+          String filePath = file.path; // Store for logging
           // Determine resource type based on file extension
           String resourceType;
           if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].contains(fileExtension)) {
             resourceType = 'image';
           } else if (['mp4', 'mov', 'avi', 'mkv', 'webm'].contains(fileExtension)) {
             resourceType = 'video';
+          } else if (['m4a', 'mp3', 'wav', 'aac', 'ogg'].contains(fileExtension)) { // Added audio types
+            resourceType = 'video'; // Cloudinary uses 'video' for audio
           } else if (['pdf', 'doc', 'docx', 'txt'].contains(fileExtension)) {
             resourceType = 'raw';
           } else {
             resourceType = 'auto'; // Let Cloudinary decide
           }
+
+          print('Cloudinary Upload: Preparing to upload $filePath, extension: $fileExtension, resource_type: $resourceType');
 
           var formData = FormData.fromMap({
             'file': await MultipartFile.fromFile(
@@ -165,18 +180,20 @@ class DataController extends GetxController {
               'resource_type': response.data['resource_type'] as String,
             });
           } else {
+            print('Cloudinary Upload Error for $filePath: ${response.data}');
             results.add({
               'success': false,
-              'message': response.data['message'] ?? 'Upload failed for ${file.path}',
-              'filePath': file.path,
+              'message': response.data['message'] ?? 'Upload failed for $filePath',
+              'filePath': filePath,
               'progress': uploadProgress,
             });
           }
         } catch (e) {
+          print('Cloudinary Upload Exception for $filePath: ${e.toString()}');
           results.add({
             'success': false,
-            'message': 'Upload failed for ${file.path}: ${e.toString()}',
-            'filePath': file.path,
+            'message': 'Upload failed for $filePath: ${e.toString()}',
+            'filePath': filePath,
             'progress': 0.0,
           });
         }
