@@ -97,6 +97,16 @@ class DataController extends GetxController {
   
 
   Future<List<Map<String, dynamic>>> uploadFilesToCloudinary(List<File> files) async {
+    print('[DataController uploadFilesToCloudinary] Received ${files.length} files for upload.');
+    for (int i = 0; i < files.length; i++) {
+      final f = files[i];
+      try {
+        print('[DataController uploadFilesToCloudinary] File ${i+1}: path=${f.path}, exists_sync=${f.existsSync()}, length_sync=${f.lengthSync()}');
+      } catch (e) {
+        print('[DataController uploadFilesToCloudinary] File ${i+1}: path=${f.path}, Error getting sync details: $e');
+      }
+    }
+
     final Dio dio = Dio();
 
     // Validate input

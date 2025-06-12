@@ -98,10 +98,30 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   }
 
   Future<void> _addPost(String content, List<Attachment> attachments) async {
+    print('[HomeFeedScreen _addPost] Received ${attachments.length} attachments.');
+    for (int i = 0; i < attachments.length; i++) {
+      final a = attachments[i];
+      // Use sync methods for simplicity in logging.
+      try {
+        print('[HomeFeedScreen _addPost] Attachment ${i+1}: type=${a.type}, path=${a.file.path}, file_exists_sync=${a.file.existsSync()}, length_sync=${a.file.lengthSync()}, url=${a.url}');
+      } catch (e) {
+        print('[HomeFeedScreen _addPost] Attachment ${i+1}: type=${a.type}, path=${a.file.path}, url=${a.url} - Error getting file stats: $e');
+      }
+    }
+
     // Upload files to Cloudinary
     List<Attachment> uploadedAttachments = [];
     if (attachments.isNotEmpty) {
       List<File> files = attachments.map((a) => a.file).toList();
+      print('[HomeFeedScreen _addPost] Extracted ${files.length} files for upload:');
+      for (int i = 0; i < files.length; i++) {
+        final f = files[i];
+        try {
+          print('[HomeFeedScreen _addPost] File ${i+1} for upload: path=${f.path}, exists_sync=${f.existsSync()}, length_sync=${f.lengthSync()}');
+        } catch (e) {
+          print('[HomeFeedScreen _addPost] File ${i+1} for upload: path=${f.path} - Error getting file stats: $e');
+        }
+      }
       List<Map<String, dynamic>> uploadResults = await dataController.uploadFilesToCloudinary(files);
       
       for (int i = 0; i < attachments.length; i++) {
