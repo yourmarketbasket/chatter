@@ -127,32 +127,57 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       }
     }
 
+    // Early exit if no content and no successfully uploaded attachments
     if (content.trim().isEmpty && uploadedAttachments.isEmpty) {
-      return; // No content and no successful uploads
+      return;
     }
 
-    setState(() {
-      _posts.insert(
-        0,
-        ChatterPost(
-          username: "YourName",
-          content: content.trim(),
-          timestamp: DateTime.now(),
-          attachments: uploadedAttachments,
-          avatarInitial: "Y",
-          views: Random().nextInt(100) + 10,
+    // Prepare data for the backend
+    Map<String, dynamic> postData = {
+      'content': content.trim(),
+      'attachment_urls': uploadedAttachments
+          .where((att) => att.url != null)
+          .map((att) => att.url!)
+          .toList(),
+    };
+
+    // Call the backend to create the post
+    final result = await dataController.createPost(postData);
+
+    if (result['success'] == true) {
+      setState(() {
+        _posts.insert(
+          0,
+          ChatterPost(
+            username: "YourName", // Assuming "YourName" is a placeholder for the actual user
+            content: content.trim(),
+            timestamp: DateTime.now(),
+            attachments: uploadedAttachments, // Use the full Attachment objects for the UI
+            avatarInitial: "Y", // Placeholder for avatar
+            views: Random().nextInt(100) + 10, // Placeholder for views
+          ),
+        );
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Poa! Your chatter is live!',
+            style: GoogleFonts.roboto(color: Colors.white),
+          ),
+          backgroundColor: Colors.teal[700],
         ),
       );
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Poa! Your chatter is live!',
-          style: GoogleFonts.roboto(color: Colors.white),
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Failed to create post on server: ${result['message'] ?? 'Unknown error'}',
+            style: GoogleFonts.roboto(color: Colors.white),
+          ),
+          backgroundColor: Colors.red[700],
         ),
-        backgroundColor: Colors.teal[700],
-      ),
-    );
+      );
+    }
   }
 
   void _showRepliesDialog(ChatterPost post) {
