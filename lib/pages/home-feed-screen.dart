@@ -145,6 +145,10 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       'attachments': successfullyUploadedAttachments.map((att) => att.toJson()).toList(),
     };
 
+    print('[HomeFeedScreen _addPost] Preparing to send postData attachments: ${postData['attachments']}');
+    if (postData['attachments'] is List && (postData['attachments'] as List).isNotEmpty) {
+      print('[HomeFeedScreen _addPost] Type of first attachment element: ${(postData['attachments'] as List).first.runtimeType}');
+    }
     final result = await dataController.createPost(postData);
 
     if (result['success'] == true) {
