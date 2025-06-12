@@ -1,5 +1,5 @@
 import 'package:chatter/controllers/data-controller.dart';
-import 'package:chatter/pages/new-posts-page.dart';
+import 'package:chatter/pages/new-posts-page.dart' show Attachment, NewPostScreen; // Import Attachment and NewPostScreen
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
@@ -15,15 +15,9 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:video_thumbnail/video_thumbnail.dart' as video_thumb;
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:path/path.dart' as path; // Added for path.basename
 
-class Attachment {
-  final File file;
-  final String type;
-  String? url; // URL after uploading to Cloudinary
-
-  Attachment({required this.file, required this.type, this.url});
-}
-
+// Removed local Attachment class
 class ChatterPost {
   final String username;
   final String content;
@@ -68,8 +62,10 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       avatarInitial: "M",
       attachments: [
         Attachment(
-          file: File(''), // Placeholder for demo post
+          file: File(''),
           type: "image",
+          filename: "demo_image.jpg",
+          size: 12345,
           url: "https://images.unsplash.com/photo-1518791841217-8f162f1e1131",
         ),
       ],
@@ -99,45 +95,38 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
 
   Future<void> _addPost(String content, List<Attachment> attachments) async {
     print('[HomeFeedScreen _addPost] Received ${attachments.length} attachments.');
+    // Log attachment details (optional, for debugging)
     for (int i = 0; i < attachments.length; i++) {
       final a = attachments[i];
-      // Use sync methods for simplicity in logging.
       try {
-        print('[HomeFeedScreen _addPost] Attachment ${i+1}: type=${a.type}, path=${a.file.path}, file_exists_sync=${a.file.existsSync()}, length_sync=${a.file.lengthSync()}, url=${a.url}');
+        print('[HomeFeedScreen _addPost] Attachment ${i+1}: type=${a.type}, filename=${a.filename}, path=${a.file.path}, file_exists_sync=${a.file.existsSync()}, size=${a.size}, url=${a.url}');
       } catch (e) {
-        print('[HomeFeedScreen _addPost] Attachment ${i+1}: type=${a.type}, path=${a.file.path}, url=${a.url} - Error getting file stats: $e');
+        print('[HomeFeedScreen _addPost] Attachment ${i+1}: type=${a.type}, filename=${a.filename}, path=${a.file.path}, url=${a.url} - Error getting file stats: $e');
       }
     }
 
-    // Upload files to Cloudinary
-    List<Attachment> uploadedAttachments = [];
+    List<Attachment> successfullyUploadedAttachments = [];
     if (attachments.isNotEmpty) {
-      List<File> files = attachments.map((a) => a.file).toList();
-      print('[HomeFeedScreen _addPost] Extracted ${files.length} files for upload:');
-      for (int i = 0; i < files.length; i++) {
-        final f = files[i];
-        try {
-          print('[HomeFeedScreen _addPost] File ${i+1} for upload: path=${f.path}, exists_sync=${f.existsSync()}, length_sync=${f.lengthSync()}');
-        } catch (e) {
-          print('[HomeFeedScreen _addPost] File ${i+1} for upload: path=${f.path} - Error getting file stats: $e');
-        }
-      }
-      List<Map<String, dynamic>> uploadResults = await dataController.uploadFilesToCloudinary(files);
+      List<File> filesToUpload = attachments.map((a) => a.file).toList();
+      List<Map<String, dynamic>> uploadResults = await dataController.uploadFilesToCloudinary(filesToUpload);
       
       for (int i = 0; i < attachments.length; i++) {
-        var result = uploadResults[i];
-        print(result);
-        if (result['success'] == true) {
-          uploadedAttachments.add(Attachment(
-            file: attachments[i].file,
-            type: attachments[i].type,
-            url: result['url'] as String,
-          ));
+        Attachment originalAttachment = attachments[i];
+        Map<String, dynamic> result = uploadResults.firstWhere(
+          (res) => res['filePath'] == originalAttachment.file.path,
+          orElse: () => {},
+        );
+
+        if (result.isNotEmpty && result['success'] == true) {
+          originalAttachment.url = result['url'] as String?;
+          originalAttachment.size = result['size'] as int?;
+          // originalAttachment.type = result['filetype'] as String? ?? originalAttachment.type;
+          successfullyUploadedAttachments.add(originalAttachment);
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'Failed to upload ${attachments[i].file.path.split('/').last}: ${result['message']}',
+                'Failed to upload ${originalAttachment.filename}: ${result['message'] ?? 'Unknown error'}',
                 style: GoogleFonts.roboto(color: Colors.white),
               ),
               backgroundColor: Colors.red[700],
@@ -147,21 +136,15 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       }
     }
 
-    // Early exit if no content and no successfully uploaded attachments
-    if (content.trim().isEmpty && uploadedAttachments.isEmpty) {
+    if (content.trim().isEmpty && successfullyUploadedAttachments.isEmpty) {
       return;
     }
 
-    // Prepare data for the backend
     Map<String, dynamic> postData = {
       'content': content.trim(),
-      'attachment_urls': uploadedAttachments
-          .where((att) => att.url != null)
-          .map((att) => att.url!)
-          .toList(),
+      'attachments': successfullyUploadedAttachments.map((att) => att.toJson()).toList(),
     };
 
-    // Call the backend to create the post
     final result = await dataController.createPost(postData);
 
     if (result['success'] == true) {
@@ -169,12 +152,12 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         _posts.insert(
           0,
           ChatterPost(
-            username: "YourName", // Assuming "YourName" is a placeholder for the actual user
+            username: "YourName",
             content: content.trim(),
             timestamp: DateTime.now(),
-            attachments: uploadedAttachments, // Use the full Attachment objects for the UI
-            avatarInitial: "Y", // Placeholder for avatar
-            views: Random().nextInt(100) + 10, // Placeholder for views
+            attachments: successfullyUploadedAttachments,
+            avatarInitial: "Y",
+            views: Random().nextInt(100) + 10,
           ),
         );
       });
@@ -290,13 +273,16 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                               final XFile? image = await picker.pickImage(source: ImageSource.gallery);
                               if (image != null) {
                                 final file = File(image.path);
-                                final sizeInMB = file.lengthSync() / (1024 * 1024);
+                                final sizeInBytes = await file.length();
+                                final sizeInMB = sizeInBytes / (1024 * 1024);
                                 if (sizeInMB <= 10) {
                                   setDialogState(() {
                                     replyAttachments.add(
                                       Attachment(
                                         file: file,
                                         type: "image",
+                                        filename: path.basename(file.path),
+                                        size: sizeInBytes,
                                       ),
                                     );
                                   });
@@ -325,13 +311,16 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                               );
                               if (result != null && result.files.single.path != null) {
                                 final file = File(result.files.single.path!);
-                                final sizeInMB = file.lengthSync() / (1024 * 1024);
+                                final sizeInBytes = await file.length();
+                                final sizeInMB = sizeInBytes / (1024 * 1024);
                                 if (sizeInMB <= 10) {
                                   setDialogState(() {
                                     replyAttachments.add(
                                       Attachment(
                                         file: file,
                                         type: "pdf",
+                                        filename: path.basename(file.path),
+                                        size: sizeInBytes,
                                       ),
                                     );
                                   });
@@ -359,13 +348,16 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                               );
                               if (result != null && result.files.single.path != null) {
                                 final file = File(result.files.single.path!);
-                                final sizeInMB = file.lengthSync() / (1024 * 1024);
+                                final sizeInBytes = await file.length();
+                                final sizeInMB = sizeInBytes / (1024 * 1024);
                                 if (sizeInMB <= 10) {
                                   setDialogState(() {
                                     replyAttachments.add(
                                       Attachment(
                                         file: file,
                                         type: "audio",
+                                        filename: path.basename(file.path),
+                                        size: sizeInBytes,
                                       ),
                                     );
                                   });
@@ -391,13 +383,16 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                               final XFile? video = await picker.pickVideo(source: ImageSource.gallery);
                               if (video != null) {
                                 final file = File(video.path);
-                                final sizeInMB = file.lengthSync() / (1024 * 1024);
+                                final sizeInBytes = await file.length();
+                                final sizeInMB = sizeInBytes / (1024 * 1024);
                                 if (sizeInMB <= 10) {
                                   setDialogState(() {
                                     replyAttachments.add(
                                       Attachment(
                                         file: file,
                                         type: "video",
+                                        filename: path.basename(file.path),
+                                        size: sizeInBytes,
                                       ),
                                     );
                                   });
@@ -426,7 +421,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                           children: replyAttachments.map((attachment) {
                             return Chip(
                               label: Text(
-                                attachment.file.path.split('/').last,
+                                attachment.filename,
                                 style: GoogleFonts.roboto(color: Colors.white, fontSize: 12),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -468,25 +463,27 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                       return;
                     }
 
-                    // Upload reply attachments to Cloudinary
-                    List<Attachment> uploadedReplyAttachments = [];
+                    List<Attachment> successfullyUploadedReplyAttachments = [];
                     if (replyAttachments.isNotEmpty) {
-                      List<File> files = replyAttachments.map((a) => a.file).toList();
-                      List<Map<String, dynamic>> uploadResults = await dataController.uploadFilesToCloudinary(files);
+                      List<File> filesToUpload = replyAttachments.map((a) => a.file).toList();
+                      List<Map<String, dynamic>> uploadResults = await dataController.uploadFilesToCloudinary(filesToUpload);
                       
                       for (int i = 0; i < replyAttachments.length; i++) {
-                        var result = uploadResults[i];
-                        if (result['success'] == true) {
-                          uploadedReplyAttachments.add(Attachment(
-                            file: replyAttachments[i].file,
-                            type: replyAttachments[i].type,
-                            url: result['url'] as String,
-                          ));
+                        Attachment originalReplyAttachment = replyAttachments[i];
+                        Map<String, dynamic> result = uploadResults.firstWhere(
+                          (res) => res['filePath'] == originalReplyAttachment.file.path,
+                          orElse: () => {},
+                        );
+
+                        if (result.isNotEmpty && result['success'] == true) {
+                          originalReplyAttachment.url = result['url'] as String?;
+                          originalReplyAttachment.size = result['size'] as int?;
+                          successfullyUploadedReplyAttachments.add(originalReplyAttachment);
                         } else {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
-                                'Failed to upload ${replyAttachments[i].file.path.split('/').last}: ${result['message']}',
+                                'Failed to upload ${originalReplyAttachment.filename}: ${result['message'] ?? 'Unknown error'}',
                                 style: GoogleFonts.roboto(color: Colors.white),
                               ),
                               backgroundColor: Colors.red[700],
@@ -496,8 +493,8 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                       }
                     }
 
-                    if (replyController.text.trim().isEmpty && uploadedReplyAttachments.isEmpty) {
-                      return; // No content and no successful uploads
+                    if (replyController.text.trim().isEmpty && successfullyUploadedReplyAttachments.isEmpty) {
+                      return;
                     }
 
                     setState(() {
@@ -506,7 +503,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                           username: "YourName",
                           content: replyController.text.trim(),
                           timestamp: DateTime.now(),
-                          attachments: uploadedReplyAttachments,
+                          attachments: successfullyUploadedReplyAttachments,
                           avatarInitial: "Y",
                           views: Random().nextInt(100) + 10,
                         ),
@@ -607,13 +604,15 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                       itemCount: post.attachments.length,
                       itemBuilder: (context, idx) {
                         final attachment = post.attachments[idx];
-                        final displayUrl = attachment.url ?? attachment.file.path;
+                        final String displayFilename = attachment.filename;
+                        final bool isUploaded = attachment.url != null && attachment.url!.isNotEmpty;
+
                         return GestureDetector(
                           onTap: () {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
-                                  'Opening ${attachment.type}: ${displayUrl.split('/').last}',
+                                  'Opening ${attachment.type}: $displayFilename',
                                   style: GoogleFonts.roboto(color: Colors.white),
                                 ),
                                 backgroundColor: Colors.teal[700],
@@ -623,17 +622,13 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(12),
                             child: attachment.type == "image"
-                                ? attachment.url != null
+                                ? isUploaded
                                     ? Image.network(
                                         attachment.url!,
                                         fit: BoxFit.cover,
                                         errorBuilder: (context, error, stackTrace) => Container(
                                           color: Colors.grey[900],
-                                          child: Icon(
-                                            FeatherIcons.image,
-                                            color: Colors.grey[500],
-                                            size: 40,
-                                          ),
+                                          child: Icon(FeatherIcons.image, color: Colors.grey[500], size: 40),
                                         ),
                                       )
                                     : Image.file(
@@ -641,37 +636,40 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                                         fit: BoxFit.cover,
                                         errorBuilder: (context, error, stackTrace) => Container(
                                           color: Colors.grey[900],
-                                          child: Icon(
-                                            FeatherIcons.image,
-                                            color: Colors.grey[500],
-                                            size: 40,
-                                          ),
+                                          child: Icon(FeatherIcons.image, color: Colors.grey[500], size: 40),
                                         ),
                                       )
                                 : attachment.type == "pdf"
-                                    ? PdfViewer.uri(
-                                        Uri.parse(displayUrl),
-                                        params: PdfViewerParams(
-                                          maxScale: 1.0,
-                                        ),
-                                      )
+                                    ? (isUploaded && Uri.tryParse(attachment.url!) != null
+                                        ? PdfViewer.uri(
+                                            Uri.parse(attachment.url!),
+                                            params: const PdfViewerParams(maxScale: 1.0),
+                                          )
+                                        : Container(
+                                            color: Colors.grey[900],
+                                            child: Column(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                Icon(FeatherIcons.fileText, color: Colors.tealAccent, size: 40),
+                                                SizedBox(height: 8),
+                                                Text(displayFilename, style: GoogleFonts.roboto(color: Colors.white70, fontSize: 12), textAlign: TextAlign.center, overflow: TextOverflow.ellipsis),
+                                              ],
+                                            ),
+                                          ))
                                     : Container(
                                         color: Colors.grey[900],
                                         child: Column(
                                           mainAxisAlignment: MainAxisAlignment.center,
                                           children: [
                                             Icon(
-                                              attachment.type == "audio" ? FeatherIcons.music : FeatherIcons.video,
+                                              attachment.type == "audio" ? FeatherIcons.music : (attachment.type == "video" ? FeatherIcons.video : FeatherIcons.file),
                                               color: Colors.tealAccent,
                                               size: 40,
                                             ),
                                             SizedBox(height: 8),
                                             Text(
-                                              displayUrl.split('/').last,
-                                              style: GoogleFonts.roboto(
-                                                color: Colors.white70,
-                                                fontSize: 12,
-                                              ),
+                                              displayFilename,
+                                              style: GoogleFonts.roboto(color: Colors.white70, fontSize: 12),
                                               textAlign: TextAlign.center,
                                               overflow: TextOverflow.ellipsis,
                                             ),

@@ -13,6 +13,35 @@ import 'package:pdfrx/pdfrx.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 import 'package:video_thumbnail/video_thumbnail.dart' as video_thumb;
+import 'package:path/path.dart' as path;
+
+class Attachment {
+  final File file;
+  final String type;
+  final String filename;
+  String? url;
+  int? size;
+
+  Attachment({
+    required this.file,
+    required this.type,
+    required this.filename,
+    this.url,
+    this.size,
+  });
+
+  // It might be useful to add a toJson method for debugging or sending to backend
+  Map<String, dynamic> toJson() {
+    return {
+      'filename': filename,
+      'type': type,
+      'url': url,
+      'size': size,
+      // Note: 'file' is not included here as it's a File object
+      // and usually, we send the URL or file content, not the object itself.
+    };
+  }
+}
 
 class NewPostScreen extends StatefulWidget {
   const NewPostScreen({Key? key}) : super(key: key);
@@ -201,11 +230,12 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
     if (path != null) {
       final file = File(path);
       print('[NewPostScreen] Audio Recorded: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
-      final sizeInMB = await file.length() / (1024 * 1024); // Use await file.length()
+      final sizeInMB = (await file.length()) / (1024 * 1024); // Calculate sizeInMB first
       if (sizeInMB <= 10) {
         print('[NewPostScreen] Adding to _selectedAttachments: type=audio, path=${file.path}');
+        final fileLength = await file.length(); // Get length again for Attachment
         setState(() {
-          _selectedAttachments.add(Attachment(file: file, type: "audio"));
+          _selectedAttachments.add(Attachment(file: file, type: "audio", filename: path.basename(file.path), size: fileLength));
           _isRecordingAudio = false;
         });
         _pulseController?.reset();
@@ -230,11 +260,12 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
         if (image != null) {
           final file = File(image.path);
           print('[NewPostScreen] Image Picked: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
-          final sizeInMB = await file.length() / (1024 * 1024); // Use await file.length()
+          final sizeInMB = (await file.length()) / (1024 * 1024); // Calculate sizeInMB first
           if (sizeInMB <= 10) {
             print('[NewPostScreen] Adding to _selectedAttachments: type=image, path=${file.path}');
+            final fileLength = await file.length(); // Get length again for Attachment
             setState(() {
-              _selectedAttachments.add(Attachment(file: file, type: "image"));
+              _selectedAttachments.add(Attachment(file: file, type: "image", filename: path.basename(file.path), size: fileLength));
             });
           } else {
             _showPermissionDialog(
@@ -267,11 +298,12 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
         if (video != null) {
           final file = File(video.path);
           print('[NewPostScreen] Video Picked: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
-          final sizeInMB = await file.length() / (1024 * 1024); // Use await file.length()
+          final sizeInMB = (await file.length()) / (1024 * 1024); // Calculate sizeInMB first
           if (sizeInMB <= 10) {
             print('[NewPostScreen] Adding to _selectedAttachments: type=video, path=${file.path}');
+            final fileLength = await file.length(); // Get length again for Attachment
             setState(() {
-              _selectedAttachments.add(Attachment(file: file, type: "video"));
+              _selectedAttachments.add(Attachment(file: file, type: "video", filename: path.basename(file.path), size: fileLength));
             });
           } else {
             _showPermissionDialog(
@@ -304,11 +336,12 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
       if (result != null && result.files.single.path != null) {
         final file = File(result.files.single.path!);
         print('[NewPostScreen] PDF Picked: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
-        final sizeInMB = await file.length() / (1024 * 1024); // Use await file.length()
+        final sizeInMB = (await file.length()) / (1024 * 1024); // Calculate sizeInMB first
         if (sizeInMB <= 10) {
           print('[NewPostScreen] Adding to _selectedAttachments: type=pdf, path=${file.path}');
+          final fileLength = await file.length(); // Get length again for Attachment
           setState(() {
-            _selectedAttachments.add(Attachment(file: file, type: "pdf"));
+            _selectedAttachments.add(Attachment(file: file, type: "pdf", filename: path.basename(file.path), size: fileLength));
           });
         } else {
           _showPermissionDialog(
@@ -329,11 +362,12 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
       if (result != null && result.files.single.path != null) {
         final file = File(result.files.single.path!);
         print('[NewPostScreen] Audio Picked: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
-        final sizeInMB = await file.length() / (1024 * 1024); // Use await file.length()
+        final sizeInMB = (await file.length()) / (1024 * 1024); // Calculate sizeInMB first
         if (sizeInMB <= 10) {
           print('[NewPostScreen] Adding to _selectedAttachments: type=audio, path=${file.path}');
+          final fileLength = await file.length(); // Get length again for Attachment
           setState(() {
-            _selectedAttachments.add(Attachment(file: file, type: "audio"));
+            _selectedAttachments.add(Attachment(file: file, type: "audio", filename: path.basename(file.path), size: fileLength));
           });
         } else {
           _showPermissionDialog(
@@ -434,7 +468,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
                                 },
                               ),
                               Text(
-                                attachment.file.path.split('/').last,
+                                attachment.filename, // Use attachment.filename here
                                 style: GoogleFonts.roboto(
                                   color: Colors.white70,
                                   fontSize: 12,
