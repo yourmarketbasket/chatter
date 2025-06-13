@@ -154,6 +154,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
 
     // Prepare data for the backend
     Map<String, dynamic> postData = {
+      'username': "YourName",
       'content': content.trim(),
       'attachment_urls': uploadedAttachments
           .where((att) => att.url != null)
@@ -161,15 +162,18 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           .toList(),
     };
 
+    print(dataController.user.value);
+
     // Call the backend to create the post
     final result = await dataController.createPost(postData);
+    print(result);
 
     if (result['success'] == true) {
       setState(() {
         _posts.insert(
           0,
           ChatterPost(
-            username: "YourName", // Assuming "YourName" is a placeholder for the actual user
+            username: dataController.user.value['user']['name'], // Assuming "YourName" is a placeholder for the actual user
             content: content.trim(),
             timestamp: DateTime.now(),
             attachments: uploadedAttachments, // Use the full Attachment objects for the UI

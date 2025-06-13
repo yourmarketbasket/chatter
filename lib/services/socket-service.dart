@@ -55,6 +55,11 @@ class SocketService {
       print('Welcome event received: $data');
       // Handle welcome event data if needed
     });
+    // listen fore newPost event
+    _socket!.on('newPost', (data) {
+      print('New post event received: $data');
+      // Handle new post event data if needed
+    });
   }
 
   void connect() {
