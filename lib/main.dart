@@ -3,15 +3,22 @@ import 'package:chatter/pages/landing-page.dart';
 import 'package:chatter/pages/login.dart';
 import 'package:chatter/pages/register.dart';
 import 'package:chatter/services/socket-service.dart';
+import 'package:chatter/controllers/data-controller.dart'; // Added import
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 void main() {
-  // Initialize SocketService and connect
-  final socketService = SocketService();
-  Get.put(socketService); // Register as singleton
-  socketService.connect(); // Establish socket connection
+  // Ensure Flutter bindings are initialized
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize DataController and register as singleton
+  final DataController dataController = Get.put(DataController());
+
+  // Initialize SocketService. The constructor of SocketService calls connect().
+  // Register SocketService as a singleton.
+  final SocketService socketService = Get.put(SocketService());
+
   runApp(const ChatterApp());
 }
 

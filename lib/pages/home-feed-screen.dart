@@ -57,35 +57,23 @@ class HomeFeedScreen extends StatefulWidget {
 
 class _HomeFeedScreenState extends State<HomeFeedScreen> {
   DataController dataController = Get.put(DataController());
-  final List<ChatterPost> _posts = [
-    ChatterPost(
-      username: "MtaaniGuru",
-      content: "Sasa! Who's vibin' in Nairobi tonight? 😎 #PoaVibes",
-      timestamp: DateTime.now().subtract(Duration(minutes: 5)),
-      likes: 42,
-      reposts: 10,
-      views: Random().nextInt(1000) + 100,
-      avatarInitial: "M",
-      attachments: [
-        Attachment(
-          file: File(''), // Placeholder for demo post
-          type: "image",
-          url: "https://images.unsplash.com/photo-1518791841217-8f162f1e1131",
+
+  @override
+  void initState() {
+    super.initState();
+    // Fetch initial posts when the screen loads
+    // Consider adding error handling for the fetchFeeds call if needed
+    dataController.fetchFeeds().catchError((error) {
+      // Handle or log error, e.g., show a SnackBar
+      print("Error fetching feeds: $error");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to load feed. Please try again later.', style: GoogleFonts.roboto(color: Colors.white)),
+          backgroundColor: Colors.red[700],
         ),
-      ],
-      replies: [
-        ChatterPost(
-          username: "NiajeBro",
-          content: "Poa msee! Hitting Westie clubs tonight! 🎉",
-          timestamp: DateTime.now().subtract(Duration(minutes: 2)),
-          likes: 5,
-          reposts: 1,
-          views: 50,
-          avatarInitial: "N",
-        ),
-      ],
-    ),
-  ];
+      );
+    });
+  }
 
   void _navigateToPostScreen() async {
     final result = await Navigator.push(
@@ -169,19 +157,8 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     print(result);
 
     if (result['success'] == true) {
-      setState(() {
-        _posts.insert(
-          0,
-          ChatterPost(
-            username: dataController.user.value['user']['name'], // Assuming "YourName" is a placeholder for the actual user
-            content: content.trim(),
-            timestamp: DateTime.now(),
-            attachments: uploadedAttachments, // Use the full Attachment objects for the UI
-            avatarInitial: "Y", // Placeholder for avatar
-            views: Random().nextInt(100) + 10, // Placeholder for views
-          ),
-        );
-      });
+      // The post is now added via socket event and DataController's reactive list.
+      // No need to manually add to a local list or call setState.
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -814,17 +791,59 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         backgroundColor: Color(0xFF000000),
         elevation: 0,
       ),
-      body: ListView.separated(
-        itemCount: _posts.length,
-        separatorBuilder: (context, index) => Divider(
-          color: Colors.grey[850],
-          height: 1,
-        ),
-        itemBuilder: (context, index) {
-          final post = _posts[index];
-          return FadeTransition(
-            opacity: CurvedAnimation(
-              parent: ModalRoute.of(context)!.animation!,
+      body: Obx(() {
+        if (dataController.posts.isEmpty) {
+          // Show a loading indicator or a "No posts" message
+          return Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
+            ),
+          );
+        }
+        return ListView.separated(
+          itemCount: dataController.posts.length,
+          separatorBuilder: (context, index) => Divider(
+            color: Colors.grey[850],
+            height: 1,
+          ),
+          itemBuilder: (context, index) {
+            final postMap = dataController.posts[index];
+            // Map the Map<String, dynamic> to a ChatterPost object
+            final post = ChatterPost(
+              username: postMap['user']?['name'] ?? 'Unknown User',
+              content: postMap['content'] ?? '',
+              // Ensure timestamp is parsed correctly, handling potential String from API
+              timestamp: postMap['createdAt'] is String
+                  ? DateTime.parse(postMap['createdAt'])
+                  : DateTime.now(), // Fallback to now if parsing fails or type is wrong
+              likes: postMap['likes']?.length ?? 0, // Assuming likes is an array of user IDs
+              reposts: postMap['reposts'] ?? 0, // Assuming reposts is a count
+              views: postMap['views'] ?? 0, // Assuming views is a count
+              avatarInitial: (postMap['user']?['name'] != null && postMap['user']['name'].isNotEmpty)
+                  ? postMap['user']['name'][0].toUpperCase()
+                  : '?',
+              attachments: (postMap['attachment_urls'] as List<dynamic>?)?.map((attUrl) {
+                // Determine type based on URL or stored type if available
+                String type = 'unknown';
+                if (attUrl is String) {
+                  if (attUrl.toLowerCase().endsWith('.jpg') || attUrl.toLowerCase().endsWith('.jpeg') || attUrl.toLowerCase().endsWith('.png')) {
+                    type = 'image';
+                  } else if (attUrl.toLowerCase().endsWith('.pdf')) {
+                    type = 'pdf';
+                  } else if (attUrl.toLowerCase().endsWith('.mp4') || attUrl.toLowerCase().endsWith('.mov')) {
+                    type = 'video';
+                  } else if (attUrl.toLowerCase().endsWith('.mp3') || attUrl.toLowerCase().endsWith('.wav') || attUrl.toLowerCase().endsWith('.m4a')) {
+                    type = 'audio';
+                  }
+                }
+                // The File object here is a placeholder as we only have the URL from the backend
+                return Attachment(file: File(''), type: type, url: attUrl as String?);
+              }).toList() ?? [],
+              replies: [], // Replies would need to be handled if they are part of the postMap from API
+            );
+            return FadeTransition(
+              opacity: CurvedAnimation(
+                parent: ModalRoute.of(context)!.animation!,
               curve: Curves.easeInOut,
             ),
             child: Padding(

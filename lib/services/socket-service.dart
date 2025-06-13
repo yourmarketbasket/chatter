@@ -1,9 +1,12 @@
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'dart:async';
+import 'package:chatter/controllers/data-controller.dart';
+import 'package:get/get.dart';
 
 class SocketService {
   IO.Socket? _socket;
   final StreamController<String> _messageController = StreamController<String>.broadcast();
+  final DataController _dataController = Get.find<DataController>();
 
   SocketService() {
     _initializeSocket();
@@ -58,7 +61,22 @@ class SocketService {
     // listen fore newPost event
     _socket!.on('newPost', (data) {
       print('New post event received: $data');
-      // Handle new post event data if needed
+      if (data is Map<String, dynamic>) {
+        // Assuming 'data' is the post object in the correct format
+        _dataController.addNewPost(data);
+      } else {
+        print('Received newPost event with unexpected data type: ${data.runtimeType}');
+        // Optionally, attempt to convert or log more details if the structure is known but different
+        // For example, if it's a JSON string:
+        // if (data is String) {
+        //   try {
+        //     final Map<String, dynamic> parsedData = jsonDecode(data);
+        //     _dataController.addNewPost(parsedData);
+        //   } catch (e) {
+        //     print('Error decoding newPost JSON string: $e');
+        //   }
+        // }
+      }
     });
   }
 

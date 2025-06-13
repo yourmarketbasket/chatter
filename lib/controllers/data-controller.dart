@@ -25,6 +25,7 @@ class DataController extends GetxController {
     sendTimeout: const Duration(seconds: 30),
   ));
   final user = {}.obs;
+  final RxList<Map<String, dynamic>> posts = <Map<String, dynamic>>[].obs;
 
   @override
   void onInit() {
@@ -77,7 +78,7 @@ class DataController extends GetxController {
   }
 
   // fetch all feeds for timeline
-  Future<List<Map<String, dynamic>>> fetchFeeds() async {
+  Future<void> fetchFeeds() async {
     try {
       var token = user.value['token'];
       if (token == null) {
@@ -92,14 +93,20 @@ class DataController extends GetxController {
         ),
       );
       if (response.statusCode == 200 && response.data['success'] == true) {
-        return response.data['data'];
+        posts.assignAll(List<Map<String, dynamic>>.from(response.data['data']));
       } else {
         throw Exception('Failed to fetch feeds');
       }
     } catch (e) {
       print('Error fetching feeds: $e');
-      return [];
+      posts.clear(); // Clear posts on error
+      rethrow; // Rethrow the exception to be handled by the caller
     }
+  }
+
+  // Add a new post to the beginning of the list
+  void addNewPost(Map<String, dynamic> newPost) {
+    posts.insert(0, newPost);
   }
 
   // Register user
