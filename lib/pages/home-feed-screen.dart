@@ -1,8 +1,8 @@
 import 'package:chatter/controllers/data-controller.dart';
 import 'package:chatter/pages/new-posts-page.dart';
-import 'package:chatter/pages/reply_page.dart'; // Added import for ReplyPage
-import 'package:chatter/pages/repost_page.dart'; // Added import for RepostPage
-import 'package:chatter/pages/media_view_page.dart'; // Added import for MediaViewPage
+import 'package:chatter/pages/reply_page.dart';
+import 'package:chatter/pages/repost_page.dart';
+import 'package:chatter/pages/media_view_page.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
@@ -10,7 +10,6 @@ import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 import 'package:feather_icons/feather_icons.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'dart:math';
 import 'package:image_picker/image_picker.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:record/record.dart';
@@ -20,11 +19,19 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class Attachment {
-  final File file;
+  final File? file; // Nullable for server-fetched attachments
   final String type;
-  String? url; // URL after uploading to Cloudinary
+  final String? filename; // Added to match Mongoose schema
+  final int? size; // Added to match Mongoose schema
+  final String? url;
 
-  Attachment({required this.file, required this.type, this.url});
+  Attachment({
+    this.file,
+    required this.type,
+    this.filename,
+    this.size,
+    this.url,
+  });
 }
 
 class ChatterPost {
@@ -36,7 +43,8 @@ class ChatterPost {
   int views;
   final List<Attachment> attachments;
   final String avatarInitial;
-  final List<ChatterPost> replies;
+  final String? useravatar; // Added to match Mongoose schema
+  List<String> replies; // Changed to List<String> for ObjectId references
 
   ChatterPost({
     required this.username,
@@ -47,6 +55,7 @@ class ChatterPost {
     this.views = 0,
     this.attachments = const [],
     required this.avatarInitial,
+    this.useravatar,
     this.replies = const [],
   });
 }
@@ -64,11 +73,9 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   @override
   void initState() {
     super.initState();
-    // Fetch initial posts when the screen loads
-    // Consider adding error handling for the fetchFeeds call if needed
     dataController.fetchFeeds().catchError((error) {
-      // Handle or log error, e.g., show a SnackBar
       print("Error fetching feeds: $error");
+      print("Stack trace: ${error.stackTrace}");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to load feed. Please try again later.', style: GoogleFonts.roboto(color: Colors.white)),
@@ -99,7 +106,6 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     if (confirmed == true) {
       setState(() {
         post.reposts++;
-        // TODO: Potentially call a DataController method here to notify backend about the repost
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -117,18 +123,16 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     print('[HomeFeedScreen _addPost] Received ${attachments.length} attachments.');
     for (int i = 0; i < attachments.length; i++) {
       final a = attachments[i];
-      // Use sync methods for simplicity in logging.
       try {
-        print('[HomeFeedScreen _addPost] Attachment ${i+1}: type=${a.type}, path=${a.file.path}, file_exists_sync=${a.file.existsSync()}, length_sync=${a.file.lengthSync()}, url=${a.url}');
+        print('[HomeFeedScreen _addPost] Attachment ${i+1}: type=${a.type}, path=${a.file?.path}, file_exists_sync=${a.file?.existsSync()}, length_sync=${a.file?.lengthSync()}, filename=${a.filename}, size=${a.size}, url=${a.url}');
       } catch (e) {
-        print('[HomeFeedScreen _addPost] Attachment ${i+1}: type=${a.type}, path=${a.file.path}, url=${a.url} - Error getting file stats: $e');
+        print('[HomeFeedScreen _addPost] Attachment ${i+1}: type=${a.type}, path=${a.file?.path}, url=${a.url} - Error getting file stats: $e');
       }
     }
 
-    // Upload files to Cloudinary
     List<Attachment> uploadedAttachments = [];
     if (attachments.isNotEmpty) {
-      List<File> files = attachments.map((a) => a.file).toList();
+      List<File> files = attachments.where((a) => a.file != null).map((a) => a.file!).toList();
       print('[HomeFeedScreen _addPost] Extracted ${files.length} files for upload:');
       for (int i = 0; i < files.length; i++) {
         final f = files[i];
@@ -139,7 +143,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         }
       }
       List<Map<String, dynamic>> uploadResults = await dataController.uploadFilesToCloudinary(files);
-      
+
       for (int i = 0; i < attachments.length; i++) {
         var result = uploadResults[i];
         print(result);
@@ -147,13 +151,15 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           uploadedAttachments.add(Attachment(
             file: attachments[i].file,
             type: attachments[i].type,
+            filename: attachments[i].file?.path.split('/').last ?? 'unknown',
+            size: attachments[i].file != null ? await attachments[i].file!.length() : 0,
             url: result['url'] as String,
           ));
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'Failed to upload ${attachments[i].file.path.split('/').last}: ${result['message']}',
+                'Failed to upload ${attachments[i].file?.path.split('/').last}: ${result['message']}',
                 style: GoogleFonts.roboto(color: Colors.white),
               ),
               backgroundColor: Colors.red[700],
@@ -163,30 +169,28 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       }
     }
 
-    // Early exit if no content and no successfully uploaded attachments
     if (content.trim().isEmpty && uploadedAttachments.isEmpty) {
       return;
     }
 
-    // Prepare data for the backend
     Map<String, dynamic> postData = {
       'username': "YourName",
       'content': content.trim(),
-      'attachment_urls': uploadedAttachments
-          .where((att) => att.url != null)
-          .map((att) => att.url!)
-          .toList(),
+      'useravatar': dataController.user.value['avatar'] ?? '',
+      'attachments': uploadedAttachments.map((att) => {
+        'filename': att.filename,
+        'url': att.url,
+        'size': att.size,
+        'type': att.type,
+      }).toList(),
     };
 
     print(dataController.user.value);
 
-    // Call the backend to create the post
     final result = await dataController.createPost(postData);
     print(result);
 
     if (result['success'] == true) {
-      // The post is now added via socket event and DataController's reactive list.
-      // No need to manually add to a local list or call setState.
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -209,9 +213,6 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     }
   }
 
-  // _showRepliesDialog is now replaced by navigating to ReplyPage
-  // void _showRepliesDialog(ChatterPost post) { ... } // Original content removed
-
   Future<void> _navigateToReplyPage(ChatterPost post) async {
     final newReply = await Navigator.push(
       context,
@@ -220,46 +221,50 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       ),
     );
 
-    if (newReply != null && newReply is ChatterPost) {
-      setState(() {
-        // Find the post in the dataController's list and update it.
-        // This is a simplified approach. In a real app with a proper backend,
-        // you'd likely refresh the post data or rely on a stream.
-        // For now, we update the local 'post' object's replies list.
-        // This assumes 'post' is the same instance that's rendered in the list.
-        // If dataController.posts contains different instances, this local update
-        // might not reflect correctly without finding and updating the specific post
-        // in dataController.posts.
+    if (newReply != null && newReply is Map<String, dynamic>) {
+      // Assuming ReplyPage returns a Map with reply data
+      Map<String, dynamic> replyData = {
+        'username': newReply['username'] ?? 'YourName',
+        'content': newReply['content']?.trim() ?? '',
+        'useravatar': newReply['useravatar'] ?? '',
+        'attachments': newReply['attachments']?.map((att) async => {
+          'filename': att.file?.path.split('/').last ?? 'unknown',
+          'url': att.url,
+          'size': att.file != null ? await att.file.length() : 0,
+          'type': att.type,
+        }).toList() ?? [],
+      };
 
-        // The ChatterPost object passed to ReplyPage and modified there
-        // might not be the same instance as the one in the list view if posts
-        // are rebuilt from dataController.posts on each build.
-        // A more robust way would be to update the data source (dataController.posts)
-        // and have Obx rebuild.
+      final result = await dataController.createPost(replyData);
+      if (result['success'] == true) {
+        // Add the reply's ObjectId to the parent post's replies
+        final postIndex = dataController.posts.indexWhere((p) => p['createdAt'] == post.timestamp.toIso8601String());
+        if (postIndex != -1) {
+          final postMap = dataController.posts[postIndex];
+          List<String> replies = List.from(postMap['replies'] ?? []);
+          replies.add(result['postId']); // Assuming createPost returns the new post's ID
+          postMap['replies'] = replies;
+          dataController.posts[postIndex] = postMap;
+          dataController.posts.refresh();
+        }
 
-        // For simplicity, let's assume 'post.replies.add(newReply)' is sufficient
-        // if 'post' is a direct reference to an object whose state is maintained.
-        // However, the current setup with dataController.posts being maps means
-        // we need to find and update the specific post in the list or have DataController
-        // handle this update.
-
-        // Let's try to update the original post object directly.
-        // This will work if 'post' is a reference that the UI is observing.
-        post.replies.add(newReply);
-
-        // To ensure UI update, especially if post objects are recreated from maps:
-        // We need to find the index of the post and update it in the dataController
-        // Or, ideally, the DataController handles adding replies and the UI reacts.
-        // For now, we'll rely on the direct mutation of `post.replies` and `setState`.
-        // This is a common pattern if the list items themselves are stateful or hold
-        // mutable objects.
-      });
-       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Reply added to the post!', style: GoogleFonts.roboto(color: Colors.white)),
-          backgroundColor: Colors.teal[700],
-        ),
-      );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Reply added to the post!', style: GoogleFonts.roboto(color: Colors.white)),
+            backgroundColor: Colors.teal[700],
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to add reply: ${result['message'] ?? 'Unknown error'}',
+              style: GoogleFonts.roboto(color: Colors.white),
+            ),
+            backgroundColor: Colors.red[700],
+          ),
+        );
+      }
     }
   }
 
@@ -273,14 +278,19 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
             CircleAvatar(
               radius: isReply ? 16 : 20,
               backgroundColor: Colors.tealAccent.withOpacity(0.2),
-              child: Text(
-                post.avatarInitial,
-                style: GoogleFonts.poppins(
-                  color: Colors.tealAccent,
-                  fontWeight: FontWeight.w600,
-                  fontSize: isReply ? 14 : 16,
-                ),
-              ),
+              backgroundImage: post.useravatar != null && post.useravatar!.isNotEmpty
+                  ? NetworkImage(post.useravatar!)
+                  : null,
+              child: post.useravatar == null || post.useravatar!.isEmpty
+                  ? Text(
+                      post.avatarInitial,
+                      style: GoogleFonts.poppins(
+                        color: Colors.tealAccent,
+                        fontWeight: FontWeight.w600,
+                        fontSize: isReply ? 14 : 16,
+                      ),
+                    )
+                  : null,
             ),
             SizedBox(width: 12),
             Expanded(
@@ -330,7 +340,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                       itemCount: post.attachments.length,
                       itemBuilder: (context, idx) {
                         final attachment = post.attachments[idx];
-                        final displayUrl = attachment.url ?? attachment.file.path;
+                        final displayUrl = attachment.url ?? '';
                         return GestureDetector(
                           onTap: () {
                             Navigator.push(
@@ -356,18 +366,27 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                                           ),
                                         ),
                                       )
-                                    : Image.file(
-                                        attachment.file,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (context, error, stackTrace) => Container(
-                                          color: Colors.grey[900],
-                                          child: Icon(
-                                            FeatherIcons.image,
-                                            color: Colors.grey[500],
-                                            size: 40,
-                                          ),
-                                        ),
-                                      )
+                                    : attachment.file != null
+                                        ? Image.file(
+                                            attachment.file!,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) => Container(
+                                              color: Colors.grey[900],
+                                              child: Icon(
+                                                FeatherIcons.image,
+                                                color: Colors.grey[500],
+                                                size: 40,
+                                              ),
+                                            ),
+                                          )
+                                        : Container(
+                                            color: Colors.grey[900],
+                                            child: Icon(
+                                              FeatherIcons.image,
+                                              color: Colors.grey[500],
+                                              size: 40,
+                                            ),
+                                          )
                                 : attachment.type == "pdf"
                                     ? PdfViewer.uri(
                                         Uri.parse(displayUrl),
@@ -387,7 +406,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                                             ),
                                             SizedBox(height: 8),
                                             Text(
-                                              displayUrl.split('/').last,
+                                              attachment.filename ?? displayUrl.split('/').last,
                                               style: GoogleFonts.roboto(
                                                 color: Colors.white70,
                                                 fontSize: 12,
@@ -439,8 +458,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                               size: 20,
                             ),
                             onPressed: () {
-                              // _showRepliesDialog(post); // Old call
-                              _navigateToReplyPage(post); // New call
+                              _navigateToReplyPage(post);
                             },
                           ),
                           Text(
@@ -461,19 +479,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                               size: 20,
                             ),
                             onPressed: () {
-                              // setState(() {
-                              //   post.reposts++;
-                              // });
-                              // ScaffoldMessenger.of(context).showSnackBar(
-                              //   SnackBar(
-                              //     content: Text(
-                              //       'Poa! Reposted!',
-                              //       style: GoogleFonts.roboto(color: Colors.white),
-                              //     ),
-                              //     backgroundColor: Colors.teal[700],
-                              //   ),
-                              // );
-                              _navigateToRepostPage(post); // New call
+                              _navigateToRepostPage(post);
                             },
                           ),
                           Text(
@@ -534,7 +540,6 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       ),
       body: Obx(() {
         if (dataController.posts.isEmpty) {
-          // Show a loading indicator or a "No posts" message
           return Center(
             child: CircularProgressIndicator(
               valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
@@ -549,92 +554,37 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           ),
           itemBuilder: (context, index) {
             final postMap = dataController.posts[index];
-            // Map the Map<String, dynamic> to a ChatterPost object
-            // final post = ChatterPost( ... ) // This mapping happens inside the Obx
-            // It's important that the 'post' object passed to _navigateToReplyPage
-            // is the actual instance being used by _buildPostContent, or that
-            // changes are reflected in dataController.posts list.
-
-            // The current structure maps dataController.posts (List<Map<String, dynamic>>)
-            // to ChatterPost objects on-the-fly within the itemBuilder.
-            // This means the 'post' object created here is ephemeral for each build.
-            // Modifying post.replies directly in _navigateToReplyPage's callback
-            // won't work if the 'post' instance there is not the one from dataController.
-            // The DataController should ideally handle adding replies to its data structures.
-
-            // For now, the `setState` in `_navigateToReplyPage` will trigger a rebuild.
-            // During the rebuild, `post.replies.length` will be re-evaluated.
-            // If the `ChatterPost` objects are preserved across rebuilds (e.g. if they are stored
-            // directly in DataController or if the mapping function returns the same instances),
-            // then adding to `post.replies` will reflect.
-            // However, the current mapping creates NEW ChatterPost objects each time.
-
-            // TODO: Refactor state management for replies.
-            // A quick fix might be to find the post in dataController.posts by an ID
-            // and update its 'replies' field in the map, then dataController.posts.refresh().
-            // For now, we'll proceed with the direct modification and setState,
-            // acknowledging it might not be robust if ChatterPost instances are not preserved.
-
-            final postMap = dataController.posts[index];
             final post = ChatterPost(
-              username: postMap['user']?['name'] ?? 'Unknown User',
+              username: postMap['username'] ?? 'Unknown User',
               content: postMap['content'] ?? '',
               timestamp: postMap['createdAt'] is String
                   ? DateTime.parse(postMap['createdAt'])
                   : DateTime.now(),
-              likes: postMap['likes']?.length ?? 0,
+              likes: postMap['likes'] ?? 0,
               reposts: postMap['reposts'] ?? 0,
               views: postMap['views'] ?? 0,
-              avatarInitial: (postMap['user']?['name'] != null && postMap['user']['name'].isNotEmpty)
-                  ? postMap['user']['name'][0].toUpperCase()
+              useravatar: postMap['useravatar'] ?? '',
+              avatarInitial: (postMap['username'] != null && postMap['username'].isNotEmpty)
+                  ? postMap['username'][0].toUpperCase()
                   : '?',
-              attachments: (postMap['attachment_urls'] as List<dynamic>?)?.map((attUrl) {
-                String type = 'unknown';
-                if (attUrl is String) {
-                  if (attUrl.toLowerCase().endsWith('.jpg') || attUrl.toLowerCase().endsWith('.jpeg') || attUrl.toLowerCase().endsWith('.png')) type = 'image';
-                  else if (attUrl.toLowerCase().endsWith('.pdf')) type = 'pdf';
-                  else if (attUrl.toLowerCase().endsWith('.mp4') || attUrl.toLowerCase().endsWith('.mov')) type = 'video';
-                  else if (attUrl.toLowerCase().endsWith('.mp3') || attUrl.toLowerCase().endsWith('.wav') || attUrl.toLowerCase().endsWith('.m4a')) type = 'audio';
-                }
-                return Attachment(file: File(''), type: type, url: attUrl as String?);
+              attachments: (postMap['attachments'] as List<dynamic>?)?.map((att) {
+                return Attachment(
+                  file: null,
+                  type: att['type'] ?? 'unknown',
+                  filename: att['filename'],
+                  size: att['size'],
+                  url: att['url'] as String?,
+                );
               }).toList() ?? [],
-              // IMPORTANT: Initialize replies from the postMap if available, otherwise it's always empty.
-              // This was a bug. If replies come from the server, they should be mapped here.
-              // For now, we assume replies are managed locally and start empty for new posts from server.
-              // If postMap contains 'replies', map them here.
-              replies: (postMap['replies'] as List<dynamic>?)?.map((replyMap) {
-                    // Assuming replyMap has a similar structure to a postMap
-                    return ChatterPost(
-                       username: replyMap['user']?['name'] ?? 'Unknown User',
-                        content: replyMap['content'] ?? '',
-                        timestamp: replyMap['createdAt'] is String ? DateTime.parse(replyMap['createdAt']) : DateTime.now(),
-                        avatarInitial: (replyMap['user']?['name'] != null && replyMap['user']['name'].isNotEmpty) ? replyMap['user']['name'][0].toUpperCase() : '?',
-                        attachments: (replyMap['attachment_urls'] as List<dynamic>?)?.map((attUrl) {
-                            String type = 'unknown';
-                            if (attUrl is String) {
-                                if (attUrl.toLowerCase().endsWith('.jpg') || attUrl.toLowerCase().endsWith('.jpeg') || attUrl.toLowerCase().endsWith('.png')) type = 'image';
-                                else if (attUrl.toLowerCase().endsWith('.pdf')) type = 'pdf';
-                                else if (attUrl.toLowerCase().endsWith('.mp4') || attUrl.toLowerCase().endsWith('.mov')) type = 'video';
-                                else if (attUrl.toLowerCase().endsWith('.mp3') || attUrl.toLowerCase().endsWith('.wav') || attUrl.toLowerCase().endsWith('.m4a')) type = 'audio';
-                            }
-                            return Attachment(file: File(''), type: type, url: attUrl as String?);
-                        }).toList() ?? [],
-                        replies: [], // Nested replies are not handled in this simplified example
-                    );
-                  }).toList() ?? [],
+              replies: (postMap['replies'] as List<dynamic>?)?.cast<String>() ?? [],
             );
-            return FadeTransition(
-              opacity: CurvedAnimation(
-                parent: ModalRoute.of(context)!.animation!,
-                curve: Curves.easeInOut,
-              ),
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                child: _buildPostContent(post, isReply: false),
-              ),
+            return Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: _buildPostContent(post, isReply: false),
             );
           },
-        ),
+        );
+      }),
       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: Color(0xFF000000),
         selectedItemColor: Colors.tealAccent,

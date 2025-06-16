@@ -45,6 +45,13 @@ class DataController extends GetxController {
     if (userJson != null) {
       user.value = jsonDecode(userJson);
     }
+    // fetch initial feeds
+    try {
+      await fetchFeeds();
+    } catch (e) {
+      print('Error fetching initial feeds: $e');
+      posts.clear(); // Clear posts on error
+    }
   }
 
   // Create post
@@ -92,14 +99,16 @@ class DataController extends GetxController {
           },
         ),
       );
+      // print(response.data);
       if (response.statusCode == 200 && response.data['success'] == true) {
-        posts.assignAll(List<Map<String, dynamic>>.from(response.data['data']));
+        posts.assignAll(List<Map<String, dynamic>>.from(response.data['posts']));
       } else {
         throw Exception('Failed to fetch feeds');
       }
     } catch (e) {
+
       print('Error fetching feeds: $e');
-      posts.clear(); // Clear posts on error
+      posts.clear();
       rethrow; // Rethrow the exception to be handled by the caller
     }
   }

@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:pdfrx/pdfrx.dart'; // For PDF viewing
 import 'package:feather_icons/feather_icons.dart'; // For fallback icons
+import 'dart:io';
 
-// Assuming Attachment class is defined in or imported by home-feed-screen.dart
-// Ideally, Attachment should be in its own model file.
+// MediaViewPage displays an attachment (image, PDF, video, or audio) in a full-screen view.
+// Video and audio playback are placeholders, as their respective packages (e.g., audioplayers)
+// are imported but not implemented.
 
 class MediaViewPage extends StatelessWidget {
   final Attachment attachment;
@@ -14,158 +16,202 @@ class MediaViewPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Determine the display widget and page title based on attachment type
+    String pageTitle;
     Widget mediaWidget;
-    String pageTitle = "View Media";
 
-    final String displayPath = attachment.url ?? attachment.file.path;
+    // Safely get the display path for error messages or placeholders
+    final String displayPath = attachment.url ?? attachment.file?.path ?? 'Unknown attachment';
 
-    switch (attachment.type) {
-      case "image":
-        pageTitle = "View Image";
-        if (attachment.url != null) {
-          mediaWidget = InteractiveViewer( // Allows pinch-to-zoom and panning
-            child: Image.network(
-              attachment.url!,
-              fit: BoxFit.contain, // Use contain to show the whole image
-              loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
-                if (loadingProgress == null) return child;
-                return Center(
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
-                    value: loadingProgress.expectedTotalBytes != null
-                        ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                        : null,
-                  ),
-                );
-              },
-              errorBuilder: (context, error, stackTrace) => Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(FeatherIcons.alertTriangle, color: Colors.redAccent, size: 50),
-                    SizedBox(height: 10),
-                    Text("Error loading image", style: GoogleFonts.roboto(color: Colors.white70)),
-                  ],
-                ),
-              ),
-            ),
-          );
-        } else {
-           // Displaying local file image
-          mediaWidget = InteractiveViewer(
-            child: Image.file(
-              attachment.file,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) => Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(FeatherIcons.alertTriangle, color: Colors.redAccent, size: 50),
-                    SizedBox(height: 10),
-                    Text("Error loading image file", style: GoogleFonts.roboto(color: Colors.white70)),
-                  ],
-                ),
-              ),
-            ),
-          );
-        }
+    switch (attachment.type.toLowerCase()) {
+      case 'image':
+        pageTitle = 'View Image';
+        mediaWidget = _buildImageViewer(context, displayPath);
         break;
-      case "pdf":
-        pageTitle = "View PDF";
-        // PdfViewer.uri can take both network URLs and local file URIs
-        Uri pdfUri = attachment.url != null ? Uri.parse(attachment.url!) : Uri.file(attachment.file.path);
-        mediaWidget = PdfViewer.uri(
-          pdfUri,
-          params: PdfViewerParams(
-            // layoutPages: (pages, params) { // Example: customize layout if needed
-            //   return List.generate(pages.length, (index) => SomeCustomPdfPageLayout(pages[index]));
-            // },
-            // buildPagePlaceholder: (pageNumber, pageSize) => Center(child: CircularProgressIndicator()),
-            // errorBannerBuilder: (context, error, stackTrace, documentRef) => Center(child: Text("Error loading PDF")),
-          ),
+      case 'pdf':
+        pageTitle = 'View PDF';
+        mediaWidget = _buildPdfViewer(context, displayPath);
+        break;
+      case 'video':
+        pageTitle = 'View Video';
+        mediaWidget = _buildPlaceholder(
+          context,
+          icon: FeatherIcons.video,
+          message: 'Video playback not implemented yet.',
+          fileName: displayPath.split('/').last,
         );
         break;
-      case "video":
-        pageTitle = "View Video";
-        // Placeholder for video. A real video player (like video_player package) would be integrated here.
-        mediaWidget = Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(FeatherIcons.video, color: Colors.tealAccent, size: 100),
-              SizedBox(height: 20),
-              Text(
-                "Video playback not implemented yet.",
-                style: GoogleFonts.roboto(color: Colors.white70, fontSize: 16),
-              ),
-              SizedBox(height: 10),
-              Text(
-                displayPath.split('/').last,
-                style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 12),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        );
-        break;
-      case "audio":
-        pageTitle = "View Audio";
-        // Placeholder for audio. A real audio player (like audioplayers package) would be integrated here.
-        mediaWidget = Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(FeatherIcons.music, color: Colors.tealAccent, size: 100),
-              SizedBox(height: 20),
-              Text(
-                "Audio playback not implemented yet.",
-                style: GoogleFonts.roboto(color: Colors.white70, fontSize: 16),
-              ),
-              SizedBox(height: 10),
-              Text(
-                displayPath.split('/').last,
-                style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 12),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
+      case 'audio':
+        pageTitle = 'View Audio';
+        mediaWidget = _buildPlaceholder(
+          context,
+          icon: FeatherIcons.music,
+          message: 'Audio playback not implemented yet.',
+          fileName: displayPath.split('/').last,
         );
         break;
       default:
-        pageTitle = "View Attachment";
-        mediaWidget = Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(FeatherIcons.file, color: Colors.grey[600], size: 100),
-              SizedBox(height: 20),
-              Text(
-                "Unsupported attachment type: ${attachment.type}",
-                style: GoogleFonts.roboto(color: Colors.white70, fontSize: 16),
-              ),
-              SizedBox(height: 10),
-              Text(
-                displayPath.split('/').last,
-                style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 12),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
+        pageTitle = 'View Attachment';
+        mediaWidget = _buildPlaceholder(
+          context,
+          icon: FeatherIcons.file,
+          message: 'Unsupported attachment type: ${attachment.type}',
+          fileName: displayPath.split('/').last,
+          iconColor: Colors.grey[600],
         );
     }
 
     return Scaffold(
-      backgroundColor: Colors.black, // Full black for immersive view
+      backgroundColor: Colors.black,
       appBar: AppBar(
-        title: Text(pageTitle, style: GoogleFonts.poppins(color: Colors.white)),
-        backgroundColor: Color(0xFF121212), // Dark app bar
-        iconTheme: IconThemeData(color: Colors.white),
+        title: Text(
+          pageTitle,
+          style: GoogleFonts.poppins(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        backgroundColor: const Color(0xFF121212),
+        iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
       ),
-      body: Container(
-        color: Colors.black, // Ensure body background is black
-        child: mediaWidget,
+      body: SafeArea(
+        child: Container(
+          color: Colors.black,
+          child: Center(child: mediaWidget),
+        ),
       ),
+    );
+  }
+
+  // Builds an image viewer for network or local images with pinch-to-zoom
+  Widget _buildImageViewer(BuildContext context, String displayPath) {
+    if (attachment.url != null) {
+      return InteractiveViewer(
+        minScale: 0.5,
+        maxScale: 4.0,
+        child: Image.network(
+          attachment.url!,
+          fit: BoxFit.contain,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Center(
+              child: CircularProgressIndicator(
+                valueColor: const AlwaysStoppedAnimation<Color>(Colors.tealAccent),
+                value: loadingProgress.expectedTotalBytes != null
+                    ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                    : null,
+              ),
+            );
+          },
+          errorBuilder: (context, error, stackTrace) => _buildError(
+            context,
+            message: 'Error loading image: $error',
+          ),
+        ),
+      );
+    } else if (attachment.file != null) {
+      return InteractiveViewer(
+        minScale: 0.5,
+        maxScale: 4.0,
+        child: Image.file(
+          attachment.file!,
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) => _buildError(
+            context,
+            message: 'Error loading image file: $error',
+          ),
+        ),
+      );
+    } else {
+      return _buildError(
+        context,
+        message: 'No image source available for $displayPath',
+      );
+    }
+  }
+
+  // Builds a PDF viewer for network or local PDFs
+  Widget _buildPdfViewer(BuildContext context, String displayPath) {
+    if (attachment.url != null || attachment.file != null) {
+      final Uri pdfUri = attachment.url != null
+          ? Uri.parse(attachment.url!)
+          : Uri.file(attachment.file!.path);
+      return PdfViewer.uri(
+        pdfUri,
+        params: const PdfViewerParams(
+          maxScale: 2.0,
+          minScale: 0.5,
+        ),
+      );
+    } else {
+      return _buildError(
+        context,
+        message: 'No PDF source available for $displayPath',
+      );
+    }
+  }
+
+  // Builds a generic error widget for failed media loading
+  Widget _buildError(BuildContext context, {required String message}) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Icon(
+          FeatherIcons.alertTriangle,
+          color: Colors.redAccent,
+          size: 50,
+        ),
+        const SizedBox(height: 10),
+        Text(
+          message,
+          style: GoogleFonts.roboto(
+            color: Colors.white70,
+            fontSize: 16,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+
+  // Builds a placeholder for unsupported or unimplemented media types
+  Widget _buildPlaceholder(
+    BuildContext context, {
+    required IconData icon,
+    required String message,
+    required String fileName,
+    Color? iconColor,
+  }) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(
+          icon,
+          color: iconColor ?? Colors.tealAccent,
+          size: 100,
+        ),
+        const SizedBox(height: 20),
+        Text(
+          message,
+          style: GoogleFonts.roboto(
+            color: Colors.white70,
+            fontSize: 16,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 10),
+        Text(
+          fileName,
+          style: GoogleFonts.roboto(
+            color: Colors.grey[500],
+            fontSize: 12,
+          ),
+          textAlign: TextAlign.center,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
     );
   }
 }
