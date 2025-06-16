@@ -7,6 +7,8 @@ import 'dart:convert';
 import 'package:path/path.dart' as path;
 
 class DataController extends GetxController {
+
+  final RxBool isLoading = false.obs;
   final FlutterSecureStorage _storage = const FlutterSecureStorage(
     aOptions: AndroidOptions(
       encryptedSharedPreferences: true,
