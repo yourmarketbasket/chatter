@@ -93,7 +93,8 @@ class DataController extends GetxController {
         ),
       );
       if (response.statusCode == 200 && response.data['success'] == true) {
-        posts.assignAll(List<Map<String, dynamic>>.from(response.data['data']));
+        posts.assignAll(List<Map<String, dynamic>>.from(response.data['posts']));
+        // print(posts.value);
       } else {
         throw Exception('Failed to fetch feeds');
       }
@@ -166,7 +167,7 @@ class DataController extends GetxController {
   }
 
   Future<List<Map<String, dynamic>>> uploadFilesToCloudinary(List<File> files) async {
-    print('[DataController uploadFilesToCloudinary] Received ${files.length} files for upload.');
+    // print('[DataController uploadFilesToCloudinary] Received ${files.length} files for upload.');
 
     // Validate input
     if (files.isEmpty) {
@@ -204,7 +205,7 @@ class DataController extends GetxController {
       try {
         // Validate file existence and size
         if (!await file.exists()) {
-          print('[DataController uploadFilesToCloudinary] File does not exist: $filePath');
+          // print('[DataController uploadFilesToCloudinary] File does not exist: $filePath');
           results.add({
             'success': false,
             'message': 'File does not exist: $filePath',
@@ -216,7 +217,7 @@ class DataController extends GetxController {
 
         final fileSize = await file.length();
         if (fileSize == 0) {
-          print('[DataController uploadFilesToCloudinary] Empty file: $filePath');
+          // print('[DataController uploadFilesToCloudinary] Empty file: $filePath');
           results.add({
             'success': false,
             'message': 'Empty file: $filePath',
@@ -226,12 +227,12 @@ class DataController extends GetxController {
           continue;
         }
 
-        print('[DataController uploadFilesToCloudinary] Processing file: path=$filePath, size=$fileSize bytes');
+        // print('[DataController uploadFilesToCloudinary] Processing file: path=$filePath, size=$fileSize bytes');
 
         // Determine resource type
         final fileExtension = path.extension(filePath).toLowerCase().replaceFirst('.', '');
         final resourceType = extensionToResourceType[fileExtension] ?? 'auto';
-        print('[DataController uploadFilesToCloudinary] File: $filePath, extension: $fileExtension, resource_type: $resourceType');
+        // print('[DataController uploadFilesToCloudinary] File: $filePath, extension: $fileExtension, resource_type: $resourceType');
 
         // Prepare form data
         final formData = dio.FormData.fromMap({
@@ -254,7 +255,7 @@ class DataController extends GetxController {
           ),
           onSendProgress: (sent, total) {
             uploadProgress = (sent / total * 100).clamp(0.0, 100.0);
-            print('[DataController uploadFilesToCloudinary] Upload progress for $filePath: ${uploadProgress.toStringAsFixed(2)}%');
+            // print('[DataController uploadFilesToCloudinary] Upload progress for $filePath: ${uploadProgress.toStringAsFixed(2)}%');
           },
         );
 
@@ -270,10 +271,10 @@ class DataController extends GetxController {
             'progress': uploadProgress,
             'resource_type': response.data['resource_type'] as String? ?? resourceType,
           });
-          print('[DataController uploadFilesToCloudinary] Successfully uploaded: $filePath, URL: ${response.data['secure_url']}');
+          // print('[DataController uploadFilesToCloudinary] Successfully uploaded: $filePath, URL: ${response.data['secure_url']}');
         } else {
           final errorMessage = response.data?['error']?['message'] ?? 'Upload failed with status: ${response.statusCode}';
-          print('[DataController uploadFilesToCloudinary] Upload failed for $filePath: $errorMessage');
+          // print('[DataController uploadFilesToCloudinary] Upload failed for $filePath: $errorMessage');
           results.add({
             'success': false,
             'message': errorMessage,
@@ -282,7 +283,7 @@ class DataController extends GetxController {
           });
         }
       } catch (e, stackTrace) {
-        print('[DataController uploadFilesToCloudinary] Exception for $filePath: $e\n$stackTrace');
+        // print('[DataController uploadFilesToCloudinary] Exception for $filePath: $e\n$stackTrace');
         results.add({
           'success': false,
           'message': 'Upload failed for $filePath: ${e.toString()}',
@@ -292,7 +293,7 @@ class DataController extends GetxController {
       }
     }
 
-    print('[DataController uploadFilesToCloudinary] Upload completed. Results: ${results.length} files processed.');
+    // print('[DataController uploadFilesToCloudinary] Upload completed. Results: ${results.length} files processed.');
     return results;
   }
 }
