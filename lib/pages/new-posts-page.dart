@@ -14,6 +14,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 import 'package:video_thumbnail/video_thumbnail.dart' as video_thumb;
 
+// NewPostScreen allows users to create a new post with text and attachments (image, PDF, audio, video).
 class NewPostScreen extends StatefulWidget {
   const NewPostScreen({Key? key}) : super(key: key);
 
@@ -28,27 +29,26 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
   final AudioRecorder _audioRecorder = AudioRecorder();
   bool _isRecordingAudio = false;
   String? _currentRecordingPath;
-  AnimationController? _pulseController;
-  Animation<double>? _pulseAnimation;
+  late final AnimationController _pulseController;
+  late final Animation<double> _pulseAnimation;
   final ImagePicker _picker = ImagePicker();
-  String? _currentlyPlayingPath; // Track which audio file is playing
+  String? _currentlyPlayingPath;
   final DeviceInfoPlugin _deviceInfo = DeviceInfoPlugin();
-  StreamSubscription<PlayerState>? _playerStateSubscription; // Store subscription
+  StreamSubscription<PlayerState>? _playerStateSubscription;
 
   @override
   void initState() {
     super.initState();
     _pulseController = AnimationController(
-      vsync: this,
       duration: const Duration(milliseconds: 1000),
+      vsync: this,
     )..repeat(reverse: true);
     _pulseAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
-      CurvedAnimation(parent: _pulseController!, curve: Curves.easeInOut),
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
-    // Set up audio player state listener
     _playerStateSubscription = _audioPlayer.onPlayerStateChanged.listen((state) {
       if (state == PlayerState.stopped || state == PlayerState.completed) {
-        if (mounted) { // Check if widget is still mounted
+        if (mounted) {
           setState(() {
             _currentlyPlayingPath = null;
           });
@@ -63,6 +63,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
         final androidInfo = await _deviceInfo.androidInfo;
         return androidInfo.version.sdkInt;
       } catch (e) {
+        print('Error getting Android SDK version: $e');
         return null;
       }
     }
@@ -99,7 +100,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
         permissionName = 'Audio';
         break;
       case 'pdf':
-        permission = sdkInt < 33 ? Permission.storage : null; // No permission needed on Android 13+
+        permission = sdkInt < 33 ? Permission.storage : null;
         permissionName = 'Storage';
         break;
       case 'camera':
@@ -111,7 +112,6 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
     }
 
     if (action == 'pdf' && sdkInt >= 33) {
-      // Android 13+ uses scoped storage; FilePicker doesn't need permissions
       return true;
     }
 
@@ -185,36 +185,50 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
   Future<void> _startAudioRecording() async {
     if (await _requestMicrophonePermission()) {
       if (await _audioRecorder.hasPermission()) {
-        final directory = await getTemporaryDirectory();
-        _currentRecordingPath = '${directory.path}/audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
-        await _audioRecorder.start(const RecordConfig(), path: _currentRecordingPath!);
-        setState(() {
-          _isRecordingAudio = true;
-        });
-        _pulseController?.forward();
+        try {
+          final directory = await getTemporaryDirectory();
+          _currentRecordingPath = '${directory.path}/audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
+          await _audioRecorder.start(const RecordConfig(), path: _currentRecordingPath!);
+          setState(() {
+            _isRecordingAudio = true;
+          });
+          _pulseController.forward();
+        } catch (e) {
+          _showPermissionDialog(
+            'Recording Error',
+            'Failed to start audio recording: $e',
+          );
+        }
       }
     }
   }
 
   Future<void> _stopAudioRecording() async {
-    final path = await _audioRecorder.stop();
-    if (path != null) {
-      final file = File(path);
-      print('[NewPostScreen] Audio Recorded: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
-      final sizeInMB = await file.length() / (1024 * 1024); // Use await file.length()
-      if (sizeInMB <= 10) {
-        print('[NewPostScreen] Adding to _selectedAttachments: type=audio, path=${file.path}');
-        setState(() {
-          _selectedAttachments.add(Attachment(file: file, type: "audio"));
-          _isRecordingAudio = false;
-        });
-        _pulseController?.reset();
-      } else {
-        _showPermissionDialog(
-          'File Size Error',
-          'Audio file exceeds 10MB!',
-        );
+    try {
+      final path = await _audioRecorder.stop();
+      if (path != null) {
+        final file = File(path);
+        print('[NewPostScreen] Audio Recorded: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
+        final sizeInMB = await file.length() / (1024 * 1024);
+        if (sizeInMB <= 10) {
+          print('[NewPostScreen] Adding to _selectedAttachments: type=audio, path=${file.path}');
+          setState(() {
+            _selectedAttachments.add(Attachment(file: file, type: "audio"));
+            _isRecordingAudio = false;
+          });
+          _pulseController.reset();
+        } else {
+          _showPermissionDialog(
+            'File Size Error',
+            'Audio file exceeds 10MB limit.',
+          );
+        }
       }
+    } catch (e) {
+      _showPermissionDialog(
+        'Recording Error',
+        'Failed to stop audio recording: $e',
+      );
     }
   }
 
@@ -223,14 +237,14 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
       if (await _requestMediaPermissions(fromCamera ? 'camera' : 'image')) {
         final XFile? image = await _picker.pickImage(
           source: fromCamera ? ImageSource.camera : ImageSource.gallery,
-          maxWidth: 1920, // Limit resolution to reduce file size
+          maxWidth: 1920,
           maxHeight: 1080,
-          imageQuality: 85, // Compress image to reduce size
+          imageQuality: 85,
         );
         if (image != null) {
           final file = File(image.path);
           print('[NewPostScreen] Image Picked: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
-          final sizeInMB = await file.length() / (1024 * 1024); // Use await file.length()
+          final sizeInMB = await file.length() / (1024 * 1024);
           if (sizeInMB <= 10) {
             print('[NewPostScreen] Adding to _selectedAttachments: type=image, path=${file.path}');
             setState(() {
@@ -242,11 +256,6 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
               'Image file exceeds 10MB limit.',
             );
           }
-        } else {
-          _showPermissionDialog(
-            'No Image Selected',
-            'No image was selected or the operation was cancelled.',
-          );
         }
       }
     } catch (e) {
@@ -262,12 +271,12 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
       if (await _requestMediaPermissions(fromCamera ? 'camera' : 'video')) {
         final XFile? video = await _picker.pickVideo(
           source: fromCamera ? ImageSource.camera : ImageSource.gallery,
-          maxDuration: const Duration(seconds: 30), // Limit video duration
+          maxDuration: const Duration(seconds: 30),
         );
         if (video != null) {
           final file = File(video.path);
           print('[NewPostScreen] Video Picked: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
-          final sizeInMB = await file.length() / (1024 * 1024); // Use await file.length()
+          final sizeInMB = await file.length() / (1024 * 1024);
           if (sizeInMB <= 10) {
             print('[NewPostScreen] Adding to _selectedAttachments: type=video, path=${file.path}');
             setState(() {
@@ -279,11 +288,6 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
               'Video file exceeds 10MB limit.',
             );
           }
-        } else {
-          _showPermissionDialog(
-            'No Video Selected',
-            'No video was selected or the operation was cancelled.',
-          );
         }
       }
     } catch (e) {
@@ -295,53 +299,67 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
   }
 
   Future<void> _pickPdf() async {
-    if (await _requestMediaPermissions('pdf')) {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['pdf'],
-        allowMultiple: false,
-      );
-      if (result != null && result.files.single.path != null) {
-        final file = File(result.files.single.path!);
-        print('[NewPostScreen] PDF Picked: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
-        final sizeInMB = await file.length() / (1024 * 1024); // Use await file.length()
-        if (sizeInMB <= 10) {
-          print('[NewPostScreen] Adding to _selectedAttachments: type=pdf, path=${file.path}');
-          setState(() {
-            _selectedAttachments.add(Attachment(file: file, type: "pdf"));
-          });
-        } else {
-          _showPermissionDialog(
-            'File Size Error',
-            'PDF file exceeds 10MB!',
-          );
+    try {
+      if (await _requestMediaPermissions('pdf')) {
+        final result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['pdf'],
+          allowMultiple: false,
+        );
+        if (result != null && result.files.single.path != null) {
+          final file = File(result.files.single.path!);
+          print('[NewPostScreen] PDF Picked: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
+          final sizeInMB = await file.length() / (1024 * 1024);
+          if (sizeInMB <= 10) {
+            print('[NewPostScreen] Adding to _selectedAttachments: type=pdf, path=${file.path}');
+            setState(() {
+              _selectedAttachments.add(Attachment(file: file, type: "pdf"));
+            });
+          } else {
+            _showPermissionDialog(
+              'File Size Error',
+              'PDF file exceeds 10MB limit.',
+            );
+          }
         }
       }
+    } catch (e) {
+      _showPermissionDialog(
+        'Error Picking PDF',
+        'An error occurred while picking the PDF: $e',
+      );
     }
   }
 
   Future<void> _pickAudio() async {
-    if (await _requestMediaPermissions('audio')) {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.audio,
-        allowMultiple: false,
-      );
-      if (result != null && result.files.single.path != null) {
-        final file = File(result.files.single.path!);
-        print('[NewPostScreen] Audio Picked: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
-        final sizeInMB = await file.length() / (1024 * 1024); // Use await file.length()
-        if (sizeInMB <= 10) {
-          print('[NewPostScreen] Adding to _selectedAttachments: type=audio, path=${file.path}');
-          setState(() {
-            _selectedAttachments.add(Attachment(file: file, type: "audio"));
-          });
-        } else {
-          _showPermissionDialog(
-            'File Size Error',
-            'Audio file exceeds 10MB!',
-          );
+    try {
+      if (await _requestMediaPermissions('audio')) {
+        final result = await FilePicker.platform.pickFiles(
+          type: FileType.audio,
+          allowMultiple: false,
+        );
+        if (result != null && result.files.single.path != null) {
+          final file = File(result.files.single.path!);
+          print('[NewPostScreen] Audio Picked: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
+          final sizeInMB = await file.length() / (1024 * 1024);
+          if (sizeInMB <= 10) {
+            print('[NewPostScreen] Adding to _selectedAttachments: type=audio, path=${file.path}');
+            setState(() {
+              _selectedAttachments.add(Attachment(file: file, type: "audio"));
+            });
+          } else {
+            _showPermissionDialog(
+              'File Size Error',
+              'Audio file exceeds 10MB limit.',
+            );
+          }
         }
       }
+    } catch (e) {
+      _showPermissionDialog(
+        'Error Picking Audio',
+        'An error occurred while picking the audio: $e',
+      );
     }
   }
 
@@ -355,22 +373,34 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
         quality: 75,
       );
     } catch (e) {
+      print('Error generating video thumbnail: $e');
       return null;
     }
   }
 
   @override
   void dispose() {
-    _playerStateSubscription?.cancel(); // Cancel the stream subscription
+    _playerStateSubscription?.cancel();
     _postController.dispose();
+    _audioPlayer.stop();
     _audioPlayer.dispose();
     _audioRecorder.stop();
     _audioRecorder.dispose();
-    _pulseController?.dispose();
+    _pulseController.dispose();
     super.dispose();
   }
 
   Widget _buildAttachmentPreview(Attachment attachment) {
+    if (attachment.file == null) {
+      return Container(
+        width: 100,
+        height: 100,
+        margin: const EdgeInsets.all(4),
+        color: Colors.grey[900],
+        child: const Icon(FeatherIcons.alertTriangle, color: Colors.redAccent, size: 40),
+      );
+    }
+
     return Stack(
       alignment: Alignment.topRight,
       children: [
@@ -382,7 +412,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
             borderRadius: BorderRadius.circular(12),
             child: attachment.type == "image"
                 ? Image.file(
-                    attachment.file,
+                    attachment.file!,
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) => Container(
                       color: Colors.grey[900],
@@ -395,7 +425,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
                   )
                 : attachment.type == "pdf"
                     ? PdfViewer.file(
-                        attachment.file.path,
+                        attachment.file!.path,
                         params: const PdfViewerParams(
                           maxScale: 1.0,
                         ),
@@ -406,7 +436,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
                             children: [
                               IconButton(
                                 icon: Icon(
-                                  _currentlyPlayingPath == attachment.file.path &&
+                                  _currentlyPlayingPath == attachment.file!.path &&
                                           _audioPlayer.state == PlayerState.playing
                                       ? FeatherIcons.pause
                                       : FeatherIcons.play,
@@ -414,27 +444,34 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
                                   size: 40,
                                 ),
                                 onPressed: () async {
-                                  if (_currentlyPlayingPath == attachment.file.path &&
-                                      _audioPlayer.state == PlayerState.playing) {
-                                    await _audioPlayer.pause();
-                                    if (mounted) {
-                                      setState(() {
-                                        _currentlyPlayingPath = null;
-                                      });
+                                  try {
+                                    if (_currentlyPlayingPath == attachment.file!.path &&
+                                        _audioPlayer.state == PlayerState.playing) {
+                                      await _audioPlayer.pause();
+                                      if (mounted) {
+                                        setState(() {
+                                          _currentlyPlayingPath = null;
+                                        });
+                                      }
+                                    } else {
+                                      await _audioPlayer.stop();
+                                      await _audioPlayer.play(DeviceFileSource(attachment.file!.path));
+                                      if (mounted) {
+                                        setState(() {
+                                          _currentlyPlayingPath = attachment.file!.path;
+                                        });
+                                      }
                                     }
-                                  } else {
-                                    await _audioPlayer.stop(); // Stop any currently playing audio
-                                    await _audioPlayer.play(DeviceFileSource(attachment.file.path));
-                                    if (mounted) {
-                                      setState(() {
-                                        _currentlyPlayingPath = attachment.file.path;
-                                      });
-                                    }
+                                  } catch (e) {
+                                    _showPermissionDialog(
+                                      'Playback Error',
+                                      'Failed to play audio: $e',
+                                    );
                                   }
                                 },
                               ),
                               Text(
-                                attachment.file.path.split('/').last,
+                                attachment.file!.path.split('/').last,
                                 style: GoogleFonts.roboto(
                                   color: Colors.white70,
                                   fontSize: 12,
@@ -445,7 +482,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
                             ],
                           )
                         : FutureBuilder<String?>(
-                            future: _generateVideoThumbnail(attachment.file.path),
+                            future: _generateVideoThumbnail(attachment.file!.path),
                             builder: (context, snapshot) {
                               if (snapshot.connectionState == ConnectionState.done && snapshot.data != null) {
                                 return Image.file(
@@ -478,7 +515,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
           onPressed: () {
             setState(() {
               _selectedAttachments.remove(attachment);
-              if (attachment.type == "audio" && _currentlyPlayingPath == attachment.file.path) {
+              if (attachment.type == "audio" && _currentlyPlayingPath == attachment.file?.path) {
                 _audioPlayer.stop();
                 _currentlyPlayingPath = null;
               }
@@ -550,7 +587,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   ScaleTransition(
-                    scale: _pulseAnimation!,
+                    scale: _pulseAnimation,
                     child: IconButton(
                       icon: Icon(
                         _isRecordingAudio ? FeatherIcons.square : FeatherIcons.mic,
@@ -563,7 +600,6 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
                   IconButton(
                     icon: const Icon(FeatherIcons.image, color: Colors.tealAccent),
                     onPressed: () async {
-                      // Show dialog to choose between gallery and camera
                       final source = await showModalBottomSheet<ImageSource>(
                         context: context,
                         builder: (context) => Column(
@@ -602,7 +638,6 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
                   IconButton(
                     icon: const Icon(FeatherIcons.video, color: Colors.tealAccent),
                     onPressed: () async {
-                      // Show dialog to choose between gallery and camera
                       final source = await showModalBottomSheet<ImageSource>(
                         context: context,
                         builder: (context) => Column(
@@ -659,7 +694,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
                 child: OutlinedButton(
                   onPressed: () {
                     if (_postController.text.trim().isNotEmpty || _selectedAttachments.isNotEmpty) {
-                      print('[NewPostScreen] Popping with attachments: ${_selectedAttachments.map((a) => 'type=${a.type}, path=${a.file.path}').toList()}');
+                      print('[NewPostScreen] Popping with attachments: ${_selectedAttachments.map((a) => 'type=${a.type}, path=${a.file?.path}').toList()}');
                       Navigator.pop(context, {
                         'content': _postController.text.trim(),
                         'attachments': _selectedAttachments,

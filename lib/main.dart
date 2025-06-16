@@ -31,10 +31,12 @@ class ChatterApp extends StatefulWidget {
 
 class _ChatterAppState extends State<ChatterApp> {
   late FlutterSecureStorage _storage;
+  final  DataController _dataController = Get.put(DataController());
 
   @override
   void initState() {
     super.initState();
+    _dataController.init(); // Initialize DataController
     // Initialize secure storage with platform-specific options
     _storage = const FlutterSecureStorage(
       aOptions: AndroidOptions(

@@ -7,6 +7,8 @@ import 'dart:convert';
 import 'package:path/path.dart' as path;
 
 class DataController extends GetxController {
+
+  final RxBool isLoading = false.obs;
   final FlutterSecureStorage _storage = const FlutterSecureStorage(
     aOptions: AndroidOptions(
       encryptedSharedPreferences: true,
@@ -44,6 +46,13 @@ class DataController extends GetxController {
     String? userJson = await _storage.read(key: 'user');
     if (userJson != null) {
       user.value = jsonDecode(userJson);
+    }
+    // fetch initial feeds
+    try {
+      await fetchFeeds();
+    } catch (e) {
+      print('Error fetching initial feeds: $e');
+      posts.clear(); // Clear posts on error
     }
   }
 
@@ -92,15 +101,16 @@ class DataController extends GetxController {
           },
         ),
       );
+      // print(response.data);
       if (response.statusCode == 200 && response.data['success'] == true) {
         posts.assignAll(List<Map<String, dynamic>>.from(response.data['posts']));
-        // print(posts.value);
       } else {
         throw Exception('Failed to fetch feeds');
       }
     } catch (e) {
+
       print('Error fetching feeds: $e');
-      posts.clear(); // Clear posts on error
+      posts.clear();
       rethrow; // Rethrow the exception to be handled by the caller
     }
   }
