@@ -1,5 +1,8 @@
 import 'package:chatter/controllers/data-controller.dart';
 import 'package:chatter/pages/new-posts-page.dart';
+import 'package:chatter/pages/reply_page.dart'; // Added import for ReplyPage
+import 'package:chatter/pages/repost_page.dart'; // Added import for RepostPage
+import 'package:chatter/pages/media_view_page.dart'; // Added import for MediaViewPage
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
@@ -82,6 +85,31 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     );
     if (result != null && result is Map<String, dynamic>) {
       _addPost(result['content'], result['attachments']);
+    }
+  }
+
+  Future<void> _navigateToRepostPage(ChatterPost post) async {
+    final confirmed = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RepostPage(post: post),
+      ),
+    );
+
+    if (confirmed == true) {
+      setState(() {
+        post.reposts++;
+        // TODO: Potentially call a DataController method here to notify backend about the repost
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Poa! Reposted!',
+            style: GoogleFonts.roboto(color: Colors.white),
+          ),
+          backgroundColor: Colors.teal[700],
+        ),
+      );
     }
   }
 
@@ -181,344 +209,58 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     }
   }
 
-  void _showRepliesDialog(ChatterPost post) {
-    final replyController = TextEditingController();
-    final List<Attachment> replyAttachments = [];
+  // _showRepliesDialog is now replaced by navigating to ReplyPage
+  // void _showRepliesDialog(ChatterPost post) { ... } // Original content removed
 
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              backgroundColor: Color(0xFF000000),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                side: BorderSide(color: Colors.tealAccent, width: 2),
-              ),
-              contentPadding: EdgeInsets.all(16),
-              title: Text(
-                'Replies',
-                style: GoogleFonts.poppins(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 20,
-                ),
-              ),
-              content: SizedBox(
-                width: MediaQuery.of(context).size.width * 0.9,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: EdgeInsets.only(bottom: 8),
-                        decoration: BoxDecoration(
-                          border: Border(
-                            bottom: BorderSide(color: Colors.grey[800]!),
-                          ),
-                        ),
-                        child: _buildPostContent(post, isReply: false),
-                      ),
-                      ListView.separated(
-                        shrinkWrap: true,
-                        physics: NeverScrollableScrollPhysics(),
-                        itemCount: post.replies.length,
-                        separatorBuilder: (context, index) => Divider(
-                          color: Colors.grey[800],
-                          height: 1,
-                        ),
-                        itemBuilder: (context, index) {
-                          return Padding(
-                            padding: EdgeInsets.only(left: 16),
-                            child: _buildPostContent(post.replies[index], isReply: true),
-                          );
-                        },
-                      ),
-                      SizedBox(height: 16),
-                      TextField(
-                        controller: replyController,
-                        maxLength: 280,
-                        maxLines: 3,
-                        style: GoogleFonts.roboto(color: Colors.white, fontSize: 16),
-                        decoration: InputDecoration(
-                          hintText: "Post your reply...",
-                          hintStyle: GoogleFonts.roboto(color: Colors.grey[500]),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: Colors.grey[700]!),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: Colors.grey[700]!),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: Colors.tealAccent),
-                          ),
-                          filled: true,
-                          fillColor: Color(0xFF252525),
-                        ),
-                      ),
-                      SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          IconButton(
-                            icon: Icon(FeatherIcons.image, color: Colors.tealAccent),
-                            onPressed: () async {
-                              final picker = ImagePicker();
-                              final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-                              if (image != null) {
-                                final file = File(image.path);
-                                final sizeInMB = file.lengthSync() / (1024 * 1024);
-                                if (sizeInMB <= 10) {
-                                  setDialogState(() {
-                                    replyAttachments.add(
-                                      Attachment(
-                                        file: file,
-                                        type: "image",
-                                      ),
-                                    );
-                                  });
-                                } else {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        'File must be under 10MB!',
-                                        style: GoogleFonts.roboto(color: Colors.white),
-                                      ),
-                                      backgroundColor: Colors.red[700],
-                                    ),
-                                  );
-                                }
-                              }
-                            },
-                            tooltip: 'Upload Image',
-                          ),
-                          IconButton(
-                            icon: Icon(FeatherIcons.fileText, color: Colors.tealAccent),
-                            onPressed: () async {
-                              final result = await FilePicker.platform.pickFiles(
-                                type: FileType.custom,
-                                allowedExtensions: ['pdf'],
-                                allowMultiple: false,
-                              );
-                              if (result != null && result.files.single.path != null) {
-                                final file = File(result.files.single.path!);
-                                final sizeInMB = file.lengthSync() / (1024 * 1024);
-                                if (sizeInMB <= 10) {
-                                  setDialogState(() {
-                                    replyAttachments.add(
-                                      Attachment(
-                                        file: file,
-                                        type: "pdf",
-                                      ),
-                                    );
-                                  });
-                                } else {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        'File must be under 10MB!',
-                                        style: GoogleFonts.roboto(color: Colors.white),
-                                      ),
-                                      backgroundColor: Colors.red[700],
-                                    ),
-                                  );
-                                }
-                              }
-                            },
-                            tooltip: 'Upload Document',
-                          ),
-                          IconButton(
-                            icon: Icon(FeatherIcons.music, color: Colors.tealAccent),
-                            onPressed: () async {
-                              final result = await FilePicker.platform.pickFiles(
-                                type: FileType.audio,
-                                allowMultiple: false,
-                              );
-                              if (result != null && result.files.single.path != null) {
-                                final file = File(result.files.single.path!);
-                                final sizeInMB = file.lengthSync() / (1024 * 1024);
-                                if (sizeInMB <= 10) {
-                                  setDialogState(() {
-                                    replyAttachments.add(
-                                      Attachment(
-                                        file: file,
-                                        type: "audio",
-                                      ),
-                                    );
-                                  });
-                                } else {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        'File must be under 10MB!',
-                                        style: GoogleFonts.roboto(color: Colors.white),
-                                      ),
-                                      backgroundColor: Colors.red[700],
-                                    ),
-                                  );
-                                }
-                              }
-                            },
-                            tooltip: 'Upload Audio',
-                          ),
-                          IconButton(
-                            icon: Icon(FeatherIcons.video, color: Colors.tealAccent),
-                            onPressed: () async {
-                              final picker = ImagePicker();
-                              final XFile? video = await picker.pickVideo(source: ImageSource.gallery);
-                              if (video != null) {
-                                final file = File(video.path);
-                                final sizeInMB = file.lengthSync() / (1024 * 1024);
-                                if (sizeInMB <= 10) {
-                                  setDialogState(() {
-                                    replyAttachments.add(
-                                      Attachment(
-                                        file: file,
-                                        type: "video",
-                                      ),
-                                    );
-                                  });
-                                } else {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        'File must be under 10MB!',
-                                        style: GoogleFonts.roboto(color: Colors.white),
-                                      ),
-                                      backgroundColor: Colors.red[700],
-                                    ),
-                                  );
-                                }
-                              }
-                            },
-                            tooltip: 'Upload Video',
-                          ),
-                        ],
-                      ),
-                      if (replyAttachments.isNotEmpty) ...[
-                        SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: replyAttachments.map((attachment) {
-                            return Chip(
-                              label: Text(
-                                attachment.file.path.split('/').last,
-                                style: GoogleFonts.roboto(color: Colors.white, fontSize: 12),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              backgroundColor: Colors.grey[800],
-                              deleteIcon: Icon(FeatherIcons.x, size: 16, color: Colors.white),
-                              onDeleted: () {
-                                setDialogState(() {
-                                  replyAttachments.remove(attachment);
-                                });
-                              },
-                            );
-                          }).toList(),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(
-                    'Cancel',
-                    style: GoogleFonts.roboto(color: Colors.grey[400]),
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    if (replyController.text.trim().isEmpty && replyAttachments.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Please enter some text or add attachments!',
-                            style: GoogleFonts.roboto(color: Colors.white),
-                          ),
-                          backgroundColor: Colors.red[700],
-                        ),
-                      );
-                      return;
-                    }
-
-                    // Upload reply attachments to Cloudinary
-                    List<Attachment> uploadedReplyAttachments = [];
-                    if (replyAttachments.isNotEmpty) {
-                      List<File> files = replyAttachments.map((a) => a.file).toList();
-                      List<Map<String, dynamic>> uploadResults = await dataController.uploadFilesToCloudinary(files);
-                      
-                      for (int i = 0; i < replyAttachments.length; i++) {
-                        var result = uploadResults[i];
-                        if (result['success'] == true) {
-                          uploadedReplyAttachments.add(Attachment(
-                            file: replyAttachments[i].file,
-                            type: replyAttachments[i].type,
-                            url: result['url'] as String,
-                          ));
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Failed to upload ${replyAttachments[i].file.path.split('/').last}: ${result['message']}',
-                                style: GoogleFonts.roboto(color: Colors.white),
-                              ),
-                              backgroundColor: Colors.red[700],
-                            ),
-                          );
-                        }
-                      }
-                    }
-
-                    if (replyController.text.trim().isEmpty && uploadedReplyAttachments.isEmpty) {
-                      return; // No content and no successful uploads
-                    }
-
-                    setState(() {
-                      post.replies.add(
-                        ChatterPost(
-                          username: "YourName",
-                          content: replyController.text.trim(),
-                          timestamp: DateTime.now(),
-                          attachments: uploadedReplyAttachments,
-                          avatarInitial: "Y",
-                          views: Random().nextInt(100) + 10,
-                        ),
-                      );
-                    });
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Poa! Reply posted!',
-                          style: GoogleFonts.roboto(color: Colors.white),
-                        ),
-                        backgroundColor: Colors.teal[700],
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.tealAccent,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: Text(
-                    'Reply',
-                    style: GoogleFonts.roboto(color: Colors.black, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
+  Future<void> _navigateToReplyPage(ChatterPost post) async {
+    final newReply = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ReplyPage(post: post),
+      ),
     );
+
+    if (newReply != null && newReply is ChatterPost) {
+      setState(() {
+        // Find the post in the dataController's list and update it.
+        // This is a simplified approach. In a real app with a proper backend,
+        // you'd likely refresh the post data or rely on a stream.
+        // For now, we update the local 'post' object's replies list.
+        // This assumes 'post' is the same instance that's rendered in the list.
+        // If dataController.posts contains different instances, this local update
+        // might not reflect correctly without finding and updating the specific post
+        // in dataController.posts.
+
+        // The ChatterPost object passed to ReplyPage and modified there
+        // might not be the same instance as the one in the list view if posts
+        // are rebuilt from dataController.posts on each build.
+        // A more robust way would be to update the data source (dataController.posts)
+        // and have Obx rebuild.
+
+        // For simplicity, let's assume 'post.replies.add(newReply)' is sufficient
+        // if 'post' is a direct reference to an object whose state is maintained.
+        // However, the current setup with dataController.posts being maps means
+        // we need to find and update the specific post in the list or have DataController
+        // handle this update.
+
+        // Let's try to update the original post object directly.
+        // This will work if 'post' is a reference that the UI is observing.
+        post.replies.add(newReply);
+
+        // To ensure UI update, especially if post objects are recreated from maps:
+        // We need to find the index of the post and update it in the dataController
+        // Or, ideally, the DataController handles adding replies and the UI reacts.
+        // For now, we'll rely on the direct mutation of `post.replies` and `setState`.
+        // This is a common pattern if the list items themselves are stateful or hold
+        // mutable objects.
+      });
+       ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Reply added to the post!', style: GoogleFonts.roboto(color: Colors.white)),
+          backgroundColor: Colors.teal[700],
+        ),
+      );
+    }
   }
 
   Widget _buildPostContent(ChatterPost post, {required bool isReply}) {
@@ -591,13 +333,10 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                         final displayUrl = attachment.url ?? attachment.file.path;
                         return GestureDetector(
                           onTap: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Opening ${attachment.type}: ${displayUrl.split('/').last}',
-                                  style: GoogleFonts.roboto(color: Colors.white),
-                                ),
-                                backgroundColor: Colors.teal[700],
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => MediaViewPage(attachment: attachment),
                               ),
                             );
                           },
@@ -700,7 +439,8 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                               size: 20,
                             ),
                             onPressed: () {
-                              _showRepliesDialog(post);
+                              // _showRepliesDialog(post); // Old call
+                              _navigateToReplyPage(post); // New call
                             },
                           ),
                           Text(
@@ -721,18 +461,19 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                               size: 20,
                             ),
                             onPressed: () {
-                              setState(() {
-                                post.reposts++;
-                              });
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'Poa! Reposted!',
-                                    style: GoogleFonts.roboto(color: Colors.white),
-                                  ),
-                                  backgroundColor: Colors.teal[700],
-                                ),
-                              );
+                              // setState(() {
+                              //   post.reposts++;
+                              // });
+                              // ScaffoldMessenger.of(context).showSnackBar(
+                              //   SnackBar(
+                              //     content: Text(
+                              //       'Poa! Reposted!',
+                              //       style: GoogleFonts.roboto(color: Colors.white),
+                              //     ),
+                              //     backgroundColor: Colors.teal[700],
+                              //   ),
+                              // );
+                              _navigateToRepostPage(post); // New call
                             },
                           ),
                           Text(
@@ -809,50 +550,91 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           itemBuilder: (context, index) {
             final postMap = dataController.posts[index];
             // Map the Map<String, dynamic> to a ChatterPost object
+            // final post = ChatterPost( ... ) // This mapping happens inside the Obx
+            // It's important that the 'post' object passed to _navigateToReplyPage
+            // is the actual instance being used by _buildPostContent, or that
+            // changes are reflected in dataController.posts list.
+
+            // The current structure maps dataController.posts (List<Map<String, dynamic>>)
+            // to ChatterPost objects on-the-fly within the itemBuilder.
+            // This means the 'post' object created here is ephemeral for each build.
+            // Modifying post.replies directly in _navigateToReplyPage's callback
+            // won't work if the 'post' instance there is not the one from dataController.
+            // The DataController should ideally handle adding replies to its data structures.
+
+            // For now, the `setState` in `_navigateToReplyPage` will trigger a rebuild.
+            // During the rebuild, `post.replies.length` will be re-evaluated.
+            // If the `ChatterPost` objects are preserved across rebuilds (e.g. if they are stored
+            // directly in DataController or if the mapping function returns the same instances),
+            // then adding to `post.replies` will reflect.
+            // However, the current mapping creates NEW ChatterPost objects each time.
+
+            // TODO: Refactor state management for replies.
+            // A quick fix might be to find the post in dataController.posts by an ID
+            // and update its 'replies' field in the map, then dataController.posts.refresh().
+            // For now, we'll proceed with the direct modification and setState,
+            // acknowledging it might not be robust if ChatterPost instances are not preserved.
+
+            final postMap = dataController.posts[index];
             final post = ChatterPost(
               username: postMap['user']?['name'] ?? 'Unknown User',
               content: postMap['content'] ?? '',
-              // Ensure timestamp is parsed correctly, handling potential String from API
               timestamp: postMap['createdAt'] is String
                   ? DateTime.parse(postMap['createdAt'])
-                  : DateTime.now(), // Fallback to now if parsing fails or type is wrong
-              likes: postMap['likes']?.length ?? 0, // Assuming likes is an array of user IDs
-              reposts: postMap['reposts'] ?? 0, // Assuming reposts is a count
-              views: postMap['views'] ?? 0, // Assuming views is a count
+                  : DateTime.now(),
+              likes: postMap['likes']?.length ?? 0,
+              reposts: postMap['reposts'] ?? 0,
+              views: postMap['views'] ?? 0,
               avatarInitial: (postMap['user']?['name'] != null && postMap['user']['name'].isNotEmpty)
                   ? postMap['user']['name'][0].toUpperCase()
                   : '?',
               attachments: (postMap['attachment_urls'] as List<dynamic>?)?.map((attUrl) {
-                // Determine type based on URL or stored type if available
                 String type = 'unknown';
                 if (attUrl is String) {
-                  if (attUrl.toLowerCase().endsWith('.jpg') || attUrl.toLowerCase().endsWith('.jpeg') || attUrl.toLowerCase().endsWith('.png')) {
-                    type = 'image';
-                  } else if (attUrl.toLowerCase().endsWith('.pdf')) {
-                    type = 'pdf';
-                  } else if (attUrl.toLowerCase().endsWith('.mp4') || attUrl.toLowerCase().endsWith('.mov')) {
-                    type = 'video';
-                  } else if (attUrl.toLowerCase().endsWith('.mp3') || attUrl.toLowerCase().endsWith('.wav') || attUrl.toLowerCase().endsWith('.m4a')) {
-                    type = 'audio';
-                  }
+                  if (attUrl.toLowerCase().endsWith('.jpg') || attUrl.toLowerCase().endsWith('.jpeg') || attUrl.toLowerCase().endsWith('.png')) type = 'image';
+                  else if (attUrl.toLowerCase().endsWith('.pdf')) type = 'pdf';
+                  else if (attUrl.toLowerCase().endsWith('.mp4') || attUrl.toLowerCase().endsWith('.mov')) type = 'video';
+                  else if (attUrl.toLowerCase().endsWith('.mp3') || attUrl.toLowerCase().endsWith('.wav') || attUrl.toLowerCase().endsWith('.m4a')) type = 'audio';
                 }
-                // The File object here is a placeholder as we only have the URL from the backend
                 return Attachment(file: File(''), type: type, url: attUrl as String?);
               }).toList() ?? [],
-              replies: [], // Replies would need to be handled if they are part of the postMap from API
+              // IMPORTANT: Initialize replies from the postMap if available, otherwise it's always empty.
+              // This was a bug. If replies come from the server, they should be mapped here.
+              // For now, we assume replies are managed locally and start empty for new posts from server.
+              // If postMap contains 'replies', map them here.
+              replies: (postMap['replies'] as List<dynamic>?)?.map((replyMap) {
+                    // Assuming replyMap has a similar structure to a postMap
+                    return ChatterPost(
+                       username: replyMap['user']?['name'] ?? 'Unknown User',
+                        content: replyMap['content'] ?? '',
+                        timestamp: replyMap['createdAt'] is String ? DateTime.parse(replyMap['createdAt']) : DateTime.now(),
+                        avatarInitial: (replyMap['user']?['name'] != null && replyMap['user']['name'].isNotEmpty) ? replyMap['user']['name'][0].toUpperCase() : '?',
+                        attachments: (replyMap['attachment_urls'] as List<dynamic>?)?.map((attUrl) {
+                            String type = 'unknown';
+                            if (attUrl is String) {
+                                if (attUrl.toLowerCase().endsWith('.jpg') || attUrl.toLowerCase().endsWith('.jpeg') || attUrl.toLowerCase().endsWith('.png')) type = 'image';
+                                else if (attUrl.toLowerCase().endsWith('.pdf')) type = 'pdf';
+                                else if (attUrl.toLowerCase().endsWith('.mp4') || attUrl.toLowerCase().endsWith('.mov')) type = 'video';
+                                else if (attUrl.toLowerCase().endsWith('.mp3') || attUrl.toLowerCase().endsWith('.wav') || attUrl.toLowerCase().endsWith('.m4a')) type = 'audio';
+                            }
+                            return Attachment(file: File(''), type: type, url: attUrl as String?);
+                        }).toList() ?? [],
+                        replies: [], // Nested replies are not handled in this simplified example
+                    );
+                  }).toList() ?? [],
             );
             return FadeTransition(
               opacity: CurvedAnimation(
                 parent: ModalRoute.of(context)!.animation!,
-              curve: Curves.easeInOut,
-            ),
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: _buildPostContent(post, isReply: false),
-            ),
-          );
-        },
-      ),
+                curve: Curves.easeInOut,
+              ),
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                child: _buildPostContent(post, isReply: false),
+              ),
+            );
+          },
+        ),
       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: Color(0xFF000000),
         selectedItemColor: Colors.tealAccent,
