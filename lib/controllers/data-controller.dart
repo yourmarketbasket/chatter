@@ -32,6 +32,18 @@ class DataController extends GetxController {
   // Placeholder for all users
   final RxList<Map<String, dynamic>> allUsers = <Map<String, dynamic>>[].obs;
 
+  // Add these Rx variables inside DataController class
+  final RxList<Map<String, dynamic>> conversations = <Map<String, dynamic>>[].obs;
+  final RxBool isLoadingConversations = false.obs;
+  final RxList<Map<String, dynamic>> currentConversationMessages = <Map<String, dynamic>>[].obs;
+  final RxBool isLoadingMessages = false.obs;
+
+  // Add these Rx variables inside DataController class
+  final RxList<Map<String, dynamic>> followers = <Map<String, dynamic>>[].obs;
+  final RxBool isLoadingFollowers = false.obs;
+  final RxList<Map<String, dynamic>> following = <Map<String, dynamic>>[].obs;
+  final RxBool isLoadingFollowing = false.obs;
+
   @override
   void onInit() {
     super.onInit();
@@ -327,5 +339,144 @@ class DataController extends GetxController {
 
     print('[DataController uploadFilesToCloudinary] Upload completed. Results: ${results.length} files processed.');
     return results;
+  }
+
+  // Add these placeholder methods inside DataController class
+
+  Future<void> fetchConversations() async {
+    isLoadingConversations.value = true;
+    await Future.delayed(const Duration(milliseconds: 800)); // Simulate network call
+    // Placeholder data
+    conversations.assignAll([
+      {'id': 'conv1', 'username': 'AliceWonder', 'userAvatar': 'https://i.pravatar.cc/150?u=alice', 'lastMessage': 'Hey, how are you?', 'timestamp': '10:30 AM'},
+      {'id': 'conv2', 'username': 'BobTheBuilder', 'userAvatar': 'https://i.pravatar.cc/150?u=bob', 'lastMessage': 'Project update is due.', 'timestamp': 'Yesterday'},
+      {'id': 'conv3', 'username': 'CharlieChap', 'userAvatar': 'https://i.pravatar.cc/150?u=charlie', 'lastMessage': 'Okay, sounds good!', 'timestamp': 'Mon'},
+    ]);
+    isLoadingConversations.value = false;
+    print('[DataController] Fetched conversations (placeholder).');
+  }
+
+  Future<void> fetchMessages(String conversationId) async {
+    isLoadingMessages.value = true;
+    currentConversationMessages.clear(); // Clear previous messages
+    await Future.delayed(const Duration(milliseconds: 500)); // Simulate network call
+    // Placeholder data - In real app, filter/fetch by conversationId
+    // Assuming 'currentUser' is the ID of the logged-in user.
+    // You should get this from your user object, e.g., user.value['id']
+    final String currentUserId = user.value['id']?.toString() ?? 'currentUser';
+
+    if (conversationId == 'conv1') {
+      currentConversationMessages.assignAll([
+        {'id': 'msg1', 'senderId': 'alice', 'text': 'Hey, how are you?', 'timestamp': '10:30 AM'},
+        {'id': 'msg2', 'senderId': currentUserId, 'text': 'I am good, thanks! You?', 'timestamp': '10:31 AM'},
+        {'id': 'msg3', 'senderId': 'alice', 'text': 'Doing well!', 'timestamp': '10:32 AM'},
+      ]);
+    } else if (conversationId == 'conv2') {
+       currentConversationMessages.assignAll([
+        {'id': 'msgA', 'senderId': 'bob', 'text': 'Project update is due.', 'timestamp': 'Yesterday'},
+        {'id': 'msgB', 'senderId': currentUserId, 'text': 'Working on it!', 'timestamp': 'Yesterday'},
+      ]);
+    } else {
+      // No messages for other convos in this placeholder
+    }
+    isLoadingMessages.value = false;
+    print('[DataController] Fetched messages for $conversationId (placeholder).');
+  }
+
+  // Placeholder for sending a message
+  void sendMessage(String conversationId, String text) {
+    // Simulate sending message and receiving it back
+    final String currentUserId = user.value['id']?.toString() ?? 'currentUser';
+    final newMessage = {
+      'id': DateTime.now().millisecondsSinceEpoch.toString(), // Temporary unique ID
+      'senderId': currentUserId,
+      'text': text,
+      'timestamp': 'Now', // Simple timestamp
+    };
+    currentConversationMessages.add(newMessage);
+    // In a real app, you'd also update the 'lastMessage' for the conversation in the conversations list
+    final convIndex = conversations.indexWhere((c) => c['id'] == conversationId);
+    if (convIndex != -1) {
+      conversations[convIndex]['lastMessage'] = text;
+      conversations[convIndex]['timestamp'] = 'Now';
+      conversations.refresh(); // Notify listeners of change in list item
+    }
+    print('[DataController] Sent message "$text" to $conversationId (placeholder).');
+  }
+
+  // Add these placeholder methods inside DataController class
+
+  Future<void> fetchFollowers(String userId) async {
+    isLoadingFollowers.value = true;
+    await Future.delayed(const Duration(milliseconds: 700)); // Simulate network call
+    // Placeholder data - In real app, fetch for 'userId'
+    followers.assignAll([
+      {'id': 'userA', 'username': 'FollowerOne', 'name': 'F. One', 'avatar': 'https://i.pravatar.cc/150?u=follower1', 'isFollowing': true}, // You might follow back
+      {'id': 'userB', 'username': 'FollowerTwo', 'name': 'F. Two', 'avatar': 'https://i.pravatar.cc/150?u=follower2', 'isFollowing': false},
+    ]);
+    isLoadingFollowers.value = false;
+    print('[DataController] Fetched followers for $userId (placeholder).');
+  }
+
+  Future<void> fetchFollowing(String userId) async {
+    isLoadingFollowing.value = true;
+    await Future.delayed(const Duration(milliseconds: 600)); // Simulate network call
+    // Placeholder data - In real app, fetch for 'userId'
+    following.assignAll([
+      {'id': 'userC', 'username': 'FollowingOne', 'name': 'Fol. One', 'avatar': 'https://i.pravatar.cc/150?u=following1', 'isFollowing': true},
+      {'id': 'userD', 'username': 'FollowingTwo', 'name': 'Fol. Two', 'avatar': 'https://i.pravatar.cc/150?u=following2', 'isFollowing': true},
+      {'id': 'userA', 'username': 'FollowerOne', 'name': 'F. One', 'avatar': 'https://i.pravatar.cc/150?u=follower1', 'isFollowing': true}, // Also in followers list
+    ]);
+    isLoadingFollowing.value = false;
+    print('[DataController] Fetched following list for $userId (placeholder).');
+  }
+
+  // Placeholder for toggling follow status
+  void toggleFollowStatus(String currentUserId, String targetUserId, bool follow) {
+    // This is a placeholder. In a real app:
+    // 1. Make an API call to follow/unfollow the user.
+    // 2. On success, update the local lists (`followers`, `following`) if necessary.
+    //    - If `follow` is true, you might add to `following`.
+    //    - If `follow` is false, you might remove from `following`.
+    //    - The `isFollowing` status on items in `followers` or search results might also need updating.
+
+    // Simple update for placeholder UI:
+    // Update 'following' list
+    int followingIndex = following.indexWhere((u) => u['id'] == targetUserId);
+    if (follow) {
+      if (followingIndex == -1) { // Not already following, add them (basic placeholder)
+        following.add({
+          'id': targetUserId,
+          'username': 'User_$targetUserId', // Placeholder username
+          'name': '',
+          'avatar': 'https://i.pravatar.cc/150?u=$targetUserId',
+          'isFollowing': true
+        });
+      } else { // Already in list, ensure status is true
+          following[followingIndex]['isFollowing'] = true;
+      }
+    } else {
+      if (followingIndex != -1) { // If unfollowing someone you were following
+        following.removeAt(followingIndex);
+      }
+    }
+    following.refresh();
+
+
+    // Update 'isFollowing' status in the followers list if the user is there
+    int followerIndex = followers.indexWhere((u) => u['id'] == targetUserId);
+    if (followerIndex != -1) {
+      followers[followerIndex]['isFollowing'] = follow;
+      followers.refresh();
+    }
+
+    // Also update in allUsers list if it's being displayed elsewhere with follow buttons
+    int allUsersIndex = allUsers.indexWhere((u) => u['id'] == targetUserId);
+      if (allUsersIndex != -1) {
+      allUsers[allUsersIndex]['isFollowing'] = follow;
+      allUsers.refresh();
+    }
+
+    print('[DataController] Toggled follow status for $targetUserId to $follow (placeholder).');
   }
 }

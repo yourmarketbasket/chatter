@@ -1,5 +1,7 @@
 import 'package:chatter/pages/home-feed-screen.dart';
 import 'package:chatter/pages/users_list_page.dart'; // Will be created in a later step
+import 'package:chatter/pages/direct_messages_page.dart';
+import 'package:chatter/pages/followers_page.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:chatter/controllers/data-controller.dart';
@@ -119,6 +121,29 @@ class AppDrawer extends StatelessWidget {
               // For now, this will throw an error if UsersListPage is not created.
               // We'll create UsersListPage in the next plan step.
                Get.to(() => const UsersListPage());
+            },
+          ),
+          // New Items:
+          ListTile(
+            leading: Icon(FeatherIcons.messageSquare, color: Colors.grey[300]),
+            title: Text(
+              'Direct Messages',
+              style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16),
+            ),
+            onTap: () {
+              Get.back();
+              Get.to(() => const DirectMessagesPage());
+            },
+          ),
+          ListTile(
+            leading: Icon(FeatherIcons.gitMerge, color: Colors.grey[300]), // Changed icon for Network to avoid clash
+            title: Text(
+              'Network',
+              style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16),
+            ),
+            onTap: () {
+              Get.back();
+              Get.to(() => const FollowersPage());
             },
           ),
           const Divider(color: Color(0xFF303030)),
