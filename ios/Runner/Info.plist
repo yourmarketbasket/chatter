@@ -2,12 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>NSCameraUsageDescription</key>
-	<string>We need camera access to capture photos and videos for your chatter posts.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>We need microphone access to record audio for your chatter posts.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>We need photo library access to save and select images for your chatter posts.</string>
+	<string>This app needs access to your photo library to allow you to select an avatar image.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>This app needs access to your camera to allow you to take a new avatar image.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app needs access to your microphone if you intend to capture videos with sound via the camera (not strictly for avatar images, but good practice if camera is used).</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
