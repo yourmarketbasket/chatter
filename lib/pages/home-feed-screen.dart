@@ -220,7 +220,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     }
 
     Map<String, dynamic> postData = {
-      'username': "YourName",
+      'username':  dataController.user.value['user']['name'] ?? 'YourName',
       'content': content.trim(),
       'useravatar': dataController.user.value['avatar'] ?? '',
       'attachments': uploadedAttachments.map((att) => {
@@ -232,16 +232,15 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       }).toList(),
     };
 
-    print(dataController.user.value);
 
     final result = await dataController.createPost(postData);
-    print(result);
+    
 
     if (result['success'] == true) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Poa! Your chatter is live!',
+            'Fantastic! Your chatter is live!',
             style: GoogleFonts.roboto(color: Colors.white),
           ),
           backgroundColor: Colors.teal[700],
@@ -251,7 +250,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Failed to create post on server: ${result['message'] ?? 'Unknown error'}',
+            'Could not create post, please try again later',
             style: GoogleFonts.roboto(color: Colors.white),
           ),
           backgroundColor: Colors.red[700],
