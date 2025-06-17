@@ -1,7 +1,8 @@
 import 'package:chatter/pages/home-feed-screen.dart';
-import 'package:chatter/pages/users_list_page.dart'; // Will be created in a later step
+import 'package:chatter/pages/users_list_page.dart';
 import 'package:chatter/pages/direct_messages_page.dart';
 import 'package:chatter/pages/followers_page.dart';
+import 'package:chatter/pages/login.dart'; // Ensure this import is present
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:chatter/controllers/data-controller.dart';
@@ -166,11 +167,41 @@ class AppDrawer extends StatelessWidget {
               'Logout',
               style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16),
             ),
-            onTap: () {
-              // TODO: Implement logout functionality (clear token, navigate to login)
-              Get.back();
-              Get.snackbar('Placeholder', 'Logout functionality to be implemented.',
-                  snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.orange[700], colorText: Colors.white);
+            onTap: () async { // Make onTap async
+              Get.back(); // Close the drawer first
+
+              // Show a confirmation dialog (optional, but good UX)
+              bool? confirmLogout = await Get.dialog<bool>(
+                AlertDialog(
+                  backgroundColor: const Color(0xFF1F1F1F),
+                  title: Text('Confirm Logout', style: GoogleFonts.poppins(color: Colors.white)),
+                  content: Text('Are you sure you want to log out?', style: GoogleFonts.roboto(color: Colors.grey[300])),
+                  actions: <Widget>[
+                    TextButton(
+                      child: Text('Cancel', style: GoogleFonts.roboto(color: Colors.grey[400])),
+                      onPressed: () {
+                        Get.back(result: false); // Close dialog, return false
+                      },
+                    ),
+                    TextButton(
+                      child: Text('Logout', style: GoogleFonts.roboto(color: Colors.redAccent)),
+                      onPressed: () {
+                        Get.back(result: true); // Close dialog, return true
+                      },
+                    ),
+                  ],
+                ),
+                barrierDismissible: false, // User must explicitly choose an action
+              );
+
+              if (confirmLogout == true) {
+                // Find DataController instance. It should already be registered by Get.put in main.dart
+                final DataController dataController = Get.find<DataController>();
+                await dataController.logoutUser(); // Call the logout method
+
+                // Navigate to LoginPage and clear navigation stack
+                Get.offAll(() => const LoginPage());
+              }
             },
           ),
         ],

@@ -479,4 +479,51 @@ class DataController extends GetxController {
 
     print('[DataController] Toggled follow status for $targetUserId to $follow (placeholder).');
   }
+
+  // Add this method to the DataController class
+
+  Future<void> logoutUser() async {
+    try {
+      // 1. Clear data from FlutterSecureStorage
+      await _storage.delete(key: 'token');
+      await _storage.delete(key: 'user');
+      print('[DataController] Token and user data deleted from secure storage.');
+
+      // 2. Reset reactive variables to initial states
+      user.value = {};
+      posts.clear();
+      allUsers.clear(); // If you want to clear this list on logout
+      conversations.clear();
+      currentConversationMessages.clear();
+      followers.clear();
+      following.clear();
+      print('[DataController] In-memory user state cleared.');
+
+      // 3. Optionally, disconnect other services
+      // Example: If SocketService is managed or accessible here
+      // final SocketService socketService = Get.find<SocketService>();
+      // socketService.disconnect();
+      // print('[DataController] SocketService disconnected.');
+      // Note: Ensure SocketService handles multiple disconnect calls gracefully if also called in app dispose.
+
+      // Any other cleanup specific to your application's state
+      isLoading.value = false;
+      isLoadingConversations.value = false;
+      isLoadingMessages.value = false;
+      isLoadingFollowers.value = false;
+      isLoadingFollowing.value = false;
+
+    } catch (e) {
+      print('[DataController] Error during logout: ${e.toString()}');
+      // Even if an error occurs, try to clear in-memory data as a fallback
+      user.value = {};
+      posts.clear();
+      allUsers.clear();
+      conversations.clear();
+      currentConversationMessages.clear();
+      followers.clear();
+      following.clear();
+      // Potentially rethrow or handle error in a way that UI can respond if needed
+    }
+  }
 }
