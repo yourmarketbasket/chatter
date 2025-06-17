@@ -97,7 +97,17 @@ class _RepostPageState extends State<RepostPage> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => MediaViewPage(attachment: attachment),
+                                  builder: (context) => MediaViewPage(
+                                    attachments: post.attachments, // The full list of attachments from the original post
+                                    initialIndex: idx,            // The index of the tapped attachment in the GridView
+                                    message: post.content,
+                                    userName: post.username,
+                                    userAvatarUrl: post.useravatar,
+                                    timestamp: post.timestamp,
+                                    viewsCount: post.views,
+                                    likesCount: post.likes,
+                                    repostsCount: post.reposts,
+                                  ),
                                 ),
                               );
                             },
