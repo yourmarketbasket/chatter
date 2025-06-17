@@ -744,7 +744,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
               replies: (postMap['replies'] as List<dynamic>?)?.cast<String>() ?? [],
             );
             return Padding(
-              padding: EdgeInsets.symmetric(horizontal: 5, vertical: 5),
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: _buildPostContent(post, isReply: false),
             );
           },

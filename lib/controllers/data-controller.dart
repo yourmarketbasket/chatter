@@ -544,4 +544,64 @@ class DataController extends GetxController {
       // Potentially rethrow or handle error in a way that UI can respond if needed
     }
   }
+
+  // Add this method to the DataController class
+
+  Future<Map<String, dynamic>> updateUserAvatar(String avatarUrl) async {
+    isLoading.value = true; // Optional: indicate loading state
+    try {
+      final String? currentUserId = user.value['id']?.toString();
+      final String? token = user.value['token']?.toString();
+
+      if (currentUserId == null || token == null) {
+        isLoading.value = false;
+        return {'success': false, 'message': 'User ID or token not found. Please log in again.'};
+      }
+
+      final response = await _dio.post(
+        '/api/users/avatar', // Using the endpoint provided by the user
+        data: {
+          'userId': currentUserId,
+          'avatarUrl': avatarUrl,
+        },
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+
+      isLoading.value = false;
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        // Backend confirms success, might return the new avatarUrl or just confirm
+        String returnedAvatarUrl = response.data['avatarUrl'] ?? avatarUrl; // Use returned URL if available
+
+        // Update local user state
+        var updatedUser = Map<String, dynamic>.from(user.value);
+        updatedUser['avatar'] = returnedAvatarUrl;
+        user.value = updatedUser; // Update reactive user object
+
+        // Save updated user object to secure storage
+        await _storage.write(key: 'user', value: jsonEncode(updatedUser));
+
+        print('[DataController] Avatar updated successfully on backend and locally. New URL: $returnedAvatarUrl');
+        return {
+          'success': true,
+          'message': response.data['message'] ?? 'Avatar updated successfully!',
+          'avatarUrl': returnedAvatarUrl
+        };
+      } else {
+        print('[DataController] Backend failed to update avatar. Status: ${response.statusCode}, Message: ${response.data['message']}');
+        return {
+          'success': false,
+          'message': response.data['message'] ?? 'Failed to update avatar on backend.'
+        };
+      }
+    } catch (e) {
+      isLoading.value = false;
+      print('[DataController] Error in updateUserAvatar: ${e.toString()}');
+      return {'success': false, 'message': 'An error occurred: ${e.toString()}'};
+    }
+  }
 }

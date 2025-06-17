@@ -65,8 +65,11 @@ class AppDrawer extends StatelessWidget {
     if (pickedFile != null) {
       // If an image is picked, proceed to crop it
       final CroppedFile? croppedFile = await ImageCropper().cropImage(
-        sourcePath: pickedFile.path,// Common for avatars
-        
+        sourcePath: pickedFile.path,
+        cropStyle: CropStyle.circle, // Common for avatars
+        aspectRatioPresets: [
+          CropAspectRatioPreset.square, // Enforces a square aspect ratio for the circle
+        ],
         uiSettings: [
           AndroidUiSettings(
               toolbarTitle: 'Crop Your Avatar',
@@ -118,56 +121,94 @@ class AppDrawer extends StatelessWidget {
   Future<void> _handleImageUpload(File imageFile) async { // Make it async
     final DataController dataController = Get.find<DataController>(); // Get DataController instance
 
-    // Show a loading indicator snackbar (optional, but good UX for uploads)
+    // Show a loading indicator snackbar for Cloudinary upload
     Get.snackbar(
-      'Uploading Avatar...',
+      'Uploading to Cloud...',
       'Please wait while your new avatar is being uploaded.',
       snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.blueGrey,
+      backgroundColor: Colors.blueGrey[600], // Slightly different color for this phase
       colorText: Colors.white,
       showProgressIndicator: true,
       progressIndicatorBackgroundColor: Colors.white,
       progressIndicatorValueColor: const AlwaysStoppedAnimation<Color>(Colors.tealAccent),
-      duration: const Duration(seconds: 120), // Long duration, will be dismissed manually
+      duration: const Duration(seconds: 120),
       isDismissible: false,
     );
 
     try {
-      List<Map<String, dynamic>> uploadResults = await dataController.uploadFilesToCloudinary([imageFile]);
+      List<Map<String, dynamic>> cloudinaryUploadResults = await dataController.uploadFilesToCloudinary([imageFile]);
 
-      Get.back(); // Dismiss the "Uploading..." snackbar if it's still showing by navigating back once (GetX snackbar behavior)
-                 // Or use Get.closeCurrentSnackbar() if you prefer.
+      // Attempt to dismiss the "Uploading to Cloud..." snackbar
+      // Using Get.closeCurrentSnackbar() is more robust for specific snackbar dismissal
+      if (Get.isSnackbarOpen) {
+         Get.closeCurrentSnackbar();
+      }
 
-      if (uploadResults.isNotEmpty && uploadResults[0]['success'] == true) {
-        String newAvatarUrl = uploadResults[0]['url'];
-        print('Avatar uploaded successfully: $newAvatarUrl');
+
+      if (cloudinaryUploadResults.isNotEmpty && cloudinaryUploadResults[0]['success'] == true) {
+        String newCloudinaryAvatarUrl = cloudinaryUploadResults[0]['url'];
+        print('Avatar uploaded successfully to Cloudinary: $newCloudinaryAvatarUrl');
+
+        // Now, show a new snackbar for updating the profile
         Get.snackbar(
-          'Success!',
-          'New avatar uploaded. URL: $newAvatarUrl', // Displaying URL for confirmation as per plan
+          'Updating Profile...',
+          'Saving your new avatar. Please wait.',
           snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.green,
+          backgroundColor: Colors.blueGrey[700], // Different color for this phase
           colorText: Colors.white,
+          showProgressIndicator: true,
+          progressIndicatorBackgroundColor: Colors.white,
+          progressIndicatorValueColor: const AlwaysStoppedAnimation<Color>(Colors.deepOrangeAccent),
+          duration: const Duration(seconds: 120),
+          isDismissible: false,
         );
-        // As per plan: "For this task, we will *not* update the user's avatar URL in
-        // DataController's state or make any backend calls to save the new avatar URL."
-        // So, we stop here after showing success.
+
+        // Call updateUserAvatar with the URL from Cloudinary
+        final Map<String, dynamic> backendUpdateResult = await dataController.updateUserAvatar(newCloudinaryAvatarUrl);
+
+        if (Get.isSnackbarOpen) {
+          Get.closeCurrentSnackbar(); // Dismiss the "Updating Profile..." snackbar
+        }
+
+        if (backendUpdateResult['success'] == true) {
+          print('User avatar updated successfully on backend and locally.');
+          Get.snackbar(
+            'Avatar Updated!',
+            backendUpdateResult['message'] ?? 'Your avatar has been successfully updated.',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.green,
+            colorText: Colors.white,
+          );
+          // The UI in AppDrawer should reactively update due to user.value change in DataController
+        } else {
+          print('Backend failed to update avatar: ${backendUpdateResult['message']}');
+          Get.snackbar(
+            'Profile Update Failed',
+            backendUpdateResult['message'] ?? 'Could not save your new avatar to your profile.',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.red,
+            colorText: Colors.white,
+          );
+        }
       } else {
-        String errorMessage = uploadResults.isNotEmpty ? uploadResults[0]['message'] : 'Unknown upload error.';
-        print('Avatar upload failed: $errorMessage');
+        String errorMessage = cloudinaryUploadResults.isNotEmpty ? cloudinaryUploadResults[0]['message'] : 'Unknown Cloudinary upload error.';
+        print('Cloudinary avatar upload failed: $errorMessage');
         Get.snackbar(
-          'Upload Failed',
-          'Could not upload new avatar: $errorMessage',
+          'Cloud Upload Failed',
+          'Could not upload new avatar to cloud: $errorMessage',
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.red,
           colorText: Colors.white,
         );
       }
     } catch (e) {
-      Get.back(); // Dismiss loading snackbar in case of an unexpected error
+      if (Get.isSnackbarOpen) {
+        Get.closeCurrentSnackbar(); // Dismiss any active loading snackbar in case of an unexpected error
+      }
       print('Error during avatar upload process: ${e.toString()}');
       Get.snackbar(
         'Upload Error',
-        'An unexpected error occurred during upload: ${e.toString()}',
+        'An unexpected error occurred during the avatar update process: ${e.toString()}',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red,
         colorText: Colors.white,
@@ -177,80 +218,81 @@ class AppDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final DataController dataController = Get.find<DataController>();
-    // Observe the user data for reactive updates
-    final user = dataController.user.value;
-    final String? avatarUrl = user['avatar'];
-    final String username = user['username'] ?? 'User';
-    final String email = user['email'] ?? 'user@example.com'; // Assuming email is available
-
-    // Fallback avatar initial
-    final String avatarInitial = username.isNotEmpty ? username[0].toUpperCase() : '?';
+    final DataController dataController = Get.find<DataController>(); // Keep this to access methods
 
     return Drawer(
-      backgroundColor: const Color(0xFF121212), // Darker background for the drawer
+      backgroundColor: const Color(0xFF121212),
       child: ListView(
         padding: EdgeInsets.zero,
         children: <Widget>[
-          UserAccountsDrawerHeader(
-            accountName: Text(
-              username,
-              style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 18),
-            ),
-            accountEmail: Text(
-              email,
-              style: GoogleFonts.roboto(fontSize: 14),
-            ),
-            currentAccountPicture: Stack(
-              alignment: Alignment.bottomRight,
-              children: [
-                CircleAvatar(
-                  radius: 36,
-                  backgroundColor: Colors.tealAccent.withOpacity(0.3),
-                  backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
-                      ? CachedNetworkImageProvider(avatarUrl)
-                      : null,
-                  child: (avatarUrl == null || avatarUrl.isEmpty)
-                      ? Text(
-                          avatarInitial,
-                          style: GoogleFonts.poppins(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.tealAccent,
+          Obx(() { // Wrap UserAccountsDrawerHeader (or just currentAccountPicture part) with Obx
+            // Access reactive user data inside Obx for it to rebuild on change
+            final userMap = dataController.user.value;
+            final String? avatarUrl = userMap['avatar'];
+            final String username = userMap['username'] ?? 'User';
+            final String email = userMap['email'] ?? 'user@example.com';
+            final String avatarInitial = username.isNotEmpty ? username[0].toUpperCase() : '?';
+
+            return UserAccountsDrawerHeader(
+              accountName: Text(
+                username,
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 18),
+              ),
+              accountEmail: Text(
+                email,
+                style: GoogleFonts.roboto(fontSize: 14),
+              ),
+              currentAccountPicture: Stack(
+                alignment: Alignment.bottomRight,
+                children: [
+                  CircleAvatar(
+                    radius: 36,
+                    backgroundColor: Colors.tealAccent.withOpacity(0.3),
+                    backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
+                        ? CachedNetworkImageProvider(avatarUrl)
+                        : null,
+                    child: (avatarUrl == null || avatarUrl.isEmpty)
+                        ? Text(
+                            avatarInitial,
+                            style: GoogleFonts.poppins(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.tealAccent,
+                            ),
+                          )
+                        : null,
+                  ),
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: Material(
+                      color: Colors.tealAccent,
+                      shape: const CircleBorder(),
+                      elevation: 2.0,
+                      child: InkWell(
+                        onTap: () {
+                          _showImageSourceActionSheet(context);
+                        },
+                        customBorder: const CircleBorder(),
+                        child: const Padding(
+                          padding: EdgeInsets.all(6.0),
+                          child: Icon(
+                            FeatherIcons.edit2,
+                            size: 16.0,
+                            color: Colors.black,
                           ),
-                        )
-                      : null,
-                ),
-                Positioned(
-                  right: 0,
-                  bottom: 0,
-                  child: Material(
-                    color: Colors.tealAccent,
-                    shape: const CircleBorder(),
-                    elevation: 2.0,
-                    child: InkWell(
-                      onTap: () {
-                        // Call the new method to show the bottom sheet
-                        _showImageSourceActionSheet(context);
-                      },
-                      customBorder: const CircleBorder(),
-                      child: const Padding(
-                        padding: EdgeInsets.all(6.0),
-                        child: Icon(
-                          FeatherIcons.edit2,
-                          size: 16.0,
-                          color: Colors.black,
                         ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
-            decoration: BoxDecoration(
-              color: Colors.teal[700], // Teal color for the header background
-            ),
-          ),
+                ],
+              ),
+              decoration: BoxDecoration(
+                color: Colors.teal[700],
+              ),
+            );
+          }), // End of Obx
+          // ... other ListTiles (they don't need to be in Obx unless they also depend on user.value directly)
           ListTile(
             leading: Icon(FeatherIcons.rss, color: Colors.grey[300]),
             title: Text(
