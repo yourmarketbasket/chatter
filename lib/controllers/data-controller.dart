@@ -184,19 +184,35 @@ class DataController extends GetxController {
       if (response.statusCode == 200 && response.data['success'] == true) {
         try {
           // Save token and user data to secure storage
-          await _storage.write(
-            key: 'token',
-            value: response.data['user']['token']?.toString(),
-          );
-          await _storage.write(
-            key: 'user',
-            value: jsonEncode(response.data['user']),
-          );
+          String? tokenValue = response.data['user']['token']?.toString();
+          String userJson = jsonEncode(response.data['user']);
+
+          await _storage.write(key: 'token', value: tokenValue);
+          await _storage.write(key: 'user', value: userJson);
+
+          // Update the in-memory user state immediately
+          user.value = jsonDecode(userJson);
+          print('[DataController] User data saved to storage and in-memory state updated.');
+
+          // Now, fetch feeds
+          try {
+            print('[DataController] Login successful. Fetching initial feeds...');
+            await fetchFeeds();
+            print('[DataController] Initial feeds fetched successfully after login.');
+          } catch (feedError) {
+            print('[DataController] Error fetching feeds immediately after login: ${feedError.toString()}. Login itself is still considered successful. Feeds can be fetched later.');
+            // Optionally, you could set a flag here to indicate feeds failed to load,
+            // so HomeFeedScreen could show a specific message or retry option.
+            // For now, HomeFeedScreen will show its default empty/loading state for posts.
+          }
+
           return {'success': true, 'message': 'User logged in successfully'};
         } catch (e) {
+          // This catch is for errors during storage write or updating user.value
+          print('[DataController] Error saving user data or updating state after login: ${e.toString()}');
           return {
             'success': false,
-            'message': 'Failed to save user data securely: ${e.toString()}'
+            'message': 'Login partially failed: Could not save user session: ${e.toString()}'
           };
         }
       } else {
@@ -206,7 +222,9 @@ class DataController extends GetxController {
         };
       }
     } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      // This catch is for network errors or other issues with the login API call itself
+      print('[DataController] Login API call failed: ${e.toString()}');
+      return {'success': false, 'message': 'Login failed: ${e.toString()}'};
     }
   }
 
