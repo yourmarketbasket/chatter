@@ -4,6 +4,8 @@ import 'package:chatter/pages/new-posts-page.dart';
 import 'package:chatter/pages/reply_page.dart';
 import 'package:chatter/pages/repost_page.dart';
 import 'package:chatter/pages/media_view_page.dart';
+import 'package:chatter/pages/search_page.dart';
+import 'package:chatter/widgets/app_drawer.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
@@ -693,7 +695,11 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         ),
         backgroundColor: Color(0xFF000000),
         elevation: 0,
+        // The leading hamburger icon to open the drawer will be automatically added
+        // by Flutter when a drawer is present on the Scaffold.
+        // No explicit leading button is needed here unless custom behavior is desired.
       ),
+      drawer: const AppDrawer(), // <-- ADD THIS LINE
       body: Obx(() {
         if (dataController.posts.isEmpty) {
           return Center(
@@ -743,48 +749,35 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         );
       }),
       bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Color(0xFF000000),
+        backgroundColor: const Color(0xFF000000),
         selectedItemColor: Colors.tealAccent,
         unselectedItemColor: Colors.grey[500],
         selectedLabelStyle: GoogleFonts.roboto(fontWeight: FontWeight.w500),
         unselectedLabelStyle: GoogleFonts.roboto(),
         elevation: 0,
+        iconSize: 22, // Reduced icon size (was 24)
+        type: BottomNavigationBarType.fixed, // Good practice for 2-3 items
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(FeatherIcons.home, size: 24),
+            icon: Icon(FeatherIcons.home), // size is now controlled by iconSize above
             label: 'Home',
           ),
           BottomNavigationBarItem(
-            icon: Icon(FeatherIcons.search, size: 24),
+            icon: Icon(FeatherIcons.search), // size is now controlled by iconSize above
             label: 'Search',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(FeatherIcons.user, size: 24),
-            label: 'Profile',
-          ),
         ],
-        currentIndex: 0,
+        currentIndex: 0, // Set to 0 as this is the HomeFeedScreen
         onTap: (index) {
-          if (index == 1) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Search screen coming soon!',
-                  style: GoogleFonts.roboto(color: Colors.white),
-                ),
-                backgroundColor: Colors.teal[700],
-              ),
-            );
-          } else if (index == 2) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Profile screen coming soon!',
-                  style: GoogleFonts.roboto(color: Colors.white),
-                ),
-                backgroundColor: Colors.teal[700],
-              ),
-            );
+          if (index == 0) {
+            // Already on Home, or navigate to Home if somehow accessed from a different context
+            // This primarily handles the visual selection of the tab.
+            // If HomeFeedScreen is part of a larger navigation stack (e.g. if other pages push on top of it),
+            // ensure Get.offAll or similar is used when appropriate from other pages to return "home".
+            // For now, if we are on HomeFeedScreen, tapping "Home" does nothing new.
+          } else if (index == 1) {
+            // Navigate to SearchPage
+            Get.to(() => const SearchPage());
           }
         },
       ),

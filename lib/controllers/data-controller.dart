@@ -29,6 +29,9 @@ class DataController extends GetxController {
   final user = {}.obs;
   final RxList<Map<String, dynamic>> posts = <Map<String, dynamic>>[].obs;
 
+  // Placeholder for all users
+  final RxList<Map<String, dynamic>> allUsers = <Map<String, dynamic>>[].obs;
+
   @override
   void onInit() {
     super.onInit();
@@ -54,6 +57,25 @@ class DataController extends GetxController {
       print('Error fetching initial feeds: $e');
       posts.clear(); // Clear posts on error
     }
+    // Fetch all users (placeholder)
+    // We will call this from UsersListPage for now to avoid startup delays
+    // fetchAllUsers();
+  }
+
+  // Method to fetch/initialize all users (placeholder implementation)
+  Future<void> fetchAllUsers() async {
+    // Simulate a network call
+    await Future.delayed(const Duration(seconds: 1));
+    // Placeholder data
+    var fetchedUsers = [
+      {'id': '1', 'username': 'AliceWonder', 'email': 'alice@example.com', 'avatar': 'https://i.pravatar.cc/150?u=alice'},
+      {'id': '2', 'username': 'BobTheBuilder', 'email': 'bob@example.com', 'avatar': 'https://i.pravatar.cc/150?u=bob'},
+      {'id': '3', 'username': 'CharlieChap', 'email': 'charlie@example.com', 'avatar': 'https://i.pravatar.cc/150?u=charlie'},
+      {'id': '4', 'username': 'DianaPrince', 'email': 'diana@example.com', 'avatar': 'https://i.pravatar.cc/150?u=diana'},
+      {'id': '5', 'username': 'EdwardScissor', 'email': 'edward@example.com', 'avatar': 'https://i.pravatar.cc/150?u=edward'},
+    ];
+    allUsers.assignAll(fetchedUsers);
+    print('[DataController] Fetched all users (placeholder).');
   }
 
   // Create post
