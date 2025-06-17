@@ -2,18 +2,18 @@ import 'package:better_player_enhanced/better_player.dart';
 import 'package:chatter/pages/home-feed-screen.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:feather_icons/feather_icons.dart'; // For fallback icons
+import 'package:feather_icons/feather_icons.dart';
 import 'package:pdfrx/pdfrx.dart';
-import 'package:video_player/video_player.dart'; // For video playback
-import 'package:audioplayers/audioplayers.dart' as audioplayers; // For audio playback with prefix
-import 'package:cached_network_image/cached_network_image.dart'; // For cached image loading
+import 'package:video_player/video_player.dart';
+import 'package:audioplayers/audioplayers.dart' as audioplayers;
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:chatter/widgets/video_player_widget.dart';
 import 'package:chatter/widgets/better_player_widget.dart';
 import 'dart:io';
 import 'dart:async';
 import 'dart:math';
-import 'package:device_info_plus/device_info_plus.dart'; // For checking Android version
-import 'package:intl/intl.dart'; // For date formatting
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:intl/intl.dart';
 
 // MediaViewPage displays attachments with metadata and social interactions.
 class MediaViewPage extends StatefulWidget {
@@ -61,7 +61,32 @@ class _MediaViewPageState extends State<MediaViewPage> {
     super.dispose();
   }
 
-  // Optimize Cloudinary URL
+  // Optimize Cloudinary URL for videos
+  String _optimizeCloudinaryVideoUrl(String? url) {
+    if (url == null || !url.contains('cloudinary.com')) return url ?? '';
+    final uri = Uri.parse(url);
+    
+    // Video-specific optimization parameters
+    final optimizedParams = {
+      ...uri.queryParameters,
+      'q': 'auto:good',
+      'f': 'auto',
+      'c': 'scale',
+      'ac': 'aac',
+      'vc': 'auto',
+      'dpr': 'auto',
+      'ar': '16:9',
+      'cs': 'hls',
+      'w': '1280',
+      'h': '720',
+      'r': '24',
+      'b': 'auto',
+    };
+    
+    return uri.replace(queryParameters: optimizedParams).toString();
+  }
+
+  // Original _optimizeCloudinaryUrl for non-video assets
   String _optimizeCloudinaryUrl(String? url) {
     if (url == null || !url.contains('cloudinary.com')) return url ?? '';
     final uri = Uri.parse(url);
@@ -73,7 +98,7 @@ class _MediaViewPageState extends State<MediaViewPage> {
     return optimizedUrl.toString();
   }
 
-  // Check Android version
+  // Check Android version for player compatibility
   Future<bool> _isAndroid13OrLower() async {
     if (!Platform.isAndroid) return false;
     final deviceInfo = DeviceInfoPlugin();
@@ -100,17 +125,9 @@ class _MediaViewPageState extends State<MediaViewPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(
-        title: Text(
-          widget.attachments.isNotEmpty ? _getPageTitle(widget.attachments[_currentPageIndex]) : "View Post",
-          style: GoogleFonts.poppins(color: Colors.white)
-        ),
-        backgroundColor: const Color(0xFF121212),
-        iconTheme: const IconThemeData(color: Colors.white),
-        elevation: 0,
-      ),
       body: Column(
         children: [
+          SizedBox(height: 20),
           Expanded(
             child: PageView.builder(
               controller: _pageController,
@@ -123,7 +140,9 @@ class _MediaViewPageState extends State<MediaViewPage> {
               itemBuilder: (context, index) {
                 final Attachment currentAttachment = widget.attachments[index];
                 final String displayPath = currentAttachment.url ?? currentAttachment.file?.path ?? 'Unknown attachment';
-                final String optimizedUrl = _optimizeCloudinaryUrl(currentAttachment.url);
+                final String optimizedUrl = currentAttachment.type.toLowerCase() == 'video' 
+                    ? _optimizeCloudinaryVideoUrl(currentAttachment.url)
+                    : _optimizeCloudinaryUrl(currentAttachment.url);
 
                 Widget mediaWidget;
                 switch (currentAttachment.type.toLowerCase()) {
@@ -138,19 +157,12 @@ class _MediaViewPageState extends State<MediaViewPage> {
                       future: _isAndroid13OrLower(),
                       builder: (context, snapshot) {
                         if (snapshot.connectionState == ConnectionState.done && snapshot.data != null) {
-                          if (snapshot.data!) {
-                            return BetterPlayerWidget(
-                              url: optimizedUrl.isNotEmpty ? optimizedUrl : currentAttachment.url,
-                              file: currentAttachment.file,
-                              displayPath: displayPath,
-                            );
-                          } else {
-                            return VideoPlayerWidget(
-                              url: optimizedUrl.isNotEmpty ? optimizedUrl : currentAttachment.url,
-                              file: currentAttachment.file,
-                              displayPath: displayPath,
-                            );
-                          }
+                          return VideoPlayerContainer(
+                            url: optimizedUrl.isNotEmpty ? optimizedUrl : currentAttachment.url,
+                            file: currentAttachment.file,
+                            displayPath: displayPath,
+                            isAndroid13OrLower: snapshot.data!,
+                          );
                         }
                         return const Center(
                           child: CircularProgressIndicator(
@@ -168,7 +180,7 @@ class _MediaViewPageState extends State<MediaViewPage> {
                     );
                     break;
                   default:
-                    mediaWidget = _buildPlaceholder(
+                    mediaWidget = buildError(
                       context,
                       icon: FeatherIcons.file,
                       message: 'Unsupported attachment type: ${currentAttachment.type}',
@@ -176,12 +188,12 @@ class _MediaViewPageState extends State<MediaViewPage> {
                       iconColor: Colors.grey[600],
                     );
                 }
-                return Center(child: mediaWidget); // Ensure media widget is centered
+                return Center(child: mediaWidget);
               },
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(8.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -190,7 +202,7 @@ class _MediaViewPageState extends State<MediaViewPage> {
                     CircleAvatar(
                       backgroundImage: widget.userAvatarUrl != null && widget.userAvatarUrl!.isNotEmpty
                           ? NetworkImage(_optimizeCloudinaryUrl(widget.userAvatarUrl!))
-                          : const AssetImage('assets/images/default_avatar.png') as ImageProvider, // Placeholder
+                          : const AssetImage('assets/images/default_avatar.png') as ImageProvider,
                       radius: 20,
                     ),
                     const SizedBox(width: 10),
@@ -222,17 +234,6 @@ class _MediaViewPageState extends State<MediaViewPage> {
                     Text('${widget.repostsCount} Reposts', style: GoogleFonts.poppins(color: Colors.grey[400], fontSize: 12)),
                   ],
                 ),
-                const SizedBox(height: 12),
-                Divider(color: Colors.grey[700]),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildSocialButton(FeatherIcons.heart, 'Like', () { /* Like action */ }),
-                    _buildSocialButton(FeatherIcons.repeat, 'Repost', () { /* Repost action */ }),
-                    _buildSocialButton(FeatherIcons.messageSquare, 'Comment', () { /* Comment action */ }),
-                    _buildSocialButton(FeatherIcons.share, 'Share', () { /* Share action */ }),
-                  ],
-                ),
               ],
             ),
           ),
@@ -248,16 +249,13 @@ class _MediaViewPageState extends State<MediaViewPage> {
       onPressed: onPressed,
       style: TextButton.styleFrom(
         padding: EdgeInsets.zero,
-        minimumSize: Size(50, 30), // Adjust size to fit content
-      )
+        minimumSize: Size(50, 30),
+      ),
     );
   }
 
   Widget _buildImageViewer(BuildContext context, Attachment attachment, String displayPath, String optimizedUrl) {
-    // ... (Keep existing _buildImageViewer logic, but use the passed attachment)
-    // Replace `attachment.url` with `currentAttachment.url` etc.
-    // For brevity, I'm not fully expanding this here but it needs to be updated
-     return LayoutBuilder(
+    return LayoutBuilder(
       builder: (context, constraints) {
         final String currentOptimizedUrl = _optimizeCloudinaryUrl(attachment.url);
         if (currentOptimizedUrl.isNotEmpty) {
@@ -269,7 +267,7 @@ class _MediaViewPageState extends State<MediaViewPage> {
                 imageUrl: currentOptimizedUrl,
                 fit: BoxFit.contain,
                 placeholder: (context, url) => Center(child: LinearProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent), backgroundColor: Colors.grey)),
-                errorWidget: (context, url, error) => _buildError(context, message: 'Error loading image: $error'),
+                errorWidget: (context, url, error) => buildError(context, message: 'Error loading image: $error'),
                 cacheKey: attachment.url,
               ),
             ),
@@ -282,19 +280,18 @@ class _MediaViewPageState extends State<MediaViewPage> {
               child: Image.file(
                 attachment.file!,
                 fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) => _buildError(context, message: 'Error loading image file: $error'),
+                errorBuilder: (context, error, stackTrace) => buildError(context, message: 'Error loading image file: $error'),
               ),
             ),
           );
         } else {
-          return _buildError(context, message: 'No image source available for $displayPath');
+          return buildError(context, message: 'No image source available for $displayPath');
         }
       },
     );
   }
 
   Widget _buildPdfViewer(BuildContext context, Attachment attachment, String displayPath, String optimizedUrl) {
-    // ... (Keep existing _buildPdfViewer logic, but use the passed attachment)
     final String currentOptimizedUrl = _optimizeCloudinaryUrl(attachment.url);
     if (currentOptimizedUrl.isNotEmpty || attachment.file != null) {
       final Uri pdfUri = currentOptimizedUrl.isNotEmpty
@@ -310,57 +307,37 @@ class _MediaViewPageState extends State<MediaViewPage> {
         ),
       );
     } else {
-      return _buildError(context, message: 'No PDF source available for $displayPath');
+      return buildError(context, message: 'No PDF source available for $displayPath');
     }
   }
 
-  static Widget _buildError(BuildContext context, {required String message}) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        const Icon(
-          FeatherIcons.alertTriangle,
-          color: Colors.redAccent,
-          size: 50,
-        ),
-        const SizedBox(height: 10),
-        Text(
-          message,
-          style: GoogleFonts.roboto(
-            color: Colors.white70,
-            fontSize: 16,
-          ),
-          textAlign: TextAlign.center,
-        ),
-      ],
-    );
-  }
+}
 
-  // Builds a placeholder for unsupported or unimplemented media types
-  Widget _buildPlaceholder(
-    BuildContext context, {
-    required IconData icon,
-    required String message,
-    required String fileName,
-    Color? iconColor,
-  }) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(
-          icon,
-          color: iconColor ?? Colors.tealAccent,
-          size: 100,
+Widget buildError(
+  BuildContext context, {
+  String? message,
+  IconData? icon,
+  String? fileName,
+  Color? iconColor,
+}) {
+  return Column(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      Icon(
+        icon ?? FeatherIcons.alertTriangle,
+        color: iconColor ?? Colors.redAccent,
+        size: icon != null ? 100 : 50,
+      ),
+      const SizedBox(height: 10),
+      Text(
+        message ?? 'Error loading content',
+        style: GoogleFonts.roboto(
+          color: Colors.white70,
+          fontSize: 16,
         ),
-        const SizedBox(height: 20),
-        Text(
-          message,
-          style: GoogleFonts.roboto(
-            color: Colors.white70,
-            fontSize: 16,
-          ),
-          textAlign: TextAlign.center,
-        ),
+        textAlign: TextAlign.center,
+      ),
+      if (fileName != null) ...[
         const SizedBox(height: 10),
         Text(
           fileName,
@@ -372,7 +349,176 @@ class _MediaViewPageState extends State<MediaViewPage> {
           overflow: TextOverflow.ellipsis,
         ),
       ],
-    );
+    ],
+  );
+}
+
+// VideoPlayerContainer to handle optimized video playback
+class VideoPlayerContainer extends StatefulWidget {
+  final String? url;
+  final File? file;
+  final String displayPath;
+  final bool isAndroid13OrLower;
+
+  const VideoPlayerContainer({
+    Key? key,
+    this.url,
+    this.file,
+    required this.displayPath,
+    required this.isAndroid13OrLower,
+  }) : super(key: key);
+
+  @override
+  _VideoPlayerContainerState createState() => _VideoPlayerContainerState();
+}
+
+class _VideoPlayerContainerState extends State<VideoPlayerContainer> {
+  BetterPlayerController? betterPlayerController;
+  VideoPlayerController? videoPlayerController;
+  bool _isLoading = true;
+  String? _errorMessage;
+  int _retryCount = 0;
+  final int _maxRetries = 3;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeVideoPlayer();
+  }
+
+  Future<void> _initializeVideoPlayer() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      if (widget.isAndroid13OrLower) {
+        // Configure BetterPlayer for older Android versions
+        final betterPlayerDataSource = widget.url != null
+            ? BetterPlayerDataSource(
+                BetterPlayerDataSourceType.network,
+                widget.url!,
+                cacheConfiguration: BetterPlayerCacheConfiguration(
+                  useCache: true,
+                  preCacheSize: 10 * 1024 * 1024,
+                  maxCacheSize: 100 * 1024 * 1024,
+                  maxCacheFileSize: 10 * 1024 * 1024,
+                ),
+                bufferingConfiguration: BetterPlayerBufferingConfiguration(
+                  minBufferMs: 5000,
+                  maxBufferMs: 15000,
+                  bufferForPlaybackMs: 2500,
+                  bufferForPlaybackAfterRebufferMs: 5000,
+                ),
+                resolutions: {
+                  'low': widget.url!.replaceAll('q_auto:good', 'q_auto:low'),
+                  'medium': widget.url!,
+                  'high': widget.url!.replaceAll('q_auto:good', 'q_auto:best'),
+                },
+              )
+            : BetterPlayerDataSource(
+                BetterPlayerDataSourceType.file,
+                widget.file!.path,
+              );
+
+        betterPlayerController = BetterPlayerController(
+          BetterPlayerConfiguration(
+            autoPlay: false,
+            fit: BoxFit.contain,
+            errorBuilder: (context, errorMessage) => buildError(context, message: errorMessage ?? 'Video playback error'),
+            controlsConfiguration: BetterPlayerControlsConfiguration(
+              enableSkips: false,
+              enableFullscreen: true,
+              enablePip: true,
+              enableQualities: widget.url != null,
+              loadingWidget: const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
+              ),
+            ),
+          ),
+          betterPlayerDataSource: betterPlayerDataSource,
+        );
+
+        // Preload video
+        await betterPlayerController?.preCache(betterPlayerDataSource);
+      } else {
+        // Configure VideoPlayer for newer Android versions
+        videoPlayerController = widget.url != null
+            ? VideoPlayerController.networkUrl(Uri.parse(widget.url!))
+            : VideoPlayerController.file(widget.file!);
+
+        await videoPlayerController!.initialize();
+        videoPlayerController!.setLooping(true);
+        
+        // Monitor buffer health
+        videoPlayerController!.addListener(() {
+          final buffered = videoPlayerController!.value.buffered;
+          if (buffered.isNotEmpty && mounted) {
+            final bufferDuration = buffered.last.end - buffered.last.start;
+            if (bufferDuration.inSeconds < 5 && videoPlayerController!.value.isPlaying) {
+              videoPlayerController!.pause();
+              Future.delayed(Duration(seconds: 2), () {
+                if (mounted && videoPlayerController!.value.buffered.last.end.inSeconds > 10) {
+                  videoPlayerController!.play();
+                }
+              });
+            }
+          }
+        });
+      }
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (_retryCount < _maxRetries && mounted) {
+        _retryCount++;
+        await Future.delayed(const Duration(seconds: 2));
+        return _initializeVideoPlayer();
+      } else if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Failed to load video after $_maxRetries attempts: $e';
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    betterPlayerController?.dispose();
+    videoPlayerController?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
+        ),
+      );
+    }
+
+    if (_errorMessage != null) {
+      return buildError(context, message: _errorMessage!);
+    }
+
+    return widget.isAndroid13OrLower
+        ? BetterPlayerWidget(
+            url: widget.url,
+            file: widget.file,
+            displayPath: widget.displayPath,
+          )
+        : VideoPlayerWidget(
+            url: widget.url,
+            file: widget.file,
+            displayPath: widget.displayPath,
+          );
   }
 }
 
@@ -438,16 +584,12 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget> with SingleTicker
         return;
       }
 
-      // Set the audio source and wait for completion
       await _audioPlayer.setSource(audioSource);
-
-      // Get duration after setting source
       final duration = await _audioPlayer.getDuration();
       if (duration != null && mounted) {
         setState(() {
           _duration = duration;
         });
-        // Initialize waveform with duration
         await _waveformController.prepareWaveform(widget.url ?? widget.file!.path, duration);
       }
 
@@ -494,14 +636,12 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget> with SingleTicker
         _retryCount++;
         await Future.delayed(const Duration(seconds: 2));
         return _initializeAudio();
-      } else {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-            _isInitialized = false;
-            _errorMessage = 'Failed to load audio after $_maxRetries attempts: $e';
-          });
-        }
+      } else if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isInitialized = false;
+          _errorMessage = 'Failed to load audio after $_maxRetries attempts: $e';
+        });
       }
     }
   }
@@ -530,9 +670,12 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget> with SingleTicker
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            LinearProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
-              backgroundColor: Colors.grey,
+            Padding(
+              padding: EdgeInsets.all(8.0),
+              child: LinearProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
+                backgroundColor: Colors.grey,
+              ),
             ),
           ],
         ),
@@ -540,9 +683,13 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget> with SingleTicker
     }
 
     if (!_isInitialized || _errorMessage != null) {
-      return MediaViewPage._buildError(
-        context,
-        message: _errorMessage ?? 'Error loading audio: ${widget.displayPath}',
+      print('Error: $_errorMessage');
+      return Center(
+        child: Text(
+          _errorMessage ?? 'Audio player not initialized',
+          style: const TextStyle(color: Colors.red, fontSize: 16),
+          textAlign: TextAlign.center,
+        ),
       );
     }
 
@@ -554,7 +701,7 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget> with SingleTicker
           color: Colors.tealAccent,
           size: 100,
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 10),
         Text(
           widget.displayPath.split('/').last,
           style: GoogleFonts.roboto(
@@ -564,14 +711,14 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget> with SingleTicker
           textAlign: TextAlign.center,
           overflow: TextOverflow.ellipsis,
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 10),
         CustomWaveform(
           controller: _waveformController,
           animationController: _animationController,
           height: 100,
           width: MediaQuery.of(context).size.width - 40,
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 10),
         Container(
           padding: const EdgeInsets.all(8.0),
           decoration: BoxDecoration(
@@ -639,20 +786,16 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget> with SingleTicker
   }
 }
 
-// Controller for managing waveform data and animation
 class WaveformPlayerController {
   List<double> _waveformData = [];
   double _progress = 0.0;
 
   Future<void> prepareWaveform(String path, Duration duration) async {
-    // Generate dynamic waveform data simulating pitch and amplitude
-    const sampleCount = 200; // Increased samples for smoother waveform
+    const sampleCount = 200;
     final random = Random();
     _waveformData = List.generate(sampleCount, (index) {
-      // Simulate amplitude (volume) with random variations
       final amplitude = 0.3 + random.nextDouble() * 0.5;
-      // Simulate pitch (frequency) with a sine wave
-      final frequency = 1.0 + random.nextDouble() * 4.0; // Vary frequency for pitch effect
+      final frequency = 1.0 + random.nextDouble() * 4.0;
       final time = index / sampleCount;
       return amplitude * sin(2 * pi * frequency * time);
     }).map((value) => (value.abs() * 0.8 + 0.2).clamp(0.0, 1.0)).toList();
@@ -671,7 +814,6 @@ class WaveformPlayerController {
   }
 }
 
-// Custom waveform widget using CustomPaint
 class CustomWaveform extends StatelessWidget {
   final WaveformPlayerController controller;
   final AnimationController animationController;
@@ -705,7 +847,6 @@ class CustomWaveform extends StatelessWidget {
   }
 }
 
-// Painter for drawing the waveform
 class WaveformPainter extends CustomPainter {
   final List<double> waveformData;
   final double progress;
@@ -742,7 +883,6 @@ class WaveformPainter extends CustomPainter {
         barHeight,
       );
 
-      // Draw played portion in active color, unplayed in gray
       canvas.drawRect(rect, i <= progressIndex ? activePaint : inactivePaint);
     }
   }

@@ -187,9 +187,13 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
     }
 
     if (!_isInitialized || _controller == null || _errorMessage != null) {
-      return MediaViewPage._buildError( // This is the line that needs the import for MediaViewPage
-        context,
-        message: _errorMessage ?? 'Error loading video: ${widget.displayPath}',
+      print('Error: $_errorMessage');
+      return Center(
+        child: Text(
+          _errorMessage ?? 'Video player not initialized',
+          style: const TextStyle(color: Colors.red, fontSize: 16),
+          textAlign: TextAlign.center,
+        ),
       );
     }
 
@@ -212,7 +216,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
                 duration: const Duration(milliseconds: 300),
                 child: _showControls
                     ? Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                        padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
                         decoration: const BoxDecoration(
                           color: Colors.transparent, // Transparent background
                         ),

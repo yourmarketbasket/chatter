@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:better_player_enhanced/better_player.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:chatter/pages/media_view_page.dart'; // For MediaViewPage._buildError
 import 'dart:async';
 import 'dart:io';
 
@@ -37,7 +36,7 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
   Timer? _hideControlsTimer;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
-  double? _aspectRatio; // No default aspect ratio
+  double? _aspectRatio;
 
   @override
   void initState() {
@@ -89,11 +88,33 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
         return;
       }
 
+      // Create a temporary controller to get video dimensions
+      final tempController = BetterPlayerController(
+        const BetterPlayerConfiguration(
+          autoPlay: false,
+          looping: false,
+          handleLifecycle: false,
+          autoDispose: true,
+        ),
+        betterPlayerDataSource: dataSource,
+      );
+
+      await tempController.setupDataSource(dataSource);
+      if (mounted) {
+        final videoPlayerController = tempController.videoPlayerController;
+        if (videoPlayerController != null && videoPlayerController.value.size != null && videoPlayerController.value.size!.width > 0) {
+          final size = videoPlayerController.value.size;
+          _aspectRatio = (size!.width / size!.height)!;
+        }
+        tempController.dispose();
+      }
+
+      // Initialize the actual controller with the determined aspect ratio
       _controller = BetterPlayerController(
         BetterPlayerConfiguration(
           autoPlay: false,
           looping: false,
-          fit: BoxFit.cover, // Ensure video covers the space, constrained by AspectRatio
+          aspectRatio: _aspectRatio ?? 16 / 9, // Fallback to 16:9
           controlsConfiguration: const BetterPlayerControlsConfiguration(
             showControls: false, // We'll use custom controls
           ),
@@ -109,7 +130,6 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
           _isLoading = false;
           _isInitialized = true;
           _duration = _controller!.videoPlayerController!.value.duration ?? Duration.zero;
-          _aspectRatio = _controller!.videoPlayerController!.value.aspectRatio;
         });
 
         _controller!.addEventsListener((event) {
@@ -120,7 +140,6 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
               }
               _isPlaying = _controller!.isPlaying() ?? false;
               _duration = _controller!.videoPlayerController!.value.duration ?? _duration;
-              _aspectRatio = _controller!.videoPlayerController!.value.aspectRatio ?? _aspectRatio;
               if (!_isPlaying && !_showControls) {
                 _showControls = true;
                 _animationController.forward();
@@ -208,18 +227,12 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
     }
 
     if (!_isInitialized || _controller == null || _errorMessage != null) {
-      return MediaViewPage._buildError(
-        context,
-        message: _errorMessage ?? 'Error loading video: ${widget.displayPath}',
-      );
-    }
-
-    if (_aspectRatio == null) {
-      return const Center(
-        child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
-          backgroundColor: Colors.grey,
-          strokeWidth:   1,
+      print('Error: $_errorMessage');
+      return Center(
+        child: Text(
+          _errorMessage ?? 'Video player not initialized',
+          style: const TextStyle(color: Colors.red, fontSize: 16),
+          textAlign: TextAlign.center,
         ),
       );
     }
@@ -231,9 +244,9 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
           child: Stack(
             alignment: Alignment.bottomCenter,
             children: [
-              Center( // Center the AspectRatio
+              Center(
                 child: AspectRatio(
-                  aspectRatio: _aspectRatio!,
+                  aspectRatio: _aspectRatio ?? 16 / 9,
                   child: BetterPlayer(controller: _controller!),
                 ),
               ),
