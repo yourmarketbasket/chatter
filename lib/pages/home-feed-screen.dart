@@ -6,6 +6,7 @@ import 'package:chatter/pages/repost_page.dart';
 import 'package:chatter/pages/media_view_page.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:image/image.dart' as img;
 import 'package:intl/intl.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io';
@@ -48,7 +49,7 @@ class ChatterPost {
   int likes;
   int reposts;
   int views;
-  final List<Attachment> attachments;
+  final List<Map<String, dynamic>> attachments;
   final String avatarInitial;
   final String? useravatar;
   List<String> replies;
@@ -68,7 +69,7 @@ class ChatterPost {
 }
 
 class HomeFeedScreen extends StatefulWidget {
-  const HomeFeedScreen({Key? key}) : super(key: key);
+  const HomeFeedScreen({super.key});
 
   @override
   _HomeFeedScreenState createState() => _HomeFeedScreenState();
@@ -88,10 +89,11 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       print("Stack trace: ${error.stackTrace}");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to load feed. Please try again later.', style: GoogleFonts.roboto(color: Colors.white)),
+          content: Text('Failed to load feed: $error', style: GoogleFonts.roboto(color: Colors.white)),
           backgroundColor: Colors.red[700],
         ),
       );
+      return null;
     });
   }
 
@@ -125,10 +127,10 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   void _navigateToPostScreen() async {
     final result = await Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => NewPostScreen()),
+      MaterialPageRoute(builder: (context) => const NewPostScreen()),
     );
     if (result != null && result is Map<String, dynamic>) {
-      _addPost(result['content'], result['attachments']);
+      await _addPost(result['content'] as String, result['attachments'] as List<Attachment>);
     }
   }
 
@@ -216,7 +218,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     }
 
     Map<String, dynamic> postData = {
-      'username': "YourName",
+      'username': dataController.user.value['user']?['name'] ?? 'Unknown',
       'content': content.trim(),
       'useravatar': dataController.user.value['avatar'] ?? '',
       'attachments': uploadedAttachments.map((att) => {
@@ -231,8 +233,6 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     print(dataController.user.value);
 
     final result = await dataController.createPost(postData);
-    print(result);
-
     if (result['success'] == true) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -247,7 +247,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Failed to create post on server: ${result['message'] ?? 'Unknown error'}',
+            'Failed to create post: ${result['message'] ?? 'Unknown error'}',
             style: GoogleFonts.roboto(color: Colors.white),
           ),
           backgroundColor: Colors.red[700],
@@ -310,6 +310,408 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     }
   }
 
+  String _optimizeCloudinaryVideoUrl(String url, {bool isThumbnail = false, bool isFullScreen = false}) {
+    final uri = Uri.parse(url);
+    final pathSegments = uri.pathSegments;
+    if (!url.contains('cloudinary.com') || !pathSegments.contains('video')) {
+      return url;
+    }
+
+    final uploadIndex = pathSegments.indexOf('upload');
+    if (uploadIndex == -1 || uploadIndex + 1 >= pathSegments.length) {
+      return url;
+    }
+    final publicIdWithFormat = pathSegments.sublist(uploadIndex + 1).join('/');
+    final publicId = publicIdWithFormat.contains('.')
+        ? publicIdWithFormat.substring(0, publicIdWithFormat.lastIndexOf('.'))
+        : publicIdWithFormat;
+    final format = publicIdWithFormat.contains('.')
+        ? publicIdWithFormat.substring(publicIdWithFormat.lastIndexOf('.') + 1)
+        : 'mp4';
+
+    String transformations;
+    if (isThumbnail) {
+      transformations = 'q_auto:low,f_auto,w_480,h_270,c_fill,e_preview,so_0';
+    } else if (isFullScreen) {
+      transformations = 'q_auto:best,f_auto,w_1280,c_fill,so_0,vc_h264:baseline';
+    } else {
+      transformations = 'q_auto:good,f_auto,w_480,c_fill,so_0,vc_h264:baseline';
+    }
+
+    final optimizedPath = pathSegments.sublist(0, uploadIndex + 1).join('/') + '/$transformations/$publicId.$format';
+    return Uri(
+      scheme: uri.scheme,
+      host: uri.host,
+      path: '/$optimizedPath',
+    ).toString();
+  }
+
+  Future<String?> _generateThumbnail(String videoUrl) async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final thumbnailPath = await video_thumb.VideoThumbnail.thumbnailFile(
+        video: _optimizeCloudinaryVideoUrl(videoUrl, isThumbnail: true),
+        thumbnailPath: tempDir.path,
+        imageFormat: video_thumb.ImageFormat.PNG,
+        maxHeight: 200,
+        quality: 75,
+      );
+      return thumbnailPath;
+    } catch (e) {
+      print("Error generating thumbnail: $e");
+      return null;
+    }
+  }
+
+  Future<String?> _generatePdfThumbnail(String pdfUrl) async {
+    if (_pdfThumbnailCache.containsKey(pdfUrl)) {
+      return _pdfThumbnailCache[pdfUrl];
+    }
+
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final tempFile = File('${tempDir.path}/${DateTime.now().millisecondsSinceEpoch}.png');
+
+      final document = await PdfDocument.openUri(Uri.parse(pdfUrl));
+      final page = await document.pages[0].render(
+        width: 200,
+        height: 200,
+      );
+
+      if (page != null) {
+        await tempFile.writeAsBytes(page.bytes);
+        _pdfThumbnailCache[pdfUrl] = tempFile.path;
+        await document.dispose();
+        return tempFile.path;
+      }
+      await document.dispose();
+      return null;
+    } catch (e) {
+      print("Error generating PDF thumbnail: $e");
+      return null;
+    }
+  }
+
+  Future<bool> _isUrlAccessible(String url) async {
+    try {
+      final response = await http.head(Uri.parse(url)).timeout(const Duration(seconds: 5));
+      return response.statusCode == 200;
+    } catch (e) {
+      print("URL accessibility check failed: $e");
+      return false;
+    }
+  }
+
+  Future<Size> _getImageDimensions(String url) async {
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final image = img.decodeImage(response.bodyBytes);
+        if (image != null) {
+          return Size(image.width.toDouble(), image.height.toDouble());
+        }
+      }
+      return const Size(300, 300);
+    } catch (e) {
+      print("Error getting image dimensions: $e");
+      return const Size(300, 300);
+    }
+  }
+
+  void _showFullScreenMedia(BuildContext context, String url, String type, String filename) {
+    VideoPlayerController? fullScreenVideoController;
+    BetterPlayerController? fullScreenBetterPlayerController;
+    bool isPlaying = true;
+    final attachmentKey = '${filename}_${url.hashCode}';
+
+    if (type == 'video') {
+      final optimizedUrl = _optimizeCloudinaryVideoUrl(url, isFullScreen: true);
+      final useVideoPlayer = _androidVersion != null && _androidVersion! >= 13;
+
+      if (useVideoPlayer && !(_videoHasError[attachmentKey] ?? false)) {
+        fullScreenVideoController = VideoPlayerController.networkUrl(Uri.parse(optimizedUrl));
+        fullScreenVideoController.initialize().then((_) {
+          if (mounted && !_controllersDisposed[attachmentKey]!) {
+            setState(() {
+              fullScreenVideoController?.play();
+              fullScreenVideoController?.setLooping(true);
+            });
+          }
+        }).catchError((error) {
+          if (mounted && !_controllersDisposed[attachmentKey]!) {
+            setState(() {
+              _videoHasError[attachmentKey] = true;
+              _videoControllers.remove(attachmentKey);
+              _controllersDisposed[attachmentKey] = true;
+              fullScreenVideoController?.dispose();
+              fullScreenVideoController = null;
+              fullScreenBetterPlayerController = _createBetterPlayerController(optimizedUrl);
+              fullScreenBetterPlayerController?.play();
+            });
+          }
+        });
+      } else {
+        fullScreenBetterPlayerController = _createBetterPlayerController(optimizedUrl);
+        if (mounted && !_controllersDisposed[attachmentKey]!) {
+          fullScreenBetterPlayerController.play();
+        }
+      }
+    }
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: EdgeInsets.zero,
+          child: StatefulBuilder(
+            builder: (context, setDialogState) {
+              return FutureBuilder<Size>(
+                future: type == 'image' ? _getImageDimensions(url) : Future.value(const Size(16, 9)),
+                builder: (context, snapshot) {
+                  final maxWidth = MediaQuery.of(context).size.width * 0.9;
+                  final maxHeight = MediaQuery.of(context).size.height * 0.9;
+                  double? dialogWidth;
+                  double? dialogHeight;
+
+                  if (snapshot.hasData && type == 'image') {
+                    final size = snapshot.data!;
+                    final aspectRatio = size.width / size.height;
+                    dialogWidth = min(size.width, maxWidth);
+                    dialogHeight = min(size.height, maxHeight);
+                    if (dialogWidth / dialogHeight > aspectRatio) {
+                      dialogWidth = dialogHeight * aspectRatio;
+                    } else {
+                      dialogHeight = dialogWidth / aspectRatio;
+                    }
+                  }
+
+                  return Container(
+                    width: dialogWidth,
+                    height: dialogHeight,
+                    child: Stack(
+                      children: [
+                        Center(
+                          child: type == 'image'
+                              ? CachedNetworkImage(
+                                  imageUrl: url,
+                                  fit: BoxFit.contain,
+                                  placeholder: (context, url) => const Center(
+                                    child: CircularProgressIndicator(
+                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
+                                    ),
+                                  ),
+                                  errorWidget: (context, url, error) => const Icon(
+                                    FeatherIcons.image,
+                                    color: Colors.grey,
+                                    size: 40,
+                                  ),
+                                )
+                              : type == 'video'
+                                  ? (_videoHasError[attachmentKey] ?? false) || fullScreenVideoController == null
+                                      ? fullScreenBetterPlayerController != null
+                                          ? BetterPlayer(controller: fullScreenBetterPlayerController!)
+                                          : Container(
+                                              color: Colors.grey[900],
+                                              child: const Icon(
+                                                FeatherIcons.video,
+                                                color: Colors.tealAccent,
+                                                size: 40,
+                                              ),
+                                            )
+                                      : fullScreenVideoController?.value.isInitialized == true
+                                          ? AspectRatio(
+                                              aspectRatio: fullScreenVideoController!.value.aspectRatio,
+                                              child: VideoPlayer(fullScreenVideoController!),
+                                            )
+                                          : Container(
+                                              color: Colors.grey[900],
+                                              child: const Icon(
+                                                FeatherIcons.video,
+                                                color: Colors.tealAccent,
+                                                size: 40,
+                                              ),
+                                            )
+                                  : Container(),
+                        ),
+                        Positioned(
+                          top: 10,
+                          right: 10,
+                          child: IconButton(
+                            icon: const Icon(FeatherIcons.x, color: Colors.white),
+                            onPressed: () {
+                              Navigator.pop(context);
+                            },
+                          ),
+                        ),
+                        if (type == 'video' && fullScreenVideoController != null && fullScreenVideoController?.value.isInitialized == true)
+                          Positioned(
+                            bottom: 10,
+                            left: 0,
+                            right: 0,
+                            child: Column(
+                              children: [
+                                VideoProgressIndicator(
+                                  fullScreenVideoController!,
+                                  allowScrubbing: true,
+                                  colors: const VideoProgressColors(
+                                    playedColor: Colors.tealAccent,
+                                    bufferedColor: Colors.grey,
+                                    backgroundColor: Colors.grey,
+                                  ),
+                                ),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(
+                                        FeatherIcons.rewind,
+                                        color: Colors.white,
+                                        size: 24,
+                                      ),
+                                      onPressed: () {
+                                        if (fullScreenVideoController?.value.isInitialized == true && !_controllersDisposed[attachmentKey]!) {
+                                          final newPosition = (fullScreenVideoController?.value.position ?? Duration.zero) - const Duration(seconds: 10);
+                                          fullScreenVideoController?.seekTo(
+                                            newPosition < Duration.zero ? Duration.zero : newPosition,
+                                          );
+                                        }
+                                      },
+                                    ),
+                                    IconButton(
+                                      icon: Icon(
+                                        isPlaying ? FeatherIcons.pause : FeatherIcons.play,
+                                        color: Colors.white,
+                                        size: 24,
+                                      ),
+                                      onPressed: () {
+                                        if (fullScreenVideoController?.value.isInitialized == true && !_controllersDisposed[attachmentKey]!) {
+                                          setDialogState(() {
+                                            isPlaying = !isPlaying;
+                                            if (isPlaying) {
+                                              fullScreenVideoController?.play();
+                                            } else {
+                                              fullScreenVideoController?.pause();
+                                            }
+                                          });
+                                        }
+                                      },
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(
+                                        FeatherIcons.fastForward,
+                                        color: Colors.white,
+                                        size: 24,
+                                      ),
+                                      onPressed: () {
+                                        if (fullScreenVideoController?.value.isInitialized == true && !_controllersDisposed[attachmentKey]!) {
+                                          final newPosition = (fullScreenVideoController?.value.position ?? Duration.zero) + const Duration(seconds: 10);
+                                          final duration = fullScreenVideoController?.value.duration ?? Duration.zero;
+                                          fullScreenVideoController?.seekTo(
+                                            newPosition > duration ? duration : newPosition,
+                                          );
+                                        }
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        );
+      },
+    ).whenComplete(() {
+      if (fullScreenVideoController != null && !(_controllersDisposed[attachmentKey] ?? false)) {
+        fullScreenVideoController?.pause();
+        fullScreenVideoController?.dispose();
+        _controllersDisposed[attachmentKey] = true;
+      }
+      if (fullScreenBetterPlayerController != null && !(_controllersDisposed[attachmentKey] ?? false)) {
+        fullScreenBetterPlayerController?.pause();
+        fullScreenBetterPlayerController?.dispose();
+        _controllersDisposed[attachmentKey] = true;
+      }
+    });
+  }
+
+  BetterPlayerController _createBetterPlayerController(String url) {
+    return BetterPlayerController(
+       BetterPlayerConfiguration(
+        autoPlay: false,
+        looping: true,
+        controlsConfiguration: BetterPlayerControlsConfiguration(
+          showControls: false,
+          enableOverflowMenu: false,
+          enablePlayPause: false,
+          enableMute: false,
+          enableProgressBar: false,
+          enableProgressText: false,
+        ),
+        fit: BoxFit.contain,
+        errorBuilder: (context, errorMessage) => Container(
+          color: Colors.grey[900],
+          child: const Icon(
+            FeatherIcons.video,
+            color: Colors.grey,
+            size: 40,
+          ),
+        ),
+      ),
+      betterPlayerDataSource: BetterPlayerDataSource(
+        BetterPlayerDataSourceType.network,
+        url,
+        cacheConfiguration: const BetterPlayerCacheConfiguration(
+          useCache: true,
+          preCacheSize: 10 * 1024 * 1024,
+          maxCacheSize: 100 * 1024 * 1024,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openPdf(String url, String filename) async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final filePath = '${tempDir.path}/$filename';
+      final file = File(filePath);
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        await file.writeAsBytes(response.bodyBytes);
+        final result = await OpenFile.open(filePath);
+        if (result.type != ResultType.done) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Failed to open PDF: ${result.message}',
+                style: GoogleFonts.roboto(color: Colors.white),
+              ),
+              backgroundColor: Colors.red[700],
+            ),
+          );
+        }
+      } else {
+        throw Exception('Failed to download PDF: ${response.statusCode}');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Error downloading PDF: $e',
+            style: GoogleFonts.roboto(color: Colors.white),
+          ),
+          backgroundColor: Colors.red[700],
+        ),
+      );
+    }
+  }
+
   Widget _buildPostContent(ChatterPost post, {required bool isReply}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -334,7 +736,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                     )
                   : null,
             ),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -359,7 +761,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                       ),
                     ],
                   ),
-                  SizedBox(height: 6),
+                  const SizedBox(height: 6),
                   Text(
                     post.content,
                     style: GoogleFonts.roboto(
@@ -372,14 +774,14 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                     SizedBox(height: 12),
                     _buildAttachmentGrid(post.attachments, post),
                   ],
-                  SizedBox(height: 12),
+                  const SizedBox(height: 12),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Row(
                         children: [
                           IconButton(
-                            icon: Icon(
+                            icon: const Icon(
                               FeatherIcons.heart,
                               color: Colors.grey,
                               size: 20,
@@ -402,7 +804,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                       Row(
                         children: [
                           IconButton(
-                            icon: Icon(
+                            icon: const Icon(
                               FeatherIcons.messageCircle,
                               color: Colors.grey,
                               size: 20,
@@ -423,7 +825,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                       Row(
                         children: [
                           IconButton(
-                            icon: Icon(
+                            icon: const Icon(
                               FeatherIcons.repeat,
                               color: Colors.grey,
                               size: 20,
@@ -444,7 +846,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                       Row(
                         children: [
                           IconButton(
-                            icon: Icon(
+                            icon: const Icon(
                               FeatherIcons.eye,
                               color: Colors.grey,
                               size: 20,
@@ -649,7 +1051,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFF000000),
+      backgroundColor: const Color(0xFF000000),
       appBar: AppBar(
         title: Text(
           'Chatter',
@@ -660,7 +1062,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
             color: Colors.white,
           ),
         ),
-        backgroundColor: Color(0xFF000000),
+        backgroundColor: const Color(0xFF000000),
         elevation: 0,
       ),
       body: Obx(() {
@@ -712,7 +1114,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         );
       }),
       bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Color(0xFF000000),
+        backgroundColor: const Color(0xFF000000),
         selectedItemColor: Colors.tealAccent,
         unselectedItemColor: Colors.grey[500],
         selectedLabelStyle: GoogleFonts.roboto(fontWeight: FontWeight.w500),
@@ -739,7 +1141,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
               SnackBar(
                 content: Text(
                   'Search screen coming soon!',
-                  style: GoogleFonts.roboto(color: Colors.white),
+                  style: GoogleFonts.poppins(color: Colors.white),
                 ),
                 backgroundColor: Colors.teal[700],
               ),
@@ -749,7 +1151,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
               SnackBar(
                 content: Text(
                   'Profile screen coming soon!',
-                  style: GoogleFonts.roboto(color: Colors.white),
+                  style: GoogleFonts.poppins(color: Colors.white),
                 ),
                 backgroundColor: Colors.teal[700],
               ),
@@ -761,7 +1163,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         onPressed: _navigateToPostScreen,
         backgroundColor: Colors.tealAccent,
         elevation: 2,
-        child: Icon(FeatherIcons.plus, color: Colors.black),
+        child: const Icon(FeatherIcons.plus, color: Colors.black),
       ),
     );
   }
