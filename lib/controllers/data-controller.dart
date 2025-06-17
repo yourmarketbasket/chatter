@@ -550,7 +550,9 @@ class DataController extends GetxController {
   Future<Map<String, dynamic>> updateUserAvatar(String avatarUrl) async {
     isLoading.value = true; // Optional: indicate loading state
     try {
-      final String? currentUserId = user.value['id']?.toString();
+      print(user.value['user']['_id']);
+      print(user.value['token']);
+      final String? currentUserId = user.value['user']['_id']?.toString();
       final String? token = user.value['token']?.toString();
 
       if (currentUserId == null || token == null) {
@@ -561,7 +563,7 @@ class DataController extends GetxController {
       final response = await _dio.post(
         '/api/users/avatar', // Using the endpoint provided by the user
         data: {
-          'userId': currentUserId,
+          'userid': currentUserId,
           'avatarUrl': avatarUrl,
         },
         options: dio.Options(
