@@ -1,9 +1,9 @@
 import 'package:better_player_enhanced/better_player.dart';
-import 'package:chatter/pages/home-feed-screen.dart'; // For Attachment type
+import 'package:chatter/pages/home-feed-screen.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:pdfrx/pdfrx.dart'; // For PDF viewing
 import 'package:feather_icons/feather_icons.dart'; // For fallback icons
+import 'package:pdfrx/pdfrx.dart';
 import 'package:video_player/video_player.dart'; // For video playback
 import 'package:audioplayers/audioplayers.dart' as audioplayers; // For audio playback with prefix
 import 'package:cached_network_image/cached_network_image.dart'; // For cached image loading
@@ -109,7 +109,17 @@ class MediaViewPage extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Positioned.fill(child: mediaWidget),
+      appBar: AppBar(
+        title: Text(pageTitle, style: GoogleFonts.poppins(color: Colors.white)),
+        backgroundColor: const Color(0xFF121212),
+        iconTheme: const IconThemeData(color: Colors.white),
+        elevation: 0,
+      ),
+      body: Stack(
+        children: [
+          Positioned.fill(child: mediaWidget),
+        ],
+      ),
     );
   }
 
@@ -553,7 +563,6 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
 }
 
 // Widget for video playback using better_player for Android 13 and lower
-// Widget for video playback using better_player for Android 13 and lower
 class BetterPlayerWidget extends StatefulWidget {
   final String? url;
   final File? file;
@@ -730,150 +739,151 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
   }
 
   @override
-Widget build(BuildContext context) {
-  if (_isLoading) {
-    return Center(
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          widget.url != null
-              ? CachedNetworkImage(
-                  imageUrl: widget.url!.replaceAll(RegExp(r'\.\w+$'), '.jpg'),
-                  fit: BoxFit.cover,
-                  placeholder: (context, url) => Container(color: Colors.black),
-                  errorWidget: (context, url, error) => Container(color: Colors.black),
-                )
-              : Container(color: Colors.black),
-          const CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
-            backgroundColor: Colors.grey,
-            strokeWidth: 1,
-          ),
-        ],
-      ),
-    );
-  }
-
-  if (!_isInitialized || _controller == null || _errorMessage != null) {
-    return MediaViewPage._buildError(
-      context,
-      message: _errorMessage ?? 'Error loading video: ${widget.displayPath}',
-    );
-  }
-
-  if (_aspectRatio == null) {
-    return const Center(
-      child: CircularProgressIndicator(
-        valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
-        backgroundColor: Colors.grey,
-        strokeWidth: 1,
-      ),
-    );
-  }
-
-  return LayoutBuilder(
-    builder: (context, constraints) {
-      return GestureDetector(
-        onTap: _toggleControls,
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Center(
         child: Stack(
-          alignment: Alignment.bottomCenter,
+          alignment: Alignment.center,
           children: [
-            ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: constraints.maxWidth, // Use full available width
-                maxHeight: constraints.maxHeight,
-              ),
-              child: AspectRatio(
-                aspectRatio: _aspectRatio!,
-                child: BetterPlayer(controller: _controller!),
-              ),
-            ),
-            Positioned(
-              bottom: 20,
-              left: 20,
-              right: 20,
-              child: AnimatedOpacity(
-                opacity: _fadeAnimation.value,
-                duration: const Duration(milliseconds: 300),
-                child: _showControls
-                    ? Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                        decoration: const BoxDecoration(
-                          color: Colors.transparent,
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            IconButton(
-                              icon: Icon(
-                                _isPlaying ? Icons.pause : Icons.play_arrow,
-                                color: Colors.tealAccent,
-                                size: 30,
-                              ),
-                              onPressed: _isInitialized
-                                  ? () async {
-                                      if (_isPlaying) {
-                                        await _controller!.pause();
-                                      } else {
-                                        await _controller!.play();
-                                        setState(() {
-                                          _showControls = true;
-                                          _animationController.forward();
-                                        });
-                                        _hideControlsTimer?.cancel();
-                                        _hideControlsTimer = Timer(const Duration(seconds: 3), () {
-                                          if (mounted && _isPlaying) {
-                                            setState(() {
-                                              _showControls = false;
-                                              _animationController.reverse();
-                                            });
-                                          }
-                                        });
-                                      }
-                                      setState(() {});
-                                    }
-                                  : null,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              _formatDuration(_position),
-                              style: GoogleFonts.roboto(
-                                color: Colors.white70,
-                                fontSize: 12,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Slider(
-                                value: _duration.inMilliseconds > 0
-                                    ? _position.inMilliseconds / _duration.inMilliseconds
-                                    : 0.0,
-                                onChanged: _isInitialized ? (value) => _seekToPosition(value) : null,
-                                activeColor: Colors.tealAccent,
-                                inactiveColor: Colors.grey,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              _formatDuration(_duration),
-                              style: GoogleFonts.roboto(
-                                color: Colors.white70,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : const SizedBox.shrink(),
-              ),
+            widget.url != null
+                ? CachedNetworkImage(
+                    imageUrl: widget.url!.replaceAll(RegExp(r'\.\w+$'), '.jpg'),
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(color: Colors.black),
+                    errorWidget: (context, url, error) => Container(color: Colors.black),
+                  )
+                : Container(color: Colors.black),
+            const CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
+              backgroundColor: Colors.grey,
+              strokeWidth: 1,
             ),
           ],
         ),
       );
-    },
-  );
-}
+    }
+
+    if (!_isInitialized || _controller == null || _errorMessage != null) {
+      return MediaViewPage._buildError(
+        context,
+        message: _errorMessage ?? 'Error loading video: ${widget.displayPath}',
+      );
+    }
+
+    if (_aspectRatio == null) {
+      return const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
+          backgroundColor: Colors.grey,
+          strokeWidth:   1,
+        ),
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return GestureDetector(
+          onTap: _toggleControls,
+          child: Stack(
+            alignment: Alignment.bottomCenter,
+            children: [
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: constraints.maxWidth, // Use full available width
+                  maxHeight: constraints.maxHeight,
+                ),
+                child: AspectRatio(
+                  aspectRatio: _aspectRatio!,
+                  child: BetterPlayer(controller: _controller!),
+                ),
+              ),
+              Positioned(
+                bottom: 20,
+                left: 20,
+                right: 20,
+                child: AnimatedOpacity(
+                  opacity: _fadeAnimation.value,
+                  duration: const Duration(milliseconds: 300),
+                  child: _showControls
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                          decoration: const BoxDecoration(
+                            color: Colors.transparent,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              IconButton(
+                                icon: Icon(
+                                  _isPlaying ? Icons.pause : Icons.play_arrow,
+                                  color: Colors.tealAccent,
+                                  size: 30,
+                                ),
+                                onPressed: _isInitialized
+                                    ? () async {
+                                        if (_isPlaying) {
+                                          await _controller!.pause();
+                                        } else {
+                                          await _controller!.play();
+                                          setState(() {
+                                            _showControls = true;
+                                            _animationController.forward();
+                                          });
+                                          _hideControlsTimer?.cancel();
+                                          _hideControlsTimer = Timer(const Duration(seconds: 3), () {
+                                            if (mounted && _isPlaying) {
+                                              setState(() {
+                                                _showControls = false;
+                                                _animationController.reverse();
+                                              });
+                                            }
+                                          });
+                                        }
+                                        setState(() {});
+                                      }
+                                    : null,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _formatDuration(_position),
+                                style: GoogleFonts.roboto(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Slider(
+                                  value: _duration.inMilliseconds > 0
+                                      ? _position.inMilliseconds / _duration.inMilliseconds
+                                      : 0.0,
+                                  onChanged: _isInitialized ? (value) => _seekToPosition(value) : null,
+                                  activeColor: Colors.tealAccent,
+                                  inactiveColor: Colors.grey,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                _formatDuration(_duration),
+                                style: GoogleFonts.roboto(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   String _formatDuration(Duration duration) {
     String twoDigits(int n) => n.toString().padLeft(2, '0');
     final hours = duration.inHours;
@@ -884,8 +894,6 @@ Widget build(BuildContext context) {
         : '${twoDigits(minutes)}:${twoDigits(seconds)}';
   }
 }
-
-
 
 class AudioPlayerWidget extends StatefulWidget {
   final String? url;
