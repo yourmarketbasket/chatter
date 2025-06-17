@@ -65,11 +65,8 @@ class AppDrawer extends StatelessWidget {
     if (pickedFile != null) {
       // If an image is picked, proceed to crop it
       final CroppedFile? croppedFile = await ImageCropper().cropImage(
-        sourcePath: pickedFile.path,
-        cropStyle: CropStyle.circle, // Common for avatars
-        aspectRatioPresets: [
-          CropAspectRatioPreset.square, // Enforces a square aspect ratio for the circle
-        ],
+        sourcePath: pickedFile.path,// Common for avatars
+        
         uiSettings: [
           AndroidUiSettings(
               toolbarTitle: 'Crop Your Avatar',
