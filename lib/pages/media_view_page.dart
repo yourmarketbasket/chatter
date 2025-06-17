@@ -7,22 +7,64 @@ import 'package:pdfrx/pdfrx.dart';
 import 'package:video_player/video_player.dart'; // For video playback
 import 'package:audioplayers/audioplayers.dart' as audioplayers; // For audio playback with prefix
 import 'package:cached_network_image/cached_network_image.dart'; // For cached image loading
+import 'package:chatter/widgets/video_player_widget.dart';
+import 'package:chatter/widgets/better_player_widget.dart';
 import 'dart:io';
 import 'dart:async';
 import 'dart:math';
 import 'package:device_info_plus/device_info_plus.dart'; // For checking Android version
+import 'package:intl/intl.dart'; // For date formatting
 
-// MediaViewPage displays an attachment (image, PDF, video, or audio) in a full-screen view.
-class MediaViewPage extends StatelessWidget {
-  final Attachment attachment;
+// MediaViewPage displays attachments with metadata and social interactions.
+class MediaViewPage extends StatefulWidget {
+  final List<Attachment> attachments;
+  final int initialIndex;
+  final String message;
+  final String userName;
+  final String? userAvatarUrl;
+  final DateTime timestamp;
+  final int viewsCount;
+  final int likesCount;
+  final int repostsCount;
 
-  const MediaViewPage({Key? key, required this.attachment}) : super(key: key);
+  const MediaViewPage({
+    Key? key,
+    required this.attachments,
+    this.initialIndex = 0,
+    required this.message,
+    required this.userName,
+    this.userAvatarUrl,
+    required this.timestamp,
+    required this.viewsCount,
+    required this.likesCount,
+    required this.repostsCount,
+  }) : super(key: key);
 
-  // Optimize Cloudinary URL for faster loading without breaking the path
-  String _optimizeCloudinaryUrl(String url) {
-    if (!url.contains('cloudinary.com')) return url;
+  @override
+  _MediaViewPageState createState() => _MediaViewPageState();
+}
+
+class _MediaViewPageState extends State<MediaViewPage> {
+  late PageController _pageController;
+  late int _currentPageIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentPageIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  // Optimize Cloudinary URL
+  String _optimizeCloudinaryUrl(String? url) {
+    if (url == null || !url.contains('cloudinary.com')) return url ?? '';
     final uri = Uri.parse(url);
-    // Append quality and format optimizations as query parameters
     final optimizedUrl = uri.replace(queryParameters: {
       ...uri.queryParameters,
       'q': 'auto',
@@ -31,126 +73,204 @@ class MediaViewPage extends StatelessWidget {
     return optimizedUrl.toString();
   }
 
-  // Check if the device is running Android 13 or lower
+  // Check Android version
   Future<bool> _isAndroid13OrLower() async {
     if (!Platform.isAndroid) return false;
     final deviceInfo = DeviceInfoPlugin();
     final androidInfo = await deviceInfo.androidInfo;
-    return androidInfo.version.sdkInt <= 33; // API level 33 is Android 13
+    return androidInfo.version.sdkInt <= 33;
+  }
+
+  String _getPageTitle(Attachment attachment) {
+    switch (attachment.type.toLowerCase()) {
+      case 'image':
+        return 'View Image';
+      case 'pdf':
+        return 'View PDF';
+      case 'video':
+        return 'View Video';
+      case 'audio':
+        return 'View Audio';
+      default:
+        return 'View Attachment';
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Determine the display widget and page title based on attachment type
-    String pageTitle;
-    Widget mediaWidget;
-
-    // Safely get the display path for error messages or placeholders
-    final String displayPath = attachment.url ?? attachment.file?.path ?? 'Unknown attachment';
-    final String optimizedUrl = attachment.url != null ? _optimizeCloudinaryUrl(attachment.url!) : '';
-
-    switch (attachment.type.toLowerCase()) {
-      case 'image':
-        pageTitle = 'View Image';
-        mediaWidget = _buildImageViewer(context, displayPath, optimizedUrl);
-        break;
-      case 'pdf':
-        pageTitle = 'View PDF';
-        mediaWidget = _buildPdfViewer(context, displayPath, optimizedUrl);
-        break;
-      case 'video':
-        pageTitle = 'View Video';
-        mediaWidget = FutureBuilder<bool>(
-          future: _isAndroid13OrLower(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.done && snapshot.data != null) {
-              if (snapshot.data!) {
-                // Use BetterPlayer for Android 13 and lower
-                return BetterPlayerWidget(
-                  url: optimizedUrl.isNotEmpty ? optimizedUrl : attachment.url,
-                  file: attachment.file,
-                  displayPath: displayPath,
-                );
-              } else {
-                // Use VideoPlayer for Android 14 and higher
-                return VideoPlayerWidget(
-                  url: optimizedUrl.isNotEmpty ? optimizedUrl : attachment.url,
-                  file: attachment.file,
-                  displayPath: displayPath,
-                );
-              }
-            }
-            return const Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
-              ),
-            );
-          },
-        );
-        break;
-      case 'audio':
-        pageTitle = 'View Audio';
-        mediaWidget = AudioPlayerWidget(
-          url: optimizedUrl.isNotEmpty ? optimizedUrl : attachment.url,
-          file: attachment.file,
-          displayPath: displayPath,
-        );
-        break;
-      default:
-        pageTitle = 'View Attachment';
-        mediaWidget = _buildPlaceholder(
-          context,
-          icon: FeatherIcons.file,
-          message: 'Unsupported attachment type: ${attachment.type}',
-          fileName: displayPath.split('/').last,
-          iconColor: Colors.grey[600],
-        );
-    }
-
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: Text(pageTitle, style: GoogleFonts.poppins(color: Colors.white)),
+        title: Text(
+          widget.attachments.isNotEmpty ? _getPageTitle(widget.attachments[_currentPageIndex]) : "View Post",
+          style: GoogleFonts.poppins(color: Colors.white)
+        ),
         backgroundColor: const Color(0xFF121212),
         iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
       ),
-      body: Stack(
+      body: Column(
         children: [
-          Positioned.fill(child: mediaWidget),
+          Expanded(
+            child: PageView.builder(
+              controller: _pageController,
+              itemCount: widget.attachments.length,
+              onPageChanged: (index) {
+                setState(() {
+                  _currentPageIndex = index;
+                });
+              },
+              itemBuilder: (context, index) {
+                final Attachment currentAttachment = widget.attachments[index];
+                final String displayPath = currentAttachment.url ?? currentAttachment.file?.path ?? 'Unknown attachment';
+                final String optimizedUrl = _optimizeCloudinaryUrl(currentAttachment.url);
+
+                Widget mediaWidget;
+                switch (currentAttachment.type.toLowerCase()) {
+                  case 'image':
+                    mediaWidget = _buildImageViewer(context, currentAttachment, displayPath, optimizedUrl);
+                    break;
+                  case 'pdf':
+                    mediaWidget = _buildPdfViewer(context, currentAttachment, displayPath, optimizedUrl);
+                    break;
+                  case 'video':
+                    mediaWidget = FutureBuilder<bool>(
+                      future: _isAndroid13OrLower(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.done && snapshot.data != null) {
+                          if (snapshot.data!) {
+                            return BetterPlayerWidget(
+                              url: optimizedUrl.isNotEmpty ? optimizedUrl : currentAttachment.url,
+                              file: currentAttachment.file,
+                              displayPath: displayPath,
+                            );
+                          } else {
+                            return VideoPlayerWidget(
+                              url: optimizedUrl.isNotEmpty ? optimizedUrl : currentAttachment.url,
+                              file: currentAttachment.file,
+                              displayPath: displayPath,
+                            );
+                          }
+                        }
+                        return const Center(
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
+                          ),
+                        );
+                      },
+                    );
+                    break;
+                  case 'audio':
+                    mediaWidget = AudioPlayerWidget(
+                      url: optimizedUrl.isNotEmpty ? optimizedUrl : currentAttachment.url,
+                      file: currentAttachment.file,
+                      displayPath: displayPath,
+                    );
+                    break;
+                  default:
+                    mediaWidget = _buildPlaceholder(
+                      context,
+                      icon: FeatherIcons.file,
+                      message: 'Unsupported attachment type: ${currentAttachment.type}',
+                      fileName: displayPath.split('/').last,
+                      iconColor: Colors.grey[600],
+                    );
+                }
+                return Center(child: mediaWidget); // Ensure media widget is centered
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundImage: widget.userAvatarUrl != null && widget.userAvatarUrl!.isNotEmpty
+                          ? NetworkImage(_optimizeCloudinaryUrl(widget.userAvatarUrl!))
+                          : const AssetImage('assets/images/default_avatar.png') as ImageProvider, // Placeholder
+                      radius: 20,
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      widget.userName,
+                      style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  widget.message,
+                  style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  DateFormat('MMM d, yyyy \'at\' hh:mm a').format(widget.timestamp),
+                  style: GoogleFonts.poppins(color: Colors.grey[400], fontSize: 12),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Text('${widget.viewsCount} Views', style: GoogleFonts.poppins(color: Colors.grey[400], fontSize: 12)),
+                    const SizedBox(width: 16),
+                    Text('${widget.likesCount} Likes', style: GoogleFonts.poppins(color: Colors.grey[400], fontSize: 12)),
+                    const SizedBox(width: 16),
+                    Text('${widget.repostsCount} Reposts', style: GoogleFonts.poppins(color: Colors.grey[400], fontSize: 12)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Divider(color: Colors.grey[700]),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildSocialButton(FeatherIcons.heart, 'Like', () { /* Like action */ }),
+                    _buildSocialButton(FeatherIcons.repeat, 'Repost', () { /* Repost action */ }),
+                    _buildSocialButton(FeatherIcons.messageSquare, 'Comment', () { /* Comment action */ }),
+                    _buildSocialButton(FeatherIcons.share, 'Share', () { /* Share action */ }),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
-  // Builds an image viewer for network or local images with full-screen pinch-to-zoom and caching
-  Widget _buildImageViewer(BuildContext context, String displayPath, String optimizedUrl) {
-    return LayoutBuilder(
+  Widget _buildSocialButton(IconData icon, String label, VoidCallback onPressed) {
+    return TextButton.icon(
+      icon: Icon(icon, color: Colors.white70, size: 20),
+      label: Text(label, style: GoogleFonts.poppins(color: Colors.white70, fontSize: 12)),
+      onPressed: onPressed,
+      style: TextButton.styleFrom(
+        padding: EdgeInsets.zero,
+        minimumSize: Size(50, 30), // Adjust size to fit content
+      )
+    );
+  }
+
+  Widget _buildImageViewer(BuildContext context, Attachment attachment, String displayPath, String optimizedUrl) {
+    // ... (Keep existing _buildImageViewer logic, but use the passed attachment)
+    // Replace `attachment.url` with `currentAttachment.url` etc.
+    // For brevity, I'm not fully expanding this here but it needs to be updated
+     return LayoutBuilder(
       builder: (context, constraints) {
-        if (optimizedUrl.isNotEmpty || attachment.url != null) {
+        final String currentOptimizedUrl = _optimizeCloudinaryUrl(attachment.url);
+        if (currentOptimizedUrl.isNotEmpty) {
           return InteractiveViewer(
             minScale: 0.5,
             maxScale: 4.0,
             child: Center(
               child: CachedNetworkImage(
-                imageUrl: optimizedUrl.isNotEmpty ? optimizedUrl : attachment.url!,
-                fit: BoxFit.contain, // Maintains original aspect ratio
-                placeholder: (context, url) => Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const LinearProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
-                        backgroundColor: Colors.grey,
-                      ),
-                    ],
-                  ),
-                ),
-                errorWidget: (context, url, error) => _buildError(
-                  context,
-                  message: 'Error loading image: $error',
-                ),
-                cacheKey: attachment.url, // Use the original URL as the cache key
+                imageUrl: currentOptimizedUrl,
+                fit: BoxFit.contain,
+                placeholder: (context, url) => Center(child: LinearProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent), backgroundColor: Colors.grey)),
+                errorWidget: (context, url, error) => _buildError(context, message: 'Error loading image: $error'),
+                cacheKey: attachment.url,
               ),
             ),
           );
@@ -161,50 +281,39 @@ class MediaViewPage extends StatelessWidget {
             child: Center(
               child: Image.file(
                 attachment.file!,
-                fit: BoxFit.contain, // Maintains original aspect ratio
-                errorBuilder: (context, error, stackTrace) => _buildError(
-                  context,
-                  message: 'Error loading image file: $error',
-                ),
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) => _buildError(context, message: 'Error loading image file: $error'),
               ),
             ),
           );
         } else {
-          return _buildError(
-            context,
-            message: 'No image source available for $displayPath',
-          );
+          return _buildError(context, message: 'No image source available for $displayPath');
         }
       },
     );
   }
 
-  // Builds a PDF viewer for network or local PDFs
-  Widget _buildPdfViewer(BuildContext context, String displayPath, String optimizedUrl) {
-    if (optimizedUrl.isNotEmpty || attachment.url != null || attachment.file != null) {
-      final Uri pdfUri = optimizedUrl.isNotEmpty
-          ? Uri.parse(optimizedUrl)
-          : attachment.url != null
-              ? Uri.parse(attachment.url!)
-              : Uri.file(attachment.file!.path);
+  Widget _buildPdfViewer(BuildContext context, Attachment attachment, String displayPath, String optimizedUrl) {
+    // ... (Keep existing _buildPdfViewer logic, but use the passed attachment)
+    final String currentOptimizedUrl = _optimizeCloudinaryUrl(attachment.url);
+    if (currentOptimizedUrl.isNotEmpty || attachment.file != null) {
+      final Uri pdfUri = currentOptimizedUrl.isNotEmpty
+          ? Uri.parse(currentOptimizedUrl)
+          : Uri.file(attachment.file!.path);
       return PdfViewer.uri(
         pdfUri,
         params: const PdfViewerParams(
-          margin: 0, // Fits PDF to screen while maintaining aspect ratio
+          margin: 0,
           backgroundColor: Colors.transparent,
           maxScale: 2.0,
           minScale: 0.5,
         ),
       );
     } else {
-      return _buildError(
-        context,
-        message: 'No PDF source available for $displayPath',
-      );
+      return _buildError(context, message: 'No PDF source available for $displayPath');
     }
   }
 
-  // Builds a generic error widget for failed media loading
   static Widget _buildError(BuildContext context, {required String message}) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -264,634 +373,6 @@ class MediaViewPage extends StatelessWidget {
         ),
       ],
     );
-  }
-}
-
-// Widget for video playback with seeking and progress bar using video_player
-class VideoPlayerWidget extends StatefulWidget {
-  final String? url;
-  final File? file;
-  final String displayPath;
-
-  const VideoPlayerWidget({
-    Key? key,
-    this.url,
-    this.file,
-    required this.displayPath,
-  }) : super(key: key);
-
-  @override
-  _VideoPlayerWidgetState createState() => _VideoPlayerWidgetState();
-}
-
-class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTickerProviderStateMixin {
-  VideoPlayerController? _controller;
-  bool _isInitialized = false;
-  bool _isLoading = true;
-  bool _isPlaying = false;
-  int _retryCount = 0;
-  final int _maxRetries = 3;
-  String? _errorMessage;
-  Duration _position = Duration.zero;
-  Duration _duration = Duration.zero;
-  bool _showControls = true; // Controls visibility state
-  Timer? _hideControlsTimer; // Timer to auto-hide controls
-  late AnimationController _animationController; // For fade animation
-  late Animation<double> _fadeAnimation; // Fade animation for controls
-
-  @override
-  void initState() {
-    super.initState();
-    // Initialize animation controller for fade effect
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300), // Smooth fade duration
-    );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
-    );
-    _initializeVideoPlayer();
-  }
-
-  Future<void> _initializeVideoPlayer() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-      _showControls = true; // Show controls initially
-      _animationController.forward(); // Ensure controls are visible at start
-    });
-
-    try {
-      if (widget.url != null) {
-        _controller = VideoPlayerController.networkUrl(
-          Uri.parse(widget.url!),
-          videoPlayerOptions: VideoPlayerOptions(
-            mixWithOthers: true,
-            allowBackgroundPlayback: false,
-          ),
-          httpHeaders: {
-            'Cache-Control': 'max-age=604800', // Cache videos for 7 days
-          },
-        );
-      } else if (widget.file != null) {
-        _controller = VideoPlayerController.file(widget.file!);
-      } else {
-        setState(() {
-          _isLoading = false;
-          _isInitialized = false;
-          _errorMessage = 'No video source available';
-        });
-        return;
-      }
-
-      await _controller!.initialize();
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _isInitialized = true;
-          _duration = _controller!.value.duration;
-        });
-
-        _controller!.addListener(() {
-          if (mounted) {
-            setState(() {
-              _position = _controller!.value.position;
-              _isPlaying = _controller!.value.isPlaying;
-              // Show controls when video stops
-              if (!_isPlaying && !_showControls) {
-                _showControls = true;
-                _animationController.forward();
-              }
-            });
-          }
-        });
-      }
-    } catch (e) {
-      if (_retryCount < _maxRetries && mounted) {
-        _retryCount++;
-        await Future.delayed(const Duration(seconds: 2));
-        return _initializeVideoPlayer();
-      } else {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-            _isInitialized = false;
-            _errorMessage = 'Failed to load video after $_maxRetries attempts: $e';
-          });
-        }
-      }
-    }
-  }
-
-  void _seekToPosition(double value) {
-    final position = _duration * value;
-    _controller?.seekTo(position);
-  }
-
-  // Toggle controls visibility on tap
-  void _toggleControls() {
-    setState(() {
-      _showControls = !_showControls;
-      if (_showControls) {
-        _animationController.forward();
-        // Start timer to hide controls after 3 seconds if playing
-        if (_isPlaying) {
-          _hideControlsTimer?.cancel();
-          _hideControlsTimer = Timer(const Duration(seconds: 3), () {
-            if (mounted && _isPlaying) {
-              setState(() {
-                _showControls = false;
-                _animationController.reverse();
-              });
-            }
-          });
-        }
-      } else {
-        _animationController.reverse();
-        _hideControlsTimer?.cancel();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller?.dispose();
-    _hideControlsTimer?.cancel();
-    _animationController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Center(
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            // Display thumbnail if available
-            widget.url != null
-                ? CachedNetworkImage(
-                    imageUrl: widget.url!.replaceAll(RegExp(r'\.\w+$'), '.jpg'),
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(color: Colors.black),
-                    errorWidget: (context, url, error) => Container(color: Colors.black),
-                  )
-                : Container(color: Colors.black),
-            const CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
-              backgroundColor: Colors.grey,
-              strokeWidth: 1,
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (!_isInitialized || _controller == null || _errorMessage != null) {
-      return MediaViewPage._buildError(
-        context,
-        message: _errorMessage ?? 'Error loading video: ${widget.displayPath}',
-      );
-    }
-
-    return Center(
-      child: GestureDetector(
-        onTap: _toggleControls, // Toggle controls on tap
-        child: Stack(
-          alignment: Alignment.bottomCenter,
-          children: [
-            AspectRatio(
-              aspectRatio: _controller!.value.aspectRatio,
-              child: VideoPlayer(_controller!),
-            ),
-            Positioned(
-              bottom: 20,
-              left: 20,
-              right: 20,
-              child: AnimatedOpacity(
-                opacity: _fadeAnimation.value,
-                duration: const Duration(milliseconds: 300),
-                child: _showControls
-                    ? Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                        decoration: const BoxDecoration(
-                          color: Colors.transparent, // Transparent background
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            IconButton(
-                              icon: Icon(
-                                _isPlaying ? Icons.pause : Icons.play_arrow,
-                                color: Colors.tealAccent,
-                                size: 30,
-                              ),
-                              onPressed: _isInitialized
-                                  ? () async {
-                                      if (_isPlaying) {
-                                        await _controller!.pause();
-                                      } else {
-                                        await _controller!.play();
-                                        // Hide controls after 3 seconds if playing
-                                        setState(() {
-                                          _showControls = true;
-                                          _animationController.forward();
-                                        });
-                                        _hideControlsTimer?.cancel();
-                                        _hideControlsTimer = Timer(const Duration(seconds: 3), () {
-                                          if (mounted && _isPlaying) {
-                                            setState(() {
-                                              _showControls = false;
-                                              _animationController.reverse();
-                                            });
-                                          }
-                                        });
-                                      }
-                                      setState(() {});
-                                    }
-                                  : null,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              _formatDuration(_position),
-                              style: GoogleFonts.roboto(
-                                color: Colors.white70,
-                                fontSize: 12,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Slider(
-                                value: _duration.inMilliseconds > 0
-                                    ? _position.inMilliseconds / _duration.inMilliseconds
-                                    : 0.0,
-                                onChanged: _isInitialized ? (value) => _seekToPosition(value) : null,
-                                activeColor: Colors.tealAccent,
-                                inactiveColor: Colors.grey,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              _formatDuration(_duration),
-                              style: GoogleFonts.roboto(
-                                color: Colors.white70,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : const SizedBox.shrink(),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _formatDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    final hours = duration.inHours;
-    final minutes = duration.inMinutes.remainder(60);
-    final seconds = duration.inSeconds.remainder(60);
-    return hours > 0
-        ? '${twoDigits(hours)}:${twoDigits(minutes)}:${twoDigits(seconds)}'
-        : '${twoDigits(minutes)}:${twoDigits(seconds)}';
-  }
-}
-
-// Widget for video playback using better_player for Android 13 and lower
-class BetterPlayerWidget extends StatefulWidget {
-  final String? url;
-  final File? file;
-  final String displayPath;
-
-  const BetterPlayerWidget({
-    Key? key,
-    this.url,
-    this.file,
-    required this.displayPath,
-  }) : super(key: key);
-
-  @override
-  _BetterPlayerWidgetState createState() => _BetterPlayerWidgetState();
-}
-
-class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTickerProviderStateMixin {
-  BetterPlayerController? _controller;
-  bool _isInitialized = false;
-  bool _isLoading = true;
-  bool _isPlaying = false;
-  int _retryCount = 0;
-  final int _maxRetries = 3;
-  String? _errorMessage;
-  Duration _position = Duration.zero;
-  Duration _duration = Duration.zero;
-  bool _showControls = true;
-  Timer? _hideControlsTimer;
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
-  double? _aspectRatio; // No default aspect ratio
-
-  @override
-  void initState() {
-    super.initState();
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-    );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
-    );
-    _initializeVideoPlayer();
-  }
-
-  Future<void> _initializeVideoPlayer() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-      _showControls = true;
-      _animationController.forward();
-    });
-
-    try {
-      BetterPlayerDataSource dataSource;
-      if (widget.url != null) {
-        dataSource = BetterPlayerDataSource(
-          BetterPlayerDataSourceType.network,
-          widget.url!,
-          cacheConfiguration: const BetterPlayerCacheConfiguration(
-            useCache: true,
-            maxCacheSize: 100 * 1024 * 1024, // 100 MB
-            maxCacheFileSize: 10 * 1024 * 1024, // 10 MB per file
-          ),
-          headers: {
-            'Cache-Control': 'max-age=604800', // Cache videos for 7 days
-          },
-        );
-      } else if (widget.file != null) {
-        dataSource = BetterPlayerDataSource(
-          BetterPlayerDataSourceType.file,
-          widget.file!.path,
-        );
-      } else {
-        setState(() {
-          _isLoading = false;
-          _isInitialized = false;
-          _errorMessage = 'No video source available';
-        });
-        return;
-      }
-
-      _controller = BetterPlayerController(
-        BetterPlayerConfiguration(
-          autoPlay: false,
-          looping: false,
-          fit: BoxFit.contain,
-          controlsConfiguration: const BetterPlayerControlsConfiguration(
-            showControls: false, // We'll use custom controls
-          ),
-          handleLifecycle: true,
-          autoDispose: true,
-        ),
-        betterPlayerDataSource: dataSource,
-      );
-
-      await _controller!.setupDataSource(dataSource);
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _isInitialized = true;
-          _duration = _controller!.videoPlayerController!.value.duration ?? Duration.zero;
-          _aspectRatio = _controller!.videoPlayerController!.value.aspectRatio;
-        });
-
-        _controller!.addEventsListener((event) {
-          if (mounted) {
-            setState(() {
-              if (event.betterPlayerEventType == BetterPlayerEventType.progress) {
-                _position = event.parameters?['progress'] ?? _position;
-              }
-              _isPlaying = _controller!.isPlaying() ?? false;
-              _duration = _controller!.videoPlayerController!.value.duration ?? _duration;
-              _aspectRatio = _controller!.videoPlayerController!.value.aspectRatio ?? _aspectRatio;
-              if (!_isPlaying && !_showControls) {
-                _showControls = true;
-                _animationController.forward();
-              }
-            });
-          }
-        });
-      }
-    } catch (e) {
-      if (_retryCount < _maxRetries && mounted) {
-        _retryCount++;
-        await Future.delayed(const Duration(seconds: 2));
-        return _initializeVideoPlayer();
-      } else {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-            _isInitialized = false;
-            _errorMessage = 'Failed to load video after $_maxRetries attempts: $e';
-          });
-        }
-      }
-    }
-  }
-
-  void _seekToPosition(double value) {
-    final position = _duration * value;
-    _controller?.seekTo(position);
-  }
-
-  void _toggleControls() {
-    setState(() {
-      _showControls = !_showControls;
-      if (_showControls) {
-        _animationController.forward();
-        if (_isPlaying) {
-          _hideControlsTimer?.cancel();
-          _hideControlsTimer = Timer(const Duration(seconds: 3), () {
-            if (mounted && _isPlaying) {
-              setState(() {
-                _showControls = false;
-                _animationController.reverse();
-              });
-            }
-          });
-        }
-      } else {
-        _animationController.reverse();
-        _hideControlsTimer?.cancel();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller?.dispose();
-    _hideControlsTimer?.cancel();
-    _animationController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Center(
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            widget.url != null
-                ? CachedNetworkImage(
-                    imageUrl: widget.url!.replaceAll(RegExp(r'\.\w+$'), '.jpg'),
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(color: Colors.black),
-                    errorWidget: (context, url, error) => Container(color: Colors.black),
-                  )
-                : Container(color: Colors.black),
-            const CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
-              backgroundColor: Colors.grey,
-              strokeWidth: 1,
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (!_isInitialized || _controller == null || _errorMessage != null) {
-      return MediaViewPage._buildError(
-        context,
-        message: _errorMessage ?? 'Error loading video: ${widget.displayPath}',
-      );
-    }
-
-    if (_aspectRatio == null) {
-      return const Center(
-        child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
-          backgroundColor: Colors.grey,
-          strokeWidth:   1,
-        ),
-      );
-    }
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return GestureDetector(
-          onTap: _toggleControls,
-          child: Stack(
-            alignment: Alignment.bottomCenter,
-            children: [
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: constraints.maxWidth, // Use full available width
-                  maxHeight: constraints.maxHeight,
-                ),
-                child: AspectRatio(
-                  aspectRatio: _aspectRatio!,
-                  child: BetterPlayer(controller: _controller!),
-                ),
-              ),
-              Positioned(
-                bottom: 20,
-                left: 20,
-                right: 20,
-                child: AnimatedOpacity(
-                  opacity: _fadeAnimation.value,
-                  duration: const Duration(milliseconds: 300),
-                  child: _showControls
-                      ? Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                          decoration: const BoxDecoration(
-                            color: Colors.transparent,
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              IconButton(
-                                icon: Icon(
-                                  _isPlaying ? Icons.pause : Icons.play_arrow,
-                                  color: Colors.tealAccent,
-                                  size: 30,
-                                ),
-                                onPressed: _isInitialized
-                                    ? () async {
-                                        if (_isPlaying) {
-                                          await _controller!.pause();
-                                        } else {
-                                          await _controller!.play();
-                                          setState(() {
-                                            _showControls = true;
-                                            _animationController.forward();
-                                          });
-                                          _hideControlsTimer?.cancel();
-                                          _hideControlsTimer = Timer(const Duration(seconds: 3), () {
-                                            if (mounted && _isPlaying) {
-                                              setState(() {
-                                                _showControls = false;
-                                                _animationController.reverse();
-                                              });
-                                            }
-                                          });
-                                        }
-                                        setState(() {});
-                                      }
-                                    : null,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                _formatDuration(_position),
-                                style: GoogleFonts.roboto(
-                                  color: Colors.white70,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Slider(
-                                  value: _duration.inMilliseconds > 0
-                                      ? _position.inMilliseconds / _duration.inMilliseconds
-                                      : 0.0,
-                                  onChanged: _isInitialized ? (value) => _seekToPosition(value) : null,
-                                  activeColor: Colors.tealAccent,
-                                  inactiveColor: Colors.grey,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                _formatDuration(_duration),
-                                style: GoogleFonts.roboto(
-                                  color: Colors.white70,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      : const SizedBox.shrink(),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  String _formatDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    final hours = duration.inHours;
-    final minutes = duration.inMinutes.remainder(60);
-    final seconds = duration.inSeconds.remainder(60);
-    return hours > 0
-        ? '${twoDigits(hours)}:${twoDigits(minutes)}:${twoDigits(seconds)}'
-        : '${twoDigits(minutes)}:${twoDigits(seconds)}';
   }
 }
 

@@ -534,6 +534,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       return AudioAttachmentWidget(
         key: Key('audio_${attachment.url ?? idx}'),
         attachment: attachment,
+        post: post, // Add this
         borderRadius: borderRadius,
       );
     } else if (attachment.type == "image") {
@@ -542,7 +543,17 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => MediaViewPage(attachment: attachment),
+              builder: (context) => MediaViewPage(
+                attachments: post.attachments,
+                initialIndex: idx,
+                message: post.content,
+                userName: post.username,
+                userAvatarUrl: post.useravatar,
+                timestamp: post.timestamp,
+                viewsCount: post.views,
+                likesCount: post.likes,
+                repostsCount: post.reposts,
+              ),
             ),
           );
         },
@@ -593,7 +604,17 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => MediaViewPage(attachment: attachment),
+              builder: (context) => MediaViewPage(
+                attachments: post.attachments,
+                initialIndex: idx,
+                message: post.content,
+                userName: post.username,
+                userAvatarUrl: post.useravatar,
+                timestamp: post.timestamp,
+                viewsCount: post.views,
+                likesCount: post.likes,
+                repostsCount: post.reposts,
+              ),
             ),
           );
         },
@@ -617,7 +638,17 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => MediaViewPage(attachment: attachment),
+              builder: (context) => MediaViewPage(
+                attachments: post.attachments,
+                initialIndex: idx,
+                message: post.content,
+                userName: post.username,
+                userAvatarUrl: post.useravatar,
+                timestamp: post.timestamp,
+                viewsCount: post.views,
+                likesCount: post.likes,
+                repostsCount: post.reposts,
+              ),
             ),
           );
         },
@@ -916,7 +947,17 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => MediaViewPage(attachment: widget.attachment),
+              builder: (context) => MediaViewPage(
+                attachments: widget.post.attachments,
+                initialIndex: widget.post.attachments.indexOf(widget.attachment),
+                message: widget.post.content,
+                userName: widget.post.username,
+                userAvatarUrl: widget.post.useravatar,
+                timestamp: widget.post.timestamp,
+                viewsCount: widget.post.views,
+                likesCount: widget.post.likes,
+                repostsCount: widget.post.reposts,
+              ),
             ),
           );
         },
@@ -1006,11 +1047,13 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> {
 
 class AudioAttachmentWidget extends StatefulWidget {
   final Attachment attachment;
+  final ChatterPost post; // Add this
   final BorderRadius borderRadius;
 
   const AudioAttachmentWidget({
     required Key key,
     required this.attachment,
+    required this.post, // Add this
     required this.borderRadius,
   }) : super(key: key);
 
@@ -1065,7 +1108,17 @@ class _AudioAttachmentWidgetState extends State<AudioAttachmentWidget> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => MediaViewPage(attachment: widget.attachment),
+              builder: (context) => MediaViewPage(
+                attachments: widget.post.attachments,
+                initialIndex: widget.post.attachments.indexOf(widget.attachment),
+                message: widget.post.content,
+                userName: widget.post.username,
+                userAvatarUrl: widget.post.useravatar,
+                timestamp: widget.post.timestamp,
+                viewsCount: widget.post.views,
+                likesCount: widget.post.likes,
+                repostsCount: widget.post.reposts,
+              ),
             ),
           );
         },
