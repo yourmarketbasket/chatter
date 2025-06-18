@@ -881,7 +881,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                 child: FloatingActionButton.small(
                   heroTag: 'fab_search',
                   onPressed: () {
-                    // setState(() { _isFabMenuOpen = false; });
+                    setState(() { _isFabMenuOpen = false; });
                     Get.to(SearchPage());
                   },
                   backgroundColor: Colors.black,
