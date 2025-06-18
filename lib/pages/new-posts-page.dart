@@ -529,34 +529,39 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF000000),
-      appBar: AppBar(
-        title: Text(
-          'New Chatter',
-          style: GoogleFonts.poppins(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-            fontSize: 20,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: Row(
+            children: [
+              Text(
+                'New Chatter',
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 20,
+                ),
+              ),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(FeatherIcons.x, color: Colors.grey),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
           ),
         ),
-        backgroundColor: const Color(0xFF000000),
-        elevation: 0,
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(FeatherIcons.x, color: Colors.grey),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                height: MediaQuery.of(context).size.height * 0.4,
-                child: TextField(
+        Flexible(
+          child: SingleChildScrollView(
+            child: Padding( // Added padding around the main content column
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox( // Changed Container to SizedBox for TextField parent
+                    height: MediaQuery.of(context).size.height * 0.35, // Adjusted height slightly
+                    child: TextField(
                   controller: _postController,
                   maxLength: 280,
                   maxLines: null,
@@ -584,6 +589,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
                 ),
               ),
               const SizedBox(height: 16),
+              // Ensure this part of the UI remains within the padded area
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -726,7 +732,9 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
             ],
           ),
         ),
-      ),
+        ),
+        ), // This closes Flexible
+      ],
     );
   }
 }
