@@ -20,6 +20,7 @@ class Attachment {
 }
 
 class ChatterPost {
+  final String id; // Added field
   final String username;
   final String content;
   final DateTime timestamp;
@@ -32,6 +33,7 @@ class ChatterPost {
   List<String> replies;
 
   ChatterPost({
+    required this.id, // Added field
     required this.username,
     required this.content,
     required this.timestamp,

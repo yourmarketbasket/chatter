@@ -30,10 +30,44 @@ class _ReplyPageState extends State<ReplyPage> {
   late DataController _dataController;
   final DeviceInfoPlugin _deviceInfo = DeviceInfoPlugin();
 
+  // State Variables for replies
+  List<ChatterPost> _replies = [];
+  bool _isLoadingReplies = true;
+  String? _fetchRepliesError;
+  bool _isSubmittingReply = false; // Added state for reply submission
+
   @override
   void initState() {
     super.initState();
     _dataController = Get.find<DataController>();
+    _fetchPostReplies(); // Fetch replies when the page loads
+  }
+
+  // Method to fetch replies
+  Future<void> _fetchPostReplies() async {
+    if (mounted) {
+      setState(() {
+        _isLoadingReplies = true;
+        _fetchRepliesError = null;
+      });
+    }
+    try {
+      final fetchedReplies = await _dataController.fetchReplies(widget.post.id);
+      if (mounted) {
+        setState(() {
+          _replies = fetchedReplies;
+          _isLoadingReplies = false;
+        });
+      }
+    } catch (e) {
+      print('Error fetching replies: $e');
+      if (mounted) {
+        setState(() {
+          _fetchRepliesError = 'Failed to load replies. Please try again.';
+          _isLoadingReplies = false;
+        });
+      }
+    }
   }
 
   @override
@@ -343,62 +377,96 @@ class _ReplyPageState extends State<ReplyPage> {
   }
 
   void _submitReply() async {
+    if (_isSubmittingReply) return; // Prevent multiple submissions
+
     if (_replyController.text.trim().isEmpty && _replyAttachments.isEmpty) {
       _showSnackBar('Input Error', 'Please enter text or add an attachment.', Colors.red[700]!);
       return;
     }
 
+    setState(() {
+      _isSubmittingReply = true;
+    });
+
     List<Attachment> uploadedReplyAttachments = [];
-    if (_replyAttachments.isNotEmpty) {
-      final filesToUpload = _replyAttachments.map((a) => a.file!).toList();
-      try {
-        final uploadResults = await _dataController.uploadFilesToCloudinary(filesToUpload);
-        for (int i = 0; i < _replyAttachments.length; i++) {
-          final result = uploadResults[i];
-          if (result['success'] == true) {
-            uploadedReplyAttachments.add(Attachment(
-              file: _replyAttachments[i].file,
-              type: _replyAttachments[i].type,
-              filename: _replyAttachments[i].filename,
-              size: _replyAttachments[i].size,
-              url: result['url'] as String,
-            ));
-          } else {
-            _showSnackBar(
-              'Upload Error',
-              'Failed to upload ${_replyAttachments[i].filename}: ${result['message']}',
-              Colors.red[700]!,
-            );
+    try {
+      if (_replyAttachments.isNotEmpty) {
+        final filesToUpload = _replyAttachments.where((a) => a.file != null).map((a) => a.file!).toList();
+        if (filesToUpload.isNotEmpty) {
+          final uploadResults = await _dataController.uploadFilesToCloudinary(filesToUpload);
+          int currentFileIndex = 0;
+          for (int i = 0; i < _replyAttachments.length; i++) {
+            if (_replyAttachments[i].file != null) { // Only process attachments that had a file to upload
+              final result = uploadResults[currentFileIndex];
+              currentFileIndex++;
+              if (result['success'] == true && result['url'] != null) {
+                uploadedReplyAttachments.add(Attachment(
+                  // file: _replyAttachments[i].file, // Not needed after upload
+                  type: _replyAttachments[i].type,
+                  filename: _replyAttachments[i].filename ?? result['filename'] ?? 'unknown',
+                  size: _replyAttachments[i].size ?? result['size'] ?? 0,
+                  url: result['url'] as String,
+                ));
+              } else {
+                _showSnackBar(
+                  'Upload Error',
+                  'Failed to upload ${_replyAttachments[i].filename ?? 'a file'}: ${result['message'] ?? 'Unknown error'}',
+                  Colors.red[700]!,
+                );
+                // Optionally, decide if a single failed upload should stop the whole reply
+              }
+            } else if (_replyAttachments[i].url != null) {
+              // This case should not happen if _replyAttachments only stores new files
+              // but as a safeguard, if an attachment already has a URL, pass it through.
+              uploadedReplyAttachments.add(_replyAttachments[i]);
+            }
           }
         }
-      } catch (e) {
-        _showSnackBar('Upload Error', 'Error during file upload: $e', Colors.red[700]!);
+      }
+
+      // Check if content is empty AND all selected attachments failed to upload
+      if (_replyController.text.trim().isEmpty &&
+          uploadedReplyAttachments.isEmpty &&
+          _replyAttachments.isNotEmpty) {
+        _showSnackBar('Upload Error', 'Failed to upload attachments. Reply not sent.', Colors.red[700]!);
+        setState(() { _isSubmittingReply = false; });
         return;
       }
+
+      final result = await _dataController.replyToPost(
+        postId: widget.post.id,
+        content: _replyController.text.trim(),
+        attachments: uploadedReplyAttachments, // These are Attachment objects with URLs
+      );
+
+      if (result['success'] == true) {
+        await _fetchPostReplies(); // Refresh the displayed replies
+        _replyController.clear();
+        if (mounted) {
+          setState(() {
+            _replyAttachments.clear();
+          });
+        }
+        _showSnackBar('Success', result['message'] ?? 'Reply posted!', Colors.teal[700]!);
+
+        // Short delay before popping, so user can see snackbar
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (mounted) {
+          Navigator.pop(context);
+        }
+      } else {
+        _showSnackBar('Error', result['message'] ?? 'Failed to post reply.', Colors.red[700]!);
+      }
+    } catch (e) {
+      print('Error in _submitReply: $e');
+      _showSnackBar('Error', 'An unexpected error occurred: ${e.toString()}', Colors.red[700]!);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmittingReply = false;
+        });
+      }
     }
-
-    if (_replyController.text.trim().isEmpty && uploadedReplyAttachments.isEmpty && _replyAttachments.isNotEmpty) {
-      _showSnackBar('Upload Error', 'Failed to upload all attachments. Reply not sent.', Colors.red[700]!);
-      return;
-    }
-
-    final replyData = {
-      'username': _dataController.user.value['name'] ?? 'YourName',
-      'content': _replyController.text.trim(),
-      'useravatar': _dataController.user.value['avatar'] ?? '',
-      'attachments': uploadedReplyAttachments.map((att) => {
-        'filename': att.filename,
-        'url': att.url,
-        'size': att.size,
-        'type': att.type,
-      }).toList(),
-      'avatarInitial': (_dataController.user.value['name']?.isNotEmpty ?? false)
-          ? _dataController.user.value['name'][0].toUpperCase()
-          : 'Y',
-    };
-
-    Navigator.pop(context, replyData);
-    _showSnackBar('Success', 'Poa! Reply posted!', Colors.teal[700]!);
   }
 
   @override
@@ -429,10 +497,43 @@ class _ReplyPageState extends State<ReplyPage> {
               style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white),
             ),
             const SizedBox(height: 8),
-            Text(
-              "Replies are not displayed here. They will appear in the main feed.",
-              style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 14),
-            ),
+            // Display replies, loader, or error message
+            _isLoadingReplies
+                ? const Center(child: CircularProgressIndicator(color: Colors.tealAccent))
+                : _fetchRepliesError != null
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(_fetchRepliesError!, style: GoogleFonts.roboto(color: Colors.redAccent, fontSize: 14)),
+                            const SizedBox(height: 8),
+                            ElevatedButton(
+                              onPressed: _fetchPostReplies,
+                              child: Text("Retry", style: GoogleFonts.roboto(color: Colors.black)),
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.tealAccent),
+                            )
+                          ],
+                        ),
+                      )
+                    : _replies.isEmpty
+                        ? Center(
+                            child: Text(
+                              "No replies yet. Be the first to reply!",
+                              style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 14),
+                            ),
+                          )
+                        : ListView.builder(
+                            shrinkWrap: true, // Important inside SingleChildScrollView
+                            physics: const NeverScrollableScrollPhysics(), // Also important
+                            itemCount: _replies.length,
+                            itemBuilder: (context, index) {
+                              final reply = _replies[index];
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                                child: _buildPostContent(reply, isReply: true), // Use existing method
+                              );
+                            },
+                          ),
             const SizedBox(height: 20),
             TextField(
               controller: _replyController,
@@ -511,16 +612,23 @@ class _ReplyPageState extends State<ReplyPage> {
             const SizedBox(height: 20),
             Center(
               child: ElevatedButton(
-                onPressed: _submitReply,
+                onPressed: _isSubmittingReply ? null : _submitReply, // Disable if submitting
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.tealAccent,
                   padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  disabledBackgroundColor: Colors.grey[600], // Optional: style for disabled state
                 ),
-                child: Text(
-                  'Post Reply',
-                  style: GoogleFonts.roboto(color: Colors.black, fontWeight: FontWeight.w600, fontSize: 16),
-                ),
+                child: _isSubmittingReply
+                    ? const SizedBox(
+                        height: 20, // Adjust size as needed
+                        width: 20,  // Adjust size as needed
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                      )
+                    : Text(
+                        'Post Reply',
+                        style: GoogleFonts.roboto(color: Colors.black, fontWeight: FontWeight.w600, fontSize: 16),
+                      ),
               ),
             ),
           ],

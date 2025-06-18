@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:dio/dio.dart' as dio; // Use prefix for dio to avoid conflicts
 import 'dart:convert';
 import 'package:path/path.dart' as path;
+import '../models/feed_models.dart'; // Added import for ChatterPost
 
 class DataController extends GetxController {
 
@@ -120,6 +121,83 @@ class DataController extends GetxController {
     }
   }
 
+  // Method to reply to a post
+  Future<Map<String, dynamic>> replyToPost({
+    required String postId,
+    required String content,
+    List<Attachment> attachments = const [],
+  }) async {
+    try {
+      final token = user.value['token'];
+      if (token == null) {
+        return {'success': false, 'message': 'User not authenticated. Please log in.'};
+      }
+
+      final userId = user.value['user']?['_id']?.toString();
+      if (userId == null) {
+        return {'success': false, 'message': 'User ID not found. Please log in again.'};
+      }
+
+      final String? username = user.value['user']?['name']?.toString();
+      final String? userAvatar = user.value['user']?['avatar']?.toString();
+
+      List<Map<String, dynamic>> attachmentPayload = attachments.map((att) {
+        // Ensure URL is not null, provide a default or handle error if necessary
+        // For now, assuming att.url will be populated by earlier upload step
+        if (att.url == null) {
+          print('Warning: Attachment URL is null for ${att.filename}. This attachment might not be saved correctly.');
+        }
+        return {
+          'type': att.type,
+          'url': att.url ?? '', // Or handle more gracefully if a URL is always expected
+          'filename': att.filename,
+          'size': att.size,
+        };
+      }).toList();
+
+      final Map<String, dynamic> requestData = {
+        'content': content,
+        'userId': userId, // Make sure backend expects 'userId' and not e.g. 'authorId'
+        'attachments': attachmentPayload,
+        // Optional: include username and avatar if backend doesn't resolve from userId
+        // These might be useful if the backend wants to denormalize this info directly into the reply document
+        'username': username ?? 'Anonymous', // Provide a default if null
+        'userAvatar': userAvatar, // Can be null
+      };
+
+      final response = await _dio.post(
+        '/api/posts/$postId/reply', // Dummy endpoint
+        data: requestData,
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+
+      if ((response.statusCode == 200 || response.statusCode == 201) && response.data['success'] == true) {
+        // Assuming the backend returns the created reply object under the key 'reply'
+        return {
+          'success': true,
+          'message': response.data['message'] ?? 'Reply posted successfully!',
+          'reply': response.data['reply'] // This could be the full reply object
+        };
+      } else {
+        return {
+          'success': false,
+          'message': response.data['message'] ?? 'Failed to post reply. Server error.'
+        };
+      }
+    } catch (e) {
+      print('Error in replyToPost: ${e.toString()}');
+      // Check if e is a DioError to potentially extract more specific error info
+      if (e is dio.DioException && e.response?.data != null && e.response!.data['message'] != null) {
+        return {'success': false, 'message': 'Failed to post reply: ${e.response!.data['message']}'};
+      }
+      return {'success': false, 'message': 'An error occurred while posting reply: ${e.toString()}'};
+    }
+  }
+
   // fetch all feeds for timeline
   Future<void> fetchFeeds() async {
     try {
@@ -145,6 +223,76 @@ class DataController extends GetxController {
       print('Error fetching feeds: $e');
       posts.clear();
       rethrow; // Rethrow the exception to be handled by the caller
+    }
+  }
+
+  // Fetch replies for a post
+  Future<List<ChatterPost>> fetchReplies(String postId) async {
+    try {
+      final token = user.value['token'];
+      if (token == null) {
+        throw Exception('User token not found. Please log in.');
+      }
+
+      final response = await _dio.get(
+        '/api/posts/$postId/replies',
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        final List<dynamic> repliesData = response.data['replies'];
+        List<ChatterPost> replies = [];
+
+        for (var replyData in repliesData) {
+          // Safely extract and parse attachments
+          List<Attachment> attachments = [];
+          if (replyData['mediaAttachments'] != null && replyData['mediaAttachments'] is List) {
+            for (var attData in (replyData['mediaAttachments'] as List<dynamic>)) {
+              if (attData is Map<String, dynamic>) {
+                attachments.add(Attachment(
+                  type: attData['type']?.toString() ?? 'unknown',
+                  url: attData['url']?.toString() ?? '',
+                  filename: attData['fileName']?.toString() ?? '', // Adjusted to fileName
+                  size: (attData['fileSize'] is num ? attData['fileSize'] : int.tryParse(attData['fileSize']?.toString() ?? '0'))?.toInt() ?? 0, // Adjusted to fileSize
+                ));
+              }
+            }
+          }
+
+          // Safely extract username and generate avatarInitial
+          String username = replyData['authorDetails']?['username']?.toString() ?? 'Unknown User';
+          String avatarInitial = username.isNotEmpty ? username[0].toUpperCase() : '?';
+          if (replyData['authorDetails']?['avatarInitial'] != null) {
+            avatarInitial = replyData['authorDetails']['avatarInitial'].toString();
+          }
+
+
+          replies.add(ChatterPost(
+            id: replyData['_id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(), // Fallback id
+            username: username,
+            content: replyData['textContent']?.toString() ?? '',
+            timestamp: DateTime.tryParse(replyData['createdAt']?.toString() ?? '') ?? DateTime.now(),
+            likes: (replyData['likeCount'] is num ? replyData['likeCount'] : int.tryParse(replyData['likeCount']?.toString() ?? '0'))?.toInt() ?? 0,
+            reposts: (replyData['repostCount'] is num ? replyData['repostCount'] : int.tryParse(replyData['repostCount']?.toString() ?? '0'))?.toInt() ?? 0,
+            views: (replyData['viewCount'] is num ? replyData['viewCount'] : int.tryParse(replyData['viewCount']?.toString() ?? '0'))?.toInt() ?? 0,
+            attachments: attachments,
+            avatarInitial: avatarInitial,
+            useravatar: replyData['authorDetails']?['avatar']?.toString(), // Can be null
+            replies: const [], // Replies to a reply are not typically fetched in this call
+          ));
+        }
+        return replies;
+      } else {
+        print('Error fetching replies: ${response.statusCode} - ${response.data['message']}');
+        throw Exception('Failed to fetch replies: ${response.data['message'] ?? 'Unknown error'}');
+      }
+    } catch (e) {
+      print('Exception caught in fetchReplies: $e');
+      throw Exception('An error occurred while fetching replies: $e');
     }
   }
 
