@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:better_player_enhanced/better_player.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:chatter/pages/media_view_page.dart'; // For MediaViewPage
+import 'package:chatter/services/custom_cache_manager.dart';
 import 'package:feather_icons/feather_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
@@ -224,6 +225,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
                   child: CachedNetworkImage(
                     imageUrl: widget.attachment.thumbnailUrl ?? '',
                     fit: BoxFit.cover,
+                    cacheManager: CustomCacheManager.instance,
                     placeholder: (context, url) => ScaleTransition(
                       scale: _pulseAnimation,
                       child: Container(
