@@ -829,17 +829,12 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
               child: AnimatedOpacity(
                 opacity: _isFabMenuOpen ? 1.0 : 0.0,
                 duration: Duration(milliseconds: 200),
-                child: GestureDetector(
-                  onTap: () {
-                    _navigateToPostScreen(); // This method should already handle closing the menu.
-                  },
-                  child: FloatingActionButton.small(
-                    heroTag: 'fab_add_post',
-                    onPressed: () {},
-                    backgroundColor: Colors.black,
-                    child: Icon(FeatherIcons.plusCircle, color: Colors.tealAccent),
-                    tooltip: 'Add Post',
-                  ),
+                child: FloatingActionButton.small(
+                  heroTag: 'fab_add_post',
+                  onPressed: _navigateToPostScreen,
+                  backgroundColor: Colors.black,
+                  child: Icon(FeatherIcons.plusCircle, color: Colors.tealAccent),
+                  tooltip: 'Add Post',
                 ),
               ),
             ),
@@ -850,18 +845,12 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
               child: AnimatedOpacity(
                 opacity: _isFabMenuOpen ? 1.0 : 0.0,
                 duration: Duration(milliseconds: 200),
-                child: GestureDetector(
-                  onTap: () {
-                    setState(() { _isFabMenuOpen = false; });
-                    // Optional: Get.offAll(() => const HomeFeedScreen());
-                  },
-                  child: FloatingActionButton.small(
-                    heroTag: 'fab_home',
-                    onPressed: () {},
-                    backgroundColor: Colors.black,
-                    child: Icon(FeatherIcons.home, color: Colors.tealAccent),
-                    tooltip: 'Home',
-                  ),
+                child: FloatingActionButton.small(
+                  heroTag: 'fab_home',
+                  onPressed: () { setState(() { _isFabMenuOpen = false; }); },
+                  backgroundColor: Colors.black,
+                  child: Icon(FeatherIcons.home, color: Colors.tealAccent),
+                  tooltip: 'Home',
                 ),
               ),
             ),
@@ -872,18 +861,12 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
               child: AnimatedOpacity(
                 opacity: _isFabMenuOpen ? 1.0 : 0.0,
                 duration: Duration(milliseconds: 200),
-                child: GestureDetector(
-                  onTap: () {
-                    setState(() { _isFabMenuOpen = false; });
-                    Get.to(() => const SearchPage());
-                  },
-                  child: FloatingActionButton.small(
-                    heroTag: 'fab_search',
-                    onPressed: () {},
-                    backgroundColor: Colors.black,
-                    child: Icon(FeatherIcons.search, color: Colors.tealAccent),
-                    tooltip: 'Search',
-                  ),
+                child: FloatingActionButton.small(
+                  heroTag: 'fab_search',
+                  onPressed: () { setState(() { _isFabMenuOpen = false; }); Get.to(() => const SearchPage()); },
+                  backgroundColor: Colors.black,
+                  child: Icon(FeatherIcons.search, color: Colors.tealAccent),
+                  tooltip: 'Search',
                 ),
               ),
             ),
