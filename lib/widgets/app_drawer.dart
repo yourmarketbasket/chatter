@@ -200,7 +200,7 @@ class AppDrawer extends StatelessWidget {
         children: <Widget>[
           Obx(() {
             final userMap = dataController.user.value;
-            final String? avatarUrl = userMap['avatar'];
+            final String? avatarUrl = userMap['user']['avatar'];
             final String username = userMap['user']['name'] ?? 'User';
             final String avatarInitial = username.isNotEmpty ? username[0].toUpperCase() : '?';
 

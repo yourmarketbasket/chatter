@@ -345,13 +345,25 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        '@${post.username}',
-                        style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w600,
-                          fontSize: isReply ? 14 : 16,
-                          color: Colors.white,
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            '${post.username}  ·  ',
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.w600,
+                              fontSize: isReply ? 14 : 16,
+                              color: Colors.white,
+                            ),
+
+                          ),
+                          Text(
+                            '@${post.username}',
+                            style: GoogleFonts.poppins(
+                              fontSize: isReply ? 10 : 12,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ],
                       ),
                       Text(
                         DateFormat('h:mm a · MMM d').format(post.timestamp),
@@ -367,7 +379,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                     post.content,
                     style: GoogleFonts.roboto(
                       fontSize: isReply ? 13 : 14,
-                      color: Colors.white70,
+                      color: const Color.fromARGB(255, 255, 255, 255),
                       height: 1.5,
                     ),
                   ),
@@ -743,7 +755,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
               replies: (postMap['replies'] as List<dynamic>?)?.cast<String>() ?? [],
             );
             return Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              padding: EdgeInsets.symmetric(horizontal: 1, vertical: 5),
               child: _buildPostContent(post, isReply: false),
             );
           },
@@ -958,9 +970,6 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> {
         child: ClipRRect(
           borderRadius: widget.borderRadius,
           child: Container(
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey[800]!, width: 1),
-            ),
             child: Stack(
               alignment: Alignment.center,
               children: [
@@ -1020,7 +1029,6 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> {
                       decoration: BoxDecoration(
                         color: Colors.black.withOpacity(0.6),
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.grey[400]!, width: 1),
                       ),
                       child: Icon(
                         _isMuted ? FeatherIcons.volumeX : FeatherIcons.volume2,
@@ -1126,7 +1134,6 @@ class _AudioAttachmentWidgetState extends State<AudioAttachmentWidget> {
               ),
               decoration: BoxDecoration(
                 color: Colors.grey[900],
-                border: Border.all(color: Colors.grey[800]!, width: 1),
               ),
               padding: EdgeInsets.all(16),
               child: Column(
@@ -1159,7 +1166,6 @@ class _AudioAttachmentWidgetState extends State<AudioAttachmentWidget> {
                           decoration: BoxDecoration(
                             color: Colors.black.withOpacity(0.6),
                             shape: BoxShape.circle,
-                            border: Border.all(color: Colors.grey[400]!, width: 1),
                           ),
                           child: Icon(
                             _isPlaying ? FeatherIcons.pause : FeatherIcons.play,
@@ -1181,7 +1187,6 @@ class _AudioAttachmentWidgetState extends State<AudioAttachmentWidget> {
                           decoration: BoxDecoration(
                             color: Colors.black.withOpacity(0.6),
                             shape: BoxShape.circle,
-                            border: Border.all(color: Colors.grey[400]!, width: 1),
                           ),
                           child: Icon(
                             _isMuted ? FeatherIcons.volumeX : FeatherIcons.volume2,

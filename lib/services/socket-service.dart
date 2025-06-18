@@ -60,7 +60,7 @@ class SocketService {
     });
     // listen fore newPost event
     _socket!.on('newPost', (data) {
-      print('New post event received: $data');
+      // print('New post event received: $data');
       if (data is Map<String, dynamic>) {
         // Assuming 'data' is the post object in the correct format
         _dataController.addNewPost(data);

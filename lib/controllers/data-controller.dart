@@ -135,7 +135,6 @@ class DataController extends GetxController {
           },
         ),
       );
-      // print(response.data);
       if (response.statusCode == 200 && response.data['success'] == true) {
         posts.assignAll(List<Map<String, dynamic>>.from(response.data['posts']));
       } else {
