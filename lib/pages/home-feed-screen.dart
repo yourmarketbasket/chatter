@@ -80,6 +80,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   DataController dataController = Get.put(DataController());
   int? androidVersion;
   bool isLoadingAndroidVersion = true;
+  bool _isFabMenuOpen = false;
 
   @override
   void initState() {
@@ -127,12 +128,42 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   }
 
   void _navigateToPostScreen() async {
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => NewPostScreen()),
+    // Close the FAB menu if it's open
+    if (_isFabMenuOpen) {
+      setState(() {
+        _isFabMenuOpen = false;
+      });
+    }
+
+    final result = await Get.bottomSheet<Map<String, dynamic>>(
+      // NewPostScreen is already a Scaffold with its own background color.
+      // Wrap it if specific bottom sheet styling (like rounded top corners) is needed.
+      Container(
+        // Optional: Add padding or margin if NewPostScreen doesn't handle it well for bottom sheet form
+        // padding: EdgeInsets.only(top: 20),
+        child: NewPostScreen(), // NewPostScreen itself is a Scaffold
+        // Apply rounded corners to the container shown as bottom sheet
+        // decoration: BoxDecoration(
+        //   color: Color(0xFF000000), // Match NewPostScreen's Scaffold background
+        //   borderRadius: BorderRadius.only(
+        //     topLeft: Radius.circular(16.0),
+        //     topRight: Radius.circular(16.0),
+        //   ),
+        // ),
+      ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent, // Make Get.bottomSheet background transparent if NewPostScreen provides its own
+      // elevation: // Optional: set elevation
     );
+
     if (result != null && result is Map<String, dynamic>) {
-      _addPost(result['content'], result['attachments']);
+      // Ensure content and attachments keys exist, providing defaults if not.
+      final String content = result['content'] as String? ?? '';
+      final List<Attachment> attachments = (result['attachments'] as List?)?.whereType<Attachment>().toList() ?? <Attachment>[];
+
+      if (content.isNotEmpty || attachments.isNotEmpty) {
+        _addPost(content, attachments);
+      }
     }
   }
 
@@ -320,22 +351,45 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CircleAvatar(
-              radius: isReply ? 16 : 20,
-              backgroundColor: Colors.tealAccent.withOpacity(0.2),
-              backgroundImage: post.useravatar != null && post.useravatar!.isNotEmpty
-                  ? NetworkImage(post.useravatar!)
-                  : null,
-              child: post.useravatar == null || post.useravatar!.isEmpty
-                  ? Text(
-                      post.avatarInitial,
-                      style: GoogleFonts.poppins(
-                        color: Colors.tealAccent,
-                        fontWeight: FontWeight.w600,
-                        fontSize: isReply ? 14 : 16,
+            Stack(
+              children: [
+                CircleAvatar(
+                  radius: isReply ? 16 : 20,
+                  backgroundColor: Colors.tealAccent.withOpacity(0.2),
+                  backgroundImage: post.useravatar != null && post.useravatar!.isNotEmpty
+                      ? NetworkImage(post.useravatar!)
+                      : null,
+                  child: post.useravatar == null || post.useravatar!.isEmpty
+                      ? Text(
+                          post.avatarInitial,
+                          style: GoogleFonts.poppins(
+                            color: Colors.tealAccent,
+                            fontWeight: FontWeight.w600,
+                            fontSize: isReply ? 14 : 16,
+                          ),
+                        )
+                      : null,
+                ),
+                Positioned(
+                  bottom: 0, // Adjust for desired vertical position
+                  right: 0,  // Adjust for desired horizontal position
+                  child: Container(
+                    padding: EdgeInsets.all(isReply ? 1.5 : 2.0), // Small padding for the badge border effect
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color(0xFF000000), // Background color of the main screen, to create a "cut-out" effect for the border
+                    ),
+                    child: Container(
+                      width: isReply ? 8 : 10, // Size of the badge
+                      height: isReply ? 8 : 10, // Size of the badge
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.amber,
                       ),
-                    )
-                  : null,
+                    ),
+                  ),
+                ),
+              ],
             ),
             SizedBox(width: 12),
             Expanded(
@@ -713,93 +767,142 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         // No explicit leading button is needed here unless custom behavior is desired.
       ),
       drawer: const AppDrawer(), // <-- ADD THIS LINE
-      body: Obx(() {
-        if (dataController.posts.isEmpty) {
-          return Center(
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
-            ),
-          );
-        }
-        return ListView.separated(
-          itemCount: dataController.posts.length,
-          separatorBuilder: (context, index) => Divider(
-            color: Colors.grey[850],
-            height: 1,
-          ),
-          itemBuilder: (context, index) {
-            final postMap = dataController.posts[index];
-            final post = ChatterPost(
-              username: postMap['username'] ?? 'Unknown User',
-              content: postMap['content'] ?? '',
-              timestamp: postMap['createdAt'] is String
-                  ? DateTime.parse(postMap['createdAt'])
-                  : DateTime.now(),
-              likes: postMap['likes'] ?? 0,
-              reposts: postMap['reposts'] ?? 0,
-              views: postMap['views'] ?? 0,
-              useravatar: postMap['useravatar'] ?? '',
-              avatarInitial: (postMap['username'] != null && postMap['username'].isNotEmpty)
-                  ? postMap['username'][0].toUpperCase()
-                  : '?',
-              attachments: (postMap['attachments'] as List<dynamic>?)?.map((att) {
-                return Attachment(
-                  file: null,
-                  type: att['type'] ?? 'unknown',
-                  filename: att['filename'],
-                  size: att['size'],
-                  url: att['url'] as String?,
-                  thumbnailUrl: att['thumbnailUrl'] as String?,
+      body: Stack(
+        children: [
+          Obx(() {
+            if (dataController.posts.isEmpty) {
+              return Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
+                ),
+              );
+            }
+            return ListView.separated(
+              itemCount: dataController.posts.length,
+              separatorBuilder: (context, index) => Divider(
+                color: Colors.grey[850],
+                height: 1,
+              ),
+              itemBuilder: (context, index) {
+                final postMap = dataController.posts[index];
+                final post = ChatterPost(
+                  username: postMap['username'] ?? 'Unknown User',
+                  content: postMap['content'] ?? '',
+                  timestamp: postMap['createdAt'] is String
+                      ? DateTime.parse(postMap['createdAt'])
+                      : DateTime.now(),
+                  likes: postMap['likes'] ?? 0,
+                  reposts: postMap['reposts'] ?? 0,
+                  views: postMap['views'] ?? 0,
+                  useravatar: postMap['useravatar'] ?? '',
+                  avatarInitial: (postMap['username'] != null && postMap['username'].isNotEmpty)
+                      ? postMap['username'][0].toUpperCase()
+                      : '?',
+                  attachments: (postMap['attachments'] as List<dynamic>?)?.map((att) {
+                    return Attachment(
+                      file: null,
+                      type: att['type'] ?? 'unknown',
+                      filename: att['filename'],
+                      size: att['size'],
+                      url: att['url'] as String?,
+                      thumbnailUrl: att['thumbnailUrl'] as String?,
+                    );
+                  }).toList() ?? [],
+                  replies: (postMap['replies'] as List<dynamic>?)?.cast<String>() ?? [],
                 );
-              }).toList() ?? [],
-              replies: (postMap['replies'] as List<dynamic>?)?.cast<String>() ?? [],
+                return Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 1, vertical: 5),
+                  child: _buildPostContent(post, isReply: false),
+                );
+              },
             );
-            return Padding(
-              padding: EdgeInsets.symmetric(horizontal: 1, vertical: 5),
-              child: _buildPostContent(post, isReply: false),
-            );
-          },
-        );
-      }),
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: const Color(0xFF000000),
-        selectedItemColor: Colors.tealAccent,
-        unselectedItemColor: Colors.grey[500],
-        selectedLabelStyle: GoogleFonts.roboto(fontWeight: FontWeight.w500),
-        unselectedLabelStyle: GoogleFonts.roboto(),
-        elevation: 0,
-        iconSize: 22, // Reduced icon size (was 24)
-        type: BottomNavigationBarType.fixed, // Good practice for 2-3 items
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(FeatherIcons.home), // size is now controlled by iconSize above
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(FeatherIcons.search), // size is now controlled by iconSize above
-            label: 'Search',
+          }),
+          if (_isFabMenuOpen)
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _isFabMenuOpen = false;
+                });
+              },
+              child: Container(
+                color: Colors.black.withOpacity(0.5), // Semi-transparent black
+              ),
+            ),
+        ],
+      ),
+      floatingActionButton: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.bottomRight,
+        children: [
+          if (_isFabMenuOpen)
+            Positioned(
+              bottom: 205.0,
+              right: 8.0,
+              child: AnimatedOpacity(
+                opacity: _isFabMenuOpen ? 1.0 : 0.0,
+                duration: Duration(milliseconds: 200),
+                child: FloatingActionButton.small(
+                  heroTag: 'fab_add_post',
+                  onPressed: () {
+                    setState(() { _isFabMenuOpen = false; });
+                    _navigateToPostScreen();
+                  },
+                  backgroundColor: Colors.tealAccent[100],
+                  child: Icon(FeatherIcons.plus_circle, color: Colors.black),
+                  tooltip: 'Add Post',
+                ),
+              ),
+            ),
+          if (_isFabMenuOpen)
+            Positioned(
+              bottom: 140.0,
+              right: 8.0,
+              child: AnimatedOpacity(
+                opacity: _isFabMenuOpen ? 1.0 : 0.0,
+                duration: Duration(milliseconds: 200),
+                child: FloatingActionButton.small(
+                  heroTag: 'fab_home',
+                  onPressed: () {
+                    setState(() { _isFabMenuOpen = false; });
+                    // If already on HomeFeedScreen, just close.
+                  },
+                  backgroundColor: Colors.tealAccent[100],
+                  child: Icon(FeatherIcons.home, color: Colors.black),
+                  tooltip: 'Home',
+                ),
+              ),
+            ),
+          if (_isFabMenuOpen)
+            Positioned(
+              bottom: 75.0,
+              right: 8.0,
+              child: AnimatedOpacity(
+                opacity: _isFabMenuOpen ? 1.0 : 0.0,
+                duration: Duration(milliseconds: 200),
+                child: FloatingActionButton.small(
+                  heroTag: 'fab_search',
+                  onPressed: () {
+                    setState(() { _isFabMenuOpen = false; });
+                    Get.to(() => const SearchPage());
+                  },
+                  backgroundColor: Colors.tealAccent[100],
+                  child: Icon(FeatherIcons.search, color: Colors.black),
+                  tooltip: 'Search',
+                ),
+              ),
+            ),
+          FloatingActionButton(
+            heroTag: 'fab_main',
+            onPressed: () {
+              setState(() {
+                _isFabMenuOpen = !_isFabMenuOpen;
+              });
+            },
+            backgroundColor: Colors.tealAccent,
+            child: Icon(_isFabMenuOpen ? FeatherIcons.x : FeatherIcons.menu, color: Colors.black),
           ),
         ],
-        currentIndex: 0, // Set to 0 as this is the HomeFeedScreen
-        onTap: (index) {
-          if (index == 0) {
-            // Already on Home, or navigate to Home if somehow accessed from a different context
-            // This primarily handles the visual selection of the tab.
-            // If HomeFeedScreen is part of a larger navigation stack (e.g. if other pages push on top of it),
-            // ensure Get.offAll or similar is used when appropriate from other pages to return "home".
-            // For now, if we are on HomeFeedScreen, tapping "Home" does nothing new.
-          } else if (index == 1) {
-            // Navigate to SearchPage
-            Get.to(() => const SearchPage());
-          }
-        },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _navigateToPostScreen,
-        backgroundColor: Colors.tealAccent,
-        elevation: 2,
-        child: Icon(FeatherIcons.plus, color: Colors.black),
-      ),
+      )
     );
   }
 }
@@ -913,11 +1016,14 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> {
     if (widget.isLoadingAndroidVersion || widget.androidVersion == null) {
       return ClipRRect(
         borderRadius: widget.borderRadius,
-        child: Container(
-          color: Colors.grey[900],
-          child: Center(
-            child: CircularProgressIndicator(
-              color: Colors.tealAccent,
+        child: AspectRatio(
+          aspectRatio: 4 / 3,
+          child: Container(
+            color: Colors.grey[900],
+            child: Center(
+              child: CircularProgressIndicator(
+                color: Colors.tealAccent,
+              ),
             ),
           ),
         ),
@@ -925,11 +1031,13 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> {
     }
 
     return VisibilityDetector(
-      key: Key(widget.attachment.url!),
+      key: Key(widget.attachment.url ?? widget.key.toString()), // Ensure a stable, unique key
       onVisibilityChanged: (info) {
         if (!_isInitialized) return;
-        if (Platform.isAndroid && widget.androidVersion! < 33) {
-          if (_betterPlayerController != null) {
+        bool useBetterPlayer = Platform.isAndroid && widget.androidVersion! < 33;
+
+        if (useBetterPlayer) {
+          if (_betterPlayerController != null && _betterPlayerController!.videoPlayerController != null && _betterPlayerController!.videoPlayerController!.value.isInitialized) {
             if (info.visibleFraction > 0.5 && !_betterPlayerController!.isPlaying()!) {
               _betterPlayerController!.play();
             } else if (info.visibleFraction <= 0.5 && _betterPlayerController!.isPlaying()!) {
@@ -937,10 +1045,10 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> {
             }
           }
         } else {
-          if (_videoPlayerController != null) {
+          if (_videoPlayerController != null && _videoPlayerController!.value.isInitialized) {
             if (info.visibleFraction > 0.5 && !_videoPlayerController!.value.isPlaying) {
               _videoPlayerController!.play().catchError((error) {
-                print('Video playback error: $error');
+                print('VideoPlayer playback error in VisibilityDetector: $error');
               });
             } else if (info.visibleFraction <= 0.5 && _videoPlayerController!.value.isPlaying) {
               _videoPlayerController!.pause();
@@ -969,47 +1077,57 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> {
         },
         child: ClipRRect(
           borderRadius: widget.borderRadius,
-          child: Container(
+          child: AspectRatio(
+            aspectRatio: 4 / 3,
             child: Stack(
               alignment: Alignment.center,
               children: [
-                AspectRatio(
-                  aspectRatio: 4 / 3, // Enforce 4/3 aspect ratio for the container
-                  child: _isInitialized
-                      ? (Platform.isAndroid && widget.androidVersion! < 33
-                          ? BetterPlayer(controller: _betterPlayerController!)
-                          : VideoPlayer(_videoPlayerController!))
-                      : CachedNetworkImage(
-                          imageUrl: widget.attachment.thumbnailUrl ?? '',
-                          fit: BoxFit.cover, // Ensure thumbnail respects 4/3
-                          errorWidget: (context, url, error) => Container(
-                            color: Colors.grey[900],
-                            child: Center(
-                              child: Icon(
-                                FeatherIcons.play,
-                                color: Colors.white.withOpacity(0.8),
-                                size: 48,
-                              ),
-                            ),
-                          ),
-                          placeholder: (context, url) => Container(
-                            color: Colors.grey[900],
-                            child: Center(
-                              child: CircularProgressIndicator(
-                                color: Colors.tealAccent,
-                              ),
-                            ),
-                          ),
+                // Layer 1: Thumbnail
+                Positioned.fill(
+                  child: CachedNetworkImage(
+                    imageUrl: widget.attachment.thumbnailUrl ?? '',
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(
+                      color: Colors.grey[800],
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.0,
+                          color: Colors.tealAccent.withOpacity(0.7),
                         ),
-                ),
-                if (!_isInitialized)
-                  Center(
-                    child: Icon(
-                      FeatherIcons.play,
-                      color: Colors.white.withOpacity(0.8),
-                      size: 48,
+                      ),
+                    ),
+                    errorWidget: (context, url, error) => Container(
+                      color: Colors.grey[900],
+                      child: Center(
+                        child: Icon(
+                          FeatherIcons.image,
+                          color: Colors.white.withOpacity(0.6),
+                          size: 36,
+                        ),
+                      ),
                     ),
                   ),
+                ),
+
+                // Layer 2: Video Player
+                if (_isInitialized)
+                  (Platform.isAndroid && widget.androidVersion! < 33)
+                      ? (_betterPlayerController != null && _betterPlayerController!.videoPlayerController != null && _betterPlayerController!.videoPlayerController!.value.isInitialized
+                          ? BetterPlayer(controller: _betterPlayerController!)
+                          : SizedBox.shrink())
+                      : (_videoPlayerController != null && _videoPlayerController!.value.isInitialized
+                          ? VideoPlayer(_videoPlayerController!)
+                          : SizedBox.shrink()),
+
+                // Layer 3: Loading indicator for video (on top of thumbnail, when video is not yet initialized)
+                if (!_isInitialized)
+                  Center(
+                    child: CircularProgressIndicator(
+                      color: Colors.tealAccent,
+                    ),
+                  ),
+
+                // Layer 4: Mute/Unmute button
                 Positioned(
                   bottom: 8,
                   right: 8,
