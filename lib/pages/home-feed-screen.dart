@@ -40,23 +40,18 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   int? androidVersion;
   bool isLoadingAndroidVersion = true;
   bool _isFabMenuOpen = false;
+  final ScrollController _scrollController = ScrollController(); // Added for home button functionality
 
   @override
   void initState() {
     super.initState();
     _loadAndroidVersion();
-    // The fetchFeeds call is now primarily handled by DataController.init()
-    // However, we might want to show a snackbar if posts are empty after DataController init.
-    // For now, we rely on DataController's init. If it fails, posts will be empty,
-    // and the Obx in build method will show the loading indicator.
-    // A more robust solution would involve listening to an error state from DataController.
+  }
 
-    // Optional: If DataController's fetchFeeds fails, posts will be empty.
-    // We can check this after a short delay or listen to an error stream from DataController
-    // to show a SnackBar, but this adds complexity. The current plan is to verify and ensure loading.
-    // The DataController.init() already tries to fetch feeds.
-    // If an error occurs there, it's logged, and posts are cleared.
-    // The UI in HomeFeedScreen shows a loading spinner if posts are empty.
+  @override
+  void dispose() {
+    _scrollController.dispose(); // Dispose ScrollController
+    super.dispose();
   }
 
   Future<void> _loadAndroidVersion() async {
@@ -87,36 +82,18 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   }
 
   void _navigateToPostScreen() async {
-    // Close the FAB menu if it's open
-    if (_isFabMenuOpen) {
-      setState(() {
-        _isFabMenuOpen = false;
-      });
-    }
-
+    setState(() {
+      _isFabMenuOpen = false; // Close FAB menu
+    });
     final result = await Get.bottomSheet<Map<String, dynamic>>(
-      // NewPostScreen is already a Scaffold with its own background color.
-      // Wrap it if specific bottom sheet styling (like rounded top corners) is needed.
       Container(
-        // Optional: Add padding or margin if NewPostScreen doesn't handle it well for bottom sheet form
-        // padding: EdgeInsets.only(top: 20),
-        child: NewPostScreen(), // NewPostScreen itself is a Scaffold
-        // Apply rounded corners to the container shown as bottom sheet
-        // decoration: BoxDecoration(
-        //   color: Color(0xFF000000), // Match NewPostScreen's Scaffold background
-        //   borderRadius: BorderRadius.only(
-        //     topLeft: Radius.circular(16.0),
-        //     topRight: Radius.circular(16.0),
-        //   ),
-        // ),
+        child: NewPostScreen(),
       ),
       isScrollControlled: true,
-      backgroundColor: Colors.transparent, // Make Get.bottomSheet background transparent if NewPostScreen provides its own
-      // elevation: // Optional: set elevation
+      backgroundColor: Colors.transparent,
     );
 
     if (result != null && result is Map<String, dynamic>) {
-      // Ensure content and attachments keys exist, providing defaults if not.
       final String content = result['content'] as String? ?? '';
       final List<Attachment> attachments = (result['attachments'] as List?)?.whereType<Attachment>().toList() ?? <Attachment>[];
 
@@ -222,9 +199,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       }).toList(),
     };
 
-
     final result = await dataController.createPost(postData);
-    
 
     if (result['success'] == true) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -335,33 +310,33 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Flexible( // Added Flexible to prevent overflow if username is long
+                      Flexible(
                         child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center, // Align items vertically
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             Text(
-                              post.username, // Displaying only the username here
+                              post.username,
                               style: GoogleFonts.poppins(
                                 fontWeight: FontWeight.w600,
                                 fontSize: isReply ? 14 : 16,
                                 color: Colors.white,
                               ),
-                              overflow: TextOverflow.ellipsis, // Prevent overflow
+                              overflow: TextOverflow.ellipsis,
                             ),
                             SizedBox(width: 4.0),
                             Icon(
                               Icons.verified,
                               color: Colors.amber,
-                              size: isReply ? 13 : 15, // Adjusted size slightly
+                              size: isReply ? 13 : 15,
                             ),
                             SizedBox(width: 4.0),
-                            Text( // The handle part, now separate
+                            Text(
                               ' · @${post.username}',
                               style: GoogleFonts.poppins(
                                 fontSize: isReply ? 10 : 12,
                                 color: Colors.white70,
                               ),
-                              overflow: TextOverflow.ellipsis, // Prevent overflow
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
@@ -550,7 +525,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       return AudioAttachmentWidget(
         key: Key('audio_${attachment.url ?? idx}'),
         attachment: attachment,
-        post: post, // Add this
+        post: post,
         borderRadius: borderRadius,
       );
     } else if (attachment.type == "image") {
@@ -709,11 +684,8 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         ),
         backgroundColor: Color(0xFF000000),
         elevation: 0,
-        // The leading hamburger icon to open the drawer will be automatically added
-        // by Flutter when a drawer is present on the Scaffold.
-        // No explicit leading button is needed here unless custom behavior is desired.
       ),
-      drawer: const AppDrawer(), // <-- ADD THIS LINE
+      drawer: const AppDrawer(),
       body: Stack(
         children: [
           Obx(() {
@@ -725,6 +697,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
               );
             }
             return ListView.separated(
+              controller: _scrollController, // Attach ScrollController
               itemCount: dataController.posts.length,
               separatorBuilder: (context, index) => Divider(
                 color: Colors.grey[850],
@@ -772,7 +745,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                 });
               },
               child: Container(
-                color: Colors.black.withOpacity(0.5), // Semi-transparent black
+                color: Colors.black.withOpacity(0.5),
               ),
             ),
         ],
@@ -790,7 +763,12 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                 duration: Duration(milliseconds: 200),
                 child: FloatingActionButton.small(
                   heroTag: 'fab_add_post',
-                  onPressed: _navigateToPostScreen,
+                  onPressed: () {
+                    setState(() {
+                      _isFabMenuOpen = false; // Close FAB menu
+                    });
+                    _navigateToPostScreen(); // Navigate to post screen
+                  },
                   backgroundColor: Colors.black,
                   child: Icon(FeatherIcons.plusCircle, color: Colors.tealAccent),
                   tooltip: 'Add Post',
@@ -806,7 +784,19 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                 duration: Duration(milliseconds: 200),
                 child: FloatingActionButton.small(
                   heroTag: 'fab_home',
-                  onPressed: () { setState(() { _isFabMenuOpen = false; }); },
+                  onPressed: () {
+                    setState(() {
+                      _isFabMenuOpen = false; // Close FAB menu
+                    });
+                    // Scroll to top of the feed
+                    _scrollController.animateTo(
+                      0,
+                      duration: Duration(milliseconds: 300),
+                      curve: Curves.easeInOut,
+                    );
+                    // Optionally refresh posts
+                    dataController.fetchFeeds();
+                  },
                   backgroundColor: Colors.black,
                   child: Icon(FeatherIcons.home, color: Colors.tealAccent),
                   tooltip: 'Home',
@@ -822,7 +812,13 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                 duration: Duration(milliseconds: 200),
                 child: FloatingActionButton.small(
                   heroTag: 'fab_search',
-                  onPressed: () { setState(() { _isFabMenuOpen = false; }); Get.to(() => const SearchPage()); },
+                  onPressed: () {
+                    print("hello");
+                    setState(() {
+                      _isFabMenuOpen = false; // Close FAB menu
+                    });
+                    Get.to(() => const SearchPage(), transition: Transition.rightToLeft); // Ensure navigation with transition
+                  },
                   backgroundColor: Colors.black,
                   child: Icon(FeatherIcons.search, color: Colors.tealAccent),
                   tooltip: 'Search',
@@ -833,14 +829,14 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
             heroTag: 'fab_main',
             onPressed: () {
               setState(() {
-                _isFabMenuOpen = !_isFabMenuOpen;
+                _isFabMenuOpen = !_isFabMenuOpen; // Toggle FAB menu
               });
             },
             backgroundColor: Colors.tealAccent,
             child: Icon(_isFabMenuOpen ? FeatherIcons.x : FeatherIcons.menu, color: Colors.black),
           ),
         ],
-      )
+      ),
     );
   }
 }
