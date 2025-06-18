@@ -84,10 +84,17 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   void _navigateToPostScreen() async {
     final result = await Get.bottomSheet<Map<String, dynamic>>(
       Container(
+        decoration: BoxDecoration(
+          color: Color(0xFF1E1E1E), // Dark grey background color
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(16),
+            topRight: Radius.circular(16),
+          ),
+        ),
         child: NewPostScreen(),
       ),
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: Colors.transparent, // Important to keep this transparent
     );
 
     if (result != null && result is Map<String, dynamic>) {
