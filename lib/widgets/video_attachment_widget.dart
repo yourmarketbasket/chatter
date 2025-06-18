@@ -78,7 +78,8 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
             muteIcon: FeatherIcons.volumeX,
             unMuteIcon: FeatherIcons.volume2,
           ),
-          handleLifecycle: false,
+          handleLifecycle: true,
+          autoDispose: true,
         ),
         betterPlayerDataSource: BetterPlayerDataSource(
           BetterPlayerDataSourceType.network,
