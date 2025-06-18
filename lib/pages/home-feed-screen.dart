@@ -351,45 +351,22 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Stack(
-              children: [
-                CircleAvatar(
-                  radius: isReply ? 16 : 20,
-                  backgroundColor: Colors.tealAccent.withOpacity(0.2),
-                  backgroundImage: post.useravatar != null && post.useravatar!.isNotEmpty
-                      ? NetworkImage(post.useravatar!)
-                      : null,
-                  child: post.useravatar == null || post.useravatar!.isEmpty
-                      ? Text(
-                          post.avatarInitial,
-                          style: GoogleFonts.poppins(
-                            color: Colors.tealAccent,
-                            fontWeight: FontWeight.w600,
-                            fontSize: isReply ? 14 : 16,
-                          ),
-                        )
-                      : null,
-                ),
-                Positioned(
-                  bottom: 0, // Adjust for desired vertical position
-                  right: 0,  // Adjust for desired horizontal position
-                  child: Container(
-                    padding: EdgeInsets.all(isReply ? 1.5 : 2.0), // Small padding for the badge border effect
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Color(0xFF000000), // Background color of the main screen, to create a "cut-out" effect for the border
-                    ),
-                    child: Container(
-                      width: isReply ? 8 : 10, // Size of the badge
-                      height: isReply ? 8 : 10, // Size of the badge
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.amber,
+            CircleAvatar(
+              radius: isReply ? 16 : 20,
+              backgroundColor: Colors.tealAccent.withOpacity(0.2),
+              backgroundImage: post.useravatar != null && post.useravatar!.isNotEmpty
+                  ? NetworkImage(post.useravatar!)
+                  : null,
+              child: post.useravatar == null || post.useravatar!.isEmpty
+                  ? Text(
+                      post.avatarInitial,
+                      style: GoogleFonts.poppins(
+                        color: Colors.tealAccent,
+                        fontWeight: FontWeight.w600,
+                        fontSize: isReply ? 14 : 16,
                       ),
-                    ),
-                  ),
-                ),
-              ],
+                    )
+                  : null,
             ),
             SizedBox(width: 12),
             Expanded(
@@ -399,25 +376,36 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          Text(
-                            '${post.username}  ·  ',
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.w600,
-                              fontSize: isReply ? 14 : 16,
-                              color: Colors.white,
+                      Flexible( // Added Flexible to prevent overflow if username is long
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center, // Align items vertically
+                          children: [
+                            Text(
+                              post.username, // Displaying only the username here
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.w600,
+                                fontSize: isReply ? 14 : 16,
+                                color: Colors.white,
+                              ),
+                              overflow: TextOverflow.ellipsis, // Prevent overflow
                             ),
-
-                          ),
-                          Text(
-                            '@${post.username}',
-                            style: GoogleFonts.poppins(
-                              fontSize: isReply ? 10 : 12,
-                              color: Colors.white70,
+                            SizedBox(width: 4.0),
+                            Icon(
+                              FeatherIcons.check_circle,
+                              color: Colors.amber,
+                              size: isReply ? 13 : 15, // Adjusted size slightly
                             ),
-                          ),
-                        ],
+                            SizedBox(width: 4.0),
+                            Text( // The handle part, now separate
+                              '@${post.username}',
+                              style: GoogleFonts.poppins(
+                                fontSize: isReply ? 10 : 12,
+                                color: Colors.white70,
+                                overflow: TextOverflow.ellipsis, // Prevent overflow
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                       Text(
                         DateFormat('h:mm a · MMM d').format(post.timestamp),
@@ -841,14 +829,17 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
               child: AnimatedOpacity(
                 opacity: _isFabMenuOpen ? 1.0 : 0.0,
                 duration: Duration(milliseconds: 200),
-                child: FloatingActionButton.small(
-                  heroTag: 'fab_add_post',
-                  onPressed: () {
-                    _navigateToPostScreen();
+                child: GestureDetector(
+                  onTap: () {
+                    _navigateToPostScreen(); // This method should already handle closing the menu.
                   },
-                  backgroundColor: Colors.black,
-                  child: Icon(FeatherIcons.plusCircle, color: Colors.tealAccent),
-                  tooltip: 'Add Post',
+                  child: FloatingActionButton.small(
+                    heroTag: 'fab_add_post',
+                    onPressed: () {},
+                    backgroundColor: Colors.black,
+                    child: Icon(FeatherIcons.plus_circle, color: Colors.tealAccent),
+                    tooltip: 'Add Post',
+                  ),
                 ),
               ),
             ),
@@ -859,15 +850,18 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
               child: AnimatedOpacity(
                 opacity: _isFabMenuOpen ? 1.0 : 0.0,
                 duration: Duration(milliseconds: 200),
-                child: FloatingActionButton.small(
-                  heroTag: 'fab_home',
-                  onPressed: () {
+                child: GestureDetector(
+                  onTap: () {
                     setState(() { _isFabMenuOpen = false; });
-                    // If already on HomeFeedScreen, just close.
+                    // Optional: Get.offAll(() => const HomeFeedScreen());
                   },
-                  backgroundColor: Colors.black,
-                  child: Icon(FeatherIcons.home, color: Colors.tealAccent),
-                  tooltip: 'Home',
+                  child: FloatingActionButton.small(
+                    heroTag: 'fab_home',
+                    onPressed: () {},
+                    backgroundColor: Colors.black,
+                    child: Icon(FeatherIcons.home, color: Colors.tealAccent),
+                    tooltip: 'Home',
+                  ),
                 ),
               ),
             ),
@@ -878,15 +872,18 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
               child: AnimatedOpacity(
                 opacity: _isFabMenuOpen ? 1.0 : 0.0,
                 duration: Duration(milliseconds: 200),
-                child: FloatingActionButton.small(
-                  heroTag: 'fab_search',
-                  onPressed: () {
+                child: GestureDetector(
+                  onTap: () {
                     setState(() { _isFabMenuOpen = false; });
-                    Get.to(SearchPage());
+                    Get.to(() => const SearchPage());
                   },
-                  backgroundColor: Colors.black,
-                  child: Icon(FeatherIcons.search, color: Colors.tealAccent),
-                  tooltip: 'Search',
+                  child: FloatingActionButton.small(
+                    heroTag: 'fab_search',
+                    onPressed: () {},
+                    backgroundColor: Colors.black,
+                    child: Icon(FeatherIcons.search, color: Colors.tealAccent),
+                    tooltip: 'Search',
+                  ),
                 ),
               ),
             ),
@@ -926,9 +923,11 @@ class VideoAttachmentWidget extends StatefulWidget {
   _VideoAttachmentWidgetState createState() => _VideoAttachmentWidgetState();
 }
 
-class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> {
+class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with SingleTickerProviderStateMixin {
   VideoPlayerController? _videoPlayerController;
   BetterPlayerController? _betterPlayerController;
+  late AnimationController _pulseAnimationController;
+  late Animation<double> _pulseAnimation;
   bool _isMuted = true;
   bool _isInitialized = false;
 
@@ -936,6 +935,14 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> {
   void initState() {
     super.initState();
     _initializeVideoPlayer();
+    _pulseAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
+    _pulseAnimation = Tween<double>(begin: 0.95, end: 1.0).animate(
+      CurvedAnimation(parent: _pulseAnimationController, curve: Curves.easeInOut),
+    );
+    _pulseAnimationController.repeat(reverse: true);
   }
 
   void _initializeVideoPlayer() {
@@ -1007,6 +1014,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> {
   void dispose() {
     _videoPlayerController?.dispose();
     _betterPlayerController?.dispose();
+    _pulseAnimationController.dispose();
     super.dispose();
   }
 
@@ -1036,7 +1044,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> {
         bool useBetterPlayer = Platform.isAndroid && widget.androidVersion! < 33;
 
         if (useBetterPlayer) {
-          if (_betterPlayerController != null && _betterPlayerController!.videoPlayerController != null && _betterPlayerController!.videoPlayerController!.value.initialized) {
+          if (_betterPlayerController != null && _betterPlayerController!.videoPlayerController != null && _betterPlayerController!.videoPlayerController!.value.isInitialized) {
             if (info.visibleFraction > 0.5 && !_betterPlayerController!.isPlaying()!) {
               _betterPlayerController!.play();
             } else if (info.visibleFraction <= 0.5 && _betterPlayerController!.isPlaying()!) {
@@ -1086,13 +1094,10 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> {
                   child: CachedNetworkImage(
                     imageUrl: widget.attachment.thumbnailUrl ?? '',
                     fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(
-                      color: Colors.grey[800],
-                      child: Center(
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.0,
-                          color: Colors.tealAccent.withOpacity(0.7),
-                        ),
+                    placeholder: (context, url) => ScaleTransition(
+                      scale: _pulseAnimation,
+                      child: Container( // This container will pulse
+                        color: Colors.grey[850], // Base color of the pulsing area
                       ),
                     ),
                     errorWidget: (context, url, error) => Container(
@@ -1111,7 +1116,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> {
                 // Layer 2: Video Player
                 if (_isInitialized)
                   (Platform.isAndroid && widget.androidVersion! < 33)
-                      ? (_betterPlayerController != null && _betterPlayerController!.videoPlayerController != null && _betterPlayerController!.videoPlayerController!.value.initialized
+                      ? (_betterPlayerController != null && _betterPlayerController!.videoPlayerController != null && _betterPlayerController!.videoPlayerController!.value.isInitialized
                           ? BetterPlayer(controller: _betterPlayerController!)
                           : SizedBox.shrink())
                       : (_videoPlayerController != null && _videoPlayerController!.value.isInitialized
