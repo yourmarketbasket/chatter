@@ -27,6 +27,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:chatter/widgets/video_attachment_widget.dart';
 import 'package:chatter/widgets/audio_attachment_widget.dart';
 import 'package:chatter/models/feed_models.dart';
+import 'package:flutter_expandable_fab/flutter_expandable_fab.dart';
 
 class HomeFeedScreen extends StatefulWidget {
   const HomeFeedScreen({Key? key}) : super(key: key);
@@ -39,8 +40,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   DataController dataController = Get.put(DataController());
   int? androidVersion;
   bool isLoadingAndroidVersion = true;
-  bool _isFabMenuOpen = false;
-  final ScrollController _scrollController = ScrollController(); // Added for home button functionality
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -50,7 +50,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
 
   @override
   void dispose() {
-    _scrollController.dispose(); // Dispose ScrollController
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -74,7 +74,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         });
       } else {
         setState(() {
-          androidVersion = 33; // Default to use video_player for non-Android platforms
+          androidVersion = 33;
           isLoadingAndroidVersion = false;
         });
       }
@@ -82,9 +82,6 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   }
 
   void _navigateToPostScreen() async {
-    setState(() {
-      _isFabMenuOpen = false; // Close FAB menu
-    });
     final result = await Get.bottomSheet<Map<String, dynamic>>(
       Container(
         child: NewPostScreen(),
@@ -187,7 +184,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     }
 
     Map<String, dynamic> postData = {
-      'username':  dataController.user.value['user']['name'] ?? 'YourName',
+      'username': dataController.user.value['user']['name'] ?? 'YourName',
       'content': content.trim(),
       'useravatar': dataController.user.value['avatar'] ?? '',
       'attachments': uploadedAttachments.map((att) => {
@@ -246,7 +243,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         }).toList() ?? [],
       };
 
-      final result = await dataController.createPost(replyData);
+      final result = await dataController.createPost(replyData); // Fixed: Changed postData to replyData
       if (result['success'] == true) {
         final postIndex = dataController.posts.indexWhere((p) => p['createdAt'] == post.timestamp.toIso8601String());
         if (postIndex != -1) {
@@ -686,154 +683,106 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         elevation: 0,
       ),
       drawer: const AppDrawer(),
-      body: Stack(
-        children: [
-          Obx(() {
-            if (dataController.posts.isEmpty) {
-              return Center(
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
-                ),
-              );
-            }
-            return ListView.separated(
-              controller: _scrollController, // Attach ScrollController
-              itemCount: dataController.posts.length,
-              separatorBuilder: (context, index) => Divider(
-                color: Colors.grey[850],
-                height: 1,
-              ),
-              itemBuilder: (context, index) {
-                final postMap = dataController.posts[index];
-                final post = ChatterPost(
-                  username: postMap['username'] ?? 'Unknown User',
-                  content: postMap['content'] ?? '',
-                  timestamp: postMap['createdAt'] is String
-                      ? DateTime.parse(postMap['createdAt'])
-                      : DateTime.now(),
-                  likes: postMap['likes'] ?? 0,
-                  reposts: postMap['reposts'] ?? 0,
-                  views: postMap['views'] ?? 0,
-                  useravatar: postMap['useravatar'] ?? '',
-                  avatarInitial: (postMap['username'] != null && postMap['username'].isNotEmpty)
-                      ? postMap['username'][0].toUpperCase()
-                      : '?',
-                  attachments: (postMap['attachments'] as List<dynamic>?)?.map((att) {
-                    return Attachment(
-                      file: null,
-                      type: att['type'] ?? 'unknown',
-                      filename: att['filename'],
-                      size: att['size'],
-                      url: att['url'] as String?,
-                      thumbnailUrl: att['thumbnailUrl'] as String?,
-                    );
-                  }).toList() ?? [],
-                  replies: (postMap['replies'] as List<dynamic>?)?.cast<String>() ?? [],
+      body: Obx(() {
+        if (dataController.posts.isEmpty) {
+          return Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
+            ),
+          );
+        }
+        return ListView.separated(
+          controller: _scrollController,
+          itemCount: dataController.posts.length,
+          separatorBuilder: (context, index) => Divider(
+            color: Colors.grey[850],
+            height: 1,
+          ),
+          itemBuilder: (context, index) {
+            final postMap = dataController.posts[index];
+            final post = ChatterPost(
+              username: postMap['username'] ?? 'Unknown User',
+              content: postMap['content'] ?? '',
+              timestamp: postMap['createdAt'] is String
+                  ? DateTime.parse(postMap['createdAt'])
+                  : DateTime.now(),
+              likes: postMap['likes'] ?? 0,
+              reposts: postMap['reposts'] ?? 0,
+              views: postMap['views'] ?? 0,
+              useravatar: postMap['useravatar'] ?? '',
+              avatarInitial: (postMap['username'] != null && postMap['username'].isNotEmpty)
+                  ? postMap['username'][0].toUpperCase()
+                  : '?',
+              attachments: (postMap['attachments'] as List<dynamic>?)?.map((att) {
+                return Attachment(
+                  file: null,
+                  type: att['type'] ?? 'unknown',
+                  filename: att['filename'],
+                  size: att['size'],
+                  url: att['url'] as String?,
+                  thumbnailUrl: att['thumbnailUrl'] as String?,
                 );
-                return Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 1, vertical: 5),
-                  child: _buildPostContent(post, isReply: false),
-                );
-              },
+              }).toList() ?? [],
+              replies: (postMap['replies'] as List<dynamic>?)?.cast<String>() ?? [],
             );
-          }),
-          if (_isFabMenuOpen)
-            GestureDetector(
-              onTap: () {
-                setState(() {
-                  _isFabMenuOpen = false;
-                });
-              },
-              child: Container(
-                color: Colors.black.withOpacity(0.5),
-              ),
-            ),
-        ],
-      ),
-      floatingActionButton: Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.bottomRight,
+            return Padding(
+              padding: EdgeInsets.symmetric(horizontal: 1, vertical: 5),
+              child: _buildPostContent(post, isReply: false),
+            );
+          },
+        );
+      }),
+      floatingActionButtonLocation: ExpandableFab.location,
+      floatingActionButton: ExpandableFab(
+        key: GlobalKey<ExpandableFabState>(),
+        distance: 65.0,
+        type: ExpandableFabType.up,
+        overlayStyle: ExpandableFabOverlayStyle(
+          color: Colors.black.withOpacity(0.5),
+        ),
+        openButtonBuilder: RotateFloatingActionButtonBuilder(
+          backgroundColor: Colors.tealAccent,
+          foregroundColor: Colors.black,
+          child: Icon(FeatherIcons.menu),
+        ),
+        closeButtonBuilder: RotateFloatingActionButtonBuilder(
+          backgroundColor: Colors.tealAccent,
+          foregroundColor: Colors.black,
+          child: Icon(FeatherIcons.x),
+        ),
         children: [
-          if (_isFabMenuOpen)
-            Positioned(
-              bottom: 205.0,
-              right: 8.0,
-              child: AnimatedOpacity(
-                opacity: _isFabMenuOpen ? 1.0 : 0.0,
-                duration: Duration(milliseconds: 200),
-                child: FloatingActionButton.small(
-                  heroTag: 'fab_add_post',
-                  onPressed: () {
-                    setState(() {
-                      _isFabMenuOpen = false; // Close FAB menu
-                    });
-                    _navigateToPostScreen(); // Navigate to post screen
-                  },
-                  backgroundColor: Colors.black,
-                  child: Icon(FeatherIcons.plusCircle, color: Colors.tealAccent),
-                  tooltip: 'Add Post',
-                ),
-              ),
-            ),
-          if (_isFabMenuOpen)
-            Positioned(
-              bottom: 140.0,
-              right: 8.0,
-              child: AnimatedOpacity(
-                opacity: _isFabMenuOpen ? 1.0 : 0.0,
-                duration: Duration(milliseconds: 200),
-                child: FloatingActionButton.small(
-                  heroTag: 'fab_home',
-                  onPressed: () {
-                    setState(() {
-                      _isFabMenuOpen = false; // Close FAB menu
-                    });
-                    // Scroll to top of the feed
-                    _scrollController.animateTo(
-                      0,
-                      duration: Duration(milliseconds: 300),
-                      curve: Curves.easeInOut,
-                    );
-                    // Optionally refresh posts
-                    dataController.fetchFeeds();
-                  },
-                  backgroundColor: Colors.black,
-                  child: Icon(FeatherIcons.home, color: Colors.tealAccent),
-                  tooltip: 'Home',
-                ),
-              ),
-            ),
-          if (_isFabMenuOpen)
-            Positioned(
-              bottom: 75.0,
-              right: 8.0,
-              child: AnimatedOpacity(
-                opacity: _isFabMenuOpen ? 1.0 : 0.0,
-                duration: Duration(milliseconds: 200),
-                child: FloatingActionButton.small(
-                  heroTag: 'fab_search',
-                  onPressed: () {
-                    print("hello");
-                    setState(() {
-                      _isFabMenuOpen = false; // Close FAB menu
-                    });
-                    Get.to(() => const SearchPage(), transition: Transition.rightToLeft); // Ensure navigation with transition
-                  },
-                  backgroundColor: Colors.black,
-                  child: Icon(FeatherIcons.search, color: Colors.tealAccent),
-                  tooltip: 'Search',
-                ),
-              ),
-            ),
-          FloatingActionButton(
-            heroTag: 'fab_main',
+          FloatingActionButton.small(
+            heroTag: 'fab_add_post',
+            backgroundColor: Colors.black,
+            shape: RoundedRectangleBorder(side: BorderSide(color: Colors.tealAccent, width: 1), borderRadius: BorderRadius.circular(10)),
+            onPressed: _navigateToPostScreen,
+            tooltip: 'Add Post',
+            child: Icon(FeatherIcons.plusCircle, color: Colors.tealAccent),
+          ),
+          FloatingActionButton.small(
+            heroTag: 'fab_home',
+            backgroundColor: Colors.black,
+            shape: RoundedRectangleBorder(side: BorderSide(color: Colors.tealAccent, width: 1), borderRadius: BorderRadius.circular(10)),
             onPressed: () {
-              setState(() {
-                _isFabMenuOpen = !_isFabMenuOpen; // Toggle FAB menu
-              });
+              _scrollController.animateTo(
+                0,
+                duration: Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+              );
+              dataController.fetchFeeds();
             },
-            backgroundColor: Colors.tealAccent,
-            child: Icon(_isFabMenuOpen ? FeatherIcons.x : FeatherIcons.menu, color: Colors.black),
+            tooltip: 'Home',
+            child: Icon(FeatherIcons.home, color: Colors.tealAccent),
+          ),
+          FloatingActionButton.small(
+            heroTag: 'fab_search',
+            backgroundColor: Colors.black,
+            shape: RoundedRectangleBorder(side: BorderSide(color: Colors.tealAccent, width: 1), borderRadius: BorderRadius.circular(10)),
+            onPressed: () {
+              Get.to(() => const SearchPage(), transition: Transition.rightToLeft);
+            },
+            tooltip: 'Search',
+            child: Icon(FeatherIcons.search, color: Colors.tealAccent),
           ),
         ],
       ),
