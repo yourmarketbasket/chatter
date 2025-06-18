@@ -78,8 +78,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
             muteIcon: FeatherIcons.volumeX,
             unMuteIcon: FeatherIcons.volume2,
           ),
-          handleLifecycle: true,
-          autoDispose: true,
+          handleLifecycle: false,
         ),
         betterPlayerDataSource: BetterPlayerDataSource(
           BetterPlayerDataSourceType.network,
@@ -148,25 +147,49 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
     return VisibilityDetector(
       key: Key(widget.attachment.url ?? widget.key.toString()),
       onVisibilityChanged: (info) {
-        if (!_isInitialized) return;
-        bool useBetterPlayer = Platform.isAndroid && widget.androidVersion! < 33;
-
-        if (useBetterPlayer) {
-          if (_betterPlayerController != null && _betterPlayerController!.videoPlayerController != null && _betterPlayerController!.videoPlayerController!.value.initialized) {
-            if (info.visibleFraction > 0.5 && !_betterPlayerController!.isPlaying()!) {
-              _betterPlayerController!.play();
-            } else if (info.visibleFraction <= 0.5 && _betterPlayerController!.isPlaying()!) {
-              _betterPlayerController!.pause();
-            }
+        // bool useBetterPlayer = Platform.isAndroid && widget.androidVersion! < 33; // This line is moved down
+        if (info.visibleFraction == 0) {
+          if (_betterPlayerController != null) {
+            _betterPlayerController!.dispose();
+            _betterPlayerController = null;
           }
-        } else {
-          if (_videoPlayerController != null && _videoPlayerController!.value.isInitialized) {
-            if (info.visibleFraction > 0.5 && !_videoPlayerController!.value.isPlaying) {
-              _videoPlayerController!.play().catchError((error) {
-                print('VideoPlayer playback error in VisibilityDetector: $error');
-              });
-            } else if (info.visibleFraction <= 0.5 && _videoPlayerController!.value.isPlaying) {
-              _videoPlayerController!.pause();
+          if (_videoPlayerController != null) {
+            _videoPlayerController!.dispose();
+            _videoPlayerController = null;
+          }
+          if (_isInitialized) { // Only update state if it was initialized
+            setState(() {
+              _isInitialized = false;
+            });
+          }
+        } else if (info.visibleFraction > 0) {
+          // Moved useBetterPlayer here as it's only relevant when visibleFraction > 0
+          bool useBetterPlayer = Platform.isAndroid && widget.androidVersion! < 33;
+          if (!_isInitialized) {
+            _initializeVideoPlayer();
+          }
+          // Only proceed with play/pause logic if initialized
+          if (_isInitialized) {
+            if (useBetterPlayer) {
+              if (_betterPlayerController != null &&
+                  _betterPlayerController!.videoPlayerController != null &&
+                  _betterPlayerController!.videoPlayerController!.value.initialized) {
+                if (info.visibleFraction > 0.5 && !_betterPlayerController!.isPlaying()!) {
+                  _betterPlayerController!.play();
+                } else if (info.visibleFraction <= 0.5 && _betterPlayerController!.isPlaying()!) {
+                  _betterPlayerController!.pause();
+                }
+              }
+            } else {
+              if (_videoPlayerController != null && _videoPlayerController!.value.isInitialized) {
+                if (info.visibleFraction > 0.5 && !_videoPlayerController!.value.isPlaying) {
+                  _videoPlayerController!.play().catchError((error) {
+                    print('VideoPlayer playback error in VisibilityDetector: $error');
+                  });
+                } else if (info.visibleFraction <= 0.5 && _videoPlayerController!.value.isPlaying) {
+                  _videoPlayerController!.pause();
+                }
+              }
             }
           }
         }
