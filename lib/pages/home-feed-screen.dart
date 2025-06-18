@@ -847,7 +847,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                     _navigateToPostScreen();
                   },
                   backgroundColor: Colors.black,
-                  child: Icon(FeatherIcons.plus_circle, color: Colors.tealAccent),
+                  child: Icon(FeatherIcons.plusCircle, color: Colors.tealAccent),
                   tooltip: 'Add Post',
                 ),
               ),
@@ -881,8 +881,8 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                 child: FloatingActionButton.small(
                   heroTag: 'fab_search',
                   onPressed: () {
-                    setState(() { _isFabMenuOpen = false; });
-                    Get.to(() => const SearchPage());
+                    // setState(() { _isFabMenuOpen = false; });
+                    Get.to(SearchPage());
                   },
                   backgroundColor: Colors.black,
                   child: Icon(FeatherIcons.search, color: Colors.tealAccent),
@@ -1036,7 +1036,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> {
         bool useBetterPlayer = Platform.isAndroid && widget.androidVersion! < 33;
 
         if (useBetterPlayer) {
-          if (_betterPlayerController != null && _betterPlayerController!.videoPlayerController != null && _betterPlayerController!.videoPlayerController!.value.isInitialized) {
+          if (_betterPlayerController != null && _betterPlayerController!.videoPlayerController != null && _betterPlayerController!.videoPlayerController!.value.initialized) {
             if (info.visibleFraction > 0.5 && !_betterPlayerController!.isPlaying()!) {
               _betterPlayerController!.play();
             } else if (info.visibleFraction <= 0.5 && _betterPlayerController!.isPlaying()!) {
@@ -1111,7 +1111,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> {
                 // Layer 2: Video Player
                 if (_isInitialized)
                   (Platform.isAndroid && widget.androidVersion! < 33)
-                      ? (_betterPlayerController != null && _betterPlayerController!.videoPlayerController != null && _betterPlayerController!.videoPlayerController!.value.isInitialized
+                      ? (_betterPlayerController != null && _betterPlayerController!.videoPlayerController != null && _betterPlayerController!.videoPlayerController!.value.initialized
                           ? BetterPlayer(controller: _betterPlayerController!)
                           : SizedBox.shrink())
                       : (_videoPlayerController != null && _videoPlayerController!.value.isInitialized
