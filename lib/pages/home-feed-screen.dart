@@ -844,11 +844,10 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                 child: FloatingActionButton.small(
                   heroTag: 'fab_add_post',
                   onPressed: () {
-                    setState(() { _isFabMenuOpen = false; });
                     _navigateToPostScreen();
                   },
-                  backgroundColor: Colors.tealAccent[100],
-                  child: Icon(FeatherIcons.plus_circle, color: Colors.black),
+                  backgroundColor: Colors.black,
+                  child: Icon(FeatherIcons.plus_circle, color: Colors.tealAccent),
                   tooltip: 'Add Post',
                 ),
               ),
@@ -866,8 +865,8 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                     setState(() { _isFabMenuOpen = false; });
                     // If already on HomeFeedScreen, just close.
                   },
-                  backgroundColor: Colors.tealAccent[100],
-                  child: Icon(FeatherIcons.home, color: Colors.black),
+                  backgroundColor: Colors.black,
+                  child: Icon(FeatherIcons.home, color: Colors.tealAccent),
                   tooltip: 'Home',
                 ),
               ),
@@ -885,8 +884,8 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                     setState(() { _isFabMenuOpen = false; });
                     Get.to(() => const SearchPage());
                   },
-                  backgroundColor: Colors.tealAccent[100],
-                  child: Icon(FeatherIcons.search, color: Colors.black),
+                  backgroundColor: Colors.black,
+                  child: Icon(FeatherIcons.search, color: Colors.tealAccent),
                   tooltip: 'Search',
                 ),
               ),
