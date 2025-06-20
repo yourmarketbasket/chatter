@@ -11,12 +11,14 @@ class VideoPlayerWidget extends StatefulWidget {
   final String? url;
   final File? file;
   final String displayPath;
+  final String? thumbnailUrl;
 
   const VideoPlayerWidget({
     Key? key,
     this.url,
     this.file,
     required this.displayPath,
+    this.thumbnailUrl,
   }) : super(key: key);
 
   @override
@@ -168,19 +170,36 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
           alignment: Alignment.center,
           children: [
             // Display thumbnail if available
-            widget.url != null
-                ? CachedNetworkImage(
-                    imageUrl: widget.url!.replaceAll(RegExp(r'\.\w+$'), '.jpg'),
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(color: Colors.black),
-                    errorWidget: (context, url, error) => Container(color: Colors.black),
-                  )
-                : Container(color: Colors.black),
-            const CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
-              backgroundColor: Colors.grey,
-              strokeWidth: 1,
-            ),
+            if (widget.thumbnailUrl != null && widget.thumbnailUrl!.isNotEmpty)
+              CachedNetworkImage(
+                imageUrl: widget.thumbnailUrl!,
+                fit: BoxFit.contain, // Or BoxFit.cover, depending on desired behavior
+                placeholder: (context, url) => const Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
+                    strokeWidth: 2,
+                  ),
+                ),
+                errorWidget: (context, url, error) => Container(
+                  color: Colors.black,
+                  child: const Center(
+                    child: Icon(Icons.error_outline, color: Colors.grey, size: 40),
+                  ),
+                ),
+              )
+            else
+              Container(color: Colors.black), // Fallback if no thumbnail URL
+
+            // Always show a progress indicator on top if still loading,
+            // or remove if thumbnail itself has an indicator.
+            // For this setup, CachedNetworkImage's placeholder handles it.
+            // If no thumbnail, then a direct progress indicator is good.
+            if (widget.thumbnailUrl == null || widget.thumbnailUrl!.isEmpty)
+              const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
+                backgroundColor: Colors.transparent, // Make background transparent
+                strokeWidth: 2,
+              ),
           ],
         ),
       );

@@ -210,11 +210,13 @@ class _MediaViewPageState extends State<MediaViewPage> {
                       future: _isAndroid13OrLower(),
                       builder: (context, snapshot) {
                         if (snapshot.connectionState == ConnectionState.done && snapshot.data != null) {
+                          final String? thumbnailUrl = currentAttachment['thumbnailUrl'] as String?;
                           return VideoPlayerContainer(
                             url: optimizedUrl.isNotEmpty ? optimizedUrl : url,
                             file: file,
                             displayPath: displayPath,
                             isAndroid13OrLower: snapshot.data!,
+                            thumbnailUrl: thumbnailUrl,
                           );
                         }
                         return const Center(
@@ -374,6 +376,7 @@ class VideoPlayerContainer extends StatefulWidget {
   final File? file;
   final String displayPath;
   final bool isAndroid13OrLower;
+  final String? thumbnailUrl;
 
   const VideoPlayerContainer({
     Key? key,
@@ -381,6 +384,7 @@ class VideoPlayerContainer extends StatefulWidget {
     this.file,
     required this.displayPath,
     required this.isAndroid13OrLower,
+    this.thumbnailUrl,
   }) : super(key: key);
 
   @override
@@ -426,11 +430,19 @@ class _VideoPlayerContainerState extends State<VideoPlayerContainer> {
                   bufferForPlaybackMs: 2500,
                   bufferForPlaybackAfterRebufferMs: 5000,
                 ),
-                resolutions: {
+                resolutions: widget.url != null ? { // Check if widget.url is null
                   'low': widget.url!.replaceAll('q_auto:good', 'q_auto:low'),
                   'medium': widget.url!,
                   'high': widget.url!.replaceAll('q_auto:good', 'q_auto:best'),
-                },
+                } : null,
+                liveStream: false, // Added default for liveStream
+                notificationConfiguration: widget.thumbnailUrl != null ? BetterPlayerNotificationConfiguration( // Add notification configuration for thumbnail
+                  showNotification: true,
+                  title: widget.displayPath.split('/').last,
+                  author: "Chatter App", // Replace with actual author if available
+                  imageUrl: widget.thumbnailUrl,
+                  activityName: "MainActivity", // Replace with your actual activity name
+                ) : null,
               )
             : BetterPlayerDataSource(
                 BetterPlayerDataSourceType.file,
@@ -450,13 +462,25 @@ class _VideoPlayerContainerState extends State<VideoPlayerContainer> {
               loadingWidget: const CircularProgressIndicator(
                 valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
               ),
+              playerTheme: BetterPlayerTheme.custom, // Example: using custom theme
+              customControlsBuilder: (controller, onControlsVisibilityChanged) { // Example: Custom controls
+                return Container(); // Replace with your custom controls widget
+              }
             ),
+            placeholder: widget.thumbnailUrl != null && widget.thumbnailUrl!.isNotEmpty // Add placeholder for thumbnail
+                ? CachedNetworkImage(
+                    imageUrl: widget.thumbnailUrl!,
+                    fit: BoxFit.contain,
+                    errorWidget: (context, url, error) => Container(color: Colors.black), // Fallback if thumbnail fails
+                  )
+                : Container(color: Colors.black), // Fallback if no thumbnail
           ),
           betterPlayerDataSource: betterPlayerDataSource,
         );
 
         // Preload video
-        await betterPlayerController?.preCache(betterPlayerDataSource);
+        // Consider removing preCache if it causes issues or is not needed for your use case
+        // await betterPlayerController?.preCache(betterPlayerDataSource);
       } else {
         // Configure VideoPlayer for newer Android versions
         videoPlayerController = widget.url != null
@@ -467,14 +491,23 @@ class _VideoPlayerContainerState extends State<VideoPlayerContainer> {
         videoPlayerController!.setLooping(true);
         
         // Monitor buffer health
+        // Consider adjusting or removing this listener if it's too aggressive or causes issues
         videoPlayerController!.addListener(() {
-          final buffered = videoPlayerController!.value.buffered;
-          if (buffered.isNotEmpty && mounted) {
-            final bufferDuration = buffered.last.end - buffered.last.start;
-            if (bufferDuration.inSeconds < 5 && videoPlayerController!.value.isPlaying) {
+          if (!mounted) return; // Ensure widget is still mounted
+          final value = videoPlayerController!.value;
+          final buffered = value.buffered;
+          if (buffered.isNotEmpty) {
+            // Check if buffer is running low
+            final currentPosition = value.position;
+            final lastBufferedPosition = buffered.last.end;
+            final remainingBuffer = lastBufferedPosition - currentPosition;
+
+            if (remainingBuffer < Duration(seconds: 5) && value.isPlaying && !value.isBuffering) {
               videoPlayerController!.pause();
+              // Optionally, show a buffering indicator here
+              // Wait for buffer to fill up a bit before resuming
               Future.delayed(Duration(seconds: 2), () {
-                if (mounted && videoPlayerController!.value.buffered.last.end.inSeconds > 10) {
+                if (mounted && videoPlayerController!.value.buffered.last.end > currentPosition + Duration(seconds: 10)) {
                   videoPlayerController!.play();
                 }
               });
@@ -528,11 +561,13 @@ class _VideoPlayerContainerState extends State<VideoPlayerContainer> {
             url: widget.url,
             file: widget.file,
             displayPath: widget.displayPath,
+            thumbnailUrl: widget.thumbnailUrl,
           )
         : VideoPlayerWidget(
             url: widget.url,
             file: widget.file,
             displayPath: widget.displayPath,
+            thumbnailUrl: widget.thumbnailUrl,
           );
   }
 }

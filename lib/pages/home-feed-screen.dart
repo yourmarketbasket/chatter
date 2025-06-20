@@ -587,13 +587,33 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     }
 
     if (attachmentType == "video") {
-      return VideoAttachmentWidget(
-        key: Key('video_${attachmentMap['url'] ?? idx}'),
-        attachment: attachmentMap, // Pass the map directly
-        post: post,
-        borderRadius: borderRadius,
-        androidVersion: androidVersion,
-        isLoadingAndroidVersion: isLoadingAndroidVersion,
+      return GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => MediaViewPage(
+                attachments: correctlyTypedPostAttachments,
+                initialIndex: idx,
+                message: post['content'] as String? ?? '',
+                userName: post['username'] as String? ?? 'Unknown User',
+                userAvatarUrl: post['useravatar'] as String?,
+                timestamp: post['createdAt'] is String ? DateTime.parse(post['createdAt'] as String) : DateTime.now(),
+                viewsCount: post['views'] as int? ?? 0,
+                likesCount: post['likes'] as int? ?? 0,
+                repostsCount: post['reposts'] as int? ?? 0,
+              ),
+            ),
+          );
+        },
+        child: VideoAttachmentWidget(
+          key: Key('video_${attachmentMap['url'] ?? idx}'),
+          attachment: attachmentMap, // Pass the map directly
+          post: post,
+          borderRadius: borderRadius,
+          androidVersion: androidVersion,
+          isLoadingAndroidVersion: isLoadingAndroidVersion,
+        ),
       );
     } else if (attachmentType == "audio") {
       return AudioAttachmentWidget(
