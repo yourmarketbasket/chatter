@@ -224,12 +224,41 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
       },
       child: GestureDetector(
         onTap: () {
+          List<Map<String, dynamic>> correctlyTypedPostAttachments = [];
+          final dynamic rawPostAttachments = widget.post['attachments'];
+          if (rawPostAttachments is List) {
+            for (var item in rawPostAttachments) {
+              if (item is Map<String, dynamic>) {
+                correctlyTypedPostAttachments.add(item);
+              } else if (item is Map) {
+                try {
+                  correctlyTypedPostAttachments.add(Map<String, dynamic>.from(item));
+                } catch (e) {
+                  print('[VideoAttachmentWidget] Error converting attachment item Map to Map<String, dynamic>: $e for item $item');
+                }
+              } else {
+                print('[VideoAttachmentWidget] Skipping non-map attachment item: $item');
+              }
+            }
+          }
+
+          int initialIndex = -1;
+          if (widget.attachment['url'] != null) {
+              initialIndex = correctlyTypedPostAttachments.indexWhere((att) => att['url'] == widget.attachment['url']);
+          } else if (widget.attachment['_id'] != null) { // Assuming an '_id' field might exist
+              initialIndex = correctlyTypedPostAttachments.indexWhere((att) => att['_id'] == widget.attachment['_id']);
+          }
+          if (initialIndex == -1) {
+              initialIndex = correctlyTypedPostAttachments.indexOf(widget.attachment);
+              if (initialIndex == -1) initialIndex = 0;
+          }
+
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => MediaViewPage(
-                attachments: widget.post['attachments'] as List<Map<String, dynamic>>,
-                initialIndex: (widget.post['attachments'] as List<Map<String, dynamic>>).indexOf(widget.attachment),
+                attachments: correctlyTypedPostAttachments,
+                initialIndex: initialIndex,
                 message: widget.post['content'] as String? ?? '',
                 userName: widget.post['username'] as String? ?? 'Unknown User',
                 userAvatarUrl: widget.post['useravatar'] as String?,

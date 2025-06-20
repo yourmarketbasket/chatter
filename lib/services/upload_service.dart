@@ -49,6 +49,8 @@ class UploadService {
       'txt': 'raw',
     };
 
+    final Set<String> videoExtensionsForCompression = {'mp4', 'mov', 'avi', 'mkv', 'webm'};
+
     for (File originalFile in files) {
       final originalFilePath = originalFile.path;
       File fileToUpload = originalFile; // By default, upload the original file
@@ -85,7 +87,7 @@ class UploadService {
         final resourceType = extensionToResourceType[fileExtension] ?? 'auto';
         print('[UploadService uploadFilesToCloudinary] File: $originalFilePath, extension: $fileExtension, resource_type: $resourceType');
 
-        if (resourceType == 'video') {
+        if (videoExtensionsForCompression.contains(fileExtension)) {
           // Compress Video
           MediaInfo? mediaInfo;
           try {

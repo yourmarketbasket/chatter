@@ -33,18 +33,36 @@ class _AudioAttachmentWidgetState extends State<AudioAttachmentWidget> {
     super.initState();
     _audioPlayer = AudioPlayer();
     final String? audioUrlString = widget.attachment['url'] as String?;
-    if (audioUrlString != null) {
-      final audioUrl = audioUrlString.replaceAll(
-        '/upload/',
-        '/upload/f_mp3/',
-      );
-      _audioPlayer.setSourceUrl(audioUrl).catchError((error) {
-        print('Audio initialization error: $error');
+
+    if (audioUrlString != null && audioUrlString.isNotEmpty) {
+      String finalAudioUrl = audioUrlString;
+      // Apply Cloudinary transformation only if it seems like a generic Cloudinary URL
+      // and doesn't already look like an mp3 or other audio format.
+      if (audioUrlString.contains('res.cloudinary.com') &&
+          audioUrlString.contains('/upload/') &&
+          !audioUrlString.toLowerCase().endsWith('.mp3') &&
+          !audioUrlString.toLowerCase().endsWith('.m4a') &&
+          !audioUrlString.toLowerCase().endsWith('.wav') &&
+          !audioUrlString.toLowerCase().endsWith('.ogg') &&
+          !audioUrlString.contains('/f_')) { // Don't transform if format 'f_' is already specified
+        finalAudioUrl = audioUrlString.replaceAll('/upload/', '/upload/f_mp3/');
+        print('[AudioAttachmentWidget] Applied Cloudinary f_mp3 transformation to: $audioUrlString, new URL: $finalAudioUrl');
+      } else {
+        print('[AudioAttachmentWidget] Using audio URL as is (no Cloudinary f_mp3 transformation): $finalAudioUrl');
+      }
+
+      _audioPlayer.setSourceUrl(finalAudioUrl).then((_) {
+        // Successfully set source
+        print('[AudioAttachmentWidget] Source set successfully for $finalAudioUrl');
+      }).catchError((error) {
+        print('[AudioAttachmentWidget] Error setting source for $finalAudioUrl: $error');
+        // Optionally, update UI to show an error state
       });
-      _audioPlayer.setVolume(0.0);
+      _audioPlayer.setVolume(_isMuted ? 0.0 : 1.0); // Set initial volume based on _isMuted state
+
     } else {
-      // Handle case where URL is null, perhaps log an error or set a default state
-      print('Audio attachment URL is null.');
+      print('[AudioAttachmentWidget] Audio attachment URL is null or empty.');
+      // Optionally, update UI to show an error state or that audio is unavailable
     }
   }
 
@@ -76,12 +94,41 @@ class _AudioAttachmentWidgetState extends State<AudioAttachmentWidget> {
       },
       child: GestureDetector(
         onTap: () {
+          List<Map<String, dynamic>> correctlyTypedPostAttachments = [];
+          final dynamic rawPostAttachments = widget.post['attachments'];
+          if (rawPostAttachments is List) {
+            for (var item in rawPostAttachments) {
+              if (item is Map<String, dynamic>) {
+                correctlyTypedPostAttachments.add(item);
+              } else if (item is Map) {
+                try {
+                  correctlyTypedPostAttachments.add(Map<String, dynamic>.from(item));
+                } catch (e) {
+                  print('[AudioAttachmentWidget] Error converting attachment item Map to Map<String, dynamic>: $e for item $item');
+                }
+              } else {
+                print('[AudioAttachmentWidget] Skipping non-map attachment item: $item');
+              }
+            }
+          }
+
+          int initialIndex = -1;
+          if (widget.attachment['url'] != null) {
+              initialIndex = correctlyTypedPostAttachments.indexWhere((att) => att['url'] == widget.attachment['url']);
+          } else if (widget.attachment['_id'] != null) {
+              initialIndex = correctlyTypedPostAttachments.indexWhere((att) => att['_id'] == widget.attachment['_id']);
+          }
+          if (initialIndex == -1) {
+              initialIndex = correctlyTypedPostAttachments.indexOf(widget.attachment);
+              if (initialIndex == -1) initialIndex = 0;
+          }
+
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => MediaViewPage(
-                attachments: widget.post['attachments'] as List<Map<String, dynamic>>,
-                initialIndex: (widget.post['attachments'] as List<Map<String, dynamic>>).indexOf(widget.attachment),
+                attachments: correctlyTypedPostAttachments,
+                initialIndex: initialIndex,
                 message: widget.post['content'] as String? ?? '',
                 userName: widget.post['username'] as String? ?? 'Unknown User',
                 userAvatarUrl: widget.post['useravatar'] as String?,
