@@ -235,7 +235,7 @@ class DataController extends GetxController {
       }
 
       final response = await _dio.get(
-        '/api/posts/$postId/replies',
+        '/api/posts/fetch-replies/$postId',
         options: dio.Options(
           headers: {
             'Authorization': 'Bearer $token',
@@ -244,6 +244,7 @@ class DataController extends GetxController {
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
+        print(response.data);
         final List<dynamic> repliesData = response.data['replies'];
         List<ChatterPost> replies = [];
 

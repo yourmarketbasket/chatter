@@ -708,6 +708,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           itemBuilder: (context, index) {
             final postMap = dataController.posts[index];
             final post = ChatterPost(
+              id: postMap['_id'],
               username: postMap['username'] ?? 'Unknown User',
               content: postMap['content'] ?? '',
               timestamp: postMap['createdAt'] is String

@@ -46,6 +46,7 @@ class _SearchPageState extends State<SearchPage> {
     final allPosts = _dataController.posts.map((postMap) {
       // This mapping logic is from HomeFeedScreen, ensure it's up-to-date
       return ChatterPost(
+        id: postMap['_id'],
         username: postMap['username'] ?? 'Unknown User',
         content: postMap['content'] ?? '',
         timestamp: postMap['createdAt'] is String
