@@ -568,7 +568,23 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   Widget _buildAttachmentWidget(Map<String, dynamic> attachmentMap, int idx, Map<String, dynamic> post, BorderRadius borderRadius) {
     final String attachmentType = attachmentMap['type'] as String? ?? 'unknown';
     final String? displayUrl = attachmentMap['url'] as String?; // Get URL from attachmentMap
-    final List<Map<String, dynamic>> postAttachments = (post['attachments'] as List<dynamic>?)?.map((e) => e as Map<String, dynamic>).toList() ?? [];
+
+    List<Map<String, dynamic>> correctlyTypedPostAttachments = [];
+    if (post['attachments'] is List) {
+      for (var item in (post['attachments'] as List)) {
+        if (item is Map<String, dynamic>) {
+          correctlyTypedPostAttachments.add(item);
+        } else if (item is Map) {
+          try {
+            correctlyTypedPostAttachments.add(Map<String, dynamic>.from(item));
+          } catch (e) {
+            print('Error converting attachment item Map to Map<String, dynamic>: $e');
+          }
+        } else {
+          print('Skipping non-map attachment item: $item');
+        }
+      }
+    }
 
     if (attachmentType == "video") {
       return VideoAttachmentWidget(
@@ -593,7 +609,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
             context,
             MaterialPageRoute(
               builder: (context) => MediaViewPage(
-                attachments: postAttachments,
+                attachments: correctlyTypedPostAttachments, // Use the new robustly typed list
                 initialIndex: idx,
                 message: post['content'] as String? ?? '',
                 userName: post['username'] as String? ?? 'Unknown User',
@@ -654,7 +670,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
             context,
             MaterialPageRoute(
               builder: (context) => MediaViewPage(
-                attachments: postAttachments,
+                attachments: correctlyTypedPostAttachments, // Use the new robustly typed list
                 initialIndex: idx,
                 message: post['content'] as String? ?? '',
                 userName: post['username'] as String? ?? 'Unknown User',
@@ -693,7 +709,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
             context,
             MaterialPageRoute(
               builder: (context) => MediaViewPage(
-                attachments: postAttachments,
+                attachments: correctlyTypedPostAttachments, // Use the new robustly typed list
                 initialIndex: idx,
                 message: post['content'] as String? ?? '',
                 userName: post['username'] as String? ?? 'Unknown User',

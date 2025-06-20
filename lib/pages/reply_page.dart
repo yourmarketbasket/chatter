@@ -164,9 +164,24 @@ class _ReplyPageState extends State<ReplyPage> {
         ? (DateTime.tryParse(post['timestamp'] as String) ?? DateTime.now())
         : (post['timestamp'] is DateTime ? post['timestamp'] : DateTime.now());
 
-    final List<Map<String, dynamic>> attachments = (post['attachments'] as List<dynamic>?)
-        ?.map((att) => att as Map<String, dynamic>)
-        .toList() ?? [];
+    List<Map<String, dynamic>> correctlyTypedReplyAttachments = [];
+    final dynamic rawAttachments = post['attachments']; // Source of attachments for the current post/reply being built
+    if (rawAttachments is List) {
+      for (var item in rawAttachments) {
+        if (item is Map<String, dynamic>) {
+          correctlyTypedReplyAttachments.add(item);
+        } else if (item is Map) {
+          try {
+            correctlyTypedReplyAttachments.add(Map<String, dynamic>.from(item));
+          } catch (e) {
+            print('Error converting attachment item Map to Map<String, dynamic> in reply: $e');
+          }
+        } else {
+          print('Skipping non-map attachment item in reply: $item');
+        }
+      }
+    }
+    // Use correctlyTypedReplyAttachments where 'attachments' was used below
 
 
     return Column(
@@ -226,20 +241,20 @@ class _ReplyPageState extends State<ReplyPage> {
                       height: 1.5,
                     ),
                   ),
-                  if (attachments.isNotEmpty) ...[ // Use extracted attachments
+                  if (correctlyTypedReplyAttachments.isNotEmpty) ...[ // Use correctlyTypedReplyAttachments
                     const SizedBox(height: 12),
                     GridView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: attachments.length > 1 ? 2 : 1,
+                        crossAxisCount: correctlyTypedReplyAttachments.length > 1 ? 2 : 1,
                         crossAxisSpacing: 8,
                         mainAxisSpacing: 8,
                         childAspectRatio: 1,
                       ),
-                      itemCount: attachments.length,
+                      itemCount: correctlyTypedReplyAttachments.length,
                       itemBuilder: (context, idx) {
-                        final attachment = attachments[idx];
+                        final attachment = correctlyTypedReplyAttachments[idx];
                         final displayUrl = attachment['url'] as String? ?? (attachment['file'] as File?)?.path ?? 'Unknown attachment';
                         final String attachmentType = attachment['type'] as String? ?? 'unknown';
                         final String? attachmentFilename = attachment['filename'] as String?;
@@ -250,7 +265,7 @@ class _ReplyPageState extends State<ReplyPage> {
                               context,
                               MaterialPageRoute(
                                 builder: (context) => MediaViewPage(
-                                  attachments: attachments,
+                                  attachments: correctlyTypedReplyAttachments, // Use correctlyTypedReplyAttachments
                                   initialIndex: idx,
                                   message: content,
                                   userName: username,
