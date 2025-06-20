@@ -154,7 +154,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           print('[HomeFeedScreen _addPost] File ${i+1} for upload: path=${f.path} - Error getting file stats: $e');
         }
       }
-      List<Map<String, dynamic>> uploadResults = await dataController.uploadFilesToCloudinary(files);
+      List<Map<String, dynamic>> uploadResults = await dataController.uploadFiles(files);
 
       for (int i = 0; i < attachments.length; i++) {
         var result = uploadResults[i]; // Assuming uploadResults corresponds to the order of files derived from attachments
@@ -163,16 +163,15 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         print(result);
         if (result['success'] == true) {
           String originalUrl = result['url'] as String;
-          String? thumbnailUrl = originalAttachment['type'] == 'video'
-              ? originalUrl.replaceAll('/upload/', '/upload/so_0,q_auto:low/')
-              : null;
+          // Use the thumbnailUrl directly from the upload result
+          String? thumbnailUrl = result['thumbnailUrl'] as String?;
           uploadedAttachments.add({
             'file': originalAttachment['file'], // Keep the original file object if needed, or null
             'type': originalAttachment['type'],
             'filename': (originalAttachment['file'] as File?)?.path.split('/').last ?? result['filename'] ?? 'unknown',
             'size': result['size'] ?? ((originalAttachment['file'] as File?) != null ? await (originalAttachment['file'] as File)!.length() : 0),
             'url': originalUrl,
-            'thumbnailUrl': thumbnailUrl,
+            'thumbnailUrl': thumbnailUrl, // Assign the new thumbnailUrl here
           });
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -320,9 +319,9 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     // Ensure 'username' is not null and not empty before accessing its first character.
     final String avatarInitial = (username.isNotEmpty ? username[0].toUpperCase() : '?');
     final DateTime timestamp = post['createdAt'] is String ? DateTime.parse(post['createdAt'] as String) : DateTime.now();
-    int likes = post['likesCount'] as int? ?? 0; // Assuming 'likesCount' from backend
-    int reposts = post['repostsCount'] as int? ?? 0; // Assuming 'repostsCount'
-    int views = post['viewsCount'] as int? ?? 0; // Assuming 'viewsCount'
+    int likes = post['likes'] as int? ?? 0;
+    int reposts = post['reposts'] as int? ?? 0;
+    int views = post['views'] as int? ?? 0;
     List<Map<String, dynamic>> attachments = (post['attachments'] as List<dynamic>?)?.map((e) => e as Map<String, dynamic>).toList() ?? [];
     // Assuming 'replies' is a list of reply objects/IDs, its length is the count.
     // If your backend sends a specific count field like 'replyCount', use that instead.
@@ -428,14 +427,14 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                             onPressed: () {
                               // Optimistically update UI and call backend
                               setState(() {
-                                post['likesCount'] = (post['likesCount'] as int? ?? 0) + 1;
+                                post['likes'] = (post['likes'] as int? ?? 0) + 1; // Use 'likes' here
                                 // Add logic to reflect if the user has liked this post
                               });
                               // Example: dataController.likePost(post['_id']);
                             },
                           ),
                           Text(
-                            '$likes', // This now uses the likesCount from the map
+                            '$likes',
                             style: GoogleFonts.roboto(
                               color: Colors.grey[400],
                               fontSize: 14,
@@ -477,7 +476,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                             },
                           ),
                           Text(
-                            '$reposts', // This now uses the repostsCount from the map
+                            '$reposts',
                             style: GoogleFonts.roboto(
                               color: Colors.grey[400],
                               fontSize: 14,
@@ -498,7 +497,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                             },
                           ),
                           Text(
-                            '$views', // This now uses the viewsCount from the map
+                            '$views',
                             style: GoogleFonts.roboto(
                               color: Colors.grey[400],
                               fontSize: 14,
@@ -600,9 +599,9 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                 userName: post['username'] as String? ?? 'Unknown User',
                 userAvatarUrl: post['useravatar'] as String?,
                 timestamp: post['createdAt'] is String ? DateTime.parse(post['createdAt'] as String) : DateTime.now(),
-                viewsCount: post['viewsCount'] as int? ?? 0, // Use 'viewsCount'
-                likesCount: post['likesCount'] as int? ?? 0, // Use 'likesCount'
-                repostsCount: post['repostsCount'] as int? ?? 0, // Use 'repostsCount'
+                viewsCount: post['views'] as int? ?? 0, // Use 'views'
+                likesCount: post['likes'] as int? ?? 0, // Use 'likes'
+                repostsCount: post['reposts'] as int? ?? 0, // Use 'reposts'
               ),
             ),
           );
@@ -661,9 +660,9 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                 userName: post['username'] as String? ?? 'Unknown User',
                 userAvatarUrl: post['useravatar'] as String?,
                 timestamp: post['createdAt'] is String ? DateTime.parse(post['createdAt'] as String) : DateTime.now(),
-                viewsCount: post['viewsCount'] as int? ?? 0, // Use 'viewsCount'
-                likesCount: post['likesCount'] as int? ?? 0, // Use 'likesCount'
-                repostsCount: post['repostsCount'] as int? ?? 0, // Use 'repostsCount'
+                viewsCount: post['views'] as int? ?? 0, // Use 'views'
+                likesCount: post['likes'] as int? ?? 0, // Use 'likes'
+                repostsCount: post['reposts'] as int? ?? 0, // Use 'reposts'
               ),
             ),
           );
@@ -700,9 +699,9 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                 userName: post['username'] as String? ?? 'Unknown User',
                 userAvatarUrl: post['useravatar'] as String?,
                 timestamp: post['createdAt'] is String ? DateTime.parse(post['createdAt'] as String) : DateTime.now(),
-                viewsCount: post['viewsCount'] as int? ?? 0, // Use 'viewsCount'
-                likesCount: post['likesCount'] as int? ?? 0, // Use 'likesCount'
-                repostsCount: post['repostsCount'] as int? ?? 0, // Use 'repostsCount'
+                viewsCount: post['views'] as int? ?? 0, // Use 'views'
+                likesCount: post['likes'] as int? ?? 0, // Use 'likes'
+                repostsCount: post['reposts'] as int? ?? 0, // Use 'reposts'
               ),
             ),
           );

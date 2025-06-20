@@ -1,8 +1,6 @@
-import 'package:chatter/models/feed_models.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:chatter/controllers/data-controller.dart';
-import 'package:chatter/pages/home-feed-screen.dart' show ChatterPost, Attachment, _HomeFeedScreenState; // Reusing widgets and models
 import 'package:google_fonts/google_fonts.dart';
 import 'package:feather_icons/feather_icons.dart';
 import 'package:intl/intl.dart';
@@ -24,7 +22,7 @@ class SearchPage extends StatefulWidget {
 
 class _SearchPageState extends State<SearchPage> {
   final DataController _dataController = Get.find<DataController>();
-  List<ChatterPost> _searchResults = [];
+  List<Map<String, dynamic>> _searchResults = [];
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
 
@@ -43,39 +41,13 @@ class _SearchPageState extends State<SearchPage> {
       return;
     }
 
-    final allPosts = _dataController.posts.map((postMap) {
-      // This mapping logic is from HomeFeedScreen, ensure it's up-to-date
-      return ChatterPost(
-        id: postMap['_id'],
-        username: postMap['username'] ?? 'Unknown User',
-        content: postMap['content'] ?? '',
-        timestamp: postMap['createdAt'] is String
-            ? DateTime.parse(postMap['createdAt'])
-            : DateTime.now(),
-        likes: postMap['likes'] ?? 0,
-        reposts: postMap['reposts'] ?? 0,
-        views: postMap['views'] ?? 0,
-        useravatar: postMap['useravatar'] ?? '',
-        avatarInitial: (postMap['username'] != null && postMap['username'].isNotEmpty)
-            ? postMap['username'][0].toUpperCase()
-            : '?',
-        attachments: (postMap['attachments'] as List<dynamic>?)?.map((att) {
-          return Attachment(
-            file: null, // File is not available here, only URLs
-            type: att['type'] ?? 'unknown',
-            filename: att['filename'],
-            size: att['size'],
-            url: att['url'] as String?,
-            thumbnailUrl: att['thumbnailUrl'] as String?,
-          );
-        }).toList() ?? [],
-        replies: (postMap['replies'] as List<dynamic>?)?.cast<String>() ?? [],
-      );
-    }).toList();
+    final allPosts = _dataController.posts.toList();
 
     final filteredPosts = allPosts.where((post) {
-      final contentMatches = post.content.toLowerCase().contains(_searchQuery.toLowerCase());
-      final usernameMatches = post.username.toLowerCase().contains(_searchQuery.toLowerCase());
+      final content = post['content'] as String? ?? '';
+      final username = post['username'] as String? ?? '';
+      final contentMatches = content.toLowerCase().contains(_searchQuery.toLowerCase());
+      final usernameMatches = username.toLowerCase().contains(_searchQuery.toLowerCase());
       // Add more criteria if needed, e.g., search in attachment filenames
       return contentMatches || usernameMatches;
     }).toList();
@@ -87,7 +59,7 @@ class _SearchPageState extends State<SearchPage> {
 
   // This widget is a simplified version of _buildPostContent from HomeFeedScreen.
   // For a full implementation, this should be refactored into a common widget.
-  Widget _buildPostItem(ChatterPost post) {
+  Widget _buildPostItem(Map<String, dynamic> post) {
     // Use a _HomeFeedScreenState instance to call _buildPostContent.
     // This is a workaround. Ideally, _buildPostContent should be a static method or in a separate widget.
     // Creating a dummy _HomeFeedScreenState or refactoring _buildPostContent is necessary.
@@ -97,6 +69,19 @@ class _SearchPageState extends State<SearchPage> {
     // Let's try to replicate the necessary parts or make it static/reusable.
     // As a quick solution, we'll mimic the structure.
     // This is a known limitation of this approach and should be refactored in a real scenario.
+
+    final String username = post['username'] as String? ?? 'Unknown User';
+    final String content = post['content'] as String? ?? '';
+    final DateTime timestamp = post['createdAt'] is String
+        ? DateTime.parse(post['createdAt'] as String)
+        : DateTime.now(); // Default to now if parsing fails or type is wrong
+    // final int likes = post['likes'] as int? ?? 0; // Not displayed in this simplified view
+    // final int reposts = post['reposts'] as int? ?? 0; // Not displayed
+    // final int views = post['views'] as int? ?? 0; // Not displayed
+    final String? useravatar = post['useravatar'] as String?;
+    final String avatarInitial = (username.isNotEmpty) ? username[0].toUpperCase() : '?';
+    final List<dynamic> attachments = post['attachments'] as List<dynamic>? ?? [];
+
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -109,12 +94,12 @@ class _SearchPageState extends State<SearchPage> {
               CircleAvatar(
                 radius: 20,
                 backgroundColor: Colors.tealAccent.withOpacity(0.2),
-                backgroundImage: post.useravatar != null && post.useravatar!.isNotEmpty
-                    ? CachedNetworkImageProvider(post.useravatar!)
+                backgroundImage: useravatar != null && useravatar.isNotEmpty
+                    ? CachedNetworkImageProvider(useravatar)
                     : null,
-                child: post.useravatar == null || post.useravatar!.isEmpty
+                child: useravatar == null || useravatar.isEmpty
                     ? Text(
-                        post.avatarInitial,
+                        avatarInitial,
                         style: GoogleFonts.poppins(
                           color: Colors.tealAccent,
                           fontWeight: FontWeight.w600,
@@ -132,7 +117,7 @@ class _SearchPageState extends State<SearchPage> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          '@${post.username}',
+                          '@$username',
                           style: GoogleFonts.poppins(
                             fontWeight: FontWeight.w600,
                             fontSize: 16,
@@ -140,7 +125,7 @@ class _SearchPageState extends State<SearchPage> {
                           ),
                         ),
                         Text(
-                          DateFormat('h:mm a · MMM d').format(post.timestamp),
+                          DateFormat('h:mm a · MMM d').format(timestamp),
                           style: GoogleFonts.roboto(
                             color: Colors.grey[500],
                             fontSize: 12,
@@ -150,20 +135,20 @@ class _SearchPageState extends State<SearchPage> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      post.content,
+                      content,
                       style: GoogleFonts.roboto(
                         fontSize: 14,
                         color: Colors.white70,
                         height: 1.5,
                       ),
                     ),
-                    if (post.attachments.isNotEmpty) ...[
+                    if (attachments.isNotEmpty) ...[
                       const SizedBox(height: 12),
                       // _buildAttachmentGrid should be used here.
                       // For simplicity, we'll just indicate attachments exist.
                       // This part needs the full _HomeFeedScreenState context or a refactor.
                        Text(
-                        '${post.attachments.length} attachment(s)',
+                        '${attachments.length} attachment(s)',
                         style: GoogleFonts.roboto(color: Colors.tealAccent),
                       ),
                     ],

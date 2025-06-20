@@ -55,6 +55,21 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
   }
 
   void _initializeVideoPlayer() {
+    // Defensive disposal of existing controllers before creating new ones
+    if (_betterPlayerController != null) {
+      _betterPlayerController!.dispose();
+      _betterPlayerController = null;
+    }
+    if (_videoPlayerController != null) {
+      _videoPlayerController!.dispose();
+      _videoPlayerController = null;
+    }
+    // If we are re-initializing, ensure _isInitialized is false before starting
+    // This is mostly a safeguard; VisibilityDetector should handle this.
+    // However, if _initializeVideoPlayer is called from elsewhere, this helps.
+    _isInitialized = false;
+
+
     if (widget.isLoadingAndroidVersion || widget.androidVersion == null) {
       return;
     }

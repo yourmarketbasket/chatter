@@ -43,6 +43,7 @@ dependencies:
   flutter_secure_storage: ^9.2.4
   get: ^4.7.2
   dio: ^5.8.0+1
+  video_compress: ^3.1.2
   record: ^6.0.0
   audioplayers: ^6.4.0
   video_thumbnail: ^0.5.6
