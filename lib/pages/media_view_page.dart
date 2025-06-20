@@ -1,5 +1,5 @@
 import 'package:better_player_enhanced/better_player.dart';
-import 'package:chatter/models/feed_models.dart';
+// import 'package:chatter/models/feed_models.dart'; // Removed import
 import 'package:chatter/pages/home-feed-screen.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -18,7 +18,7 @@ import 'package:intl/intl.dart';
 
 // MediaViewPage displays attachments with metadata and social interactions.
 class MediaViewPage extends StatefulWidget {
-  final List<Attachment> attachments;
+  final List<Map<String, dynamic>> attachments; // Changed to List<Map<String, dynamic>>
   final int initialIndex;
   final String message;
   final String userName;
@@ -107,8 +107,9 @@ class _MediaViewPageState extends State<MediaViewPage> {
     return androidInfo.version.sdkInt <= 33;
   }
 
-  String _getPageTitle(Attachment attachment) {
-    switch (attachment.type.toLowerCase()) {
+  String _getPageTitle(Map<String, dynamic> attachment) { // Changed Attachment to Map<String, dynamic>
+    final String type = attachment['type'] as String? ?? 'unknown';
+    switch (type.toLowerCase()) {
       case 'image':
         return 'View Image';
       case 'pdf':
@@ -139,14 +140,18 @@ class _MediaViewPageState extends State<MediaViewPage> {
                 });
               },
               itemBuilder: (context, index) {
-                final Attachment currentAttachment = widget.attachments[index];
-                final String displayPath = currentAttachment.url ?? currentAttachment.file?.path ?? 'Unknown attachment';
-                final String optimizedUrl = currentAttachment.type.toLowerCase() == 'video' 
-                    ? _optimizeCloudinaryVideoUrl(currentAttachment.url)
-                    : _optimizeCloudinaryUrl(currentAttachment.url);
+                final Map<String, dynamic> currentAttachment = widget.attachments[index]; // Now a Map
+                final String? url = currentAttachment['url'] as String?;
+                final File? file = currentAttachment['file'] as File?;
+                final String type = currentAttachment['type'] as String? ?? 'unknown';
+
+                final String displayPath = url ?? file?.path ?? 'Unknown attachment';
+                final String optimizedUrl = type.toLowerCase() == 'video'
+                    ? _optimizeCloudinaryVideoUrl(url)
+                    : _optimizeCloudinaryUrl(url);
 
                 Widget mediaWidget;
-                switch (currentAttachment.type.toLowerCase()) {
+                switch (type.toLowerCase()) {
                   case 'image':
                     mediaWidget = _buildImageViewer(context, currentAttachment, displayPath, optimizedUrl);
                     break;
@@ -159,8 +164,8 @@ class _MediaViewPageState extends State<MediaViewPage> {
                       builder: (context, snapshot) {
                         if (snapshot.connectionState == ConnectionState.done && snapshot.data != null) {
                           return VideoPlayerContainer(
-                            url: optimizedUrl.isNotEmpty ? optimizedUrl : currentAttachment.url,
-                            file: currentAttachment.file,
+                            url: optimizedUrl.isNotEmpty ? optimizedUrl : url,
+                            file: file,
                             displayPath: displayPath,
                             isAndroid13OrLower: snapshot.data!,
                           );
@@ -175,8 +180,8 @@ class _MediaViewPageState extends State<MediaViewPage> {
                     break;
                   case 'audio':
                     mediaWidget = AudioPlayerWidget(
-                      url: optimizedUrl.isNotEmpty ? optimizedUrl : currentAttachment.url,
-                      file: currentAttachment.file,
+                      url: optimizedUrl.isNotEmpty ? optimizedUrl : url,
+                      file: file,
                       displayPath: displayPath,
                     );
                     break;
@@ -184,7 +189,7 @@ class _MediaViewPageState extends State<MediaViewPage> {
                     mediaWidget = buildError(
                       context,
                       icon: FeatherIcons.file,
-                      message: 'Unsupported attachment type: ${currentAttachment.type}',
+                      message: 'Unsupported attachment type: $type',
                       fileName: displayPath.split('/').last,
                       iconColor: Colors.grey[600],
                     );
@@ -255,10 +260,13 @@ class _MediaViewPageState extends State<MediaViewPage> {
     );
   }
 
-  Widget _buildImageViewer(BuildContext context, Attachment attachment, String displayPath, String optimizedUrl) {
+  Widget _buildImageViewer(BuildContext context, Map<String, dynamic> attachment, String displayPath, String optimizedUrl) {
+    final String? url = attachment['url'] as String?;
+    final File? file = attachment['file'] as File?;
+
     return LayoutBuilder(
       builder: (context, constraints) {
-        final String currentOptimizedUrl = _optimizeCloudinaryUrl(attachment.url);
+        final String currentOptimizedUrl = _optimizeCloudinaryUrl(url);
         if (currentOptimizedUrl.isNotEmpty) {
           return InteractiveViewer(
             minScale: 0.5,
@@ -269,17 +277,17 @@ class _MediaViewPageState extends State<MediaViewPage> {
                 fit: BoxFit.contain,
                 placeholder: (context, url) => Center(child: LinearProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent), backgroundColor: Colors.grey)),
                 errorWidget: (context, url, error) => buildError(context, message: 'Error loading image: $error'),
-                cacheKey: attachment.url,
+                cacheKey: url,
               ),
             ),
           );
-        } else if (attachment.file != null) {
+        } else if (file != null) {
           return InteractiveViewer(
             minScale: 0.5,
             maxScale: 4.0,
             child: Center(
               child: Image.file(
-                attachment.file!,
+                file,
                 fit: BoxFit.contain,
                 errorBuilder: (context, error, stackTrace) => buildError(context, message: 'Error loading image file: $error'),
               ),
@@ -292,12 +300,15 @@ class _MediaViewPageState extends State<MediaViewPage> {
     );
   }
 
-  Widget _buildPdfViewer(BuildContext context, Attachment attachment, String displayPath, String optimizedUrl) {
-    final String currentOptimizedUrl = _optimizeCloudinaryUrl(attachment.url);
-    if (currentOptimizedUrl.isNotEmpty || attachment.file != null) {
+  Widget _buildPdfViewer(BuildContext context, Map<String, dynamic> attachment, String displayPath, String optimizedUrl) {
+    final String? url = attachment['url'] as String?;
+    final File? file = attachment['file'] as File?;
+
+    final String currentOptimizedUrl = _optimizeCloudinaryUrl(url);
+    if (currentOptimizedUrl.isNotEmpty || file != null) {
       final Uri pdfUri = currentOptimizedUrl.isNotEmpty
           ? Uri.parse(currentOptimizedUrl)
-          : Uri.file(attachment.file!.path);
+          : Uri.file(file!.path);
       return PdfViewer.uri(
         pdfUri,
         params: const PdfViewerParams(

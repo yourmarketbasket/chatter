@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:chatter/models/feed_models.dart';
+// import 'package:chatter/models/feed_models.dart'; // Removed import
 import 'package:chatter/pages/home-feed-screen.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:device_info_plus/device_info_plus.dart';
@@ -25,7 +25,7 @@ class NewPostScreen extends StatefulWidget {
 
 class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProviderStateMixin {
   final TextEditingController _postController = TextEditingController();
-  final List<Attachment> _selectedAttachments = [];
+  final List<Map<String, dynamic>> _selectedAttachments = []; // Changed to List<Map<String, dynamic>>
   final AudioPlayer _audioPlayer = AudioPlayer();
   final AudioRecorder _audioRecorder = AudioRecorder();
   bool _isRecordingAudio = false;
@@ -214,7 +214,12 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
         if (sizeInMB <= 10) {
           print('[NewPostScreen] Adding to _selectedAttachments: type=audio, path=${file.path}');
           setState(() {
-            _selectedAttachments.add(Attachment(file: file, type: "audio"));
+            _selectedAttachments.add({
+              'file': file,
+              'type': "audio",
+              'filename': file.path.split('/').last,
+              'size': await file.length(),
+            });
             _isRecordingAudio = false;
           });
           _pulseController.reset();
@@ -249,7 +254,12 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
           if (sizeInMB <= 10) {
             print('[NewPostScreen] Adding to _selectedAttachments: type=image, path=${file.path}');
             setState(() {
-              _selectedAttachments.add(Attachment(file: file, type: "image"));
+              _selectedAttachments.add({
+                'file': file,
+                'type': "image",
+                'filename': file.path.split('/').last,
+                'size': await file.length(),
+              });
             });
           } else {
             _showPermissionDialog(
@@ -281,7 +291,12 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
           if (sizeInMB <= 10) {
             print('[NewPostScreen] Adding to _selectedAttachments: type=video, path=${file.path}');
             setState(() {
-              _selectedAttachments.add(Attachment(file: file, type: "video"));
+              _selectedAttachments.add({
+                'file': file,
+                'type': "video",
+                'filename': file.path.split('/').last,
+                'size': await file.length(),
+              });
             });
           } else {
             _showPermissionDialog(
@@ -314,7 +329,12 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
           if (sizeInMB <= 10) {
             print('[NewPostScreen] Adding to _selectedAttachments: type=pdf, path=${file.path}');
             setState(() {
-              _selectedAttachments.add(Attachment(file: file, type: "pdf"));
+              _selectedAttachments.add({
+                'file': file,
+                'type': "pdf",
+                'filename': file.path.split('/').last,
+                'size': await file.length(),
+              });
             });
           } else {
             _showPermissionDialog(
@@ -346,7 +366,12 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
           if (sizeInMB <= 10) {
             print('[NewPostScreen] Adding to _selectedAttachments: type=audio, path=${file.path}');
             setState(() {
-              _selectedAttachments.add(Attachment(file: file, type: "audio"));
+              _selectedAttachments.add({
+                'file': file,
+                'type': "audio",
+                'filename': file.path.split('/').last,
+                'size': await file.length(),
+              });
             });
           } else {
             _showPermissionDialog(
@@ -391,8 +416,11 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
     super.dispose();
   }
 
-  Widget _buildAttachmentPreview(Attachment attachment) {
-    if (attachment.file == null) {
+  Widget _buildAttachmentPreview(Map<String, dynamic> attachment) { // Changed Attachment to Map<String, dynamic>
+    final File? file = attachment['file'] as File?; // Get file from map
+    final String type = attachment['type'] as String? ?? 'unknown'; // Get type from map
+
+    if (file == null) {
       return Container(
         width: 100,
         height: 100,
@@ -411,9 +439,9 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
           margin: const EdgeInsets.all(4),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: attachment.type == "image"
+            child: type == "image" // Use type from map
                 ? Image.file(
-                    attachment.file!,
+                    file!, // Use file from map
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) => Container(
                       color: Colors.grey[900],
@@ -424,20 +452,20 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
                       ),
                     ),
                   )
-                : attachment.type == "pdf"
+                : type == "pdf" // Use type from map
                     ? PdfViewer.file(
-                        attachment.file!.path,
+                        file!.path, // Use file from map
                         params: const PdfViewerParams(
                           maxScale: 1.0,
                         ),
                       )
-                    : attachment.type == "audio"
+                    : type == "audio" // Use type from map
                         ? Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               IconButton(
                                 icon: Icon(
-                                  _currentlyPlayingPath == attachment.file!.path &&
+                                  _currentlyPlayingPath == file!.path && // Use file from map
                                           _audioPlayer.state == PlayerState.playing
                                       ? FeatherIcons.pause
                                       : FeatherIcons.play,
@@ -446,7 +474,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
                                 ),
                                 onPressed: () async {
                                   try {
-                                    if (_currentlyPlayingPath == attachment.file!.path &&
+                                    if (_currentlyPlayingPath == file!.path && // Use file from map
                                         _audioPlayer.state == PlayerState.playing) {
                                       await _audioPlayer.pause();
                                       if (mounted) {
@@ -456,10 +484,10 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
                                       }
                                     } else {
                                       await _audioPlayer.stop();
-                                      await _audioPlayer.play(DeviceFileSource(attachment.file!.path));
+                                      await _audioPlayer.play(DeviceFileSource(file!.path)); // Use file from map
                                       if (mounted) {
                                         setState(() {
-                                          _currentlyPlayingPath = attachment.file!.path;
+                                          _currentlyPlayingPath = file!.path; // Use file from map
                                         });
                                       }
                                     }
@@ -472,7 +500,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
                                 },
                               ),
                               Text(
-                                attachment.file!.path.split('/').last,
+                                file!.path.split('/').last, // Use file from map
                                 style: GoogleFonts.roboto(
                                   color: Colors.white70,
                                   fontSize: 12,
@@ -482,8 +510,8 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
                               ),
                             ],
                           )
-                        : FutureBuilder<String?>(
-                            future: _generateVideoThumbnail(attachment.file!.path),
+                        : FutureBuilder<String?>( // Assuming video type if not image, pdf, or audio
+                            future: _generateVideoThumbnail(file!.path), // Use file from map
                             builder: (context, snapshot) {
                               if (snapshot.connectionState == ConnectionState.done && snapshot.data != null) {
                                 return Image.file(
@@ -516,7 +544,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
           onPressed: () {
             setState(() {
               _selectedAttachments.remove(attachment);
-              if (attachment.type == "audio" && _currentlyPlayingPath == attachment.file?.path) {
+              if (type == "audio" && _currentlyPlayingPath == file?.path) { // Use type and file from map
                 _audioPlayer.stop();
                 _currentlyPlayingPath = null;
               }
@@ -701,7 +729,8 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
                 child: OutlinedButton(
                   onPressed: () {
                     if (_postController.text.trim().isNotEmpty || _selectedAttachments.isNotEmpty) {
-                      print('[NewPostScreen] Popping with attachments: ${_selectedAttachments.map((a) => 'type=${a.type}, path=${a.file?.path}').toList()}');
+                      // Ensure _selectedAttachments (List<Map<String, dynamic>>) is passed correctly
+                      print('[NewPostScreen] Popping with attachments: ${_selectedAttachments.map((a) => 'type=${a['type']}, path=${(a['file'] as File?)?.path}').toList()}');
                       Navigator.pop(context, {
                         'content': _postController.text.trim(),
                         'attachments': _selectedAttachments,

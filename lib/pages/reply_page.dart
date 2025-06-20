@@ -1,5 +1,5 @@
 import 'package:chatter/controllers/data-controller.dart';
-import 'package:chatter/models/feed_models.dart';
+// import 'package:chatter/models/feed_models.dart'; // Removed import
 import 'package:chatter/pages/home-feed-screen.dart';
 import 'package:chatter/pages/media_view_page.dart';
 import 'package:flutter/material.dart';
@@ -16,7 +16,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 
 // ReplyPage allows users to reply to a ChatterPost with text and attachments.
 class ReplyPage extends StatefulWidget {
-  final ChatterPost post;
+  final Map<String, dynamic> post; // Changed ChatterPost to Map<String, dynamic>
 
   const ReplyPage({Key? key, required this.post}) : super(key: key);
 
@@ -26,12 +26,12 @@ class ReplyPage extends StatefulWidget {
 
 class _ReplyPageState extends State<ReplyPage> {
   final TextEditingController _replyController = TextEditingController();
-  final List<Attachment> _replyAttachments = [];
+  final List<Map<String, dynamic>> _replyAttachments = []; // Changed List<Attachment> to List<Map<String, dynamic>>
   late DataController _dataController;
   final DeviceInfoPlugin _deviceInfo = DeviceInfoPlugin();
 
   // State Variables for replies
-  List<ChatterPost> _replies = [];
+  List<Map<String, dynamic>> _replies = []; // Changed List<ChatterPost> to List<Map<String, dynamic>>
   bool _isLoadingReplies = true;
   String? _fetchRepliesError;
   bool _isSubmittingReply = false; // Added state for reply submission
@@ -52,10 +52,10 @@ class _ReplyPageState extends State<ReplyPage> {
       });
     }
     try {
-      final fetchedReplies = await _dataController.fetchReplies(widget.post.id);
+      final fetchedReplies = await _dataController.fetchReplies(widget.post['id'] as String); // Access 'id' via map key
       if (mounted) {
         setState(() {
-          _replies = fetchedReplies;
+          _replies = fetchedReplies; // Already List<Map<String, dynamic>> from DataController
           _isLoadingReplies = false;
         });
       }
@@ -152,7 +152,23 @@ class _ReplyPageState extends State<ReplyPage> {
     );
   }
 
-  Widget _buildPostContent(ChatterPost post, {required bool isReply}) {
+  Widget _buildPostContent(Map<String, dynamic> post, {required bool isReply}) {
+    // Extract data using map keys, providing defaults or handling nulls
+    final String username = post['username'] as String? ?? 'Unknown User';
+    final String content = post['content'] as String? ?? '';
+    final String? userAvatar = post['useravatar'] as String?;
+    // Ensure avatarInitial is derived correctly or default
+    final String avatarInitial = post['avatarInitial'] as String? ?? (username.isNotEmpty ? username[0].toUpperCase() : '?');
+    // Handle timestamp parsing carefully
+    final DateTime timestamp = post['timestamp'] is String
+        ? (DateTime.tryParse(post['timestamp'] as String) ?? DateTime.now())
+        : (post['timestamp'] is DateTime ? post['timestamp'] : DateTime.now());
+
+    final List<Map<String, dynamic>> attachments = (post['attachments'] as List<dynamic>?)
+        ?.map((att) => att as Map<String, dynamic>)
+        .toList() ?? [];
+
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -162,12 +178,12 @@ class _ReplyPageState extends State<ReplyPage> {
             CircleAvatar(
               radius: isReply ? 16 : 20,
               backgroundColor: Colors.tealAccent.withOpacity(0.2),
-              backgroundImage: post.useravatar != null && post.useravatar!.isNotEmpty
-                  ? NetworkImage(post.useravatar!)
+              backgroundImage: userAvatar != null && userAvatar.isNotEmpty
+                  ? NetworkImage(userAvatar)
                   : null,
-              child: post.useravatar == null || post.useravatar!.isEmpty
+              child: userAvatar == null || userAvatar.isEmpty
                   ? Text(
-                      post.avatarInitial,
+                      avatarInitial,
                       style: GoogleFonts.poppins(
                         color: Colors.tealAccent,
                         fontWeight: FontWeight.w600,
@@ -185,7 +201,7 @@ class _ReplyPageState extends State<ReplyPage> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        '@${post.username}',
+                        '@$username', // Use extracted username
                         style: GoogleFonts.poppins(
                           fontWeight: FontWeight.w600,
                           fontSize: isReply ? 14 : 16,
@@ -193,7 +209,7 @@ class _ReplyPageState extends State<ReplyPage> {
                         ),
                       ),
                       Text(
-                        DateFormat('h:mm a · MMM d').format(post.timestamp),
+                        DateFormat('h:mm a · MMM d').format(timestamp), // Use extracted timestamp
                         style: GoogleFonts.roboto(
                           color: Colors.grey[500],
                           fontSize: 12,
@@ -203,95 +219,98 @@ class _ReplyPageState extends State<ReplyPage> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    post.content,
+                    content, // Use extracted content
                     style: GoogleFonts.roboto(
                       fontSize: isReply ? 13 : 14,
                       color: Colors.white70,
                       height: 1.5,
                     ),
                   ),
-                  if (post.attachments.isNotEmpty) ...[
+                  if (attachments.isNotEmpty) ...[ // Use extracted attachments
                     const SizedBox(height: 12),
                     GridView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: post.attachments.length > 1 ? 2 : 1,
+                        crossAxisCount: attachments.length > 1 ? 2 : 1,
                         crossAxisSpacing: 8,
                         mainAxisSpacing: 8,
                         childAspectRatio: 1,
                       ),
-                      itemCount: post.attachments.length,
+                      itemCount: attachments.length,
                       itemBuilder: (context, idx) {
-                        final attachment = post.attachments[idx];
-                        final displayUrl = attachment.url ?? attachment.file?.path ?? 'Unknown attachment';
+                        final attachment = attachments[idx];
+                        final displayUrl = attachment['url'] as String? ?? (attachment['file'] as File?)?.path ?? 'Unknown attachment';
+                        final String attachmentType = attachment['type'] as String? ?? 'unknown';
+                        final String? attachmentFilename = attachment['filename'] as String?;
+
                         return GestureDetector(
                           onTap: () {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (context) => MediaViewPage(
-                                  attachments: post.attachments, // The full list of attachments from the original post
-                                  initialIndex: idx,            // The index of the tapped attachment in the GridView
-                                  message: post.content,
-                                  userName: post.username,
-                                  userAvatarUrl: post.useravatar,
-                                  timestamp: post.timestamp,
-                                  viewsCount: post.views,
-                                  likesCount: post.likes,
-                                  repostsCount: post.reposts,
+                                  attachments: attachments,
+                                  initialIndex: idx,
+                                  message: content,
+                                  userName: username,
+                                  userAvatarUrl: userAvatar,
+                                  timestamp: timestamp,
+                                  viewsCount: post['views'] as int? ?? 0, // Example, ensure these keys exist
+                                  likesCount: post['likes'] as int? ?? 0,
+                                  repostsCount: post['reposts'] as int? ?? 0,
                                 ),
                               ),
                             );
                           },
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(12),
-                            child: attachment.type == "image"
-                                ? attachment.url != null
+                            child: attachmentType == "image"
+                                ? (attachment['url'] != null
                                     ? Image.network(
-                                        attachment.url!,
+                                        attachment['url'] as String,
                                         fit: BoxFit.cover,
                                         errorBuilder: (context, error, stackTrace) => Container(
                                           color: Colors.grey[900],
                                           child: const Icon(FeatherIcons.image, color: Colors.grey, size: 40),
                                         ),
                                       )
-                                    : attachment.file != null
+                                    : (attachment['file'] as File?) != null
                                         ? Image.file(
-                                            attachment.file!,
+                                            attachment['file'] as File,
                                             fit: BoxFit.cover,
                                             errorBuilder: (context, error, stackTrace) => Container(
                                               color: Colors.grey[900],
                                               child: const Icon(FeatherIcons.image, color: Colors.grey, size: 40),
                                             ),
                                           )
-                                        : Container(
+                                        : Container( // Fallback if no URL and no file
                                             color: Colors.grey[900],
                                             child: const Icon(FeatherIcons.alertTriangle, color: Colors.redAccent, size: 40),
-                                          )
-                                : attachment.type == "pdf"
-                                    ? (attachment.url != null || attachment.file != null)
+                                          ))
+                                : attachmentType == "pdf"
+                                    ? ((attachment['url'] != null || (attachment['file'] as File?) != null)
                                         ? PdfViewer.uri(
-                                            attachment.url != null ? Uri.parse(attachment.url!) : Uri.file(attachment.file!.path),
+                                            attachment['url'] != null ? Uri.parse(attachment['url'] as String) : Uri.file((attachment['file'] as File).path),
                                             params: const PdfViewerParams(maxScale: 1.0),
                                           )
                                         : Container(
                                             color: Colors.grey[900],
                                             child: const Icon(FeatherIcons.alertTriangle, color: Colors.redAccent, size: 40),
-                                          )
-                                    : Container(
+                                          ))
+                                    : Container( // Fallback for other types like video, audio
                                         color: Colors.grey[900],
                                         child: Column(
                                           mainAxisAlignment: MainAxisAlignment.center,
                                           children: [
                                             Icon(
-                                              attachment.type == "audio" ? FeatherIcons.music : FeatherIcons.video,
+                                              attachmentType == "audio" ? FeatherIcons.music : FeatherIcons.video, // Or other relevant icons
                                               color: Colors.tealAccent,
                                               size: 40,
                                             ),
                                             const SizedBox(height: 8),
                                             Text(
-                                              attachment.filename ?? displayUrl.split('/').last,
+                                              attachmentFilename ?? displayUrl.split('/').last,
                                               style: GoogleFonts.roboto(color: Colors.white70, fontSize: 12),
                                               textAlign: TextAlign.center,
                                               overflow: TextOverflow.ellipsis,
@@ -353,12 +372,12 @@ class _ReplyPageState extends State<ReplyPage> {
         final sizeInMB = sizeInBytes / (1024 * 1024);
         if (sizeInMB <= 10) {
           setState(() {
-            _replyAttachments.add(Attachment(
-              file: file,
-              type: type,
-              filename: file?.path.split('/').last,
-              size: sizeInBytes,
-            ));
+            _replyAttachments.add({ // Add as Map<String, dynamic>
+              'file': file,
+              'type': type,
+              'filename': file?.path.split('/').last,
+              'size': sizeInBytes,
+            });
           });
           message = '${type[0].toUpperCase()}${type.substring(1)} selected: ${file.path.split('/').last}';
           _showSnackBar(dialogTitle, message, Colors.teal[700]!);
@@ -377,7 +396,7 @@ class _ReplyPageState extends State<ReplyPage> {
   }
 
   void _submitReply() async {
-    if (_isSubmittingReply) return; // Prevent multiple submissions
+    if (_isSubmittingReply) return;
 
     if (_replyController.text.trim().isEmpty && _replyAttachments.isEmpty) {
       _showSnackBar('Input Error', 'Please enter text or add an attachment.', Colors.red[700]!);
@@ -388,59 +407,68 @@ class _ReplyPageState extends State<ReplyPage> {
       _isSubmittingReply = true;
     });
 
-    List<Attachment> uploadedReplyAttachments = [];
+    List<Map<String, dynamic>> uploadedReplyAttachments = []; // Changed to List<Map<String, dynamic>>
     try {
       if (_replyAttachments.isNotEmpty) {
-        final filesToUpload = _replyAttachments.where((a) => a.file != null).map((a) => a.file!).toList();
+        // Filter for attachments that have a 'file' key and are not null
+        final filesToUpload = _replyAttachments
+            .where((a) => a['file'] != null && a['file'] is File)
+            .map((a) => a['file'] as File)
+            .toList();
+
         if (filesToUpload.isNotEmpty) {
           final uploadResults = await _dataController.uploadFilesToCloudinary(filesToUpload);
-          int currentFileIndex = 0;
-          for (int i = 0; i < _replyAttachments.length; i++) {
-            if (_replyAttachments[i].file != null) { // Only process attachments that had a file to upload
-              final result = uploadResults[currentFileIndex];
-              currentFileIndex++;
-              if (result['success'] == true && result['url'] != null) {
-                uploadedReplyAttachments.add(Attachment(
-                  // file: _replyAttachments[i].file, // Not needed after upload
-                  type: _replyAttachments[i].type,
-                  filename: _replyAttachments[i].filename ?? result['filename'] ?? 'unknown',
-                  size: _replyAttachments[i].size ?? result['size'] ?? 0,
-                  url: result['url'] as String,
-                ));
-              } else {
-                _showSnackBar(
-                  'Upload Error',
-                  'Failed to upload ${_replyAttachments[i].filename ?? 'a file'}: ${result['message'] ?? 'Unknown error'}',
-                  Colors.red[700]!,
-                );
-                // Optionally, decide if a single failed upload should stop the whole reply
+
+          // Correlate upload results with original attachments
+          // This assumes uploadResults are in the same order as filesToUpload
+          int uploadResultIndex = 0;
+          for (var originalAttachment in _replyAttachments) {
+            if (originalAttachment['file'] != null && originalAttachment['file'] is File) {
+              // This attachment was intended for upload
+              if (uploadResultIndex < uploadResults.length) {
+                final result = uploadResults[uploadResultIndex];
+                if (result['success'] == true && result['url'] != null) {
+                  uploadedReplyAttachments.add({
+                    'type': originalAttachment['type'],
+                    'filename': originalAttachment['filename'] ?? result['filename'] ?? 'unknown',
+                    'size': originalAttachment['size'] ?? result['size'] ?? 0,
+                    'url': result['url'] as String,
+                    // Add other relevant fields like 'thumbnailUrl' if applicable
+                  });
+                } else {
+                  _showSnackBar(
+                    'Upload Error',
+                    'Failed to upload ${originalAttachment['filename'] ?? 'a file'}: ${result['message'] ?? 'Unknown error'}',
+                    Colors.red[700]!,
+                  );
+                }
+                uploadResultIndex++;
               }
-            } else if (_replyAttachments[i].url != null) {
-              // This case should not happen if _replyAttachments only stores new files
-              // but as a safeguard, if an attachment already has a URL, pass it through.
-              uploadedReplyAttachments.add(_replyAttachments[i]);
+            } else if (originalAttachment['url'] != null) {
+              // If an attachment already has a URL (e.g., pre-existing, though unlikely in this flow), pass it through
+              uploadedReplyAttachments.add(originalAttachment);
             }
           }
         }
       }
 
-      // Check if content is empty AND all selected attachments failed to upload
+
       if (_replyController.text.trim().isEmpty &&
           uploadedReplyAttachments.isEmpty &&
-          _replyAttachments.isNotEmpty) {
+          _replyAttachments.isNotEmpty) { // Check if original attachments were present but failed to upload
         _showSnackBar('Upload Error', 'Failed to upload attachments. Reply not sent.', Colors.red[700]!);
         setState(() { _isSubmittingReply = false; });
         return;
       }
 
       final result = await _dataController.replyToPost(
-        postId: widget.post.id,
+        postId: widget.post['id'] as String, // Access 'id' via map key
         content: _replyController.text.trim(),
-        attachments: uploadedReplyAttachments, // These are Attachment objects with URLs
+        attachments: uploadedReplyAttachments, // Pass as List<Map<String, dynamic>>
       );
 
       if (result['success'] == true) {
-        await _fetchPostReplies(); // Refresh the displayed replies
+        await _fetchPostReplies();
         _replyController.clear();
         if (mounted) {
           setState(() {
@@ -449,7 +477,6 @@ class _ReplyPageState extends State<ReplyPage> {
         }
         _showSnackBar('Success', result['message'] ?? 'Reply posted!', Colors.teal[700]!);
 
-        // Short delay before popping, so user can see snackbar
         await Future.delayed(const Duration(milliseconds: 500));
         if (mounted) {
           Navigator.pop(context);
@@ -471,10 +498,13 @@ class _ReplyPageState extends State<ReplyPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Extract username for AppBar title, providing a default
+    final String postUsername = widget.post['username'] as String? ?? 'User';
+
     return Scaffold(
       backgroundColor: const Color(0xFF000000),
       appBar: AppBar(
-        title: Text('Reply to @${widget.post.username}', style: GoogleFonts.poppins(color: Colors.white)),
+        title: Text('Reply to @$postUsername', style: GoogleFonts.poppins(color: Colors.white)),
         backgroundColor: const Color(0xFF121212),
         iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,

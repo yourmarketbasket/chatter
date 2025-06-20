@@ -1,6 +1,7 @@
 // Contents for lib/models/feed_models.dart
 import 'dart:io';
 
+/*
 class Attachment {
   final File? file;
   final String type;
@@ -18,7 +19,9 @@ class Attachment {
     this.thumbnailUrl,
   });
 }
+*/
 
+/*
 class ChatterPost {
   final String id; // Added field
   final String username;
@@ -46,3 +49,4 @@ class ChatterPost {
     this.replies = const [],
   });
 }
+*/

@@ -26,7 +26,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:chatter/widgets/video_attachment_widget.dart';
 import 'package:chatter/widgets/audio_attachment_widget.dart';
-import 'package:chatter/models/feed_models.dart';
+// import 'package:chatter/models/feed_models.dart'; Removed import
 import 'package:flutter_expandable_fab/flutter_expandable_fab.dart';
 
 class HomeFeedScreen extends StatefulWidget {
@@ -99,7 +99,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
 
     if (result != null && result is Map<String, dynamic>) {
       final String content = result['content'] as String? ?? '';
-      final List<Attachment> attachments = (result['attachments'] as List?)?.whereType<Attachment>().toList() ?? <Attachment>[];
+      final List<Map<String, dynamic>> attachments = (result['attachments'] as List?)?.whereType<Map<String, dynamic>>().toList() ?? <Map<String, dynamic>>[];
 
       if (content.isNotEmpty || attachments.isNotEmpty) {
         _addPost(content, attachments);
@@ -107,7 +107,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     }
   }
 
-  Future<void> _navigateToRepostPage(ChatterPost post) async {
+  Future<void> _navigateToRepostPage(Map<String, dynamic> post) async {
     final confirmed = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -117,7 +117,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
 
     if (confirmed == true) {
       setState(() {
-        post.reposts++;
+        post['reposts'] = (post['reposts'] ?? 0) + 1;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -131,20 +131,20 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     }
   }
 
-  Future<void> _addPost(String content, List<Attachment> attachments) async {
+  Future<void> _addPost(String content, List<Map<String, dynamic>> attachments) async {
     print('[HomeFeedScreen _addPost] Received ${attachments.length} attachments.');
     for (int i = 0; i < attachments.length; i++) {
       final a = attachments[i];
       try {
-        print('[HomeFeedScreen _addPost] Attachment ${i+1}: type=${a.type}, path=${a.file?.path}, file_exists_sync=${a.file?.existsSync()}, length_sync=${a.file?.lengthSync()}, filename=${a.filename}, size=${a.size}, url=${a.url}');
+        print('[HomeFeedScreen _addPost] Attachment ${i+1}: type=${a['type']}, path=${(a['file'] as File?)?.path}, file_exists_sync=${(a['file'] as File?)?.existsSync()}, length_sync=${(a['file'] as File?)?.lengthSync()}, filename=${a['filename']}, size=${a['size']}, url=${a['url']}');
       } catch (e) {
-        print('[HomeFeedScreen _addPost] Attachment ${i+1}: type=${a.type}, path=${a.file?.path}, url=${a.url} - Error getting file stats: $e');
+        print('[HomeFeedScreen _addPost] Attachment ${i+1}: type=${a['type']}, path=${(a['file'] as File?)?.path}, url=${a['url']} - Error getting file stats: $e');
       }
     }
 
-    List<Attachment> uploadedAttachments = [];
+    List<Map<String, dynamic>> uploadedAttachments = [];
     if (attachments.isNotEmpty) {
-      List<File> files = attachments.where((a) => a.file != null).map((a) => a.file!).toList();
+      List<File> files = attachments.where((a) => a['file'] != null).map((a) => a['file']! as File).toList();
       print('[HomeFeedScreen _addPost] Extracted ${files.length} files for upload:');
       for (int i = 0; i < files.length; i++) {
         final f = files[i];
@@ -157,26 +157,28 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       List<Map<String, dynamic>> uploadResults = await dataController.uploadFilesToCloudinary(files);
 
       for (int i = 0; i < attachments.length; i++) {
-        var result = uploadResults[i];
+        var result = uploadResults[i]; // Assuming uploadResults corresponds to the order of files derived from attachments
+        final originalAttachment = attachments.firstWhere((att) => (att['file'] as File?)?.path == result['filePath'], orElse: () => attachments[i]);
+
         print(result);
         if (result['success'] == true) {
           String originalUrl = result['url'] as String;
-          String? thumbnailUrl = attachments[i].type == 'video'
+          String? thumbnailUrl = originalAttachment['type'] == 'video'
               ? originalUrl.replaceAll('/upload/', '/upload/so_0,q_auto:low/')
               : null;
-          uploadedAttachments.add(Attachment(
-            file: attachments[i].file,
-            type: attachments[i].type,
-            filename: attachments[i].file?.path.split('/').last ?? 'unknown',
-            size: attachments[i].file != null ? await attachments[i].file!.length() : 0,
-            url: originalUrl,
-            thumbnailUrl: thumbnailUrl,
-          ));
+          uploadedAttachments.add({
+            'file': originalAttachment['file'], // Keep the original file object if needed, or null
+            'type': originalAttachment['type'],
+            'filename': (originalAttachment['file'] as File?)?.path.split('/').last ?? result['filename'] ?? 'unknown',
+            'size': result['size'] ?? ((originalAttachment['file'] as File?) != null ? await (originalAttachment['file'] as File)!.length() : 0),
+            'url': originalUrl,
+            'thumbnailUrl': thumbnailUrl,
+          });
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'Failed to upload ${attachments[i].file?.path.split('/').last}: ${result['message']}',
+                'Failed to upload ${(originalAttachment['file'] as File?)?.path.split('/').last}: ${result['message']}',
                 style: GoogleFonts.roboto(color: Colors.white),
               ),
               backgroundColor: Colors.red[700],
@@ -195,12 +197,12 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       'content': content.trim(),
       'useravatar': dataController.user.value['avatar'] ?? '',
       'attachments': uploadedAttachments.map((att) => {
-        'filename': att.filename,
-        'url': att.url,
-        'size': att.size,
-        'type': att.type,
-        'thumbnailUrl': att.thumbnailUrl,
-      }).toList(),
+            'filename': att['filename'],
+            'url': att['url'],
+            'size': att['size'],
+            'type': att['type'],
+            'thumbnailUrl': att['thumbnailUrl'],
+          }).toList(),
     };
 
     final result = await dataController.createPost(postData);
@@ -228,7 +230,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     }
   }
 
-  Future<void> _navigateToReplyPage(ChatterPost post) async {
+  Future<void> _navigateToReplyPage(Map<String, dynamic> post) async {
     final newReply = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -241,30 +243,59 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         'username': newReply['username'] ?? 'YourName',
         'content': newReply['content']?.trim() ?? '',
         'useravatar': newReply['useravatar'] ?? '',
-        'attachments': newReply['attachments']?.map((att) => {
-          'filename': att.file?.path.split('/').last ?? 'unknown',
-          'url': att.url,
-          'size': att.file != null ? att.file.lengthSync() : 0,
-          'type': att.type,
-          'thumbnailUrl': att.thumbnailUrl,
+        'attachments': (newReply['attachments'] as List<Map<String, dynamic>>?)?.map((att) => {
+          'filename': (att['file'] as File?)?.path.split('/').last ?? att['filename'] ?? 'unknown',
+          'url': att['url'],
+          'size': (att['file'] as File?) != null ? (att['file'] as File).lengthSync() : att['size'] ?? 0,
+          'type': att['type'],
+          'thumbnailUrl': att['thumbnailUrl'],
         }).toList() ?? [],
       };
 
-      final result = await dataController.createPost(replyData); // Fixed: Changed postData to replyData
+      // Assuming replyToPost is the correct method in DataController for replies
+      // And it expects postId, content, and attachments.
+      // The original post's ID is needed here.
+      final postId = post['_id'] as String?;
+      if (postId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: Original post ID is missing.', style: GoogleFonts.roboto(color: Colors.white)),
+            backgroundColor: Colors.red[700],
+          ),
+        );
+        return;
+      }
+
+      final result = await dataController.replyToPost(
+        postId: postId,
+        content: replyData['content'] as String,
+        attachments: replyData['attachments'] as List<Map<String, dynamic>>,
+      );
+
       if (result['success'] == true) {
-        final postIndex = dataController.posts.indexWhere((p) => p['createdAt'] == post.timestamp.toIso8601String());
+        // Optionally, update the local post's reply count or add reply to a local list
+        // This depends on how you want the UI to reflect the new reply immediately
+        final postIndex = dataController.posts.indexWhere((p) => p['_id'] == postId);
         if (postIndex != -1) {
           final postMap = dataController.posts[postIndex];
-          List<String> replies = List.from(postMap['replies'] ?? []);
-          replies.add(result['postId']);
-          postMap['replies'] = replies;
+          // Assuming the backend returns the new reply details and you want to add it
+          // or simply increment a counter. For simplicity, let's assume a counter.
+          // If 'replies' is a list of reply objects:
+          // List<dynamic> repliesList = List.from(postMap['replies'] ?? []);
+          // repliesList.add(result['reply']); // Assuming 'reply' contains the new reply data
+          // postMap['replies'] = repliesList;
+
+          // If 'replies' is just a count or you're managing it as a count in the UI:
+          postMap['replyCount'] = (postMap['replyCount'] ?? 0) + 1; // Example if it's a count
+          // Or if 'replies' is a list of IDs or full objects:
+          // (postMap['replies'] as List<dynamic>).add(result['reply']['_id']); // If adding ID
+
           dataController.posts[postIndex] = postMap;
           dataController.posts.refresh();
         }
-
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Reply added to the post!', style: GoogleFonts.roboto(color: Colors.white)),
+            content: Text('Reply added!', style: GoogleFonts.roboto(color: Colors.white)),
             backgroundColor: Colors.teal[700],
           ),
         );
@@ -282,7 +313,19 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     }
   }
 
-  Widget _buildPostContent(ChatterPost post, {required bool isReply}) {
+  Widget _buildPostContent(Map<String, dynamic> post, {required bool isReply}) {
+    final String username = post['username'] ?? 'Unknown User';
+    final String content = post['content'] ?? '';
+    final String? userAvatar = post['useravatar'] as String?;
+    final String avatarInitial = (post['avatarInitial'] as String?) ?? (username.isNotEmpty ? username[0].toUpperCase() : '?');
+    final DateTime timestamp = post['createdAt'] is String ? DateTime.parse(post['createdAt']) : DateTime.now();
+    int likes = post['likes'] ?? 0;
+    int reposts = post['reposts'] ?? 0;
+    int views = post['views'] ?? 0;
+    List<Map<String, dynamic>> attachments = (post['attachments'] as List<dynamic>?)?.map((e) => e as Map<String, dynamic>).toList() ?? [];
+    List<dynamic> replies = post['replies'] as List<dynamic>? ?? [];
+
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -292,12 +335,12 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
             CircleAvatar(
               radius: isReply ? 16 : 20,
               backgroundColor: Colors.tealAccent.withOpacity(0.2),
-              backgroundImage: post.useravatar != null && post.useravatar!.isNotEmpty
-                  ? NetworkImage(post.useravatar!)
+              backgroundImage: userAvatar != null && userAvatar.isNotEmpty
+                  ? NetworkImage(userAvatar)
                   : null,
-              child: post.useravatar == null || post.useravatar!.isEmpty
+              child: userAvatar == null || userAvatar.isEmpty
                   ? Text(
-                      post.avatarInitial,
+                      avatarInitial,
                       style: GoogleFonts.poppins(
                         color: Colors.tealAccent,
                         fontWeight: FontWeight.w600,
@@ -319,7 +362,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             Text(
-                              post.username,
+                              username,
                               style: GoogleFonts.poppins(
                                 fontWeight: FontWeight.w600,
                                 fontSize: isReply ? 14 : 16,
@@ -335,7 +378,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                             ),
                             SizedBox(width: 4.0),
                             Text(
-                              ' · @${post.username}',
+                              ' · @$username',
                               style: GoogleFonts.poppins(
                                 fontSize: isReply ? 10 : 12,
                                 color: Colors.white70,
@@ -346,7 +389,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                         ),
                       ),
                       Text(
-                        DateFormat('h:mm a · MMM d').format(post.timestamp),
+                        DateFormat('h:mm a · MMM d').format(timestamp),
                         style: GoogleFonts.roboto(
                           color: Colors.grey[500],
                           fontSize: 12,
@@ -356,16 +399,16 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                   ),
                   SizedBox(height: 6),
                   Text(
-                    post.content,
+                    content,
                     style: GoogleFonts.roboto(
                       fontSize: isReply ? 13 : 14,
                       color: const Color.fromARGB(255, 255, 255, 255),
                       height: 1.5,
                     ),
                   ),
-                  if (post.attachments.isNotEmpty) ...[
+                  if (attachments.isNotEmpty) ...[
                     SizedBox(height: 12),
-                    _buildAttachmentGrid(post.attachments, post),
+                    _buildAttachmentGrid(attachments, post),
                   ],
                   SizedBox(height: 12),
                   Row(
@@ -381,12 +424,12 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                             ),
                             onPressed: () {
                               setState(() {
-                                post.likes++;
+                                post['likes'] = (post['likes'] ?? 0) + 1;
                               });
                             },
                           ),
                           Text(
-                            '${post.likes}',
+                            '$likes',
                             style: GoogleFonts.roboto(
                               color: Colors.grey[400],
                               fontSize: 14,
@@ -407,7 +450,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                             },
                           ),
                           Text(
-                            '${post.replies.length}',
+                            '${replies.length}', // Assuming 'replies' is a list
                             style: GoogleFonts.roboto(
                               color: Colors.grey[400],
                               fontSize: 14,
@@ -428,7 +471,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                             },
                           ),
                           Text(
-                            '${post.reposts}',
+                            '$reposts',
                             style: GoogleFonts.roboto(
                               color: Colors.grey[400],
                               fontSize: 14,
@@ -447,7 +490,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                             onPressed: () {},
                           ),
                           Text(
-                            '${post.views}',
+                            '$views',
                             style: GoogleFonts.roboto(
                               color: Colors.grey[400],
                               fontSize: 14,
@@ -466,21 +509,21 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     );
   }
 
-  Widget _buildAttachmentGrid(List<Attachment> attachments, ChatterPost post) {
+  Widget _buildAttachmentGrid(List<Map<String, dynamic>> attachments, Map<String, dynamic> post) {
     return GridView.builder(
       shrinkWrap: true,
       physics: NeverScrollableScrollPhysics(),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: attachments.length == 1 ? 1 : 2,
+        crossAxisCount: attachments.length == 1 ? 1 : 2, // Keep this logic
         crossAxisSpacing: 4,
         mainAxisSpacing: 4,
-        childAspectRatio: 4 / 3,
+        childAspectRatio: 4 / 3, // Keep aspect ratio or adjust as needed
       ),
       itemCount: attachments.length,
       itemBuilder: (context, index) {
         final attachment = attachments[index];
-        final displayUrl = attachment.url ?? '';
-        BorderRadius borderRadius;
+        final displayUrl = attachment['url'] as String? ?? ''; // Access 'url' via map key
+        BorderRadius borderRadius; // Keep this logic for border radius
         if (attachments.length == 1) {
           borderRadius = BorderRadius.circular(12);
         } else {
@@ -495,19 +538,18 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                     bottomRight: Radius.circular(12),
                   );
           } else {
-            if (index % 2 == 0) {
-              borderRadius = index == 0
-                  ? BorderRadius.only(topLeft: Radius.circular(12))
-                  : index == attachments.length - 1 && attachments.length % 2 == 1
-                      ? BorderRadius.only(bottomLeft: Radius.circular(12))
-                      : BorderRadius.zero;
-            } else {
-              borderRadius = index == 1
-                  ? BorderRadius.only(topRight: Radius.circular(12))
-                  : index == attachments.length - 1
-                      ? BorderRadius.only(bottomRight: Radius.circular(12))
-                      : BorderRadius.zero;
+            // Simplified logic for more than 2 items, adjust if specific corners are needed
+            if (index == 0) borderRadius = BorderRadius.only(topLeft: Radius.circular(12));
+            else if (index == 1) borderRadius = BorderRadius.only(topRight: Radius.circular(12));
+            else if (index == attachments.length - 2 && attachments.length % 2 == 0) borderRadius = BorderRadius.only(bottomLeft: Radius.circular(12));
+            else if (index == attachments.length -1) {
+                if (attachments.length % 2 == 1 && index == attachments.length -1) {
+                    borderRadius = BorderRadius.only(bottomLeft: Radius.circular(12));
+                } else {
+                    borderRadius = BorderRadius.only(bottomRight: Radius.circular(12));
+                }
             }
+            else borderRadius = BorderRadius.zero;
           }
         }
         return _buildAttachmentWidget(attachment, index, displayUrl, post, borderRadius);
@@ -515,39 +557,43 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     );
   }
 
-  Widget _buildAttachmentWidget(Attachment attachment, int idx, String displayUrl, ChatterPost post, BorderRadius borderRadius) {
-    if (attachment.type == "video") {
+  Widget _buildAttachmentWidget(Map<String, dynamic> attachment, int idx, String displayUrl, Map<String, dynamic> post, BorderRadius borderRadius) {
+    final String attachmentType = attachment['type'] as String? ?? 'unknown';
+    final List<Map<String, dynamic>> postAttachments = (post['attachments'] as List<dynamic>?)?.map((e) => e as Map<String, dynamic>).toList() ?? [];
+
+
+    if (attachmentType == "video") {
       return VideoAttachmentWidget(
-        key: Key('video_${attachment.url ?? idx}'),
-        attachment: attachment,
-        post: post,
+        key: Key('video_${attachment['url'] ?? idx}'),
+        attachment: attachment, // Pass the map directly
+        post: post, // Pass the post map
         borderRadius: borderRadius,
         androidVersion: androidVersion,
         isLoadingAndroidVersion: isLoadingAndroidVersion,
       );
-    } else if (attachment.type == "audio") {
+    } else if (attachmentType == "audio") {
       return AudioAttachmentWidget(
-        key: Key('audio_${attachment.url ?? idx}'),
-        attachment: attachment,
-        post: post,
+        key: Key('audio_${attachment['url'] ?? idx}'),
+        attachment: attachment, // Pass the map directly
+        post: post, // Pass the post map
         borderRadius: borderRadius,
       );
-    } else if (attachment.type == "image") {
+    } else if (attachmentType == "image") {
       return GestureDetector(
         onTap: () {
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => MediaViewPage(
-                attachments: post.attachments,
+                attachments: postAttachments,
                 initialIndex: idx,
-                message: post.content,
-                userName: post.username,
-                userAvatarUrl: post.useravatar,
-                timestamp: post.timestamp,
-                viewsCount: post.views,
-                likesCount: post.likes,
-                repostsCount: post.reposts,
+                message: post['content'] as String? ?? '',
+                userName: post['username'] as String? ?? 'Unknown User',
+                userAvatarUrl: post['useravatar'] as String?,
+                timestamp: post['createdAt'] is String ? DateTime.parse(post['createdAt']) : DateTime.now(),
+                viewsCount: post['views'] as int? ?? 0,
+                likesCount: post['likes'] as int? ?? 0,
+                repostsCount: post['reposts'] as int? ?? 0,
               ),
             ),
           );
@@ -556,7 +602,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           borderRadius: borderRadius,
           child: AspectRatio(
             aspectRatio: 4 / 3,
-            child: attachment.url != null
+            child: attachment['url'] != null
                 ? CachedNetworkImage(
                     imageUrl: displayUrl,
                     fit: BoxFit.cover,
@@ -569,9 +615,9 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                       ),
                     ),
                   )
-                : attachment.file != null
+                : (attachment['file'] as File?) != null // Check for local file
                     ? Image.file(
-                        attachment.file!,
+                        attachment['file'] as File,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) => Container(
                           color: Colors.grey[900],
@@ -582,7 +628,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                           ),
                         ),
                       )
-                    : Container(
+                    : Container( // Fallback for no URL and no file
                         color: Colors.grey[900],
                         child: Icon(
                           FeatherIcons.image,
@@ -593,22 +639,22 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           ),
         ),
       );
-    } else if (attachment.type == "pdf") {
+    } else if (attachmentType == "pdf") {
       return GestureDetector(
         onTap: () {
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => MediaViewPage(
-                attachments: post.attachments,
+                attachments: postAttachments,
                 initialIndex: idx,
-                message: post.content,
-                userName: post.username,
-                userAvatarUrl: post.useravatar,
-                timestamp: post.timestamp,
-                viewsCount: post.views,
-                likesCount: post.likes,
-                repostsCount: post.reposts,
+                message: post['content'] as String? ?? '',
+                userName: post['username'] as String? ?? 'Unknown User',
+                userAvatarUrl: post['useravatar'] as String?,
+                timestamp: post['createdAt'] is String ? DateTime.parse(post['createdAt']) : DateTime.now(),
+                viewsCount: post['views'] as int? ?? 0,
+                likesCount: post['likes'] as int? ?? 0,
+                repostsCount: post['reposts'] as int? ?? 0,
               ),
             ),
           );
@@ -617,32 +663,32 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           borderRadius: borderRadius,
           child: AspectRatio(
             aspectRatio: 4 / 3,
-            child: PdfViewer.uri(
+            child: PdfViewer.uri( // Assuming displayUrl is valid for PDF
               Uri.parse(displayUrl),
               params: PdfViewerParams(
                 margin: 0,
-                maxScale: 1.0,
+                maxScale: 1.0, // Adjust as needed
               ),
             ),
           ),
         ),
       );
-    } else {
+    } else { // Fallback for other/unknown types
       return GestureDetector(
         onTap: () {
-          Navigator.push(
+           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => MediaViewPage(
-                attachments: post.attachments,
+                attachments: postAttachments,
                 initialIndex: idx,
-                message: post.content,
-                userName: post.username,
-                userAvatarUrl: post.useravatar,
-                timestamp: post.timestamp,
-                viewsCount: post.views,
-                likesCount: post.likes,
-                repostsCount: post.reposts,
+                message: post['content'] as String? ?? '',
+                userName: post['username'] as String? ?? 'Unknown User',
+                userAvatarUrl: post['useravatar'] as String?,
+                timestamp: post['createdAt'] is String ? DateTime.parse(post['createdAt']) : DateTime.now(),
+                viewsCount: post['views'] as int? ?? 0,
+                likesCount: post['likes'] as int? ?? 0,
+                repostsCount: post['reposts'] as int? ?? 0,
               ),
             ),
           );
@@ -658,11 +704,13 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    attachment.type == "audio" ? FeatherIcons.music : FeatherIcons.file,
+                    attachmentType == "audio" ? FeatherIcons.music : FeatherIcons.file,
                     color: Colors.tealAccent,
-                    size: 20,
+                    size: 20, // Reduced size
                   ),
                   SizedBox(height: 8),
+                  // Optionally display filename if available
+                  // Text(attachment['filename'] ?? 'File', style: TextStyle(color: Colors.white, fontSize: 10), textAlign: TextAlign.center, overflow: TextOverflow.ellipsis),
                 ],
               ),
             ),

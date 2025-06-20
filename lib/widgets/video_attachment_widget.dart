@@ -9,13 +9,12 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
-// TODO: Update this import when Attachment and ChatterPost are moved to models
-import 'package:chatter/models/feed_models.dart';
+// Removed import for feed_models.dart
 
 
 class VideoAttachmentWidget extends StatefulWidget {
-  final Attachment attachment;
-  final ChatterPost post;
+  final Map<String, dynamic> attachment; // Changed to Map<String, dynamic>
+  final Map<String, dynamic> post; // Changed to Map<String, dynamic>
   final BorderRadius borderRadius;
   final int? androidVersion;
   final bool isLoadingAndroidVersion;
@@ -60,7 +59,17 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
       return;
     }
 
-    final optimizedUrl = widget.attachment.url!.replaceAll(
+    final String? attachmentUrl = widget.attachment['url'] as String?;
+    if (attachmentUrl == null) {
+      // Handle null URL case, perhaps show an error or placeholder
+      print("Video attachment URL is null.");
+      setState(() {
+        _isInitialized = false;
+      });
+      return;
+    }
+
+    final optimizedUrl = attachmentUrl.replaceAll(
       '/upload/',
       '/upload/q_auto:good,w_1280,h_960,c_fill/',
     );
@@ -92,7 +101,8 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
               _isInitialized = true;
             });
             _betterPlayerController!.setVolume(_isMuted ? 0.0 : 1.0);
-            widget.post.views++;
+            // Safely increment views
+            widget.post['views'] = (widget.post['views'] as int? ?? 0) + 1;
           } else if (event.betterPlayerEventType == BetterPlayerEventType.exception) {
             print('BetterPlayer error: ${event.parameters}');
             setState(() {
@@ -108,7 +118,8 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
           });
           _videoPlayerController!.setVolume(_isMuted ? 0.0 : 1.0);
           _videoPlayerController!.setLooping(true);
-          widget.post.views++;
+          // Safely increment views
+          widget.post['views'] = (widget.post['views'] as int? ?? 0) + 1;
         }).catchError((error) {
           print('VideoPlayer initialization error: $error');
           setState(() {
@@ -145,8 +156,9 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
       );
     }
 
+    final String? attachmentUrlForKey = widget.attachment['url'] as String?;
     return VisibilityDetector(
-      key: Key(widget.attachment.url ?? widget.key.toString()),
+      key: Key(attachmentUrlForKey ?? widget.key.toString()),
       onVisibilityChanged: (info) {
         // bool useBetterPlayer = Platform.isAndroid && widget.androidVersion! < 33; // This line is moved down
         if (info.visibleFraction == 0) {
@@ -201,15 +213,17 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
             context,
             MaterialPageRoute(
               builder: (context) => MediaViewPage(
-                attachments: widget.post.attachments,
-                initialIndex: widget.post.attachments.indexOf(widget.attachment),
-                message: widget.post.content,
-                userName: widget.post.username,
-                userAvatarUrl: widget.post.useravatar,
-                timestamp: widget.post.timestamp,
-                viewsCount: widget.post.views,
-                likesCount: widget.post.likes,
-                repostsCount: widget.post.reposts,
+                attachments: widget.post['attachments'] as List<Map<String, dynamic>>,
+                initialIndex: (widget.post['attachments'] as List<Map<String, dynamic>>).indexOf(widget.attachment),
+                message: widget.post['content'] as String? ?? '',
+                userName: widget.post['username'] as String? ?? 'Unknown User',
+                userAvatarUrl: widget.post['useravatar'] as String?,
+                timestamp: widget.post['timestamp'] is String
+                    ? (DateTime.tryParse(widget.post['timestamp'] as String) ?? DateTime.now())
+                    : (widget.post['timestamp'] is DateTime ? widget.post['timestamp'] : DateTime.now()),
+                viewsCount: widget.post['views'] as int? ?? 0,
+                likesCount: widget.post['likes'] as int? ?? 0,
+                repostsCount: widget.post['reposts'] as int? ?? 0,
               ),
             ),
           );
@@ -223,7 +237,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
               children: [
                 Positioned.fill(
                   child: CachedNetworkImage(
-                    imageUrl: widget.attachment.thumbnailUrl ?? '',
+                    imageUrl: widget.attachment['thumbnailUrl'] as String? ?? '',
                     fit: BoxFit.cover,
                     cacheManager: CustomCacheManager.instance,
                     placeholder: (context, url) => ScaleTransition(

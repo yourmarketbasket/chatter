@@ -1,4 +1,4 @@
-import 'package:chatter/models/feed_models.dart';
+// import 'package:chatter/models/feed_models.dart'; // Removed import
 import 'package:chatter/pages/home-feed-screen.dart';
 import 'package:chatter/pages/media_view_page.dart';
 import 'package:flutter/material.dart';
@@ -9,7 +9,7 @@ import 'package:pdfrx/pdfrx.dart';
 
 // RepostPage allows users to confirm reposting a ChatterPost.
 class RepostPage extends StatefulWidget {
-  final ChatterPost post;
+  final Map<String, dynamic> post; // Changed ChatterPost to Map<String, dynamic>
 
   const RepostPage({Key? key, required this.post}) : super(key: key);
 
@@ -18,7 +18,23 @@ class RepostPage extends StatefulWidget {
 }
 
 class _RepostPageState extends State<RepostPage> {
-  Widget _buildPostContent(ChatterPost post) {
+  Widget _buildPostContent(Map<String, dynamic> post) { // Changed ChatterPost to Map<String, dynamic>
+    // Extract data using map keys, providing defaults or handling nulls
+    final String avatarInitial = post['avatarInitial'] as String? ?? '?';
+    final String username = post['username'] as String? ?? 'Unknown User';
+    final DateTime timestamp = post['timestamp'] is String
+        ? (DateTime.tryParse(post['timestamp'] as String) ?? DateTime.now())
+        : (post['timestamp'] is DateTime ? post['timestamp'] : DateTime.now());
+    final String content = post['content'] as String? ?? '';
+    final List<Map<String, dynamic>> attachments = (post['attachments'] as List<dynamic>?)
+        ?.map((att) => att as Map<String, dynamic>)
+        .toList() ?? [];
+    final String? userAvatar = post['useravatar'] as String?; // For MediaViewPage
+    final int views = post['views'] as int? ?? 0; // For MediaViewPage
+    final int likes = post['likes'] as int? ?? 0; // For MediaViewPage
+    final int repostsCount = post['reposts'] as int? ?? 0; // For MediaViewPage
+
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -36,7 +52,7 @@ class _RepostPageState extends State<RepostPage> {
                 radius: 20,
                 backgroundColor: Colors.tealAccent.withOpacity(0.2),
                 child: Text(
-                  post.avatarInitial,
+                  avatarInitial, // Use extracted avatarInitial
                   style: GoogleFonts.poppins(
                     color: Colors.tealAccent,
                     fontWeight: FontWeight.w600,
@@ -53,7 +69,7 @@ class _RepostPageState extends State<RepostPage> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          '@${post.username}',
+                          '@$username', // Use extracted username
                           style: GoogleFonts.poppins(
                             fontWeight: FontWeight.w600,
                             fontSize: 16,
@@ -61,7 +77,7 @@ class _RepostPageState extends State<RepostPage> {
                           ),
                         ),
                         Text(
-                          DateFormat('h:mm a · MMM d').format(post.timestamp),
+                          DateFormat('h:mm a · MMM d').format(timestamp), // Use extracted timestamp
                           style: GoogleFonts.roboto(
                             color: Colors.grey[500],
                             fontSize: 12,
@@ -71,95 +87,98 @@ class _RepostPageState extends State<RepostPage> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      post.content,
+                      content, // Use extracted content
                       style: GoogleFonts.roboto(
                         fontSize: 14,
                         color: Colors.white70,
                         height: 1.5,
                       ),
                     ),
-                    if (post.attachments.isNotEmpty) ...[
+                    if (attachments.isNotEmpty) ...[ // Use extracted attachments
                       const SizedBox(height: 12),
                       GridView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: post.attachments.length > 1 ? 2 : 1,
+                          crossAxisCount: attachments.length > 1 ? 2 : 1,
                           crossAxisSpacing: 8,
                           mainAxisSpacing: 8,
                           childAspectRatio: 1,
                         ),
-                        itemCount: post.attachments.length,
+                        itemCount: attachments.length,
                         itemBuilder: (context, idx) {
-                          final attachment = post.attachments[idx];
-                          final displayUrl = attachment.url ?? attachment.file?.path ?? 'Unknown attachment';
+                          final attachment = attachments[idx]; // attachment is Map<String, dynamic>
+                          final displayUrl = attachment['url'] as String? ?? (attachment['file'] as File?)?.path ?? 'Unknown attachment';
+                          final String attachmentType = attachment['type'] as String? ?? 'unknown';
+                          final String? attachmentFilename = attachment['filename'] as String?;
+
                           return GestureDetector(
                             onTap: () {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
                                   builder: (context) => MediaViewPage(
-                                    attachments: post.attachments, // The full list of attachments from the original post
-                                    initialIndex: idx,            // The index of the tapped attachment in the GridView
-                                    message: post.content,
-                                    userName: post.username,
-                                    userAvatarUrl: post.useravatar,
-                                    timestamp: post.timestamp,
-                                    viewsCount: post.views,
-                                    likesCount: post.likes,
-                                    repostsCount: post.reposts,
+                                    attachments: attachments, // Pass the List<Map<String, dynamic>>
+                                    initialIndex: idx,
+                                    message: content,
+                                    userName: username,
+                                    userAvatarUrl: userAvatar,
+                                    timestamp: timestamp,
+                                    viewsCount: views,
+                                    likesCount: likes,
+                                    repostsCount: repostsCount,
                                   ),
                                 ),
                               );
                             },
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(12),
-                              child: attachment.type == "image"
-                                  ? attachment.url != null
+                              child: attachmentType == "image"
+                                  ? (attachment['url'] != null
                                       ? Image.network(
-                                          attachment.url!,
+                                          attachment['url'] as String,
                                           fit: BoxFit.cover,
                                           errorBuilder: (context, error, stackTrace) => Container(
                                             color: Colors.grey[900],
                                             child: const Icon(FeatherIcons.image, color: Colors.grey, size: 40),
                                           ),
                                         )
-                                      : attachment.file != null
+                                      : (attachment['file'] as File?) != null
                                           ? Image.file(
-                                              attachment.file!,
+                                              attachment['file'] as File,
                                               fit: BoxFit.cover,
                                               errorBuilder: (context, error, stackTrace) => Container(
                                                 color: Colors.grey[900],
                                                 child: const Icon(FeatherIcons.image, color: Colors.grey, size: 40),
                                               ),
                                             )
-                                          : Container(
+                                          : Container( // Fallback if no URL and no file
                                               color: Colors.grey[900],
                                               child: const Icon(FeatherIcons.alertTriangle, color: Colors.redAccent, size: 40),
-                                            )
-                                  : attachment.type == "pdf"
-                                      ? (attachment.url != null || attachment.file != null)
+                                            ))
+                                  : attachmentType == "pdf"
+                                      ? ((attachment['url'] != null || (attachment['file'] as File?) != null)
                                           ? PdfViewer.uri(
-                                              attachment.url != null ? Uri.parse(attachment.url!) : Uri.file(attachment.file!.path),
+                                              attachment['url'] != null ? Uri.parse(attachment['url'] as String) : Uri.file((attachment['file'] as File).path),
                                               params: const PdfViewerParams(maxScale: 1.0),
                                             )
                                           : Container(
                                               color: Colors.grey[900],
                                               child: const Icon(FeatherIcons.alertTriangle, color: Colors.redAccent, size: 40),
-                                            )
-                                      : Container(
+                                            ))
+                                      : Container( // Fallback for other types
                                           color: Colors.grey[900],
                                           child: Column(
                                             mainAxisAlignment: MainAxisAlignment.center,
                                             children: [
                                               Icon(
-                                                attachment.type == "audio" ? FeatherIcons.music : FeatherIcons.video,
+                                                attachmentType == "audio" ? FeatherIcons.music : FeatherIcons.video,
                                                 color: Colors.tealAccent,
                                                 size: 40,
                                               ),
                                               const SizedBox(height: 8),
                                               Text(
-                                                displayUrl.split('/').last,
+                                                attachmentFilename ?? displayUrl.split('/').last,
                                                 style: GoogleFonts.roboto(color: Colors.white70, fontSize: 12),
                                                 textAlign: TextAlign.center,
                                                 overflow: TextOverflow.ellipsis,

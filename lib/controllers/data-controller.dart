@@ -125,7 +125,7 @@ class DataController extends GetxController {
   Future<Map<String, dynamic>> replyToPost({
     required String postId,
     required String content,
-    List<Attachment> attachments = const [],
+    List<Map<String, dynamic>> attachments = const [],
   }) async {
     try {
       final token = user.value['token'];
@@ -143,15 +143,15 @@ class DataController extends GetxController {
 
       List<Map<String, dynamic>> attachmentPayload = attachments.map((att) {
         // Ensure URL is not null, provide a default or handle error if necessary
-        // For now, assuming att.url will be populated by earlier upload step
-        if (att.url == null) {
-          print('Warning: Attachment URL is null for ${att.filename}. This attachment might not be saved correctly.');
+        // For now, assuming att['url'] will be populated by earlier upload step
+        if (att['url'] == null) {
+          print('Warning: Attachment URL is null for ${att['filename']}. This attachment might not be saved correctly.');
         }
         return {
-          'type': att.type,
-          'url': att.url ?? '', // Or handle more gracefully if a URL is always expected
-          'filename': att.filename,
-          'size': att.size,
+          'type': att['type'],
+          'url': att['url'] ?? '', // Or handle more gracefully if a URL is always expected
+          'filename': att['filename'],
+          'size': att['size'],
         };
       }).toList();
 
@@ -227,7 +227,7 @@ class DataController extends GetxController {
   }
 
   // Fetch replies for a post
-  Future<List<ChatterPost>> fetchReplies(String postId) async {
+  Future<List<Map<String, dynamic>>> fetchReplies(String postId) async {
     try {
       final token = user.value['token'];
       if (token == null) {
@@ -246,20 +246,20 @@ class DataController extends GetxController {
       if (response.statusCode == 200 && response.data['success'] == true) {
         print(response.data);
         final List<dynamic> repliesData = response.data['replies'];
-        List<ChatterPost> replies = [];
+        List<Map<String, dynamic>> replies = [];
 
         for (var replyData in repliesData) {
           // Safely extract and parse attachments
-          List<Attachment> attachments = [];
+          List<Map<String, dynamic>> attachments = [];
           if (replyData['mediaAttachments'] != null && replyData['mediaAttachments'] is List) {
             for (var attData in (replyData['mediaAttachments'] as List<dynamic>)) {
               if (attData is Map<String, dynamic>) {
-                attachments.add(Attachment(
-                  type: attData['type']?.toString() ?? 'unknown',
-                  url: attData['url']?.toString() ?? '',
-                  filename: attData['fileName']?.toString() ?? '', // Adjusted to fileName
-                  size: (attData['fileSize'] is num ? attData['fileSize'] : int.tryParse(attData['fileSize']?.toString() ?? '0'))?.toInt() ?? 0, // Adjusted to fileSize
-                ));
+                attachments.add({
+                  'type': attData['type']?.toString() ?? 'unknown',
+                  'url': attData['url']?.toString() ?? '',
+                  'filename': attData['fileName']?.toString() ?? '', // Adjusted to fileName
+                  'size': (attData['fileSize'] is num ? attData['fileSize'] : int.tryParse(attData['fileSize']?.toString() ?? '0'))?.toInt() ?? 0, // Adjusted to fileSize
+                });
               }
             }
           }
@@ -271,20 +271,19 @@ class DataController extends GetxController {
             avatarInitial = replyData['authorDetails']['avatarInitial'].toString();
           }
 
-
-          replies.add(ChatterPost(
-            id: replyData['_id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(), // Fallback id
-            username: username,
-            content: replyData['textContent']?.toString() ?? '',
-            timestamp: DateTime.tryParse(replyData['createdAt']?.toString() ?? '') ?? DateTime.now(),
-            likes: (replyData['likeCount'] is num ? replyData['likeCount'] : int.tryParse(replyData['likeCount']?.toString() ?? '0'))?.toInt() ?? 0,
-            reposts: (replyData['repostCount'] is num ? replyData['repostCount'] : int.tryParse(replyData['repostCount']?.toString() ?? '0'))?.toInt() ?? 0,
-            views: (replyData['viewCount'] is num ? replyData['viewCount'] : int.tryParse(replyData['viewCount']?.toString() ?? '0'))?.toInt() ?? 0,
-            attachments: attachments,
-            avatarInitial: avatarInitial,
-            useravatar: replyData['authorDetails']?['avatar']?.toString(), // Can be null
-            replies: const [], // Replies to a reply are not typically fetched in this call
-          ));
+          replies.add({
+            'id': replyData['_id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(), // Fallback id
+            'username': username,
+            'content': replyData['textContent']?.toString() ?? '',
+            'timestamp': (DateTime.tryParse(replyData['createdAt']?.toString() ?? '') ?? DateTime.now()).toIso8601String(),
+            'likes': (replyData['likeCount'] is num ? replyData['likeCount'] : int.tryParse(replyData['likeCount']?.toString() ?? '0'))?.toInt() ?? 0,
+            'reposts': (replyData['repostCount'] is num ? replyData['repostCount'] : int.tryParse(replyData['repostCount']?.toString() ?? '0'))?.toInt() ?? 0,
+            'views': (replyData['viewCount'] is num ? replyData['viewCount'] : int.tryParse(replyData['viewCount']?.toString() ?? '0'))?.toInt() ?? 0,
+            'attachments': attachments,
+            'avatarInitial': avatarInitial,
+            'useravatar': replyData['authorDetails']?['avatar']?.toString(), // Can be null
+            'replies': const [], // Replies to a reply are not typically fetched in this call
+          });
         }
         return replies;
       } else {
