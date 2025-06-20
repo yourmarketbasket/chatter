@@ -417,7 +417,7 @@ class _ReplyPageState extends State<ReplyPage> {
             .toList();
 
         if (filesToUpload.isNotEmpty) {
-          final uploadResults = await _dataController.uploadFilesToCloudinary(filesToUpload);
+          final uploadResults = await _dataController.uploadFiles(filesToUpload);
 
           // Correlate upload results with original attachments
           // This assumes uploadResults are in the same order as filesToUpload
@@ -433,7 +433,7 @@ class _ReplyPageState extends State<ReplyPage> {
                     'filename': originalAttachment['filename'] ?? result['filename'] ?? 'unknown',
                     'size': originalAttachment['size'] ?? result['size'] ?? 0,
                     'url': result['url'] as String,
-                    // Add other relevant fields like 'thumbnailUrl' if applicable
+                    'thumbnailUrl': result['thumbnailUrl'] as String?, // Ensure this is added
                   });
                 } else {
                   _showSnackBar(
