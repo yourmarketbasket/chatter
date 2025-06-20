@@ -28,9 +28,24 @@ class _RepostPageState extends State<RepostPage> {
         ? (DateTime.tryParse(post['timestamp'] as String) ?? DateTime.now())
         : (post['timestamp'] is DateTime ? post['timestamp'] : DateTime.now());
     final String content = post['content'] as String? ?? '';
-    final List<Map<String, dynamic>> attachments = (post['attachments'] as List<dynamic>?)
-        ?.map((att) => att as Map<String, dynamic>)
-        .toList() ?? [];
+    // Robust conversion for attachments
+    List<Map<String, dynamic>> correctlyTypedRepostAttachments = [];
+    final dynamic rawAttachmentsFromRepost = post['attachments'];
+    if (rawAttachmentsFromRepost is List) {
+      for (var item in rawAttachmentsFromRepost) {
+        if (item is Map<String, dynamic>) {
+          correctlyTypedRepostAttachments.add(item);
+        } else if (item is Map) {
+          try {
+            correctlyTypedRepostAttachments.add(Map<String, dynamic>.from(item));
+          } catch (e) {
+            print('[RepostPage] Error converting attachment item Map to Map<String, dynamic>: $e for item $item');
+          }
+        } else {
+          print('[RepostPage] Skipping non-map attachment item: $item');
+        }
+      }
+    }
     final String? userAvatar = post['useravatar'] as String?; // For MediaViewPage
     final int views = post['views'] as int? ?? 0; // For MediaViewPage
     final int likes = post['likes'] as int? ?? 0; // For MediaViewPage
@@ -96,20 +111,20 @@ class _RepostPageState extends State<RepostPage> {
                         height: 1.5,
                       ),
                     ),
-                    if (attachments.isNotEmpty) ...[ // Use extracted attachments
+                    if (correctlyTypedRepostAttachments.isNotEmpty) ...[ // Use correctlyTypedRepostAttachments
                       const SizedBox(height: 12),
                       GridView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: attachments.length > 1 ? 2 : 1,
+                          crossAxisCount: correctlyTypedRepostAttachments.length > 1 ? 2 : 1,
                           crossAxisSpacing: 8,
                           mainAxisSpacing: 8,
                           childAspectRatio: 1,
                         ),
-                        itemCount: attachments.length,
+                        itemCount: correctlyTypedRepostAttachments.length,
                         itemBuilder: (context, idx) {
-                          final attachment = attachments[idx]; // attachment is Map<String, dynamic>
+                          final attachment = correctlyTypedRepostAttachments[idx]; // Use item from robust list
                           final displayUrl = attachment['url'] as String? ?? (attachment['file'] as File?)?.path ?? 'Unknown attachment';
                           final String attachmentType = attachment['type'] as String? ?? 'unknown';
                           final String? attachmentFilename = attachment['filename'] as String?;
@@ -120,7 +135,7 @@ class _RepostPageState extends State<RepostPage> {
                                 context,
                                 MaterialPageRoute(
                                   builder: (context) => MediaViewPage(
-                                    attachments: attachments, // Pass the List<Map<String, dynamic>>
+                                    attachments: correctlyTypedRepostAttachments, // Pass the robustly typed list
                                     initialIndex: idx,
                                     message: content,
                                     userName: username,

@@ -578,10 +578,10 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           try {
             correctlyTypedPostAttachments.add(Map<String, dynamic>.from(item));
           } catch (e) {
-            print('Error converting attachment item Map to Map<String, dynamic>: $e');
+            print('[HomeFeedScreen] Error converting attachment item Map to Map<String, dynamic>: $e for item $item');
           }
         } else {
-          print('Skipping non-map attachment item: $item');
+          print('[HomeFeedScreen] Skipping non-map attachment item: $item');
         }
       }
     }

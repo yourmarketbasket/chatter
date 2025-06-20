@@ -52,6 +52,21 @@ class _MediaViewPageState extends State<MediaViewPage> {
   @override
   void initState() {
     super.initState();
+
+    // Defensive runtime check for attachments type
+    if (widget.attachments.any((item) => item is! Map<String, dynamic>)) {
+      print("CRITICAL WARNING: MediaViewPage received an attachments list where one or more elements are NOT Map<String, dynamic>.");
+      print("Problematic attachments list: ${widget.attachments}");
+      // Example of filtering (use with caution, might hide issues):
+      // widget.attachments = widget.attachments.where((item) => item is Map<String, dynamic>).toList();
+    }
+
+    // Assert for development builds
+    assert(
+      widget.attachments.every((item) => item is Map<String, dynamic>),
+      "MediaViewPage attachments list contains elements that are not of type Map<String, dynamic>. Data: ${widget.attachments.where((item) => item is! Map<String, dynamic>).toList()}"
+    );
+
     _currentPageIndex = widget.initialIndex;
     _pageController = PageController(initialPage: widget.initialIndex);
   }
