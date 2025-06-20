@@ -10,12 +10,14 @@ class BetterPlayerWidget extends StatefulWidget {
   final String? url;
   final File? file;
   final String displayPath;
+  final String? thumbnailUrl;
 
   const BetterPlayerWidget({
     Key? key,
     this.url,
     this.file,
     required this.displayPath,
+    this.thumbnailUrl,
   }) : super(key: key);
 
   @override
@@ -115,8 +117,10 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
           autoPlay: false,
           looping: false,
           aspectRatio: _aspectRatio ?? 16 / 9, // Fallback to 16:9
+          placeholder: _buildPlaceholder(),
           controlsConfiguration: const BetterPlayerControlsConfiguration(
             showControls: false, // We'll use custom controls
+            loadingWidget: SizedBox.shrink(), // Hide default loading widget as placeholder handles it
           ),
           handleLifecycle: true,
           autoDispose: true,
@@ -202,41 +206,70 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
   }
 
   @override
-  Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Center(
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            widget.url != null
-                ? CachedNetworkImage(
-                    imageUrl: widget.url!.replaceAll(RegExp(r'\.\w+$'), '.jpg'),
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(color: Colors.black),
-                    errorWidget: (context, url, error) => Container(color: Colors.black),
-                  )
-                : Container(color: Colors.black),
-            const CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
-              backgroundColor: Colors.grey,
-              strokeWidth: 1,
-            ),
-          ],
+  Widget _buildPlaceholder() {
+    if (widget.thumbnailUrl != null && widget.thumbnailUrl!.isNotEmpty) {
+      return CachedNetworkImage(
+        imageUrl: widget.thumbnailUrl!,
+        fit: BoxFit.contain,
+        placeholder: (context, url) => const Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
+            strokeWidth: 2,
+          ),
+        ),
+        errorWidget: (context, url, error) => Container(
+          color: Colors.black,
+          child: const Center(
+            child: Icon(Icons.error_outline, color: Colors.grey, size: 40),
+          ),
+        ),
+      );
+    } else {
+      // Default placeholder if no thumbnail URL is provided
+      return const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
+          strokeWidth: 2,
         ),
       );
     }
+  }
 
-    if (!_isInitialized || _controller == null || _errorMessage != null) {
+  @override
+  Widget build(BuildContext context) {
+    // If there's an error message, display it.
+    if (_errorMessage != null) {
       print('Error: $_errorMessage');
       return Center(
         child: Text(
-          _errorMessage ?? 'Video player not initialized',
+          _errorMessage!, // Already checked for null
           style: const TextStyle(color: Colors.red, fontSize: 16),
           textAlign: TextAlign.center,
         ),
       );
     }
 
+    // If still loading and not yet initialized (controller is null), show placeholder.
+    // This handles the very initial state before controller setup attempts.
+    // The BetterPlayerConfiguration.placeholder will handle loading display during controller setup.
+    if (_isLoading && _controller == null) {
+      return _buildPlaceholder();
+    }
+
+    // If not initialized and controller is null (could be due to no source), show error.
+    // This case should ideally be caught by _errorMessage, but as a fallback.
+    if (!_isInitialized || _controller == null) {
+      return Center(
+        child: Text(
+          _errorMessage ?? 'Video player not available.', // Generic error if _errorMessage is null
+          style: const TextStyle(color: Colors.red, fontSize: 16),
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+
+    // Once controller is available and initialized (or attempting to initialize),
+    // BetterPlayer widget itself will use its placeholder.
     return LayoutBuilder(
       builder: (context, constraints) {
         return GestureDetector(
@@ -246,7 +279,7 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
             children: [
               Center(
                 child: AspectRatio(
-                  aspectRatio: _aspectRatio ?? 16 / 9,
+                  aspectRatio: _aspectRatio ?? 16 / 9, // Use dynamic aspect ratio
                   child: BetterPlayer(controller: _controller!),
                 ),
               ),
