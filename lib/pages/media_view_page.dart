@@ -127,9 +127,41 @@ class _MediaViewPageState extends State<MediaViewPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(FeatherIcons.arrowLeft, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Row(
+          children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundImage: widget.userAvatarUrl != null && widget.userAvatarUrl!.isNotEmpty
+                  ? CachedNetworkImageProvider(_optimizeCloudinaryUrl(widget.userAvatarUrl!))
+                  : null,
+              child: (widget.userAvatarUrl == null || widget.userAvatarUrl!.isEmpty)
+                  ? Icon(FeatherIcons.user, size: 18, color: Colors.white)
+                  : null,
+            ),
+            const SizedBox(width: 12),
+            Text(
+              widget.userName,
+              style: GoogleFonts.poppins(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: Icon(FeatherIcons.moreVertical, color: Colors.white),
+            onPressed: () { /* TODO: Implement more options */ },
+          ),
+        ],
+      ),
       body: Column(
         children: [
-          SizedBox(height: 20),
+          // SizedBox(height: 20), // Removed as AppBar provides top structure
           Expanded(
             child: PageView.builder(
               controller: _pageController,
@@ -198,51 +230,7 @@ class _MediaViewPageState extends State<MediaViewPage> {
               },
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundImage: widget.userAvatarUrl != null && widget.userAvatarUrl!.isNotEmpty
-                          ? NetworkImage(_optimizeCloudinaryUrl(widget.userAvatarUrl!))
-                          : const AssetImage('assets/images/default_avatar.png') as ImageProvider,
-                      radius: 20,
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      widget.userName,
-                      style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  widget.message,
-                  style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  DateFormat('MMM d, yyyy \'at\' hh:mm a').format(widget.timestamp),
-                  style: GoogleFonts.poppins(color: Colors.grey[400], fontSize: 12),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Text('${widget.viewsCount} Views', style: GoogleFonts.poppins(color: Colors.grey[400], fontSize: 12)),
-                    const SizedBox(width: 16),
-                    Text('${widget.likesCount} Likes', style: GoogleFonts.poppins(color: Colors.grey[400], fontSize: 12)),
-                    const SizedBox(width: 16),
-                    Text('${widget.repostsCount} Reposts', style: GoogleFonts.poppins(color: Colors.grey[400], fontSize: 12)),
-                  ],
-                ),
-              ],
-            ),
-          ),
+          // Removed the Padding widget containing metadata and engagement counts
         ],
       ),
     );
