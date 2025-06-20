@@ -314,16 +314,19 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   }
 
   Widget _buildPostContent(Map<String, dynamic> post, {required bool isReply}) {
-    final String username = post['username'] ?? 'Unknown User';
-    final String content = post['content'] ?? '';
+    final String username = post['username'] as String? ?? 'Unknown User';
+    final String content = post['content'] as String? ?? '';
     final String? userAvatar = post['useravatar'] as String?;
-    final String avatarInitial = (post['avatarInitial'] as String?) ?? (username.isNotEmpty ? username[0].toUpperCase() : '?');
-    final DateTime timestamp = post['createdAt'] is String ? DateTime.parse(post['createdAt']) : DateTime.now();
-    int likes = post['likes'] ?? 0;
-    int reposts = post['reposts'] ?? 0;
-    int views = post['views'] ?? 0;
+    // Ensure 'username' is not null and not empty before accessing its first character.
+    final String avatarInitial = (username.isNotEmpty ? username[0].toUpperCase() : '?');
+    final DateTime timestamp = post['createdAt'] is String ? DateTime.parse(post['createdAt'] as String) : DateTime.now();
+    int likes = post['likesCount'] as int? ?? 0; // Assuming 'likesCount' from backend
+    int reposts = post['repostsCount'] as int? ?? 0; // Assuming 'repostsCount'
+    int views = post['viewsCount'] as int? ?? 0; // Assuming 'viewsCount'
     List<Map<String, dynamic>> attachments = (post['attachments'] as List<dynamic>?)?.map((e) => e as Map<String, dynamic>).toList() ?? [];
-    List<dynamic> replies = post['replies'] as List<dynamic>? ?? [];
+    // Assuming 'replies' is a list of reply objects/IDs, its length is the count.
+    // If your backend sends a specific count field like 'replyCount', use that instead.
+    int replyCount = (post['replies'] as List<dynamic>?)?.length ?? post['replyCount'] as int? ?? 0;
 
 
     return Column(
@@ -423,13 +426,16 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                               size: 20,
                             ),
                             onPressed: () {
+                              // Optimistically update UI and call backend
                               setState(() {
-                                post['likes'] = (post['likes'] ?? 0) + 1;
+                                post['likesCount'] = (post['likesCount'] as int? ?? 0) + 1;
+                                // Add logic to reflect if the user has liked this post
                               });
+                              // Example: dataController.likePost(post['_id']);
                             },
                           ),
                           Text(
-                            '$likes',
+                            '$likes', // This now uses the likesCount from the map
                             style: GoogleFonts.roboto(
                               color: Colors.grey[400],
                               fontSize: 14,
@@ -450,7 +456,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                             },
                           ),
                           Text(
-                            '${replies.length}', // Assuming 'replies' is a list
+                            '$replyCount', // Use the calculated replyCount
                             style: GoogleFonts.roboto(
                               color: Colors.grey[400],
                               fontSize: 14,
@@ -471,7 +477,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                             },
                           ),
                           Text(
-                            '$reposts',
+                            '$reposts', // This now uses the repostsCount from the map
                             style: GoogleFonts.roboto(
                               color: Colors.grey[400],
                               fontSize: 14,
@@ -487,10 +493,12 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                               color: Colors.grey,
                               size: 20,
                             ),
-                            onPressed: () {},
+                            onPressed: () {
+                               // Optionally, increment views or handle view logic
+                            },
                           ),
                           Text(
-                            '$views',
+                            '$views', // This now uses the viewsCount from the map
                             style: GoogleFonts.roboto(
                               color: Colors.grey[400],
                               fontSize: 14,
@@ -509,25 +517,26 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     );
   }
 
-  Widget _buildAttachmentGrid(List<Map<String, dynamic>> attachments, Map<String, dynamic> post) {
+  Widget _buildAttachmentGrid(List<Map<String, dynamic>> attachmentsArg, Map<String, dynamic> post) {
+    // Use attachmentsArg to avoid confusion with post['attachments']
     return GridView.builder(
       shrinkWrap: true,
       physics: NeverScrollableScrollPhysics(),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: attachments.length == 1 ? 1 : 2, // Keep this logic
+        crossAxisCount: attachmentsArg.length == 1 ? 1 : 2,
         crossAxisSpacing: 4,
         mainAxisSpacing: 4,
-        childAspectRatio: 4 / 3, // Keep aspect ratio or adjust as needed
+        childAspectRatio: 4 / 3,
       ),
-      itemCount: attachments.length,
+      itemCount: attachmentsArg.length,
       itemBuilder: (context, index) {
-        final attachment = attachments[index];
-        final displayUrl = attachment['url'] as String? ?? ''; // Access 'url' via map key
-        BorderRadius borderRadius; // Keep this logic for border radius
-        if (attachments.length == 1) {
+        final attachmentMap = attachmentsArg[index]; // Use attachmentMap for clarity
+        final displayUrl = attachmentMap['url'] as String? ?? '';
+        BorderRadius borderRadius;
+        if (attachmentsArg.length == 1) {
           borderRadius = BorderRadius.circular(12);
         } else {
-          if (attachments.length == 2) {
+          if (attachmentsArg.length == 2) {
             borderRadius = index == 0
                 ? BorderRadius.only(
                     topLeft: Radius.circular(12),
@@ -538,12 +547,11 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                     bottomRight: Radius.circular(12),
                   );
           } else {
-            // Simplified logic for more than 2 items, adjust if specific corners are needed
             if (index == 0) borderRadius = BorderRadius.only(topLeft: Radius.circular(12));
             else if (index == 1) borderRadius = BorderRadius.only(topRight: Radius.circular(12));
-            else if (index == attachments.length - 2 && attachments.length % 2 == 0) borderRadius = BorderRadius.only(bottomLeft: Radius.circular(12));
-            else if (index == attachments.length -1) {
-                if (attachments.length % 2 == 1 && index == attachments.length -1) {
+            else if (index == attachmentsArg.length - 2 && attachmentsArg.length % 2 == 0) borderRadius = BorderRadius.only(bottomLeft: Radius.circular(12));
+            else if (index == attachmentsArg.length -1) {
+                if (attachmentsArg.length % 2 == 1 && index == attachmentsArg.length -1) {
                     borderRadius = BorderRadius.only(bottomLeft: Radius.circular(12));
                 } else {
                     borderRadius = BorderRadius.only(bottomRight: Radius.circular(12));
@@ -552,30 +560,31 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
             else borderRadius = BorderRadius.zero;
           }
         }
-        return _buildAttachmentWidget(attachment, index, displayUrl, post, borderRadius);
+        // Pass attachmentMap instead of individual fields where _buildAttachmentWidget expects a map
+        return _buildAttachmentWidget(attachmentMap, index, post, borderRadius);
       },
     );
   }
 
-  Widget _buildAttachmentWidget(Map<String, dynamic> attachment, int idx, String displayUrl, Map<String, dynamic> post, BorderRadius borderRadius) {
-    final String attachmentType = attachment['type'] as String? ?? 'unknown';
+  Widget _buildAttachmentWidget(Map<String, dynamic> attachmentMap, int idx, Map<String, dynamic> post, BorderRadius borderRadius) {
+    final String attachmentType = attachmentMap['type'] as String? ?? 'unknown';
+    final String? displayUrl = attachmentMap['url'] as String?; // Get URL from attachmentMap
     final List<Map<String, dynamic>> postAttachments = (post['attachments'] as List<dynamic>?)?.map((e) => e as Map<String, dynamic>).toList() ?? [];
-
 
     if (attachmentType == "video") {
       return VideoAttachmentWidget(
-        key: Key('video_${attachment['url'] ?? idx}'),
-        attachment: attachment, // Pass the map directly
-        post: post, // Pass the post map
+        key: Key('video_${attachmentMap['url'] ?? idx}'),
+        attachment: attachmentMap, // Pass the map directly
+        post: post,
         borderRadius: borderRadius,
         androidVersion: androidVersion,
         isLoadingAndroidVersion: isLoadingAndroidVersion,
       );
     } else if (attachmentType == "audio") {
       return AudioAttachmentWidget(
-        key: Key('audio_${attachment['url'] ?? idx}'),
-        attachment: attachment, // Pass the map directly
-        post: post, // Pass the post map
+        key: Key('audio_${attachmentMap['url'] ?? idx}'),
+        attachment: attachmentMap, // Pass the map directly
+        post: post,
         borderRadius: borderRadius,
       );
     } else if (attachmentType == "image") {
@@ -590,10 +599,10 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                 message: post['content'] as String? ?? '',
                 userName: post['username'] as String? ?? 'Unknown User',
                 userAvatarUrl: post['useravatar'] as String?,
-                timestamp: post['createdAt'] is String ? DateTime.parse(post['createdAt']) : DateTime.now(),
-                viewsCount: post['views'] as int? ?? 0,
-                likesCount: post['likes'] as int? ?? 0,
-                repostsCount: post['reposts'] as int? ?? 0,
+                timestamp: post['createdAt'] is String ? DateTime.parse(post['createdAt'] as String) : DateTime.now(),
+                viewsCount: post['viewsCount'] as int? ?? 0, // Use 'viewsCount'
+                likesCount: post['likesCount'] as int? ?? 0, // Use 'likesCount'
+                repostsCount: post['repostsCount'] as int? ?? 0, // Use 'repostsCount'
               ),
             ),
           );
@@ -602,9 +611,9 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           borderRadius: borderRadius,
           child: AspectRatio(
             aspectRatio: 4 / 3,
-            child: attachment['url'] != null
+            child: displayUrl != null && displayUrl.isNotEmpty
                 ? CachedNetworkImage(
-                    imageUrl: displayUrl,
+                    imageUrl: displayUrl, // Use the local displayUrl
                     fit: BoxFit.cover,
                     errorWidget: (context, url, error) => Container(
                       color: Colors.grey[900],
@@ -615,9 +624,9 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                       ),
                     ),
                   )
-                : (attachment['file'] as File?) != null // Check for local file
+                : (attachmentMap['file'] as File?) != null // Check for local file from attachmentMap
                     ? Image.file(
-                        attachment['file'] as File,
+                        attachmentMap['file'] as File,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) => Container(
                           color: Colors.grey[900],
@@ -651,10 +660,10 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                 message: post['content'] as String? ?? '',
                 userName: post['username'] as String? ?? 'Unknown User',
                 userAvatarUrl: post['useravatar'] as String?,
-                timestamp: post['createdAt'] is String ? DateTime.parse(post['createdAt']) : DateTime.now(),
-                viewsCount: post['views'] as int? ?? 0,
-                likesCount: post['likes'] as int? ?? 0,
-                repostsCount: post['reposts'] as int? ?? 0,
+                timestamp: post['createdAt'] is String ? DateTime.parse(post['createdAt'] as String) : DateTime.now(),
+                viewsCount: post['viewsCount'] as int? ?? 0, // Use 'viewsCount'
+                likesCount: post['likesCount'] as int? ?? 0, // Use 'likesCount'
+                repostsCount: post['repostsCount'] as int? ?? 0, // Use 'repostsCount'
               ),
             ),
           );
@@ -663,13 +672,18 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           borderRadius: borderRadius,
           child: AspectRatio(
             aspectRatio: 4 / 3,
-            child: PdfViewer.uri( // Assuming displayUrl is valid for PDF
-              Uri.parse(displayUrl),
-              params: PdfViewerParams(
-                margin: 0,
-                maxScale: 1.0, // Adjust as needed
-              ),
-            ),
+            child: displayUrl != null && displayUrl.isNotEmpty
+                ? PdfViewer.uri(
+                    Uri.parse(displayUrl), // Use the local displayUrl
+                    params: PdfViewerParams(
+                      margin: 0,
+                      maxScale: 1.0, // Adjust as needed
+                    ),
+                  )
+                : Container( // Fallback if URL is null
+                    color: Colors.grey[900],
+                    child: Icon(FeatherIcons.file_text, color: Colors.grey[500], size: 40),
+                  ),
           ),
         ),
       );
@@ -685,10 +699,10 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                 message: post['content'] as String? ?? '',
                 userName: post['username'] as String? ?? 'Unknown User',
                 userAvatarUrl: post['useravatar'] as String?,
-                timestamp: post['createdAt'] is String ? DateTime.parse(post['createdAt']) : DateTime.now(),
-                viewsCount: post['views'] as int? ?? 0,
-                likesCount: post['likes'] as int? ?? 0,
-                repostsCount: post['reposts'] as int? ?? 0,
+                timestamp: post['createdAt'] is String ? DateTime.parse(post['createdAt'] as String) : DateTime.now(),
+                viewsCount: post['viewsCount'] as int? ?? 0, // Use 'viewsCount'
+                likesCount: post['likesCount'] as int? ?? 0, // Use 'likesCount'
+                repostsCount: post['repostsCount'] as int? ?? 0, // Use 'repostsCount'
               ),
             ),
           );
@@ -754,36 +768,11 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
             height: 1,
           ),
           itemBuilder: (context, index) {
-            final postMap = dataController.posts[index];
-            final post = ChatterPost(
-              id: postMap['_id'],
-              username: postMap['username'] ?? 'Unknown User',
-              content: postMap['content'] ?? '',
-              timestamp: postMap['createdAt'] is String
-                  ? DateTime.parse(postMap['createdAt'])
-                  : DateTime.now(),
-              likes: postMap['likes'] ?? 0,
-              reposts: postMap['reposts'] ?? 0,
-              views: postMap['views'] ?? 0,
-              useravatar: postMap['useravatar'] ?? '',
-              avatarInitial: (postMap['username'] != null && postMap['username'].isNotEmpty)
-                  ? postMap['username'][0].toUpperCase()
-                  : '?',
-              attachments: (postMap['attachments'] as List<dynamic>?)?.map((att) {
-                return Attachment(
-                  file: null,
-                  type: att['type'] ?? 'unknown',
-                  filename: att['filename'],
-                  size: att['size'],
-                  url: att['url'] as String?,
-                  thumbnailUrl: att['thumbnailUrl'] as String?,
-                );
-              }).toList() ?? [],
-              replies: (postMap['replies'] as List<dynamic>?)?.cast<String>() ?? [],
-            );
+            final postMap = dataController.posts[index] as Map<String, dynamic>; // Ensure it's a Map
+            // Directly use postMap, no need to instantiate ChatterPost or Attachment
             return Padding(
               padding: EdgeInsets.symmetric(horizontal: 1, vertical: 5),
-              child: _buildPostContent(post, isReply: false),
+              child: _buildPostContent(postMap, isReply: false), // Pass postMap directly
             );
           },
         );
