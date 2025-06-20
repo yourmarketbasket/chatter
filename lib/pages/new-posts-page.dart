@@ -213,7 +213,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
         final sizeInMB = await file.length() / (1024 * 1024);
         if (sizeInMB <= 10) {
           print('[NewPostScreen] Adding to _selectedAttachments: type=audio, path=${file.path}');
-          setState(() {
+          setState(() async {
             _selectedAttachments.add({
               'file': file,
               'type': "audio",
@@ -253,7 +253,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
           final sizeInMB = await file.length() / (1024 * 1024);
           if (sizeInMB <= 10) {
             print('[NewPostScreen] Adding to _selectedAttachments: type=image, path=${file.path}');
-            setState(() {
+            setState(() async {
               _selectedAttachments.add({
                 'file': file,
                 'type': "image",
@@ -290,7 +290,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
           final sizeInMB = await file.length() / (1024 * 1024);
           if (sizeInMB <= 10) {
             print('[NewPostScreen] Adding to _selectedAttachments: type=video, path=${file.path}');
-            setState(() {
+            setState(() async {
               _selectedAttachments.add({
                 'file': file,
                 'type': "video",
@@ -328,7 +328,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
           final sizeInMB = await file.length() / (1024 * 1024);
           if (sizeInMB <= 10) {
             print('[NewPostScreen] Adding to _selectedAttachments: type=pdf, path=${file.path}');
-            setState(() {
+            setState(() async {
               _selectedAttachments.add({
                 'file': file,
                 'type': "pdf",
@@ -365,7 +365,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
           final sizeInMB = await file.length() / (1024 * 1024);
           if (sizeInMB <= 10) {
             print('[NewPostScreen] Adding to _selectedAttachments: type=audio, path=${file.path}');
-            setState(() {
+            setState(() async {
               _selectedAttachments.add({
                 'file': file,
                 'type': "audio",

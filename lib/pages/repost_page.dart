@@ -1,4 +1,6 @@
 // import 'package:chatter/models/feed_models.dart'; // Removed import
+import 'dart:io';
+
 import 'package:chatter/pages/home-feed-screen.dart';
 import 'package:chatter/pages/media_view_page.dart';
 import 'package:flutter/material.dart';

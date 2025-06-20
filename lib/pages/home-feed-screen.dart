@@ -682,7 +682,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                   )
                 : Container( // Fallback if URL is null
                     color: Colors.grey[900],
-                    child: Icon(FeatherIcons.file_text, color: Colors.grey[500], size: 40),
+                    child: Icon(FeatherIcons.fileText, color: Colors.grey[500], size: 40),
                   ),
           ),
         ),

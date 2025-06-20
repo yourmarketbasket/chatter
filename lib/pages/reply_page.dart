@@ -624,7 +624,7 @@ class _ReplyPageState extends State<ReplyPage> {
                 children: _replyAttachments.map((attachment) {
                   return Chip(
                     label: Text(
-                      attachment.filename ?? attachment.file!.path.split('/').last,
+                      (attachment['filename'] ?? (attachment['file']?.path.split('/').last ?? '')) as String,
                       style: GoogleFonts.roboto(color: Colors.white, fontSize: 12),
                       overflow: TextOverflow.ellipsis,
                     ),
