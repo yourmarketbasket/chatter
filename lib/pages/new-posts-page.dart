@@ -210,15 +210,16 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
       if (path != null) {
         final file = File(path);
         print('[NewPostScreen] Audio Recorded: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
-        final sizeInMB = await file.length() / (1024 * 1024);
+        final int fileSize = await file.length(); // Perform await outside
+        final sizeInMB = fileSize / (1024 * 1024);
         if (sizeInMB <= 10) {
           print('[NewPostScreen] Adding to _selectedAttachments: type=audio, path=${file.path}');
-          setState(() async {
+          setState(() { // Removed async
             _selectedAttachments.add({
               'file': file,
               'type': "audio",
               'filename': file.path.split('/').last,
-              'size': await file.length(),
+              'size': fileSize, // Use pre-fetched size
             });
             _isRecordingAudio = false;
           });
@@ -250,15 +251,16 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
         if (image != null) {
           final file = File(image.path);
           print('[NewPostScreen] Image Picked: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
-          final sizeInMB = await file.length() / (1024 * 1024);
+          final int fileSize = await file.length(); // Perform await outside
+          final sizeInMB = fileSize / (1024 * 1024);
           if (sizeInMB <= 10) {
             print('[NewPostScreen] Adding to _selectedAttachments: type=image, path=${file.path}');
-            setState(() async {
+            setState(() { // Removed async
               _selectedAttachments.add({
                 'file': file,
                 'type': "image",
                 'filename': file.path.split('/').last,
-                'size': await file.length(),
+                'size': fileSize, // Use pre-fetched size
               });
             });
           } else {
@@ -287,15 +289,16 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
         if (video != null) {
           final file = File(video.path);
           print('[NewPostScreen] Video Picked: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
-          final sizeInMB = await file.length() / (1024 * 1024);
+          final int fileSize = await file.length(); // Perform await outside
+          final sizeInMB = fileSize / (1024 * 1024);
           if (sizeInMB <= 10) {
             print('[NewPostScreen] Adding to _selectedAttachments: type=video, path=${file.path}');
-            setState(() async {
+            setState(() { // Removed async
               _selectedAttachments.add({
                 'file': file,
                 'type': "video",
                 'filename': file.path.split('/').last,
-                'size': await file.length(),
+                'size': fileSize, // Use pre-fetched size
               });
             });
           } else {
@@ -307,9 +310,10 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
         }
       }
     } catch (e) {
+      print('[NewPostScreen _pickVideo] Error: $e'); // Log the full error
       _showPermissionDialog(
         'Error Picking Video',
-        'An error occurred while picking the video: $e',
+        'Could not pick video. Details: ${e.toString()} (Type: ${e.runtimeType.toString()})',
       );
     }
   }
@@ -325,15 +329,16 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
         if (result != null && result.files.single.path != null) {
           final file = File(result.files.single.path!);
           print('[NewPostScreen] PDF Picked: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
-          final sizeInMB = await file.length() / (1024 * 1024);
+          final int fileSize = await file.length(); // Perform await outside
+          final sizeInMB = fileSize / (1024 * 1024);
           if (sizeInMB <= 10) {
             print('[NewPostScreen] Adding to _selectedAttachments: type=pdf, path=${file.path}');
-            setState(() async {
+            setState(() { // Removed async
               _selectedAttachments.add({
                 'file': file,
                 'type': "pdf",
                 'filename': file.path.split('/').last,
-                'size': await file.length(),
+                'size': fileSize, // Use pre-fetched size
               });
             });
           } else {
@@ -362,15 +367,16 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
         if (result != null && result.files.single.path != null) {
           final file = File(result.files.single.path!);
           print('[NewPostScreen] Audio Picked: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
-          final sizeInMB = await file.length() / (1024 * 1024);
+          final int fileSize = await file.length(); // Perform await outside
+          final sizeInMB = fileSize / (1024 * 1024);
           if (sizeInMB <= 10) {
             print('[NewPostScreen] Adding to _selectedAttachments: type=audio, path=${file.path}');
-            setState(() async {
+            setState(() { // Removed async
               _selectedAttachments.add({
                 'file': file,
                 'type': "audio",
                 'filename': file.path.split('/').last,
-                'size': await file.length(),
+                'size': fileSize, // Use pre-fetched size
               });
             });
           } else {
