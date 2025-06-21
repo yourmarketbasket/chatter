@@ -7,28 +7,20 @@ import 'package:chatter/controllers/data-controller.dart'; // Added import
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:device_info_plus/device_info_plus.dart'; // Added for device info
-import 'dart:io'; // Added for Platform check
+// import 'package:device_info_plus/device_info_plus.dart'; // No longer needed for player selection
+// import 'dart:io'; // No longer needed for player selection (Platform check)
 
-void main() async { // Changed to async
+void main() async {
   // Ensure Flutter bindings are initialized
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize DataController and register as singleton
   final DataController dataController = Get.put(DataController());
 
-  // Fetch Android version and store in DataController
-  if (Platform.isAndroid) {
-    DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
-    AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
-    dataController.androidSDKVersion.value = androidInfo.version.sdkInt;
-  } else {
-    // For non-Android platforms, you might set a default or a specific indicator
-    // For example, 0 or a high number if your logic depends on it.
-    // Setting to a high number (e.g., 34 or higher) to ensure non-Android defaults to video_player logic
-    dataController.androidSDKVersion.value = 34; // Assuming 34+ will use video_player
-  }
-  print("Android SDK Version: ${dataController.androidSDKVersion.value}");
+  // Removed Android version fetching for player selection.
+  // If dataController.androidSDKVersion is used elsewhere, its population might need to be re-evaluated or retained.
+  // For now, we assume it was primarily for player choice.
+  // print("Android SDK Version logic for player selection removed.");
 
 
   // Initialize SocketService. The constructor of SocketService calls connect().

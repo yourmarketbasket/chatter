@@ -11,10 +11,10 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:feather_icons/feather_icons.dart';
 import 'package:pdfrx/pdfrx.dart';
-import 'package:video_player/video_player.dart';
+import 'package:video_player/video_player.dart'; // This is for the general video_player package, might still be used by better_player internally or for types. Keep for now.
 import 'package:audioplayers/audioplayers.dart' as audioplayers;
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:chatter/widgets/video_player_widget.dart';
+// import 'package:chatter/widgets/video_player_widget.dart'; // Removed as the file is deleted
 import 'package:chatter/widgets/better_player_widget.dart';
 import 'dart:io';
 import 'dart:async';
@@ -278,29 +278,18 @@ class _MediaViewPageState extends State<MediaViewPage> {
                         mediaWidget = _buildPdfViewer(context, currentAttachment, displayPath, optimizedUrl);
                         break;
                       case 'video':
-                        // Use DataController.androidSDKVersion directly
-                        final int currentAndroidSDKVersion = _dataController.androidSDKVersion.value;
-                        if (currentAndroidSDKVersion == 0 && Platform.isAndroid) {
-                          // SDK version not yet available, show loading or placeholder
-                          mediaWidget = const Center(
-                            child: CircularProgressIndicator(
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
-                            ),
-                          );
-                        } else {
-                          // SDK 31 is Android 12. Use better_player if SDK < 31.
-                          bool useBetterPlayer = Platform.isAndroid && currentAndroidSDKVersion < 31;
-                          final String? thumbnailUrl = currentAttachment['thumbnailUrl'] as String?;
-                          mediaWidget = VideoPlayerContainer(
-                            url: optimizedUrl.isNotEmpty ? optimizedUrl : url,
-                            file: file,
-                            displayPath: displayPath,
-                            useBetterPlayer: useBetterPlayer, // Pass the decision
-                            thumbnailUrl: thumbnailUrl,
-                            // No need to pass isFeedContext, it defaults to false in VideoPlayerWidget/BetterPlayerWidget
-                            // The player widgets themselves will check DataController if isTransitioningVideo is true.
-                          );
-                        }
+                        // final int currentAndroidSDKVersion = _dataController.androidSDKVersion.value; // Removed, no longer used for player choice
+                        // SDK version check is no longer used to decide player type here.
+                        // Always use BetterPlayer via VideoPlayerContainer.
+                        // The useBetterPlayer flag in VideoPlayerContainer will be set to true.
+                        final String? thumbnailUrl = currentAttachment['thumbnailUrl'] as String?;
+                        mediaWidget = VideoPlayerContainer(
+                          url: optimizedUrl.isNotEmpty ? optimizedUrl : url,
+                          file: file,
+                          displayPath: displayPath,
+                          useBetterPlayer: true, // Always true now
+                          thumbnailUrl: thumbnailUrl,
+                        );
                         break;
                       case 'audio':
                         mediaWidget = AudioPlayerWidget(
@@ -632,22 +621,16 @@ class _VideoPlayerContainerState extends State<VideoPlayerContainer> {
 
     // Directly render the appropriate player widget based on useBetterPlayer.
     // They will handle their own loading indicators and thumbnail display.
-    if (widget.useBetterPlayer) {
-      return BetterPlayerWidget(
-        url: widget.url,
-        file: widget.file,
-        displayPath: widget.displayPath,
-        thumbnailUrl: widget.thumbnailUrl,
-        // isFeedContext is false by default in BetterPlayerWidget, which is correct for MediaViewPage
-      );
-    } else {
-      return VideoPlayerWidget(
-        url: widget.url,
-        file: widget.file,
-        displayPath: widget.displayPath,
-        thumbnailUrl: widget.thumbnailUrl,
-      );
-    }
+    // Always use BetterPlayerWidget as per new requirement.
+    // The widget.useBetterPlayer flag will always be true when this is called from PageView builder.
+    return BetterPlayerWidget(
+      url: widget.url,
+      file: widget.file,
+      displayPath: widget.displayPath,
+      thumbnailUrl: widget.thumbnailUrl,
+      // isFeedContext is false by default in BetterPlayerWidget, which is correct for MediaViewPage
+    );
+    // Removed VideoPlayerWidget instantiation path.
   }
 }
 
