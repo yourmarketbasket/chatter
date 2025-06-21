@@ -499,8 +499,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
             ),
           ],
         ),
-      ),
-    );
+      );
 
     if (widget.isFeedContext) {
       return Center(child: videoPlayerStack);

@@ -1,6 +1,5 @@
 import 'package:chatter/controllers/data-controller.dart';
-// import 'package:chatter/pages/home-feed-screen.dart'; // Not directly used, consider removing if VideoPlayerWidget is self-contained
-import 'package:chatter/widgets/video_player_widget.dart' as chatter; // Added import
+import 'package:chatter/widgets/video_player_widget.dart' as chatter;
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -9,14 +8,16 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:feather_icons/feather_icons.dart';
 import 'package:pdfrx/pdfrx.dart';
-import 'package:video_player/video_player.dart';
-import 'package:audioplayers/audioplayers.dart' as audioplayers;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:io';
 import 'dart:async';
 import 'dart:math';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:intl/intl.dart';
+import 'package:audioplayers/audioplayers.dart' as audioplayers;
+import 'package:video_player/video_player.dart';
+
+// Assuming VideoPlayerWidget is a standard video_player-based widget in chatter/widgets/video_player_widget.dart
+// Removed unused import: 'package:chatter/pages/home-feed-screen.dart'
 
 class MediaViewPage extends StatefulWidget {
   final List<Map<String, dynamic>> attachments;
@@ -69,41 +70,30 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
       duration: const Duration(milliseconds: 300),
     );
 
+    // Validate attachments
     if (widget.attachments.any((item) => item is! Map<String, dynamic>)) {
       debugPrint("CRITICAL WARNING: MediaViewPage received invalid attachments list.");
     }
 
-    _currentPageIndex = widget.initialIndex;
-    _pageController = PageController(initialPage: widget.initialIndex);
+    _currentPageIndex = widget.initialIndex.clamp(0, widget.attachments.length - 1);
+    _pageController = PageController(initialPage: _currentPageIndex);
   }
 
   @override
   void dispose() {
-    // When MediaViewPage is disposed, if it was part of a transition,
-    // ensure DataController knows the transition is over.
-    // The actual controller is managed by VideoPlayerWidget or VideoAttachmentWidget now.
+    // Handle video transition logic
     if (widget.transitionVideoId != null && _dataController.activeFeedPlayerVideoId.value == widget.transitionVideoId) {
-        // If this MediaViewPage was showing the video that was transitioned from the feed,
-        // and that video is still the active one in DataController,
-        // then this MediaViewPage is "releasing" its control.
-        if (_dataController.isTransitioningVideo.value) {
-             // If the controller was passed to this MediaViewPage (via VideoPlayerWidget using DataController)
-             // and it's time to return to the feed, the feed's VideoAttachmentWidget will reclaim it.
-             // We just need to signal the transition is over.
-            final currentControllerInDC = _dataController.activeFeedPlayerController.value;
-            if (currentControllerInDC is VideoPlayerController && currentControllerInDC.value.isInitialized) {
-                 _dataController.activeFeedPlayerPosition.value = currentControllerInDC.value.position;
-            }
-            _dataController.isTransitioningVideo.value = false;
-            debugPrint("MediaViewPage disposing: Signalled end of transition for ${widget.transitionVideoId}. Feed player should reclaim.");
+      if (_dataController.isTransitioningVideo.value) {
+        final currentControllerInDC = _dataController.activeFeedPlayerController.value;
+        if (currentControllerInDC is VideoPlayerController && currentControllerInDC.value.isInitialized) {
+          _dataController.activeFeedPlayerPosition.value = currentControllerInDC.value.position;
         }
-    } else if (_dataController.isTransitioningVideo.value) {
-        // If a transition was active but not for *this* video, it's an odd state.
-        // For safety, if MediaViewPage is closing, any active transition should probably be considered ended.
-        // This depends on app logic: can another video be transitioning while one is in MediaViewPage?
-        // Assuming only one transition at a time for simplicity.
         _dataController.isTransitioningVideo.value = false;
-        debugPrint("MediaViewPage disposing: Ending a potentially orphaned transition for ${_dataController.activeFeedPlayerVideoId.value}.");
+        debugPrint("MediaViewPage disposing: Signalled end of transition for ${widget.transitionVideoId}.");
+      }
+    } else if (_dataController.isTransitioningVideo.value) {
+      _dataController.isTransitioningVideo.value = false;
+      debugPrint("MediaViewPage disposing: Ending orphaned transition for ${_dataController.activeFeedPlayerVideoId.value}.");
     }
 
     _pageController.dispose();
@@ -209,7 +199,7 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
                   ),
           IconButton(
             icon: const Icon(FeatherIcons.moreVertical, color: Colors.white),
-            onPressed: () {},
+            onPressed: () {}, // TODO: Implement more options
           ),
         ],
       ),
@@ -243,21 +233,14 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
                         mediaWidget = _buildPdfViewer(context, currentAttachment, displayPath, optimizedUrl);
                         break;
                       case 'video':
-                        // Directly use the new VideoPlayerWidget (or the refactored VideoAttachmentWidget if it's meant for full-screen too)
-                        // For now, assuming a generic VideoPlayerWidget for full-screen context.
-                        // This part needs to align with how VideoAttachmentWidget was refactored and if a separate full-screen player is used.
-                        // Let's use a placeholder for `chatter/widgets/video_player_widget.dart` which should be the standard video_player based widget.
-                        // This might require creating/using the existing `lib/widgets/video_player_widget.dart` and ensuring it's suitable.
-                        // For the purpose of this step, I'm assuming VideoPlayerWidget is the one from `lib/widgets/video_player_widget.dart`
-                        // and it's already using `video_player`.
-                        mediaWidget = chatter.VideoPlayerWidget( // Assuming chatter is the package name or an import alias
-                           key: Key(currentAttachment['url'] ?? currentAttachment['file']?.path ?? index.toString()), // Ensure unique key
-                           url: optimizedUrl.isNotEmpty ? optimizedUrl : url,
-                           file: file,
-                           displayPath: displayPath,
-                           thumbnailUrl: currentAttachment['thumbnailUrl'] as String?,
-                           isFeedContext: false, // Explicitly false for MediaViewPage
-                         );
+                        mediaWidget = chatter.VideoPlayerWidget(
+                          key: Key(currentAttachment['url'] ?? currentAttachment['file']?.path ?? index.toString()),
+                          url: optimizedUrl.isNotEmpty ? optimizedUrl : url,
+                          file: file,
+                          displayPath: displayPath,
+                          thumbnailUrl: currentAttachment['thumbnailUrl'] as String?,
+                          isFeedContext: false,
+                        );
                         break;
                       case 'audio':
                         mediaWidget = AudioPlayerWidget(
@@ -274,12 +257,6 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
                           fileName: displayPath.split('/').last,
                           iconColor: Colors.grey[600],
                         );
-                    }
-                    // For videos in MediaViewPage, we don't want to Center them,
-                    // as VideoPlayerWidget will handle its own sizing (full width, aspect ratio height).
-                    // Other media types can still be centered.
-                    if (type == 'video') {
-                      return mediaWidget;
                     }
                     return Center(child: mediaWidget);
                   },
@@ -316,8 +293,6 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
   Widget _buildFullScreenImageViewer(BuildContext context, Map<String, dynamic> attachment, String displayPath, String? optimizedUrl) {
     final String? url = attachment['url'] as String?;
     final File? file = attachment['file'] as File?;
-
-    // Retrieve width and height from attachment
     final num? imageWidth = attachment['width'] as num?;
     final num? imageHeight = attachment['height'] as num?;
     double? originalAspectRatio;
@@ -335,20 +310,18 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
             placeholder: (context, url) => const Center(child: LinearProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent))),
             errorWidget: (context, url, error) => buildError(context, message: 'Error loading image: $error'),
             cacheKey: url,
-            // Width and alignment are handled by AspectRatio and InteractiveViewer
           )
         : file != null
             ? Image.file(
                 file,
                 fit: BoxFit.contain,
-                // Width and alignment are handled by AspectRatio and InteractiveViewer
                 errorBuilder: (context, error, stackTrace) => buildError(context, message: 'Error loading image file: $error'),
               )
             : buildError(context, message: 'No image source available for $displayPath');
 
     Widget interactiveImage = InteractiveViewer(
       transformationController: _transformationController,
-      minScale: 0.5, // Allow zooming out slightly
+      minScale: 0.5,
       maxScale: 4.0,
       child: imageContentWidget,
     );
@@ -360,7 +333,7 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
               aspectRatio: originalAspectRatio,
               child: interactiveImage,
             )
-          : interactiveImage, // Fallback if no aspect ratio determined
+          : interactiveImage,
     );
   }
 
@@ -533,254 +506,6 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
   }
 }
 
-Widget buildError(
-  BuildContext context, {
-  String? message,
-  IconData? icon,
-  String? fileName,
-  Color? iconColor,
-}) {
-  return Column(
-    mainAxisAlignment: MainAxisAlignment.center,
-    children: [
-      Icon(
-        icon ?? FeatherIcons.alertTriangle,
-        color: iconColor ?? Colors.redAccent,
-        size: icon != null ? 100 : 50,
-      ),
-      const SizedBox(height: 10),
-      Text(
-        message ?? 'Error loading content',
-        style: GoogleFonts.roboto(color: Colors.white70, fontSize: 16),
-        textAlign: TextAlign.center,
-      ),
-      if (fileName != null) ...[
-        const SizedBox(height: 10),
-        Text(
-          fileName,
-          style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 12),
-          textAlign: TextAlign.center,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ],
-    ],
-  );
-}
-
-/*
-class VideoPlayerContainer extends StatefulWidget {
-  final String? url;
-  final File? file;
-  final String displayPath;
-  final bool useBetterPlayer;
-  final String? thumbnailUrl;
-  final String? aspectRatioString; // Backend-provided aspect ratio as string (renamed)
-  final double? numericAspectRatio; // Added for direct aspect ratio
-
-  const VideoPlayerContainer({
-    Key? key,
-    this.url,
-    this.file,
-    required this.displayPath,
-    required this.useBetterPlayer,
-    this.thumbnailUrl,
-    this.aspectRatioString,
-    this.numericAspectRatio,
-  }) : super(key: key);
-
-  @override
-  _VideoPlayerContainerState createState() => _VideoPlayerContainerState();
-}
-
-class _VideoPlayerContainerState extends State<VideoPlayerContainer> {
-  @override
-  Widget build(BuildContext context) {
-    return BetterPlayerWidget(
-      url: widget.url,
-      file: widget.file,
-      displayPath: widget.displayPath,
-      thumbnailUrl: widget.thumbnailUrl,
-      aspectRatioString: widget.aspectRatioString,
-      numericAspectRatio: widget.numericAspectRatio,
-    );
-  }
-}
-
-class BetterPlayerWidget extends StatefulWidget {
-  final String? url;
-  final File? file;
-  final String displayPath;
-  final String? thumbnailUrl;
-  final String? aspectRatioString; // Renamed
-  final double? numericAspectRatio; // Added
-
-  const BetterPlayerWidget({
-    Key? key,
-    this.url,
-    this.file,
-    required this.displayPath,
-    this.thumbnailUrl,
-    this.aspectRatioString,
-    this.numericAspectRatio,
-  }) : super(key: key);
-
-  @override
-  _BetterPlayerWidgetState createState() => _BetterPlayerWidgetState();
-}
-
-class _BetterPlayerWidgetState extends State<BetterPlayerWidget> {
-  BetterPlayerController? _betterPlayerController;
-  bool _isLoading = true;
-  String? _errorMessage;
-  double? _videoAspectRatio;
-
-  @override
-  void initState() {
-    super.initState();
-    _initializePlayer();
-  }
-
-  Future<void> _initializePlayer() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      // Prioritize numeric aspect ratio if provided and valid
-      if (widget.numericAspectRatio != null && widget.numericAspectRatio! > 0 && widget.numericAspectRatio!.isFinite) {
-        _videoAspectRatio = widget.numericAspectRatio;
-      }
-      // Fallback to parsing the aspect ratio string
-      else if (widget.aspectRatioString != null && widget.aspectRatioString!.isNotEmpty) {
-        final parsedAspectRatioFromString = double.tryParse(widget.aspectRatioString!);
-        if (parsedAspectRatioFromString != null && parsedAspectRatioFromString.isFinite && parsedAspectRatioFromString > 0) {
-          _videoAspectRatio = parsedAspectRatioFromString;
-        } else {
-          debugPrint('Invalid aspect ratio string from backend: ${widget.aspectRatioString}, falling back to player or default');
-        }
-      }
-      // If _videoAspectRatio is still null here, it will be determined after player initialization or default to 16/9.
-
-      final configuration = BetterPlayerConfiguration(
-        autoPlay: true,
-        looping: false,
-        fit: BoxFit.contain, // Changed to BoxFit.contain for MediaViewPage
-        aspectRatio: _videoAspectRatio ?? 16 / 9, // Use determined aspect ratio or default
-        placeholder: widget.thumbnailUrl != null
-            ? CachedNetworkImage(
-                imageUrl: widget.thumbnailUrl!,
-                fit: BoxFit.contain, // Consistent fit for placeholder
-                width: double.infinity,
-                errorWidget: (context, url, error) => const SizedBox.shrink(),
-              )
-            : null,
-        errorBuilder: (context, errorMessage) => buildError(
-          context,
-          message: errorMessage ?? 'Error playing video',
-          fileName: widget.displayPath.split('/').last,
-        ),
-      );
-
-      BetterPlayerDataSource dataSource;
-      if (widget.url != null && widget.url!.isNotEmpty) {
-        dataSource = BetterPlayerDataSource(
-          BetterPlayerDataSourceType.network,
-          widget.url!,
-          cacheConfiguration: const BetterPlayerCacheConfiguration(
-            useCache: true,
-            maxCacheSize: 10 * 1024 * 1024,
-            maxCacheFileSize: 10 * 1024 * 1024,
-          ),
-        );
-      } else if (widget.file != null) {
-        dataSource = BetterPlayerDataSource(
-          BetterPlayerDataSourceType.file,
-          widget.file!.path,
-        );
-      } else {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = 'No video source available';
-        });
-        return;
-      }
-
-      _betterPlayerController = BetterPlayerController(
-        configuration,
-        betterPlayerDataSource: dataSource,
-      );
-
-      // If no valid backend aspect ratio, get it from the video player after initialization
-      if (_videoAspectRatio == null) {
-        _betterPlayerController!.addEventsListener((event) {
-          if (event.betterPlayerEventType == BetterPlayerEventType.initialized) {
-            final videoPlayerController = _betterPlayerController!.videoPlayerController;
-            if (videoPlayerController != null && videoPlayerController.value.initialized) {
-              double aspectRatio = videoPlayerController.value.aspectRatio;
-              if (aspectRatio.isFinite && aspectRatio > 0) {
-                if (mounted) {
-                  setState(() {
-                    _videoAspectRatio = aspectRatio;
-                  });
-                }
-              } else {
-                debugPrint('Invalid aspect ratio from video: $aspectRatio, using default 16:9');
-                if (mounted) {
-                  setState(() {
-                    _videoAspectRatio = 16 / 9;
-                  });
-                }
-              }
-            }
-          }
-        });
-      }
-
-      setState(() {
-        _isLoading = false;
-      });
-    } catch (e) {
-      debugPrint('Error initializing video player: $e');
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Failed to initialize video player: $e';
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _betterPlayerController?.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator(color: Colors.tealAccent));
-    }
-
-    if (_errorMessage != null) {
-      return buildError(
-        context,
-        message: _errorMessage,
-        fileName: widget.displayPath.split('/').last,
-      );
-    }
-
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: double.infinity),
-      child: AspectRatio(
-        aspectRatio: _videoAspectRatio ?? 16 / 9,
-        child: BetterPlayer(controller: _betterPlayerController!),
-      ),
-    );
-  }
-}
-*/
-
-/*
 class AudioPlayerWidget extends StatefulWidget {
   final String? url;
   final File? file;
@@ -937,12 +662,10 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget> with SingleTicker
 
     if (!_isInitialized || _errorMessage != null) {
       debugPrint('Error: $_errorMessage');
-      return Center(
-        child: Text(
-          _errorMessage ?? 'Audio player not initialized',
-          style: const TextStyle(color: Colors.red, fontSize: 16),
-          textAlign: TextAlign.center,
-        ),
+      return buildError(
+        context,
+        message: _errorMessage ?? 'Audio player not initialized',
+        fileName: widget.displayPath.split('/').last,
       );
     }
 
@@ -1135,4 +858,38 @@ class WaveformPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+Widget buildError(
+  BuildContext context, {
+  String? message,
+  IconData? icon,
+  String? fileName,
+  Color? iconColor,
+}) {
+  return Column(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      Icon(
+        icon ?? FeatherIcons.alertTriangle,
+        color: iconColor ?? Colors.redAccent,
+        size: icon != null ? 100 : 50,
+      ),
+      const SizedBox(height: 10),
+      Text(
+        message ?? 'Error loading content',
+        style: GoogleFonts.roboto(color: Colors.white70, fontSize: 16),
+        textAlign: TextAlign.center,
+      ),
+      if (fileName != null) ...[
+        const SizedBox(height: 10),
+        Text(
+          fileName,
+          style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 12),
+          textAlign: TextAlign.center,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    ],
+  );
 }

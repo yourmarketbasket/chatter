@@ -452,8 +452,8 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
                   bottom: 8,
                   right: 8,
                   child: GestureDetector(
-                    onTap: (e) {
-                      // e.stopPropagation(); // Prevent tap from bubbling to the parent GestureDetector if needed
+                    onTap: () {
+                      // Prevent tap from bubbling to the parent GestureDetector if needed
                       if (_disposed || _videoPlayerController == null) return;
                       setState(() {
                         _isMuted = !_isMuted;
