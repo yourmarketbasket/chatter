@@ -3,6 +3,7 @@ import 'package:chatter/pages/landing-page.dart';
 import 'package:chatter/pages/login.dart';
 import 'package:chatter/pages/register.dart';
 import 'package:chatter/services/socket-service.dart';
+import 'package:chatter/services/media_visibility_service.dart'; // Import MediaVisibilityService
 import 'package:chatter/controllers/data-controller.dart'; // Added import
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -16,6 +17,8 @@ void main() async {
 
   // Initialize DataController and register as singleton
   final DataController dataController = Get.put(DataController());
+  // Initialize MediaVisibilityService
+  Get.put(MediaVisibilityService());
 
   // Removed Android version fetching for player selection.
   // If dataController.androidSDKVersion is used elsewhere, its population might need to be re-evaluated or retained.
@@ -26,6 +29,7 @@ void main() async {
   // Initialize SocketService. The constructor of SocketService calls connect().
   // Register SocketService as a singleton.
   final SocketService socketService = Get.put(SocketService());
+
 
   runApp(const ChatterApp());
 }

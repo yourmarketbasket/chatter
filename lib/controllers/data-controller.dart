@@ -47,15 +47,16 @@ class DataController extends GetxController {
   final RxList<Map<String, dynamic>> following = <Map<String, dynamic>>[].obs;
   final RxBool isLoadingFollowing = false.obs;
 
-  // For managing single video playback
-  final Rxn<String> currentlyPlayingVideoId = Rxn<String>();
+  // For managing single media playback (video or audio)
+  final Rxn<String> currentlyPlayingMediaId = Rxn<String>();
+  final Rxn<String> currentlyPlayingMediaType = Rxn<String>(); // 'video' or 'audio'
+  final Rxn<Object> activeMediaController = Rxn<Object>(); // Can be VideoPlayerController, BetterPlayerController, or AudioPlayer
 
-  // For seamless video transition
+  // For seamless video transition (specific to video)
   final Rxn<Object> activeFeedPlayerController = Rxn<Object>(); // Can be VideoPlayerController or BetterPlayerController
   final Rxn<String> activeFeedPlayerVideoId = Rxn<String>();
   final Rxn<Duration> activeFeedPlayerPosition = Rxn<Duration>();
   final RxBool isTransitioningVideo = false.obs; // True if a video is being transitioned to MediaViewPage
-  // final RxInt androidSDKVersion = 0.obs; // Removed as player choice is now fixed to better_player
 
   @override
   void onInit() {
@@ -692,18 +693,73 @@ class DataController extends GetxController {
     }
   }
 
-  void videoDidStartPlaying(String videoId) {
-    if (currentlyPlayingVideoId.value != videoId) {
-      currentlyPlayingVideoId.value = videoId;
-      print("[DataController] Video $videoId started playing. Setting global lock.");
+  void mediaDidStartPlaying(String mediaId, String mediaType, Object controller) {
+    if (currentlyPlayingMediaId.value != mediaId || currentlyPlayingMediaType.value != mediaType) {
+      // If another media is playing, we might need to stop it here or ensure it's stopped by its own listener.
+      // For now, this method just sets the new active media.
+      // The widgets themselves should pause if currentlyPlayingMediaId changes to something else.
+      currentlyPlayingMediaId.value = mediaId;
+      currentlyPlayingMediaType.value = mediaType;
+      activeMediaController.value = controller;
+      print("[DataController] Media $mediaId (type: $mediaType) started playing. Setting global lock.");
+
+      // If the new media is a video and it's in the feed, update video-specific transition logic
+      if (mediaType == 'video') {
+        // This assumes that 'controller' for video is the actual player controller (VideoPlayerController/BetterPlayerController)
+        // And that videoId for video transition purposes is the same as mediaId.
+        activeFeedPlayerController.value = controller;
+        activeFeedPlayerVideoId.value = mediaId;
+        // activeFeedPlayerPosition will be updated by the video player widget itself.
+      }
     }
   }
 
-  // Optional: Call this if a video is explicitly paused by the user or finishes.
+  void mediaDidStopPlaying(String mediaId, String mediaType) {
+    if (currentlyPlayingMediaId.value == mediaId && currentlyPlayingMediaType.value == mediaType) {
+      currentlyPlayingMediaId.value = null;
+      currentlyPlayingMediaType.value = null;
+      activeMediaController.value = null;
+      print("[DataController] Media $mediaId (type: $mediaType) stopped playing. Releasing global lock.");
+
+      // If the stopped media was a video relevant to transition logic, clear those fields too
+      if (mediaType == 'video' && activeFeedPlayerVideoId.value == mediaId) {
+          // Only clear if not currently in a transition state to MediaViewPage for this specific video
+          if (!isTransitioningVideo.value || activeFeedPlayerVideoId.value != mediaId) {
+            activeFeedPlayerController.value = null;
+            activeFeedPlayerVideoId.value = null;
+            activeFeedPlayerPosition.value = null;
+          }
+      }
+    }
+  }
+
+  // Existing video transition methods - might need review if they conflict or overlap
+  // For now, videoDidStartPlaying and videoDidStopPlaying are effectively replaced by the generic media methods.
+  // Keeping these stubs in case any part of the code still calls them directly,
+  // but they should ideally be refactored to call the new media methods.
+
+  void videoDidStartPlaying(String videoId) {
+    // This method is now largely superseded by mediaDidStartPlaying.
+    // If called, ensure it correctly interfaces with the new media state.
+    // For simplicity, we can delegate or log a warning.
+    print("[DataController] Legacy videoDidStartPlaying called for $videoId. Consider updating call site to mediaDidStartPlaying.");
+    // Example: find the controller if this videoId is active and call mediaDidStartPlaying
+    // This requires knowing the controller instance which isn't passed here.
+    // A safer approach might be to ensure all video players call mediaDidStartPlaying directly.
+    // For now, let's assume video players will be updated to call mediaDidStartPlaying.
+    // If this videoId matches the current active video media, do nothing as it's already handled.
+    if (currentlyPlayingMediaId.value == videoId && currentlyPlayingMediaType.value == 'video') {
+      return;
+    }
+    // If no media is playing, or a different media is playing, this call is ambiguous without controller.
+    // It might be best to let the video player itself manage this via mediaDidStartPlaying.
+  }
+
   void videoDidStopPlaying(String videoId) {
-    if (currentlyPlayingVideoId.value == videoId) {
-      currentlyPlayingVideoId.value = null;
-      print("[DataController] Video $videoId stopped playing. Releasing global lock.");
+    // Similar to videoDidStartPlaying, this is superseded.
+    print("[DataController] Legacy videoDidStopPlaying called for $videoId. Consider updating call site to mediaDidStopPlaying.");
+    if (currentlyPlayingMediaId.value == videoId && currentlyPlayingMediaType.value == 'video') {
+      mediaDidStopPlaying(videoId, 'video');
     }
   }
 }

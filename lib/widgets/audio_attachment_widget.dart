@@ -1,15 +1,16 @@
+import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
-import 'package:chatter/pages/media_view_page.dart'; // For MediaViewPage
+import 'package:chatter/controllers/data-controller.dart';
+import 'package:chatter/pages/media_view_page.dart';
+import 'package:chatter/services/media_visibility_service.dart'; // Import MediaVisibilityService
 import 'package:feather_icons/feather_icons.dart';
 import 'package:flutter/material.dart';
-import 'package:visibility_detector/visibility_detector.dart';
-
-// Removed import for feed_models.dart
-
+import 'package:get/get.dart';
+import 'package:visibility_detector/visibility_detector.dart'; // Import VisibilityDetector
 
 class AudioAttachmentWidget extends StatefulWidget {
-  final Map<String, dynamic> attachment; // Changed to Map<String, dynamic>
-  final Map<String, dynamic> post; // Changed to Map<String, dynamic>
+  final Map<String, dynamic> attachment;
+  final Map<String, dynamic> post;
   final BorderRadius borderRadius;
 
   const AudioAttachmentWidget({
@@ -27,70 +28,136 @@ class _AudioAttachmentWidgetState extends State<AudioAttachmentWidget> {
   late AudioPlayer _audioPlayer;
   bool _isMuted = true;
   bool _isPlaying = false;
+  PlayerState _playerState = PlayerState.stopped;
+
+  final DataController _dataController = Get.find<DataController>();
+  final MediaVisibilityService _mediaVisibilityService = Get.find<MediaVisibilityService>();
+  String _audioId = ""; // Ensure initialized
+  StreamSubscription? _playerStateSubscription;
+  StreamSubscription? _currentlyPlayingMediaSubscription;
 
   @override
   void initState() {
     super.initState();
     _audioPlayer = AudioPlayer();
+    // Ensure _audioId is definitively set
+    _audioId = widget.attachment['url'] as String? ??
+               (widget.key?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString());
+
     final String? audioUrlString = widget.attachment['url'] as String?;
 
     if (audioUrlString != null && audioUrlString.isNotEmpty) {
       String finalAudioUrl = audioUrlString;
-      // Apply Cloudinary transformation only if it seems like a generic Cloudinary URL
-      // and doesn't already look like an mp3 or other audio format.
       if (audioUrlString.contains('res.cloudinary.com') &&
           audioUrlString.contains('/upload/') &&
           !audioUrlString.toLowerCase().endsWith('.mp3') &&
           !audioUrlString.toLowerCase().endsWith('.m4a') &&
           !audioUrlString.toLowerCase().endsWith('.wav') &&
           !audioUrlString.toLowerCase().endsWith('.ogg') &&
-          !audioUrlString.contains('/f_')) { // Don't transform if format 'f_' is already specified
+          !audioUrlString.contains('/f_')) {
         finalAudioUrl = audioUrlString.replaceAll('/upload/', '/upload/f_mp3/');
-        print('[AudioAttachmentWidget] Applied Cloudinary f_mp3 transformation to: $audioUrlString, new URL: $finalAudioUrl');
+        print('[AudioAttachmentWidget-$_audioId] Applied Cloudinary f_mp3 transformation. New URL: $finalAudioUrl');
       } else {
-        print('[AudioAttachmentWidget] Using audio URL as is (no Cloudinary f_mp3 transformation): $finalAudioUrl');
+        print('[AudioAttachmentWidget-$_audioId] Using audio URL as is: $finalAudioUrl');
       }
 
       _audioPlayer.setSourceUrl(finalAudioUrl).then((_) {
-        // Successfully set source
-        print('[AudioAttachmentWidget] Source set successfully for $finalAudioUrl');
+        print('[AudioAttachmentWidget-$_audioId] Source set successfully.');
       }).catchError((error) {
-        print('[AudioAttachmentWidget] Error setting source for $finalAudioUrl: $error');
-        // Optionally, update UI to show an error state
+        print('[AudioAttachmentWidget-$_audioId] Error setting source: $error');
       });
-      _audioPlayer.setVolume(_isMuted ? 0.0 : 1.0); // Set initial volume based on _isMuted state
-
+      _audioPlayer.setVolume(_isMuted ? 0.0 : 1.0);
     } else {
-      print('[AudioAttachmentWidget] Audio attachment URL is null or empty.');
-      // Optionally, update UI to show an error state or that audio is unavailable
+      print('[AudioAttachmentWidget-$_audioId] Audio attachment URL is null or empty.');
     }
+
+    _playerStateSubscription = _audioPlayer.onPlayerStateChanged.listen((state) {
+      if (!mounted) return;
+      bool newIsPlaying = (state == PlayerState.playing);
+      if (_isPlaying != newIsPlaying) {
+        setState(() { // Update local _isPlaying for UI
+          _isPlaying = newIsPlaying;
+        });
+        if (newIsPlaying) {
+          _dataController.mediaDidStartPlaying(_audioId, 'audio', _audioPlayer);
+        } else {
+          _dataController.mediaDidStopPlaying(_audioId, 'audio');
+        }
+      }
+       // Also update _playerState if needed for other logic, though _isPlaying is primary for UI
+      if (_playerState != state) {
+        setState(() {
+          _playerState = state;
+        });
+      }
+    });
+
+    _currentlyPlayingMediaSubscription = ever(_dataController.currentlyPlayingMediaId, (String? playingId) {
+      if (!mounted) return;
+      if (_isPlaying && playingId != null && playingId != _audioId) {
+        print('[AudioAttachmentWidget-$_audioId] Another media ($playingId) started. Pausing this audio.');
+        _audioPlayer.pause();
+      }
+    });
   }
 
   @override
   void dispose() {
+    _mediaVisibilityService.unregisterItem(_audioId);
+    if (_isPlaying) { // If disposing while playing, ensure DataController is notified
+      _dataController.mediaDidStopPlaying(_audioId, 'audio');
+    }
+    _playerStateSubscription?.cancel();
+    _currentlyPlayingMediaSubscription?.cancel();
     _audioPlayer.dispose();
     super.dispose();
   }
 
+  void _playAudio() {
+    // Check with DataController before playing, only if not already playing this media
+    if (_dataController.currentlyPlayingMediaId.value != _audioId || _playerState != PlayerState.playing) {
+        print("[AudioAttachmentWidget-$_audioId] Play callback executed by MediaVisibilityService.");
+        _audioPlayer.resume();
+        // DataController update will happen via onPlayerStateChanged listener
+    }
+  }
+
+  void _pauseAudio() {
+     if (_playerState == PlayerState.playing) {
+        print("[AudioAttachmentWidget-$_audioId] Pause callback executed by MediaVisibilityService.");
+        _audioPlayer.pause();
+        // DataController update will happen via onPlayerStateChanged listener
+     }
+  }
+
+  void _togglePlayPauseByUser() { // Renamed to clarify it's a direct user action
+    if (_isPlaying) {
+      _audioPlayer.pause();
+    } else {
+      // If user explicitly taps play, it should attempt to play,
+      // potentially interrupting other media if MediaVisibilityService rules allow.
+      // The currentlyPlayingMediaSubscription will handle pausing other players if this one starts.
+      print('[AudioAttachmentWidget-$_audioId] User tapped play. Requesting to play.');
+      _audioPlayer.resume();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final String? attachmentUrl = widget.attachment['url'] as String?;
+    final String visibilityDetectorKey = _audioId;
+
     return VisibilityDetector(
-      key: Key(attachmentUrl ?? UniqueKey().toString()), // Use a unique key if URL is null
-      onVisibilityChanged: (info) {
-        // TODO: Consider if auto-play/pause on visibility is desired for audio.
-        // For now, mirroring video's behavior.
-        if (info.visibleFraction > 0.5 && !_isPlaying) {
-          _audioPlayer.resume();
-          setState(() {
-            _isPlaying = true;
-          });
-        } else if (info.visibleFraction <= 0.5 && _isPlaying) {
-          _audioPlayer.pause();
-          setState(() {
-            _isPlaying = false;
-          });
-        }
+      key: Key(visibilityDetectorKey),
+      onVisibilityChanged: (visibilityInfo) {
+        final visibleFraction = visibilityInfo.visibleFraction;
+        _mediaVisibilityService.itemVisibilityChanged(
+          mediaId: _audioId,
+          mediaType: 'audio',
+          visibleFraction: visibleFraction,
+          playCallback: _playAudio,
+          pauseCallback: _pauseAudio,
+          context: context,
+        );
       },
       child: GestureDetector(
         onTap: () {
@@ -104,10 +171,10 @@ class _AudioAttachmentWidgetState extends State<AudioAttachmentWidget> {
                 try {
                   correctlyTypedPostAttachments.add(Map<String, dynamic>.from(item));
                 } catch (e) {
-                  print('[AudioAttachmentWidget] Error converting attachment item Map to Map<String, dynamic>: $e for item $item');
+                  print('[AudioAttachmentWidget-$_audioId] Error converting attachment item Map: $e');
                 }
               } else {
-                print('[AudioAttachmentWidget] Skipping non-map attachment item: $item');
+                print('[AudioAttachmentWidget-$_audioId] Skipping non-map attachment item: $item');
               }
             }
           }
@@ -145,54 +212,44 @@ class _AudioAttachmentWidgetState extends State<AudioAttachmentWidget> {
         child: ClipRRect(
           borderRadius: widget.borderRadius,
           child: AspectRatio(
-            aspectRatio: 4 / 3, // Assuming same aspect ratio for consistency, can be adjusted
+            aspectRatio: 4 / 3,
             child: Container(
-              constraints: BoxConstraints(
-                maxWidth: 200, // From original code
+              constraints: const BoxConstraints(
+                maxWidth: 200,
               ),
               decoration: BoxDecoration(
                 color: Colors.grey[900],
               ),
-              padding: EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
+                  const Icon(
                     FeatherIcons.music,
                     color: Colors.tealAccent,
-                    size: 20, // Consistent icon size
+                    size: 20,
                   ),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            if (_isPlaying) {
-                              _audioPlayer.pause();
-                              _isPlaying = false;
-                            } else {
-                              _audioPlayer.resume();
-                              _isPlaying = true;
-                            }
-                          });
-                        },
+                        onTap: _togglePlayPauseByUser, // User direct interaction
                         child: Container(
-                          padding: EdgeInsets.all(6),
+                          padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
                             color: Colors.black.withOpacity(0.6),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
-                            _isPlaying ? FeatherIcons.pause : FeatherIcons.play,
+                            _isPlaying ? FeatherIcons.pause : FeatherIcons.play, // Uses local _isPlaying for UI
                             color: Colors.white,
                             size: 16,
                           ),
                         ),
                       ),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       GestureDetector(
                         onTap: () {
                           setState(() {
@@ -201,7 +258,7 @@ class _AudioAttachmentWidgetState extends State<AudioAttachmentWidget> {
                           });
                         },
                         child: Container(
-                          padding: EdgeInsets.all(6),
+                          padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
                             color: Colors.black.withOpacity(0.6),
                             shape: BoxShape.circle,
