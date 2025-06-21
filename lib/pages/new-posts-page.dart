@@ -278,12 +278,25 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
       final info = await videoInfo.getVideoInfo(file.path);
 
       if (info != null && info.width != null && info.height != null) {
-        final width = info.width!.toInt();
-        final height = info.height!.toInt();
+        var width = info.width!.toInt();
+        var height = info.height!.toInt();
         final duration = info.duration != null ? (info.duration! / 1000).round() : null; // Convert ms to seconds
         String determinedOrientation;
+        int? rotationAngle = info.orientation; // This is the rotation in degrees (e.g., 0, 90, 180, 270)
 
-        // Primary determination based on width and height
+        print('[NewPostScreen] Video Info Raw: path=${file.path}, width=$width, height=$height, rotationAngle=$rotationAngle, durationMs=${info.duration}');
+
+        // Adjust width and height based on rotation angle
+        // Typically, if rotation is 90 or 270, the raw width/height are for the unrotated frame.
+        // We need to swap them to get the effective display dimensions.
+        if (rotationAngle == 90 || rotationAngle == 270) {
+          var temp = width;
+          width = height;
+          height = temp;
+          print('[NewPostScreen] Video Info: Swapped width/height due to rotation $rotationAngle. New effective: width=$width, height=$height for path=${file.path}');
+        }
+
+        // Now determine orientation string based on the (potentially swapped) effective dimensions
         if (width > height) {
           determinedOrientation = 'landscape';
         } else if (height > width) {
@@ -292,22 +305,15 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
           determinedOrientation = 'square';
         }
 
-        // Log the orientation provided by the package for debugging, but don't let it override.
-        int? packageOrientation = info.orientation;
-        if (packageOrientation != null) {
-            print('[NewPostScreen] Video Info: Package orientation "$packageOrientation" (int) found. Using dimension-based "$determinedOrientation".');
-        }
-
-
-        print('[NewPostScreen] Video Decoded Dimensions: width=$width, height=$height, orientation=$determinedOrientation, duration=$duration (Package Orientation: $packageOrientation)');
+        print('[NewPostScreen] Video Decoded Dimensions: effectiveWidth=$width, effectiveHeight=$height, orientationString=$determinedOrientation, durationSec=$duration for path=${file.path}');
         return {
-          'width': width,
-          'height': height,
+          'width': width, // Return the effective width
+          'height': height, // Return the effective height
           'orientation': determinedOrientation,
           if (duration != null) 'duration': duration,
         };
       } else {
-        print('[NewPostScreen] Error decoding video or width/height is null.');
+        print('[NewPostScreen] Error decoding video or width/height is null for path=${file.path}. VideoInfo object: ${info?.toMap()}');
         return null;
       }
     } catch (e) {

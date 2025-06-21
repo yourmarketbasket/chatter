@@ -7,6 +7,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:get/get.dart';
 import 'package:chatter/controllers/data-controller.dart';
+import 'package:chatter/services/custom_cache_manager.dart'; // Import CustomCacheManager
 
 // Widget for video playback with seeking and progress bar using video_player
 class VideoPlayerWidget extends StatefulWidget {
@@ -15,6 +16,9 @@ class VideoPlayerWidget extends StatefulWidget {
   final String displayPath;
   final String? thumbnailUrl;
   final bool isFeedContext; // Added to identify if this player is in the home feed
+  final int? videoWidth;
+  final int? videoHeight;
+  final String? videoOrientation; // e.g., "portrait", "landscape", "square"
 
   const VideoPlayerWidget({
     Key? key,
@@ -23,6 +27,9 @@ class VideoPlayerWidget extends StatefulWidget {
     required this.displayPath,
     this.thumbnailUrl,
     this.isFeedContext = false, // Default to false
+    this.videoWidth,
+    this.videoHeight,
+    this.videoOrientation,
   }) : super(key: key);
 
   @override
@@ -363,6 +370,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
             if (widget.thumbnailUrl != null && widget.thumbnailUrl!.isNotEmpty)
               CachedNetworkImage(
                 imageUrl: widget.thumbnailUrl!,
+                cacheManager: CustomCacheManager.instance, // Use custom cache manager
                 fit: BoxFit.contain, // Or BoxFit.cover, depending on desired behavior
                 placeholder: (context, url) => const Center(
                   child: CircularProgressIndicator(
@@ -413,7 +421,9 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
           alignment: Alignment.bottomCenter,
           children: [
             AspectRatio(
-              aspectRatio: _controller!.value.aspectRatio,
+              aspectRatio: (widget.videoWidth != null && widget.videoHeight != null && widget.videoHeight! > 0)
+                  ? widget.videoWidth! / widget.videoHeight!
+                  : _controller!.value.aspectRatio,
               child: VideoPlayer(_controller!),
             ),
             Positioned(

@@ -186,12 +186,25 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
             setState(() => _isInitialized = true);
             _betterPlayerController!.setVolume(_isMuted ? 0.0 : 1.0);
             widget.post['views'] = (widget.post['views'] as int? ?? 0) + 1;
-            _updateDataControllerWithCurrentState(); // Update controller state after init
+            // If it autoplays on init (though current config is autoPlay: false),
+            // this is where it would call videoDidStartPlaying.
+            // For now, play is triggered by VisibilityDetector or user interaction.
+            _updateDataControllerWithCurrentState();
           }
         } else if (event.betterPlayerEventType == BetterPlayerEventType.exception) {
           print('BetterPlayer error for $_videoUniqueId: ${event.parameters}');
-          if (mounted) setState(() => _isInitialized = false);
-        } else if (event.betterPlayerEventType == BetterPlayerEventType.play || event.betterPlayerEventType == BetterPlayerEventType.pause) {
+          if (mounted) {
+            _dataController.videoDidStopPlaying(_videoUniqueId!); // Ensure lock is released on error
+            setState(() => _isInitialized = false);
+          }
+        } else if (event.betterPlayerEventType == BetterPlayerEventType.play) {
+            _dataController.videoDidStartPlaying(_videoUniqueId!);
+            _updateDataControllerWithCurrentState();
+        } else if (event.betterPlayerEventType == BetterPlayerEventType.pause) {
+            _dataController.videoDidStopPlaying(_videoUniqueId!);
+            _updateDataControllerWithCurrentState();
+        } else if (event.betterPlayerEventType == BetterPlayerEventType.completed) {
+            _dataController.videoDidStopPlaying(_videoUniqueId!);
             _updateDataControllerWithCurrentState();
         } else if (event.betterPlayerEventType == BetterPlayerEventType.progress && _betterPlayerController!.isPlaying()!) {
             if (widget.isFeedContext) _dataController.activeFeedPlayerPosition.value = event.parameters!['progress'] as Duration;
@@ -282,6 +295,9 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
         if (info.visibleFraction == 0) { // Not visible
           if (_betterPlayerController != null) {
             if (_dataController.activeFeedPlayerVideoId.value != _videoUniqueId || !_dataController.isTransitioningVideo.value) {
+              if (_betterPlayerController!.isPlaying() ?? false) {
+                _dataController.videoDidStopPlaying(_videoUniqueId!);
+              }
               _betterPlayerController!.pause();
               _betterPlayerController!.dispose();
               _betterPlayerController = null;
@@ -294,18 +310,24 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
                  setState(() => _isInitialized = false);
             }
           }
-           _updateDataControllerWithCurrentState(); // Update data controller that it stopped
+          // _updateDataControllerWithCurrentState(); // Called by pause event now
         } else { // Visible
           if (!_isInitialized && mounted) {
-            _initializeVideoPlayer(); // Initialize if not already
-          } else if (_isInitialized && _betterPlayerController != null) { // Already initialized, handle play/pause based on visibility
-            if (info.visibleFraction > 0.5 && !_betterPlayerController!.isPlaying()!) {
+            _initializeVideoPlayer(); // Initialize if not already. Play will be handled by its event or below.
+          } else if (_isInitialized && _betterPlayerController != null) { // Already initialized
+            if (info.visibleFraction > 0.5 && !(_betterPlayerController!.isPlaying() ?? false)) {
+              // Before playing, ensure this video can acquire the play lock.
+              // The videoDidStartPlaying call will effectively request the lock.
+              // The actual play() call might be redundant if the event listener handles it,
+              // but it's safer to be explicit here.
+              _dataController.videoDidStartPlaying(_videoUniqueId!); // Announce intention to play
               _betterPlayerController!.play();
-            } else if (info.visibleFraction <= 0.5 && _betterPlayerController!.isPlaying()!) {
+            } else if (info.visibleFraction <= 0.5 && (_betterPlayerController!.isPlaying() ?? false)) {
+              // videoDidStopPlaying will be called by the pause event from BetterPlayerController
               _betterPlayerController!.pause();
             }
             // Removed VideoPlayerController specific logic
-             _updateDataControllerWithCurrentState(); // Update data controller on play/pause
+            // _updateDataControllerWithCurrentState(); // Called by play/pause events now
           }
         }
       },

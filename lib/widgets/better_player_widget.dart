@@ -6,6 +6,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:get/get.dart';
 import 'package:chatter/controllers/data-controller.dart';
+import 'package:chatter/services/custom_cache_manager.dart'; // Import CustomCacheManager
 
 // Widget for video playback using better_player for Android 13 and lower
 class BetterPlayerWidget extends StatefulWidget {
@@ -14,6 +15,9 @@ class BetterPlayerWidget extends StatefulWidget {
   final String displayPath;
   final String? thumbnailUrl;
   final bool isFeedContext; // Added to identify if this player is in the home feed
+  final int? videoWidth;
+  final int? videoHeight;
+  final String? videoOrientation; // e.g., "portrait", "landscape", "square"
 
   const BetterPlayerWidget({
     Key? key,
@@ -22,6 +26,9 @@ class BetterPlayerWidget extends StatefulWidget {
     required this.displayPath,
     this.thumbnailUrl,
     this.isFeedContext = false, // Default to false
+    this.videoWidth,
+    this.videoHeight,
+    this.videoOrientation,
   }) : super(key: key);
 
   @override
@@ -235,7 +242,9 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
         BetterPlayerConfiguration(
           autoPlay: false,
           looping: false,
-          aspectRatio: null, // Use video's intrinsic aspect ratio
+          aspectRatio: (widget.videoWidth != null && widget.videoHeight != null && widget.videoHeight! > 0)
+              ? widget.videoWidth! / widget.videoHeight!
+              : null, // Use video's intrinsic aspect ratio if not provided
           fit: BoxFit.contain, // Ensure entire video is visible
           placeholder: _buildPlaceholder(),
           controlsConfiguration: const BetterPlayerControlsConfiguration(
@@ -385,6 +394,7 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
     if (widget.thumbnailUrl != null && widget.thumbnailUrl!.isNotEmpty) {
       return CachedNetworkImage(
         imageUrl: widget.thumbnailUrl!,
+        cacheManager: CustomCacheManager.instance, // Use custom cache manager
         fit: BoxFit.contain,
         placeholder: (context, url) => const Center(
           child: CircularProgressIndicator(

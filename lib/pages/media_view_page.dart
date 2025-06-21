@@ -17,6 +17,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:intl/intl.dart';
+import 'package:chatter/services/custom_cache_manager.dart'; // Import CustomCacheManager
 
 class MediaViewPage extends StatefulWidget {
   final List<Map<String, dynamic>> attachments;
@@ -238,12 +239,11 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
                           url: optimizedUrl.isNotEmpty ? optimizedUrl : url,
                           file: file,
                           displayPath: displayPath,
-                          useBetterPlayer: true,
+                          useBetterPlayer: true, // This flag could determine which player widget is used if VideoPlayerWidget was also an option here
                           thumbnailUrl: currentAttachment['thumbnailUrl'] as String?,
-                          aspectRatioString: currentAttachment['aspectRatio'] as String?, // Keep as string fallback
-                          numericAspectRatio: (currentAttachment['width'] is num && currentAttachment['height'] is num && (currentAttachment['height'] as num) > 0)
-                              ? (currentAttachment['width'] as num) / (currentAttachment['height'] as num)
-                              : null, // Calculate and pass numeric aspect ratio
+                          videoWidth: currentAttachment['width'] as int?,
+                          videoHeight: currentAttachment['height'] as int?,
+                          videoOrientation: currentAttachment['orientation'] as String?,
                         );
                         break;
                       case 'audio':
@@ -554,8 +554,12 @@ class VideoPlayerContainer extends StatefulWidget {
   final String displayPath;
   final bool useBetterPlayer;
   final String? thumbnailUrl;
-  final String? aspectRatioString; // Backend-provided aspect ratio as string (renamed)
-  final double? numericAspectRatio; // Added for direct aspect ratio
+  // final String? aspectRatioString; // Kept for reference, but numericAspectRatio or width/height is preferred
+  // final double? numericAspectRatio; // Kept for reference
+  final int? videoWidth;
+  final int? videoHeight;
+  final String? videoOrientation;
+
 
   const VideoPlayerContainer({
     Key? key,
@@ -564,8 +568,11 @@ class VideoPlayerContainer extends StatefulWidget {
     required this.displayPath,
     required this.useBetterPlayer,
     this.thumbnailUrl,
-    this.aspectRatioString,
-    this.numericAspectRatio,
+    // this.aspectRatioString,
+    // this.numericAspectRatio,
+    this.videoWidth,
+    this.videoHeight,
+    this.videoOrientation,
   }) : super(key: key);
 
   @override
@@ -575,24 +582,35 @@ class VideoPlayerContainer extends StatefulWidget {
 class _VideoPlayerContainerState extends State<VideoPlayerContainer> {
   @override
   Widget build(BuildContext context) {
-    return BetterPlayerWidget(
+    // Ensure that if useBetterPlayer is false, a different widget (e.g., the main VideoPlayerWidget)
+    // would be instantiated here. For now, it always points to the local BetterPlayerWidget.
+    // This could be a point of future enhancement if different player types are needed in MediaViewPage.
+    return BetterPlayerWidget( // This is the local BetterPlayerWidget defined below
       url: widget.url,
       file: widget.file,
       displayPath: widget.displayPath,
       thumbnailUrl: widget.thumbnailUrl,
-      aspectRatioString: widget.aspectRatioString,
-      numericAspectRatio: widget.numericAspectRatio,
+      // aspectRatioString: widget.aspectRatioString,
+      // numericAspectRatio: widget.numericAspectRatio,
+      videoWidth: widget.videoWidth,
+      videoHeight: widget.videoHeight,
+      videoOrientation: widget.videoOrientation,
     );
   }
 }
 
+// This is the local BetterPlayerWidget definition within MediaViewPage.dart
 class BetterPlayerWidget extends StatefulWidget {
   final String? url;
   final File? file;
   final String displayPath;
   final String? thumbnailUrl;
-  final String? aspectRatioString; // Renamed
-  final double? numericAspectRatio; // Added
+  // final String? aspectRatioString; // Kept for reference
+  // final double? numericAspectRatio; // Kept for reference
+  final int? videoWidth;
+  final int? videoHeight;
+  final String? videoOrientation;
+
 
   const BetterPlayerWidget({
     Key? key,
@@ -600,8 +618,11 @@ class BetterPlayerWidget extends StatefulWidget {
     this.file,
     required this.displayPath,
     this.thumbnailUrl,
-    this.aspectRatioString,
-    this.numericAspectRatio,
+    // this.aspectRatioString,
+    // this.numericAspectRatio,
+    this.videoWidth,
+    this.videoHeight,
+    this.videoOrientation,
   }) : super(key: key);
 
   @override
@@ -612,7 +633,7 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> {
   BetterPlayerController? _betterPlayerController;
   bool _isLoading = true;
   String? _errorMessage;
-  double? _videoAspectRatio;
+  double? _videoAspectRatio; // This will be calculated and set
 
   @override
   void initState() {
@@ -627,20 +648,26 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> {
     });
 
     try {
-      // Prioritize numeric aspect ratio if provided and valid
-      if (widget.numericAspectRatio != null && widget.numericAspectRatio! > 0 && widget.numericAspectRatio!.isFinite) {
-        _videoAspectRatio = widget.numericAspectRatio;
+      // Calculate aspect ratio:
+      // 1. Prioritize direct width/height if valid
+      if (widget.videoWidth != null && widget.videoHeight != null && widget.videoWidth! > 0 && widget.videoHeight! > 0) {
+        _videoAspectRatio = widget.videoWidth! / widget.videoHeight!;
       }
-      // Fallback to parsing the aspect ratio string
-      else if (widget.aspectRatioString != null && widget.aspectRatioString!.isNotEmpty) {
-        final parsedAspectRatioFromString = double.tryParse(widget.aspectRatioString!);
-        if (parsedAspectRatioFromString != null && parsedAspectRatioFromString.isFinite && parsedAspectRatioFromString > 0) {
-          _videoAspectRatio = parsedAspectRatioFromString;
-        } else {
-          debugPrint('Invalid aspect ratio string from backend: ${widget.aspectRatioString}, falling back to player or default');
-        }
-      }
-      // If _videoAspectRatio is still null here, it will be determined after player initialization or default to 16/9.
+      // 2. Fallback to numericAspectRatio (if it were still passed, currently commented out)
+      // else if (widget.numericAspectRatio != null && widget.numericAspectRatio! > 0 && widget.numericAspectRatio!.isFinite) {
+      //   _videoAspectRatio = widget.numericAspectRatio;
+      // }
+      // 3. Fallback to parsing aspectRatioString (if it were still passed, currently commented out)
+      // else if (widget.aspectRatioString != null && widget.aspectRatioString!.isNotEmpty) {
+      //   final parsedAspectRatioFromString = double.tryParse(widget.aspectRatioString!);
+      //   if (parsedAspectRatioFromString != null && parsedAspectRatioFromString.isFinite && parsedAspectRatioFromString > 0) {
+      //     _videoAspectRatio = parsedAspectRatioFromString;
+      //   } else {
+      //     debugPrint('Invalid aspect ratio string: ${widget.aspectRatioString}, falling back to player or default');
+      //   }
+      // }
+      // If _videoAspectRatio is still null, it will be determined by the player after initialization or default to 16/9.
+      // The `videoOrientation` string is available as `widget.videoOrientation` if needed for other logic.
 
       final configuration = BetterPlayerConfiguration(
         autoPlay: true,
@@ -650,6 +677,7 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> {
         placeholder: widget.thumbnailUrl != null
             ? CachedNetworkImage(
                 imageUrl: widget.thumbnailUrl!,
+                cacheManager: CustomCacheManager.instance, // Use custom cache manager
                 fit: BoxFit.contain, // Consistent fit for placeholder
                 width: double.infinity,
                 errorWidget: (context, url, error) => const SizedBox.shrink(),
