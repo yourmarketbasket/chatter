@@ -13,6 +13,8 @@ import 'package:pdfrx/pdfrx.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 import 'package:video_thumbnail/video_thumbnail.dart' as video_thumb;
+import 'package:image/image.dart' as img; // Added for image processing
+import 'package:flutter_video_info/flutter_video_info.dart'; // Added for video processing
 
 // NewPostScreen allows users to create a new post with text and attachments (image, PDF, audio, video).
 class NewPostScreen extends StatefulWidget {
@@ -240,34 +242,74 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
 
   Future<Map<String, dynamic>?> _getImageDimensions(File file) async {
     try {
-      // Create a Completer to capture image size
-      final completer = Completer<Size>();
-      final imageProvider = FileImage(file);
-      final listener = ImageStreamListener(
-        (ImageInfo info, bool synchronousCall) {
-          completer.complete(Size(
-            info.image.width.toDouble(),
-            info.image.height.toDouble(),
-          ));
-        },
-        onError: (exception, stackTrace) {
-          completer.completeError(exception, stackTrace);
-        },
-      );
-      imageProvider.resolve(const ImageConfiguration()).addListener(listener);
+      final imageBytes = await file.readAsBytes();
+      final image = img.decodeImage(imageBytes);
 
-      final size = await completer.future;
-      final width = size.width.toInt();
-      final height = size.height.toInt();
-      final orientation = width > height ? 'landscape' : 'portrait';
-      print('[NewPostScreen] Image Rendered Dimensions: width=$width, height=$height, orientation=$orientation');
-      return {
-        'width': width,
-        'height': height,
-        'orientation': orientation,
-      };
+      if (image != null) {
+        final width = image.width;
+        final height = image.height;
+        String orientation;
+        if (width > height) {
+          orientation = 'landscape';
+        } else if (height > width) {
+          orientation = 'portrait';
+        } else {
+          orientation = 'square';
+        }
+        print('[NewPostScreen] Image Decoded Dimensions: width=$width, height=$height, orientation=$orientation');
+        return {
+          'width': width,
+          'height': height,
+          'orientation': orientation,
+        };
+      } else {
+        print('[NewPostScreen] Error decoding image with image package.');
+        return null;
+      }
     } catch (e) {
-      print('[NewPostScreen] Error getting image dimensions: $e');
+      print('[NewPostScreen] Error getting image dimensions using image package: $e');
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> _getVideoDimensions(File file) async {
+    try {
+      final videoInfo = FlutterVideoInfo();
+      final info = await videoInfo.getVideoInfo(file.path);
+
+      if (info != null && info.width != null && info.height != null) {
+        final width = info.width!.toInt();
+        final height = info.height!.toInt();
+        final duration = info.duration != null ? (info.duration! / 1000).round() : null; // Convert ms to seconds
+        String orientation = info.orientation?.toLowerCase() ?? ''; // e.g. "landscape" or "portrait"
+
+        if (orientation.isEmpty) { // Fallback if orientation is not directly provided
+            if (width > height) {
+            orientation = 'landscape';
+            } else if (height > width) {
+            orientation = 'portrait';
+            } else {
+            orientation = 'square';
+            }
+        }
+        // Normalize orientation string if it comes as "Landscape" or "Portrait"
+        if (orientation.contains("landscape")) orientation = "landscape";
+        if (orientation.contains("portrait")) orientation = "portrait";
+
+
+        print('[NewPostScreen] Video Decoded Dimensions: width=$width, height=$height, orientation=$orientation, duration=$duration');
+        return {
+          'width': width,
+          'height': height,
+          'orientation': orientation,
+          if (duration != null) 'duration': duration,
+        };
+      } else {
+        print('[NewPostScreen] Error decoding video or width/height is null.');
+        return null;
+      }
+    } catch (e) {
+      print('[NewPostScreen] Error getting video dimensions using flutter_video_info: $e');
       return null;
     }
   }
@@ -294,14 +336,14 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
               'filename': file.path.split('/').last,
               'size': fileSize,
             };
-            // Get dimensions using rendered image
+            // Get dimensions using image package
             final dimensions = await _getImageDimensions(file);
             if (dimensions != null) {
-              attachment.addAll(dimensions.cast<String, Object>());
+              attachment.addAll(dimensions.cast<String, Object>()); // Add width, height, orientation
             } else {
-              print('[NewPostScreen] No dimensions or orientation added for image');
+              print('[NewPostScreen] Could not get dimensions for image, will be added without them.');
             }
-            print('[NewPostScreen] Adding to _selectedAttachments: type=image, path=${file.path}, width=${attachment['width'] ?? 'null'}, height=${attachment['height'] ?? 'null'}, orientation=${attachment['orientation'] ?? 'null'}');
+            print('[NewPostScreen] Adding to _selectedAttachments: type=image, path=${file.path}, width=${attachment['width']}, height=${attachment['height']}, orientation=${attachment['orientation']}');
             setState(() {
               _selectedAttachments.add(attachment);
             });
@@ -367,14 +409,14 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
               'filename': file.path.split('/').last,
               'size': fileSize,
             };
-            // Attempt to get dimensions from thumbnail
-            final dimensions = await _getVideoThumbnailDimensions(file.path);
+            // Get dimensions using flutter_video_info
+            final dimensions = await _getVideoDimensions(file);
             if (dimensions != null) {
-              attachment.addAll(dimensions.cast<String, Object>());
+              attachment.addAll(dimensions.cast<String, Object>()); // Adds width, height, orientation, duration
             } else {
-              print('[NewPostScreen] No dimensions or orientation added for video');
+              print('[NewPostScreen] Could not get dimensions for video, will be added without them.');
             }
-            print('[NewPostScreen] Adding to _selectedAttachments: type=video, path=${file.path}, width=${attachment['width'] ?? 'null'}, height=${attachment['height'] ?? 'null'}, orientation=${attachment['orientation'] ?? 'null'}');
+            print('[NewPostScreen] Adding to _selectedAttachments: type=video, path=${file.path}, width=${attachment['width']}, height=${attachment['height']}, orientation=${attachment['orientation']}, duration=${attachment['duration']}');
             setState(() {
               _selectedAttachments.add(attachment);
             });

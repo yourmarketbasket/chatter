@@ -15,12 +15,13 @@ class UploadService {
     sendTimeout: const Duration(seconds: 60),
   ));
 
-  Future<List<Map<String, dynamic>>> uploadFilesToCloudinary(List<File> files) async {
-    print('[UploadService uploadFilesToCloudinary] Received ${files.length} files for upload.');
+  // Method signature changed to accept List<Map<String, dynamic>>
+  Future<List<Map<String, dynamic>>> uploadFilesToCloudinary(List<Map<String, dynamic>> attachmentsData) async {
+    print('[UploadService uploadFilesToCloudinary] Received ${attachmentsData.length} attachments for upload.');
 
     // Validate input
-    if (files.isEmpty) {
-      return [{'success': false, 'message': 'No files provided', 'progress': 0.0}];
+    if (attachmentsData.isEmpty) {
+      return [{'success': false, 'message': 'No attachments provided', 'progress': 0.0}];
     }
 
     List<Map<String, dynamic>> results = [];
@@ -51,8 +52,16 @@ class UploadService {
 
     final Set<String> videoExtensionsForCompression = {'mp4', 'mov', 'avi', 'mkv', 'webm'};
 
-    for (File originalFile in files) {
+    for (Map<String, dynamic> attachmentMap in attachmentsData) {
+      final File originalFile = attachmentMap['file'] as File;
       final originalFilePath = originalFile.path;
+      final int? width = attachmentMap['width'] as int?;
+      final int? height = attachmentMap['height'] as int?;
+      final String? orientation = attachmentMap['orientation'] as String?;
+      final int? duration = attachmentMap['duration'] as int?; // For videos
+      final String attachmentType = attachmentMap['type'] as String? ?? 'unknown';
+
+
       File fileToUpload = originalFile; // By default, upload the original file
       int originalFileSize = await originalFile.length();
       String? uploadedThumbnailUrl;
@@ -66,6 +75,12 @@ class UploadService {
             'message': 'File does not exist: $originalFilePath',
             'filePath': originalFilePath,
             'progress': 0.0,
+            'width': width, // Carry over metadata even on early failure
+            'height': height,
+            'orientation': orientation,
+            'duration': duration,
+            'type': attachmentType, // Use 'type' from attachmentMap as primary type
+            'filename': path.basename(originalFilePath),
           });
           continue;
         }
@@ -77,11 +92,17 @@ class UploadService {
             'message': 'Empty file: $originalFilePath',
             'filePath': originalFilePath,
             'progress': 0.0,
+            'width': width,
+            'height': height,
+            'orientation': orientation,
+            'duration': duration,
+            'type': attachmentType,
+            'filename': path.basename(originalFilePath),
           });
           continue;
         }
 
-        print('[UploadService uploadFilesToCloudinary] Processing file: path=$originalFilePath, size=$originalFileSize bytes');
+        print('[UploadService uploadFilesToCloudinary] Processing file: path=$originalFilePath, size=$originalFileSize bytes, type: $attachmentType, width: $width, height: $height, orientation: $orientation, duration: $duration');
 
         final fileExtension = path.extension(originalFilePath).toLowerCase().replaceFirst('.', '');
         final resourceType = extensionToResourceType[fileExtension] ?? 'auto';
@@ -181,15 +202,21 @@ class UploadService {
           results.add({
             'success': true,
             'url': response.data['secure_url'] as String? ?? '',
-            'thumbnailUrl': uploadedThumbnailUrl, // Add thumbnail URL here
+            'thumbnailUrl': uploadedThumbnailUrl,
             'size': response.data['bytes'] as int? ?? finalFileSize,
-            'type': response.data['format'] as String? ?? fileExtension,
+            // Use attachmentType from input map as the primary type, fallback to Cloudinary's format or extension
+            'type': attachmentType,
             'filename': response.data['original_filename'] as String? ?? path.basename(originalFilePath),
-            'filePath': originalFilePath, // Path of the original file
+            'filePath': originalFilePath,
             'progress': 100.0,
             'resource_type': response.data['resource_type'] as String? ?? resourceType,
+            // Add pre-calculated metadata
+            'width': width,
+            'height': height,
+            'orientation': orientation,
+            'duration': duration,
           });
-          print('[UploadService uploadFilesToCloudinary] Successfully uploaded: $originalFilePath, URL: ${response.data['secure_url']}, Thumbnail: $uploadedThumbnailUrl');
+          print('[UploadService uploadFilesToCloudinary] Successfully uploaded: $originalFilePath, URL: ${response.data['secure_url']}, Thumbnail: $uploadedThumbnailUrl, Width: $width, Height: $height, Orientation: $orientation, Duration: $duration');
         } else {
           final errorMessage = response.data?['error']?['message'] ?? 'Upload failed with status: ${response.statusCode}';
           print('[UploadService uploadFilesToCloudinary] Upload failed for $originalFilePath: $errorMessage');
@@ -198,7 +225,14 @@ class UploadService {
             'message': errorMessage,
             'filePath': originalFilePath,
             'progress': uploadProgress,
-            'thumbnailUrl': uploadedThumbnailUrl, // Still include if thumbnail succeeded but main file failed
+            'thumbnailUrl': uploadedThumbnailUrl,
+             // Add pre-calculated metadata even on failure
+            'type': attachmentType,
+            'filename': path.basename(originalFilePath),
+            'width': width,
+            'height': height,
+            'orientation': orientation,
+            'duration': duration,
           });
         }
       } catch (e, stackTrace) {
@@ -208,7 +242,14 @@ class UploadService {
           'message': 'Upload failed for $originalFilePath: ${e.toString()}',
           'filePath': originalFilePath,
           'progress': 0.0,
-          'thumbnailUrl': uploadedThumbnailUrl, // Include if available even on main error
+          'thumbnailUrl': uploadedThumbnailUrl,
+           // Add pre-calculated metadata even on exception
+          'type': attachmentType,
+          'filename': path.basename(originalFilePath),
+          'width': width,
+          'height': height,
+          'orientation': orientation,
+          'duration': duration,
         });
       } finally {
         // Cleanup: Delete compressed file if it's different from original and not null

@@ -729,7 +729,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         attachment: attachmentMap,
         post: post,
         borderRadius: BorderRadius.zero,
-        isFeedContext: true,
+        isFeedContext: true, // This will be used to tell VideoAttachmentWidget to use 4:3
       );
     } else if (attachmentType == "audio") {
       contentWidget = AudioAttachmentWidget(
@@ -739,30 +739,36 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         borderRadius: BorderRadius.zero,
       );
     } else if (attachmentType == "image") {
+      Widget imageContent;
       if (displayUrl != null && displayUrl.isNotEmpty) {
-        contentWidget = CachedNetworkImage(
+        imageContent = CachedNetworkImage(
           imageUrl: displayUrl,
-          fit: fit,
+          fit: BoxFit.cover, // Ensure image covers the 4:3 area
+          placeholder: (context, url) => Container(color: Colors.grey[900]),
           errorWidget: (context, url, error) => Container(
             color: Colors.grey[900],
             child: const Icon(FeatherIcons.image, color: Colors.grey, size: 40),
           ),
         );
       } else if ((attachmentMap['file'] as File?) != null) {
-        contentWidget = Image.file(
+        imageContent = Image.file(
           attachmentMap['file'] as File,
-          fit: fit,
+          fit: BoxFit.cover, // Ensure image covers the 4:3 area
           errorBuilder: (context, error, stackTrace) => Container(
             color: Colors.grey[900],
             child: const Icon(FeatherIcons.image, color: Colors.grey, size: 40),
           ),
         );
       } else {
-        contentWidget = Container(
+        imageContent = Container(
           color: Colors.grey[900],
           child: const Icon(FeatherIcons.image, color: Colors.grey, size: 40),
         );
       }
+      contentWidget = AspectRatio(
+        aspectRatio: 4 / 3,
+        child: imageContent,
+      );
     } else if (attachmentType == "pdf") {
       if (displayUrl != null && displayUrl.isNotEmpty) {
         contentWidget = PdfViewer.uri(
