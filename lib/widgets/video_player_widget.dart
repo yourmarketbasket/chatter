@@ -14,6 +14,7 @@ class VideoPlayerWidget extends StatefulWidget {
   final File? file;
   final String displayPath;
   final String? thumbnailUrl;
+  final bool isFeedContext; // Added to identify if this player is in the home feed
 
   const VideoPlayerWidget({
     Key? key,
@@ -21,6 +22,7 @@ class VideoPlayerWidget extends StatefulWidget {
     this.file,
     required this.displayPath,
     this.thumbnailUrl,
+    this.isFeedContext = false, // Default to false
   }) : super(key: key);
 
   @override
@@ -46,41 +48,159 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
   final DataController _dataController = Get.find<DataController>();
   String? _videoUniqueId;
   StreamSubscription? _currentlyPlayingVideoSubscription;
+  StreamSubscription? _isTransitioningVideoSubscription; // For seamless transition
 
   @override
   void initState() {
     super.initState();
     _videoUniqueId = widget.url ?? widget.file?.path ?? widget.key.toString();
 
-    // Initialize animation controller for fade effect
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 300), // Smooth fade duration
+      duration: const Duration(milliseconds: 300),
     );
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
-    _initializeVideoPlayer();
+
+    // Check if this player should resume from a transitioning state
+    if (widget.isFeedContext &&
+        _dataController.isTransitioningVideo.value &&
+        _dataController.activeFeedPlayerVideoId.value == _videoUniqueId &&
+        _dataController.activeFeedPlayerController.value is VideoPlayerController) {
+      // This feed player is returning from MediaViewPage
+      _controller = _dataController.activeFeedPlayerController.value as VideoPlayerController?;
+      if (_controller != null) {
+        _isInitialized = true;
+        _isLoading = false;
+        _duration = _controller!.value.duration;
+        _position = _controller!.value.position;
+        _isPlaying = _controller!.value.isPlaying;
+        _showControls = true;
+        _animationController.forward();
+        _attachListeners(); // Attach local listeners
+        // Important: Clear the transitioning state as we've reclaimed the controller
+        _dataController.isTransitioningVideo.value = false;
+        // _dataController.activeFeedPlayerController.value = null; // Keep controller for now
+        // _dataController.activeFeedPlayerVideoId.value = null;
+        // _dataController.activeFeedPlayerPosition.value = null;
+         // Ensure it plays if it was playing
+        if (_isPlaying) {
+          _controller!.play();
+           _dataController.videoDidStartPlaying(_videoUniqueId!); // Notify global state
+        }
+      } else {
+        _initializeVideoPlayer(); // Fallback if controller is null
+      }
+    } else {
+      _initializeVideoPlayer();
+    }
 
     _currentlyPlayingVideoSubscription = _dataController.currentlyPlayingVideoId.listen((playingId) {
       if (_controller != null && _controller!.value.isPlaying) {
         if (playingId != null && playingId != _videoUniqueId) {
           _controller!.pause();
-          // Update local _isPlaying state if needed
           setState(() {
             _isPlaying = false;
           });
         }
       }
     });
+
+    if (widget.isFeedContext) {
+      _isTransitioningVideoSubscription = _dataController.isTransitioningVideo.listen((isTransitioning) {
+        if (isTransitioning && _dataController.activeFeedPlayerVideoId.value == _videoUniqueId) {
+          // If this video is transitioning to MediaViewPage, pause it but don't nullify controller in DataController yet
+          if (_controller != null && _controller!.value.isPlaying) {
+            _controller!.pause();
+          }
+        }
+      });
+    }
+  }
+
+  void _attachListeners() {
+    _controller?.addListener(() {
+      if (mounted) {
+        final newPosition = _controller!.value.position;
+        final newIsPlayingState = _controller!.value.isPlaying;
+
+        // Update state only if it has changed to avoid unnecessary rebuilds
+        bool changed = false;
+        if (_position != newPosition) {
+          _position = newPosition;
+          changed = true;
+        }
+        if (_isPlaying != newIsPlayingState) {
+           if (newIsPlayingState && !_isPlaying) { // Just started playing
+            _dataController.videoDidStartPlaying(_videoUniqueId!);
+            if (widget.isFeedContext) {
+              _dataController.activeFeedPlayerController.value = _controller;
+              _dataController.activeFeedPlayerVideoId.value = _videoUniqueId;
+            }
+          } else if (!newIsPlayingState && _isPlaying) { // Just paused or finished
+            _dataController.videoDidStopPlaying(_videoUniqueId!);
+            if (widget.isFeedContext && _dataController.activeFeedPlayerVideoId.value == _videoUniqueId) {
+              if (!_dataController.isTransitioningVideo.value) {
+                // _dataController.activeFeedPlayerController.value = null; // Don't nullify if it might be reused
+                // _dataController.activeFeedPlayerVideoId.value = null;
+                // _dataController.activeFeedPlayerPosition.value = null;
+              }
+            }
+          }
+          _isPlaying = newIsPlayingState;
+          changed = true;
+        }
+
+        if (widget.isFeedContext && _isPlaying) {
+          _dataController.activeFeedPlayerPosition.value = _position;
+        }
+
+        if (!_isPlaying && !_showControls) {
+          _showControls = true;
+          _animationController.forward();
+          changed = true;
+        }
+
+        if(changed) {
+          setState(() {});
+        }
+      }
+    });
   }
 
   Future<void> _initializeVideoPlayer() async {
+    // Check if we are using a controller passed from MediaViewPage
+    if (_dataController.isTransitioningVideo.value &&
+        _dataController.activeFeedPlayerVideoId.value == _videoUniqueId &&
+        _dataController.activeFeedPlayerController.value is VideoPlayerController &&
+        !widget.isFeedContext) { // This condition is for MediaViewPage using feed's controller
+
+      _controller = _dataController.activeFeedPlayerController.value as VideoPlayerController;
+      // The controller is already initialized and likely playing.
+      // We just need to update local state and attach listeners.
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isInitialized = true;
+          _duration = _controller!.value.duration;
+          _position = _controller!.value.position;
+          _isPlaying = _controller!.value.isPlaying;
+          _showControls = true;
+          _animationController.forward();
+        });
+        _attachListeners();
+        // _dataController.isTransitioningVideo.value = false; // MediaViewPage should manage this upon its exit
+      }
+      return;
+    }
+
+    // Standard initialization
     setState(() {
       _isLoading = true;
       _errorMessage = null;
-      _showControls = true; // Show controls initially
-      _animationController.forward(); // Ensure controls are visible at start
+      _showControls = true;
+      _animationController.forward();
     });
 
     try {
@@ -92,17 +212,19 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
             allowBackgroundPlayback: false,
           ),
           httpHeaders: {
-            'Cache-Control': 'max-age=604800', // Cache videos for 7 days
+            'Cache-Control': 'max-age=604800',
           },
         );
       } else if (widget.file != null) {
         _controller = VideoPlayerController.file(widget.file!);
       } else {
-        setState(() {
-          _isLoading = false;
-          _isInitialized = false;
-          _errorMessage = 'No video source available';
-        });
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _isInitialized = false;
+            _errorMessage = 'No video source available';
+          });
+        }
         return;
       }
 
@@ -164,7 +286,6 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
       _showControls = !_showControls;
       if (_showControls) {
         _animationController.forward();
-        // Start timer to hide controls after 3 seconds if playing
         if (_isPlaying) {
           _hideControlsTimer?.cancel();
           _hideControlsTimer = Timer(const Duration(seconds: 3), () {
@@ -186,7 +307,38 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
   @override
   void dispose() {
     _currentlyPlayingVideoSubscription?.cancel();
-    _controller?.dispose();
+    _isTransitioningVideoSubscription?.cancel(); // Cancel this new subscription
+
+    // Conditional disposal for seamless transition
+    if (widget.isFeedContext &&
+        _dataController.isTransitioningVideo.value &&
+        _dataController.activeFeedPlayerVideoId.value == _videoUniqueId) {
+      // This feed player's controller is being handed over to MediaViewPage.
+      // Do NOT dispose the _controller here.
+      // MediaViewPage or DataController will be responsible for its eventual disposal or hand-back.
+      print("VideoPlayerWidget ($_videoUniqueId in feed) NOT disposing controller due to transition.");
+    } else if (!widget.isFeedContext &&
+               _dataController.activeFeedPlayerVideoId.value == _videoUniqueId &&
+               _dataController.activeFeedPlayerController.value == _controller ) {
+      // This player (in MediaViewPage) was using a controller from the feed.
+      // Do NOT dispose it here. It will be reclaimed by the feed player or disposed by DataController.
+      print("VideoPlayerWidget ($_videoUniqueId in MediaViewPage) NOT disposing shared controller.");
+       // When MediaViewPage is closed, signal that the transition is over so feed can reclaim.
+      if (_dataController.isTransitioningVideo.value && _dataController.activeFeedPlayerVideoId.value == _videoUniqueId) {
+        // _dataController.isTransitioningVideo.value = false; // Feed player's initState will handle this
+      }
+    }
+     else {
+      _controller?.dispose();
+      print("VideoPlayerWidget ($_videoUniqueId) normally disposing controller.");
+      // If this was the active feed player and it's disposed normally (not transitioning)
+      if (widget.isFeedContext && _dataController.activeFeedPlayerVideoId.value == _videoUniqueId) {
+          _dataController.activeFeedPlayerController.value = null;
+          _dataController.activeFeedPlayerVideoId.value = null;
+          _dataController.activeFeedPlayerPosition.value = null;
+      }
+    }
+
     _hideControlsTimer?.cancel();
     _animationController.dispose();
     super.dispose();

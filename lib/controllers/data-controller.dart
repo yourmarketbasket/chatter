@@ -50,6 +50,12 @@ class DataController extends GetxController {
   // For managing single video playback
   final Rxn<String> currentlyPlayingVideoId = Rxn<String>();
 
+  // For seamless video transition
+  final Rxn<Object> activeFeedPlayerController = Rxn<Object>(); // Can be VideoPlayerController or BetterPlayerController
+  final Rxn<String> activeFeedPlayerVideoId = Rxn<String>();
+  final Rxn<Duration> activeFeedPlayerPosition = Rxn<Duration>();
+  final RxBool isTransitioningVideo = false.obs; // True if a video is being transitioned to MediaViewPage
+
   @override
   void onInit() {
     super.onInit();
@@ -308,9 +314,41 @@ class DataController extends GetxController {
     }
   }
 
-  // Add a new post to the beginning of the list
+  // Add a new post to the beginning of the list, preventing duplicates
   void addNewPost(Map<String, dynamic> newPost) {
-    posts.insert(0, newPost);
+    final String? newPostId = newPost['_id'] as String?;
+
+    if (newPostId == null) {
+      // If no ID, can't reliably check for duplicates based on ID.
+      // Depending on policy, either add it, log an error, or use another unique property if available.
+      // For now, let's log and add it to maintain previous behavior for posts without _id.
+      print("Warning: Adding a new post without an '_id'. Cannot check for duplicates by ID. Post data: $newPost");
+      posts.insert(0, newPost);
+      return;
+    }
+
+    // Check if a post with this ID already exists
+    final bool alreadyExists = posts.any((existingPost) {
+      final String? existingPostId = existingPost['_id'] as String?;
+      return existingPostId != null && existingPostId == newPostId;
+    });
+
+    if (!alreadyExists) {
+      posts.insert(0, newPost);
+      print("New post with ID $newPostId added to the list.");
+    } else {
+      // Post already exists. Optionally, update if newPost is "fresher" or different.
+      // For now, just preventing duplicates by not adding again.
+      print("Post with ID $newPostId already exists in the list. Skipping add.");
+
+      // Optional: If you want to replace the existing post with the new one (e.g., if socket data is more canonical)
+      // final int existingPostIndex = posts.indexWhere((p) => (p['_id'] as String?) == newPostId);
+      // if (existingPostIndex != -1) {
+      //   print("Replacing existing post with ID $newPostId with new data.");
+      //   posts[existingPostIndex] = newPost;
+      //   posts.refresh(); // Notify listeners if replacing an item. insert usually notifies.
+      // }
+    }
   }
 
   // Register user

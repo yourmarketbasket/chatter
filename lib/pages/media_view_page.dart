@@ -30,6 +30,8 @@ class MediaViewPage extends StatefulWidget {
   final int viewsCount;
   final int likesCount;
   final int repostsCount;
+  final String? transitionVideoId; // For seamless transition
+  final String? transitionControllerType; // 'video_player' or 'better_player'
 
   const MediaViewPage({
     Key? key,
@@ -42,6 +44,8 @@ class MediaViewPage extends StatefulWidget {
     required this.viewsCount,
     required this.likesCount,
     required this.repostsCount,
+    this.transitionVideoId,
+    this.transitionControllerType,
   }) : super(key: key);
 
   @override
@@ -80,6 +84,39 @@ class _MediaViewPageState extends State<MediaViewPage> {
 
   @override
   void dispose() {
+    // If this MediaViewPage was part of a video transition, signal that it's over.
+    if (widget.transitionVideoId != null &&
+        _dataController.isTransitioningVideo.value &&
+        _dataController.activeFeedPlayerVideoId.value == widget.transitionVideoId) {
+
+      // Check if the controller in DataController is still the one we might have used.
+      // This is a safeguard. The primary check is isTransitioningVideo and activeFeedPlayerVideoId.
+      Object? activeController = _dataController.activeFeedPlayerController.value;
+      bool controllerMatchesTransitionType = false;
+      if (widget.transitionControllerType == 'better_player' && activeController is BetterPlayerController) {
+        controllerMatchesTransitionType = true;
+      } else if (widget.transitionControllerType == 'video_player' && activeController is VideoPlayerController) {
+        controllerMatchesTransitionType = true;
+      }
+
+      if (controllerMatchesTransitionType) {
+          print("MediaViewPage disposing: Ending video transition for ${widget.transitionVideoId}. Feed can reclaim controller.");
+          // The controller itself is not disposed here; it's handed back to the feed widget.
+          // The feed widget's initState or VisibilityDetector will reclaim it.
+          // Setting isTransitioningVideo to false is the main signal.
+          _dataController.isTransitioningVideo.value = false;
+          // DataController's activeFeedPlayerController, videoId, position should remain for the feed player to pick up.
+      } else {
+        // This case should ideally not happen if logic is correct.
+        // It means MediaViewPage thought it was transitioning, but DataController state doesn't match.
+        print("MediaViewPage disposing: Transition mismatch for ${widget.transitionVideoId}. Forcing transition end.");
+        _dataController.isTransitioningVideo.value = false;
+        // Clear active player state as a precaution, as it might be stale or incorrect.
+        // _dataController.activeFeedPlayerController.value = null;
+        // _dataController.activeFeedPlayerVideoId.value = null;
+        // _dataController.activeFeedPlayerPosition.value = null;
+      }
+    }
     _pageController.dispose();
     super.dispose();
   }
@@ -247,6 +284,8 @@ class _MediaViewPageState extends State<MediaViewPage> {
                                 displayPath: displayPath,
                                 isAndroid13OrLower: snapshot.data!,
                                 thumbnailUrl: thumbnailUrl,
+                                // No need to pass isFeedContext, it defaults to false in VideoPlayerWidget/BetterPlayerWidget
+                                // The player widgets themselves will check DataController if isTransitioningVideo is true.
                               );
                             }
                             return const Center(

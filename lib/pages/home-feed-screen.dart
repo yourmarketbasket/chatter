@@ -538,41 +538,81 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
 
   Widget _buildAttachmentGrid(List<Map<String, dynamic>> attachmentsArg, Map<String, dynamic> post) {
     final double itemSpacing = 4.0;
-    final double outerBorderRadius = 12.0;
+    // final double outerBorderRadius = 12.0; // Keep this for ClipRRect if used globally for the block
 
-    if (attachmentsArg.length == 3) {
+    if (attachmentsArg.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    // Layout for 1 attachment
+    if (attachmentsArg.length == 1) {
+      return AspectRatio(
+        aspectRatio: 16 / 9,
+        child: _buildAttachmentWidget(
+          attachmentsArg[0], 0, post,
+          BorderRadius.circular(12.0), // Apply outerBorderRadius directly
+          fit: BoxFit.cover,
+        ),
+      );
+    }
+    // Layout for 2 attachments
+    else if (attachmentsArg.length == 2) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12.0),
+        child: AspectRatio(
+          aspectRatio: 2 * (4/3), // Assuming items are 4:3, total width is 2 * item_width
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: _buildAttachmentWidget(attachmentsArg[0], 0, post, BorderRadius.zero, fit: BoxFit.cover),
+              ),
+              SizedBox(width: itemSpacing),
+              Expanded(
+                child: _buildAttachmentWidget(attachmentsArg[1], 1, post, BorderRadius.zero, fit: BoxFit.cover),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    // Layout for 3 attachments
+    else if (attachmentsArg.length == 3) {
       return LayoutBuilder(
         builder: (context, constraints) {
           double width = constraints.maxWidth;
-          // Define overall aspect ratio for the 3-image block, e.g., 16:9 or similar to Twitter
-          double BORDER_RADIUS = 12;
-          double TOTAL_ASPECT_RATIO = 16 / 9; // Or experiment with 1.8 or 2.0
+          double BORDER_RADIUS = 12.0;
+          // For 3 items, aim for overall aspect ratio ~1.9 to 2.0 (e.g. Twitter's wide format)
+          // Let left item be squarer, right items combine to similar height.
+          // Example: Left item 1:1, Right items combine to 1:1 height-wise.
+          // Total height derived from left item: (width - itemSpacing) / 2
+          // This makes the right items also (width - itemSpacing) / 2 total height.
+          // So rightItemHeight = ((width - itemSpacing) / 2 - itemSpacing) / 2
 
-          double totalHeight = width / TOTAL_ASPECT_RATIO;
-          double leftWidth = (width - itemSpacing) / 2;
-          double rightWidth = (width - itemSpacing) / 2;
-          double rightItemHeight = (totalHeight - itemSpacing) / 2;
+          double leftItemWidth = (width * 0.66) - (itemSpacing / 2) ; // Left item takes 2/3 width
+          double rightColumnWidth = width * 0.33 - (itemSpacing / 2); // Right column takes 1/3
+          // Let's make the total height based on the width of the container, aiming for a 16/9 or similar.
+          double totalHeight = width * (9 / 16); // Common overall aspect ratio
+
 
           return ClipRRect(
             borderRadius: BorderRadius.circular(BORDER_RADIUS),
             child: SizedBox(
-              height: totalHeight,
+              height: totalHeight, // Constrain the height of the entire block
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Left item (larger)
                   SizedBox(
-                    width: leftWidth,
+                    width: leftItemWidth,
                     child: _buildAttachmentWidget(
                       attachmentsArg[0], 0, post,
-                      BorderRadius.zero, // Individual border radius handled by ClipRRect on content
-                      fit: BoxFit.cover, // Ensure it covers the area
+                      BorderRadius.zero,
+                      fit: BoxFit.cover,
                     ),
                   ),
                   SizedBox(width: itemSpacing),
-                  // Right column with two items
                   SizedBox(
-                    width: rightWidth,
+                    width: rightColumnWidth,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -600,38 +640,127 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           );
         },
       );
-    } else {
-      // Existing GridView.builder logic for other counts (1, 2, 4+)
-      return GridView.builder(
-        shrinkWrap: true,
-        physics: NeverScrollableScrollPhysics(),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: attachmentsArg.length == 1 ? 1 : 2,
-          crossAxisSpacing: itemSpacing,
-          mainAxisSpacing: itemSpacing,
-          childAspectRatio: attachmentsArg.length == 1 ? (16/9) : (4/3), // Use a common aspect ratio for single, and 4/3 for 2 or 4+
+    }
+    // Layout for 4 attachments (2x2 grid)
+    else if (attachmentsArg.length == 4) {
+       return ClipRRect(
+        borderRadius: BorderRadius.circular(12.0),
+        child: AspectRatio(
+          aspectRatio: 1 / 1, // Overall square block for 2x2
+          child: GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: itemSpacing,
+              mainAxisSpacing: itemSpacing,
+              childAspectRatio: 1, // Square items
+            ),
+            itemCount: 4,
+            itemBuilder: (context, index) {
+              return _buildAttachmentWidget(attachmentsArg[index], index, post, BorderRadius.zero, fit: BoxFit.cover);
+            },
+          ),
         ),
-        itemCount: attachmentsArg.length,
-        itemBuilder: (context, index) {
-          final attachmentMap = attachmentsArg[index];
-          BorderRadius borderRadius;
-          // Simplified borderRadius for GridView, applied by ClipRRect in _buildAttachmentWidget
-          if (attachmentsArg.length == 1) {
-            borderRadius = BorderRadius.circular(outerBorderRadius);
-          } else if (attachmentsArg.length == 2) {
-            borderRadius = index == 0
-                ? BorderRadius.only(topLeft: Radius.circular(outerBorderRadius), bottomLeft: Radius.circular(outerBorderRadius))
-                : BorderRadius.only(topRight: Radius.circular(outerBorderRadius), bottomRight: Radius.circular(outerBorderRadius));
-          } else { // 4+ items in a 2-column grid
-            if (index == 0) borderRadius = BorderRadius.only(topLeft: Radius.circular(outerBorderRadius));
-            else if (index == 1) borderRadius = BorderRadius.only(topRight: Radius.circular(outerBorderRadius));
-            // For 4 items, index 2 is bottomLeft, index 3 is bottomRight
-            else if (index == attachmentsArg.length - 2 && (index == 2 || attachmentsArg.length %2 != 0 ) ) borderRadius = BorderRadius.only(bottomLeft: Radius.circular(outerBorderRadius));
-            else if (index == attachmentsArg.length - 1 && (index == 3 || attachmentsArg.length %2 == 0) ) borderRadius = BorderRadius.only(bottomRight: Radius.circular(outerBorderRadius));
-            else borderRadius = BorderRadius.zero;
-          }
-          return _buildAttachmentWidget(attachmentMap, index, post, borderRadius, fit: BoxFit.cover);
-        },
+      );
+    }
+    // Layout for 5 attachments (2 items in first row, 3 in second)
+    else if (attachmentsArg.length == 5) {
+      return LayoutBuilder(builder: (context, constraints) {
+        double BORDER_RADIUS = 12.0;
+        double containerWidth = constraints.maxWidth;
+        // Let each item be roughly square.
+        // Row 1 (2 items): item width w1 = (containerWidth - itemSpacing) / 2. Height h1 = w1.
+        // Row 2 (3 items): item width w2 = (containerWidth - 2 * itemSpacing) / 3. Height h2 = w2.
+        // Total height = h1 + itemSpacing + h2.
+        double h1 = (containerWidth - itemSpacing) / 2;
+        double h2 = (containerWidth - 2 * itemSpacing) / 3;
+        double totalHeight = h1 + itemSpacing + h2;
+
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(BORDER_RADIUS),
+          child: SizedBox(
+            height: totalHeight,
+            child: Column(
+              children: [
+                SizedBox(
+                  height: h1,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(child: _buildAttachmentWidget(attachmentsArg[0], 0, post, BorderRadius.zero, fit: BoxFit.cover)),
+                      SizedBox(width: itemSpacing),
+                      Expanded(child: _buildAttachmentWidget(attachmentsArg[1], 1, post, BorderRadius.zero, fit: BoxFit.cover)),
+                    ],
+                  ),
+                ),
+                SizedBox(height: itemSpacing),
+                SizedBox(
+                  height: h2,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(child: _buildAttachmentWidget(attachmentsArg[2], 2, post, BorderRadius.zero, fit: BoxFit.cover)),
+                      SizedBox(width: itemSpacing),
+                      Expanded(child: _buildAttachmentWidget(attachmentsArg[3], 3, post, BorderRadius.zero, fit: BoxFit.cover)),
+                      SizedBox(width: itemSpacing),
+                      Expanded(child: _buildAttachmentWidget(attachmentsArg[4], 4, post, BorderRadius.zero, fit: BoxFit.cover)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      });
+    }
+    // Default fallback for other counts (e.g., 6, 7, 8, 9, 10, 11+)
+    // Uses a 2-column grid. Max items displayed effectively will be limited by UI space or could be capped.
+    // For now, let it flow.
+    else {
+      int crossAxisCount = 3; // Default to 3 columns for > 5 items
+      double childAspectRatio = 1.0; // Square items
+
+      if (attachmentsArg.length > 9) { // For very many items, use smaller aspect ratio or more columns
+          // This part can be refined based on how many items we want to show before a "+N"
+          // For now, stick to 3 columns.
+      }
+
+      // Calculate number of rows for a 3-column grid
+      int numRows = (attachmentsArg.length / crossAxisCount).ceil();
+      // Calculate total height assuming square items and 3 columns
+      // Item width = (constraints.maxWidth - 2 * itemSpacing) / 3
+      // Item height = item width
+      // Total height = numRows * itemHeight + (numRows - 1) * itemSpacing
+      // This needs LayoutBuilder to get constraints.maxWidth
+
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          double itemWidth = (constraints.maxWidth - (crossAxisCount - 1) * itemSpacing) / crossAxisCount;
+          double itemHeight = itemWidth / childAspectRatio; // itemWidth since aspect is 1.0
+          double totalHeight = numRows * itemHeight + (numRows - 1) * itemSpacing;
+
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(12.0),
+            child: SizedBox(
+              height: totalHeight, // Constrain height to prevent overflow
+              child: GridView.builder(
+                shrinkWrap: true, // Important if inside a ListView
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: crossAxisCount,
+                  crossAxisSpacing: itemSpacing,
+                  mainAxisSpacing: itemSpacing,
+                  childAspectRatio: childAspectRatio,
+                ),
+                itemCount: attachmentsArg.length, // Show all attachments
+                itemBuilder: (context, index) {
+                  return _buildAttachmentWidget(attachmentsArg[index], index, post, BorderRadius.zero, fit: BoxFit.cover);
+                },
+              ),
+            ),
+          );
+        }
       );
     }
   }
@@ -668,6 +797,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         androidVersion: androidVersion,
         isLoadingAndroidVersion: isLoadingAndroidVersion,
         boxFit: fit, // Pass fit to video widget
+        isFeedContext: true, // This video is in the feed
       );
     } else if (attachmentType == "audio") {
       contentWidget = AudioAttachmentWidget(
@@ -746,6 +876,13 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
               viewsCount: post['views'] as int? ?? 0,
               likesCount: post['likes'] as int? ?? 0,
               repostsCount: post['reposts'] as int? ?? 0,
+              // Pass transition details if this is a video and it's the one being transitioned
+              transitionVideoId: (attachmentType == "video" && dataController.isTransitioningVideo.value && dataController.activeFeedPlayerVideoId.value == attachmentMap['url'])
+                  ? dataController.activeFeedPlayerVideoId.value
+                  : null,
+              transitionControllerType: (attachmentType == "video" && dataController.isTransitioningVideo.value && dataController.activeFeedPlayerVideoId.value == attachmentMap['url'])
+                  ? (dataController.activeFeedPlayerController.value is BetterPlayerController ? 'better_player' : 'video_player')
+                  : null,
             ),
           ),
         );
