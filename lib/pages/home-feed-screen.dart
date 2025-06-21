@@ -1,4 +1,3 @@
-import 'package:better_player_enhanced/better_player.dart';
 import 'package:chatter/controllers/data-controller.dart';
 import 'package:chatter/pages/new-posts-page.dart';
 import 'package:chatter/pages/reply_page.dart';
@@ -859,7 +858,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
               transitionControllerType: (attachmentType == "video" &&
                       dataController.isTransitioningVideo.value &&
                       dataController.activeFeedPlayerVideoId.value == attachmentMap['url'])
-                  ? (dataController.activeFeedPlayerController.value is BetterPlayerController
+                  ? (dataController.activeFeedPlayerController.value is VideoPlayerController
                       ? 'better_player'
                       : 'video_player')
                   : null,

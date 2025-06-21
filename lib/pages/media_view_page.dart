@@ -1,5 +1,5 @@
+
 import 'package:chatter/controllers/data-controller.dart';
-import 'package:chatter/widgets/video_player_widget.dart' as chatter;
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -15,9 +15,255 @@ import 'dart:math';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:audioplayers/audioplayers.dart' as audioplayers;
 import 'package:video_player/video_player.dart';
+import 'package:flutter/services.dart';
 
-// Assuming VideoPlayerWidget is a standard video_player-based widget in chatter/widgets/video_player_widget.dart
-// Removed unused import: 'package:chatter/pages/home-feed-screen.dart'
+class ResponsiveVideoPlayerWidget extends StatefulWidget {
+  final String? url;
+  final File? file;
+  final String displayPath;
+  final String? thumbnailUrl;
+  final bool isFeedContext;
+  final double aspectRatio;
+
+  const ResponsiveVideoPlayerWidget({
+    Key? key,
+    this.url,
+    this.file,
+    required this.displayPath,
+    this.thumbnailUrl,
+    required this.isFeedContext,
+    required this.aspectRatio,
+  }) : super(key: key);
+
+  @override
+  _ResponsiveVideoPlayerWidgetState createState() => _ResponsiveVideoPlayerWidgetState();
+}
+
+class _ResponsiveVideoPlayerWidgetState extends State<ResponsiveVideoPlayerWidget> {
+  VideoPlayerController? _controller;
+  bool _isInitialized = false;
+  bool _isPlaying = false;
+  bool _isLoading = true;
+  bool _isFullScreen = false;
+  String? _errorMessage;
+  Duration _position = Duration.zero;
+  Duration _duration = Duration.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeVideoPlayer();
+  }
+
+  Future<void> _initializeVideoPlayer() async {
+    try {
+      if (widget.url != null && widget.url!.isNotEmpty) {
+        _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url!));
+      } else if (widget.file != null) {
+        _controller = VideoPlayerController.file(widget.file!);
+      } else {
+        setState(() {
+          _isLoading = false;
+          _isInitialized = false;
+          _errorMessage = 'No video source available';
+        });
+        return;
+      }
+
+      await _controller!.initialize();
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isInitialized = true;
+          _duration = _controller!.value.duration;
+        });
+        // Start playback automatically once initialized
+        _controller!.play();
+        _isPlaying = true;
+        _controller!.addListener(() {
+          if (mounted) {
+            setState(() {
+              _isPlaying = _controller!.value.isPlaying;
+              _position = _controller!.value.position;
+            });
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isInitialized = false;
+          _errorMessage = 'Error loading video: $e';
+        });
+      }
+    }
+  }
+
+  void _toggleFullScreen() {
+    setState(() {
+      _isFullScreen = !_isFullScreen;
+    });
+
+    if (_isFullScreen) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+    } else {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_isFullScreen) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
+    }
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final minutes = duration.inMinutes.remainder(60);
+    final seconds = duration.inSeconds.remainder(60);
+    return '${twoDigits(minutes)}:${twoDigits(seconds)}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading || (!_isInitialized && _errorMessage == null)) {
+      return AspectRatio(
+        aspectRatio: widget.aspectRatio,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            widget.thumbnailUrl != null && widget.thumbnailUrl!.isNotEmpty
+                ? CachedNetworkImage(
+                    imageUrl: widget.thumbnailUrl!,
+                    fit: BoxFit.cover, // Fill entire width, maintain aspect ratio
+                    width: double.infinity, // Ensure thumbnail spans full width
+                    placeholder: (context, url) => const Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
+                      ),
+                    ),
+                    errorWidget: (context, url, error) => _buildError(context, 'Error loading thumbnail'),
+                  )
+                : const SizedBox(),
+            const CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (!_isInitialized || _errorMessage != null) {
+      return _buildError(context, _errorMessage ?? 'Video player not initialized');
+    }
+
+    return AspectRatio(
+      aspectRatio: widget.aspectRatio,
+      child: Stack(
+        alignment: Alignment.bottomCenter,
+        children: [
+          VideoPlayer(_controller!),
+          Row(
+            children: [
+              IconButton(
+                icon: Icon(
+                  _isPlaying ? Icons.pause : Icons.play_arrow,
+                  color: Colors.white,
+                  size: 24,
+                ),
+                onPressed: () {
+                  if (_isInitialized) {
+                    if (_isPlaying) {
+                      _controller!.pause();
+                    } else {
+                      _controller!.play();
+                    }
+                    setState(() {});
+                  }
+                },
+              ),
+              Text(
+                _formatDuration(_position),
+                style: const TextStyle(color: Colors.white, fontSize: 12),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: VideoProgressIndicator(
+                  _controller!,
+                  allowScrubbing: true,
+                  colors: const VideoProgressColors(
+                    playedColor: Colors.tealAccent,
+                    bufferedColor: Colors.grey,
+                    backgroundColor: Colors.black54,
+                  ),
+                  padding: EdgeInsets.zero,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                _formatDuration(_duration),
+                style: const TextStyle(color: Colors.white, fontSize: 12),
+              ),
+              IconButton(
+                icon: Icon(
+                  _isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen,
+                  color: Colors.white,
+                  size: 24,
+                ),
+                onPressed: _toggleFullScreen,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildError(BuildContext context, String message) {
+    return AspectRatio(
+      aspectRatio: widget.aspectRatio,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(
+            Icons.error_outline,
+            color: Colors.redAccent,
+            size: 50,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            message,
+            style: const TextStyle(color: Colors.white70, fontSize: 16),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            widget.displayPath.split('/').last,
+            style: const TextStyle(color: Colors.grey, fontSize: 12),
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class MediaViewPage extends StatefulWidget {
   final List<Map<String, dynamic>> attachments;
@@ -70,7 +316,6 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
       duration: const Duration(milliseconds: 300),
     );
 
-    // Validate attachments
     if (widget.attachments.any((item) => item is! Map<String, dynamic>)) {
       debugPrint("CRITICAL WARNING: MediaViewPage received invalid attachments list.");
     }
@@ -81,7 +326,6 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
 
   @override
   void dispose() {
-    // Handle video transition logic
     if (widget.transitionVideoId != null && _dataController.activeFeedPlayerVideoId.value == widget.transitionVideoId) {
       if (_dataController.isTransitioningVideo.value) {
         final currentControllerInDC = _dataController.activeFeedPlayerController.value;
@@ -105,19 +349,24 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
   String _optimizeCloudinaryVideoUrl(String? url) {
     if (url == null || !url.contains('cloudinary.com')) return url ?? '';
     final uri = Uri.parse(url);
+    final screenWidth = MediaQuery.of(Get.context!).size.width;
+    // Calculate target width to match device screen, rounded to nearest 100 for efficiency
+    final targetWidth = ((screenWidth * 0.9).roundToDouble() / 100).round() * 100;
     final optimizedParams = {
       ...uri.queryParameters,
-      'q': 'auto:good',
-      'f': 'auto',
-      'c': 'scale',
-      'ac': 'aac',
-      'vc': 'auto',
-      'dpr': 'auto',
-      'cs': 'hls',
-      'w': '1280',
-      'h': '720',
-      'r': '24',
-      'b': 'auto',
+      'q': 'auto:low', // Prioritize low quality for faster loading
+      'f': 'auto', // Automatically select best format (usually HLS)
+      'c': 'scale', // Scale to fit dimensions
+      'ac': 'aac', // Use AAC for audio codec
+      'vc': 'auto', // Auto video codec (usually H.264 or VP9)
+      'dpr': 'auto', // Device pixel ratio
+      'cs': 'hls', // Use HLS for adaptive streaming
+      'w': targetWidth.toString(), // Match device width for efficiency
+      'h': (targetWidth / (16 / 9)).round().toString(), // Maintain 16:9 if no aspect ratio provided
+      'r': '24', // Frame rate capped at 24fps for smoother streaming
+      'b': 'auto', // Auto bitrate for adaptive streaming
+      'so': '0', // Start offset at 0 for immediate playback
+      'fl': 'progressive', // Ensure progressive loading for HLS
     };
     return uri.replace(queryParameters: optimizedParams).toString();
   }
@@ -150,6 +399,7 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
+    final deviceWidth = MediaQuery.of(context).size.width;
     return Scaffold(
       extendBodyBehindAppBar: true,
       backgroundColor: Colors.black,
@@ -223,6 +473,8 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
                     final String type = currentAttachment['type']?.toString().toLowerCase() ?? 'unknown';
                     final String displayPath = url ?? file?.path ?? 'Unknown attachment';
                     final String optimizedUrl = type == 'video' ? _optimizeCloudinaryVideoUrl(url) : _optimizeCloudinaryUrl(url);
+                    final num? width = currentAttachment['width'] as num?;
+                    final num? height = currentAttachment['height'] as num?;
 
                     Widget mediaWidget;
                     switch (type) {
@@ -233,13 +485,19 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
                         mediaWidget = _buildPdfViewer(context, currentAttachment, displayPath, optimizedUrl);
                         break;
                       case 'video':
-                        mediaWidget = chatter.VideoPlayerWidget(
-                          key: Key(currentAttachment['url'] ?? currentAttachment['file']?.path ?? index.toString()),
-                          url: optimizedUrl.isNotEmpty ? optimizedUrl : url,
-                          file: file,
-                          displayPath: displayPath,
-                          thumbnailUrl: currentAttachment['thumbnailUrl'] as String?,
-                          isFeedContext: false,
+                        double aspectRatio = (width != null && height != null && width > 0 && height > 0)
+                            ? width / height
+                            : 16 / 9; // Default to 16:9 if dimensions are invalid
+                        mediaWidget = Center(
+                          child: ResponsiveVideoPlayerWidget(
+                            key: Key(currentAttachment['url'] ?? currentAttachment['file']?.path ?? index.toString()),
+                            url: optimizedUrl.isNotEmpty ? optimizedUrl : url,
+                            file: file,
+                            displayPath: displayPath,
+                            thumbnailUrl: currentAttachment['thumbnailUrl'] as String?,
+                            isFeedContext: false,
+                            aspectRatio: aspectRatio,
+                          ),
                         );
                         break;
                       case 'audio':
@@ -258,7 +516,7 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
                           iconColor: Colors.grey[600],
                         );
                     }
-                    return Center(child: mediaWidget);
+                    return mediaWidget;
                   },
                 ),
               ),
