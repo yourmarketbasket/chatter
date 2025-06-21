@@ -10,12 +10,14 @@ class BetterPlayerWidget extends StatefulWidget {
   final String? url;
   final File? file;
   final String displayPath;
+  final double? aspectRatio;
 
   const BetterPlayerWidget({
     Key? key,
     this.url,
     this.file,
     required this.displayPath,
+    this.aspectRatio,
   }) : super(key: key);
 
   @override
@@ -114,7 +116,7 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
         BetterPlayerConfiguration(
           autoPlay: false,
           looping: false,
-          aspectRatio: _aspectRatio ?? 16 / 9, // Fallback to 16:9
+          aspectRatio: widget.aspectRatio ?? _aspectRatio ?? 16 / 9, // Prioritize widget.aspectRatio
           controlsConfiguration: const BetterPlayerControlsConfiguration(
             showControls: false, // We'll use custom controls
           ),

@@ -8,6 +8,7 @@ class Attachment {
   final int? size;
   final String? url;
   final String? thumbnailUrl;
+  final double? aspectRatio;
 
   Attachment({
     this.file,
@@ -16,6 +17,7 @@ class Attachment {
     this.size,
     this.url,
     this.thumbnailUrl,
+    this.aspectRatio,
   });
 }
 

@@ -63,26 +63,35 @@ class _MediaViewPageState extends State<MediaViewPage> {
   }
 
   // Optimize Cloudinary URL for videos
-  String _optimizeCloudinaryVideoUrl(String? url) {
+  String _optimizeCloudinaryVideoUrl(String? url, double? aspectRatio) {
     if (url == null || !url.contains('cloudinary.com')) return url ?? '';
     final uri = Uri.parse(url);
     
     // Video-specific optimization parameters
-    final optimizedParams = {
+    Map<String, String> optimizedParams = {
       ...uri.queryParameters,
       'q': 'auto:good',
       'f': 'auto',
-      'c': 'scale',
+      'c': 'limit', // Use limit to scale down if needed, preserving aspect ratio
       'ac': 'aac',
       'vc': 'auto',
       'dpr': 'auto',
-      'ar': '16:9',
-      'cs': 'hls',
-      'w': '1280',
-      'h': '720',
-      'r': '24',
-      'b': 'auto',
+      // 'ar': '16:9', // Removed hardcoded aspect ratio
+      'cs': 'hls', // Consider if HLS is always needed or adaptive streaming like DASH
+      'w': '1280', // Max width, height will adjust by aspect ratio with c_limit or c_scale
+      // 'h': '720', // Height should not be fixed if width is set and aspect ratio is maintained
+      'r': '24', // Frame rate
+      'b': 'auto', // Bitrate
     };
+
+    // Cloudinary typically uses `ar_x.y` for aspect ratio, e.g. `ar_1.777` for 16:9
+    // or it can take `w_1280,c_scale` and it will maintain aspect ratio.
+    // By removing 'ar' and 'h' (if 'w' and 'c_limit' or 'c_scale' are set), Cloudinary should respect original AR.
+    // If we wanted to explicitly pass it, it might look like:
+    // if (aspectRatio != null && aspectRatio > 0) {
+    //   optimizedParams['ar'] = aspectRatio.toStringAsFixed(3); // e.g., "1.777"
+    // }
+    // For now, removing 'ar' and relying on 'c_limit' and 'w' is safer.
     
     return uri.replace(queryParameters: optimizedParams).toString();
   }
@@ -142,7 +151,7 @@ class _MediaViewPageState extends State<MediaViewPage> {
                 final Attachment currentAttachment = widget.attachments[index];
                 final String displayPath = currentAttachment.url ?? currentAttachment.file?.path ?? 'Unknown attachment';
                 final String optimizedUrl = currentAttachment.type.toLowerCase() == 'video' 
-                    ? _optimizeCloudinaryVideoUrl(currentAttachment.url)
+                    ? _optimizeCloudinaryVideoUrl(currentAttachment.url, currentAttachment.aspectRatio)
                     : _optimizeCloudinaryUrl(currentAttachment.url);
 
                 Widget mediaWidget;
@@ -163,6 +172,7 @@ class _MediaViewPageState extends State<MediaViewPage> {
                             file: currentAttachment.file,
                             displayPath: displayPath,
                             isAndroid13OrLower: snapshot.data!,
+                            aspectRatio: currentAttachment.aspectRatio,
                           );
                         }
                         return const Center(
@@ -360,6 +370,7 @@ class VideoPlayerContainer extends StatefulWidget {
   final File? file;
   final String displayPath;
   final bool isAndroid13OrLower;
+  final double? aspectRatio;
 
   const VideoPlayerContainer({
     Key? key,
@@ -367,6 +378,7 @@ class VideoPlayerContainer extends StatefulWidget {
     this.file,
     required this.displayPath,
     required this.isAndroid13OrLower,
+    this.aspectRatio,
   }) : super(key: key);
 
   @override
@@ -514,11 +526,13 @@ class _VideoPlayerContainerState extends State<VideoPlayerContainer> {
             url: widget.url,
             file: widget.file,
             displayPath: widget.displayPath,
+            aspectRatio: widget.aspectRatio,
           )
         : VideoPlayerWidget(
             url: widget.url,
             file: widget.file,
             displayPath: widget.displayPath,
+            aspectRatio: widget.aspectRatio,
           );
   }
 }

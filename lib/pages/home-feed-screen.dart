@@ -28,6 +28,8 @@ import 'package:chatter/widgets/video_attachment_widget.dart';
 import 'package:chatter/widgets/audio_attachment_widget.dart';
 import 'package:chatter/models/feed_models.dart';
 import 'package:flutter_expandable_fab/flutter_expandable_fab.dart';
+import 'dart:async'; // For Completer
+import 'package:flutter/widgets.dart' as flutter_widgets; // For ImageConfiguration
 
 class HomeFeedScreen extends StatefulWidget {
   const HomeFeedScreen({Key? key}) : super(key: key);
@@ -131,52 +133,107 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     }
   }
 
-  Future<void> _addPost(String content, List<Attachment> attachments) async {
-    print('[HomeFeedScreen _addPost] Received ${attachments.length} attachments.');
-    for (int i = 0; i < attachments.length; i++) {
-      final a = attachments[i];
-      try {
-        print('[HomeFeedScreen _addPost] Attachment ${i+1}: type=${a.type}, path=${a.file?.path}, file_exists_sync=${a.file?.existsSync()}, length_sync=${a.file?.lengthSync()}, filename=${a.filename}, size=${a.size}, url=${a.url}');
-      } catch (e) {
-        print('[HomeFeedScreen _addPost] Attachment ${i+1}: type=${a.type}, path=${a.file?.path}, url=${a.url} - Error getting file stats: $e');
+  Future<double?> _getImageAspectRatio(File imageFile) async {
+    try {
+      final image = Image.file(imageFile);
+      final completer = Completer<Size>();
+      image.image.resolve(flutter_widgets.ImageConfiguration()).addListener(
+        ImageStreamListener((flutter_widgets.ImageInfo info, bool _) {
+          if (!completer.isCompleted) {
+            completer.complete(Size(info.image.width.toDouble(), info.image.height.toDouble()));
+          }
+        }),
+      );
+      final imageSize = await completer.future;
+      if (imageSize.height > 0) {
+        return imageSize.width / imageSize.height;
+      }
+    } catch (e) {
+      print("[HomeFeedScreen _getImageAspectRatio] Error calculating image aspect ratio: $e");
+    }
+    return null;
+  }
+
+  Future<double?> _getVideoAspectRatio(File videoFile) async {
+    VideoPlayerController? tempController;
+    try {
+      tempController = VideoPlayerController.file(videoFile);
+      await tempController.initialize();
+      final size = tempController.value.size;
+      if (size.height > 0 && size.width > 0) {
+        return size.width / size.height;
+      }
+    } catch (e) {
+      print("[HomeFeedScreen _getVideoAspectRatio] Error calculating video aspect ratio: $e");
+    } finally {
+      await tempController?.dispose();
+    }
+    return null;
+  }
+
+  Future<void> _addPost(String content, List<Attachment> attachmentsFromPicker) async {
+    print('[HomeFeedScreen _addPost] Received ${attachmentsFromPicker.length} attachments from picker.');
+
+    List<Map<String, dynamic>> filesToUploadDetails = [];
+    List<File> filesForCloudinary = [];
+
+    for (var attachmentInput in attachmentsFromPicker) {
+      if (attachmentInput.file != null) {
+        double? aspectRatio;
+        if (attachmentInput.type == 'image') {
+          aspectRatio = await _getImageAspectRatio(attachmentInput.file!);
+        } else if (attachmentInput.type == 'video') {
+          aspectRatio = await _getVideoAspectRatio(attachmentInput.file!);
+        }
+        filesForCloudinary.add(attachmentInput.file!);
+        filesToUploadDetails.add({
+          'file': attachmentInput.file!,
+          'type': attachmentInput.type,
+          'filename': attachmentInput.filename ?? attachmentInput.file!.path.split('/').last,
+          'aspectRatio': aspectRatio,
+          'originalPickerAttachment': attachmentInput // Keep a reference if needed later
+        });
+        print('[HomeFeedScreen _addPost] Prepared file for upload: ${attachmentInput.file!.path}, type: ${attachmentInput.type}, aspectRatio: $aspectRatio');
       }
     }
 
     List<Attachment> uploadedAttachments = [];
-    if (attachments.isNotEmpty) {
-      List<File> files = attachments.where((a) => a.file != null).map((a) => a.file!).toList();
-      print('[HomeFeedScreen _addPost] Extracted ${files.length} files for upload:');
-      for (int i = 0; i < files.length; i++) {
-        final f = files[i];
-        try {
-          print('[HomeFeedScreen _addPost] File ${i+1} for upload: path=${f.path}, exists_sync=${f.existsSync()}, length_sync=${f.lengthSync()}');
-        } catch (e) {
-          print('[HomeFeedScreen _addPost] File ${i+1} for upload: path=${f.path} - Error getting file stats: $e');
-        }
-      }
-      List<Map<String, dynamic>> uploadResults = await dataController.uploadFilesToCloudinary(files);
+    if (filesForCloudinary.isNotEmpty) {
+      // Assuming dataController.uploadFilesToCloudinary now accepts List<Map<String, dynamic>>
+      // or that we adapt by passing filesForCloudinary and then merging results.
+      // For now, let's assume it returns results in the same order as filesForCloudinary.
+      // The conceptual DataController change implies it might return aspectRatio if calculated server-side,
+      // but here we are calculating client-side.
+      List<Map<String, dynamic>> uploadResults = await dataController.uploadFilesToCloudinary(filesForCloudinary);
 
-      for (int i = 0; i < attachments.length; i++) {
-        var result = uploadResults[i];
-        print(result);
+      for (int i = 0; i < uploadResults.length; i++) {
+        var result = uploadResults[i]; // This is the Cloudinary response part
+        var fileDetail = filesToUploadDetails[i]; // This contains our pre-calculated aspectRatio
+
         if (result['success'] == true) {
           String originalUrl = result['url'] as String;
-          String? thumbnailUrl = attachments[i].type == 'video'
+          String? thumbnailUrl = fileDetail['type'] == 'video'
               ? originalUrl.replaceAll('/upload/', '/upload/so_0,q_auto:low/')
               : null;
+
+          File currentFile = fileDetail['file'] as File;
+          int fileSize = await currentFile.length();
+
           uploadedAttachments.add(Attachment(
-            file: attachments[i].file,
-            type: attachments[i].type,
-            filename: attachments[i].file?.path.split('/').last ?? 'unknown',
-            size: attachments[i].file != null ? await attachments[i].file!.length() : 0,
+            // file: currentFile, // Keep if needed, or nullify after upload if backend only stores URL
+            type: fileDetail['type'] as String,
+            filename: fileDetail['filename'] as String?,
+            size: fileSize,
             url: originalUrl,
             thumbnailUrl: thumbnailUrl,
+            aspectRatio: fileDetail['aspectRatio'] as double?,
           ));
+          print('[HomeFeedScreen _addPost] Successfully processed uploaded file: $originalUrl, aspectRatio: ${fileDetail['aspectRatio']}');
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'Failed to upload ${attachments[i].file?.path.split('/').last}: ${result['message']}',
+                'Failed to upload ${fileDetail['filename']}: ${result['message']}',
                 style: GoogleFonts.roboto(color: Colors.white),
               ),
               backgroundColor: Colors.red[700],
@@ -200,6 +257,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         'size': att.size,
         'type': att.type,
         'thumbnailUrl': att.thumbnailUrl,
+        'aspectRatio': att.aspectRatio, // Sending aspectRatio to backend
       }).toList(),
     };
 
@@ -729,6 +787,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                   size: att['size'],
                   url: att['url'] as String?,
                   thumbnailUrl: att['thumbnailUrl'] as String?,
+                  aspectRatio: (att['aspectRatio'] as num?)?.toDouble(), // Read aspectRatio from backend data
                 );
               }).toList() ?? [],
               replies: (postMap['replies'] as List<dynamic>?)?.cast<String>() ?? [],
