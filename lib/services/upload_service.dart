@@ -258,18 +258,22 @@ class UploadService {
           'aspectRatio': aspectRatio, // Include aspectRatio in exception result
         });
       } finally {
-        // Cleanup: Delete compressed file if it's different from original and not null
-        if (fileToUpload.path != originalFilePath && await fileToUpload.exists()) {
-            // This check is a bit problematic because VideoCompress library might manage its own cache.
-            // If mediaInfo.deleteOrigin = true was used, this wouldn't be needed.
-            // For now, let's assume VideoCompress cleans its own temp files or stores them in a cache.
-            // If we created fileToUpload from mediaInfo.file, and deleteOrigin was false,
-            // then mediaInfo.file points to a temporary location.
-            // The VideoCompress documentation should be consulted for its temporary file management.
-            // For safety, if we are sure `fileToUpload` is a temporary compressed file we created, we'd delete it.
-            // await fileToUpload.delete();
-            // print('[UploadService uploadFilesToCloudinary] Deleted temporary compressed file: ${fileToUpload.path}');
+        // Cleanup: Delete compressed video file if it was created and is different from the original.
+        // fileToUpload could be originalFile or mediaInfo.file.
+        // We only want to delete if fileToUpload is the compressed file.
+        if (fileToUpload.path != originalFilePath && originalFile.path != fileToUpload.path) { // Ensure it's the compressed file
+            if (await fileToUpload.exists()) {
+                try {
+                    await fileToUpload.delete();
+                    if (kDebugMode) {
+                        print('[UploadService uploadFilesToCloudinary] Deleted temporary compressed video file: ${fileToUpload.path}');
+                    }
+                } catch (e) {
+                    print('[UploadService uploadFilesToCloudinary] Error deleting temporary compressed video file ${fileToUpload.path}: $e');
+                }
+            }
         }
+
         // Cleanup: Delete temporary thumbnail file
         if (tempThumbnailFile != null && await tempThumbnailFile.exists()) {
           try {

@@ -7,7 +7,7 @@ class CustomCacheManager {
     Config(
       key,
       stalePeriod: const Duration(days: 15), // How long to keep items in cache before revalidating
-      maxNrOfCacheObjects: 500, // Maximum number of objects in cache
+      maxNrOfCacheObjects: 150, // Maximum number of objects in cache (Reduced from 500)
       // You might also consider fileService: HttpFileService() if not default
     ),
   );

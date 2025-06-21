@@ -57,6 +57,39 @@ class DataController extends GetxController {
   final RxBool isTransitioningVideo = false.obs; // True if a video is being transitioned to MediaViewPage
   // final RxInt androidSDKVersion = 0.obs; // Removed as player choice is now fixed to better_player
 
+  // Method to reset video transition state
+  void clearVideoTransitionState({String? expectedVideoId}) {
+    bool stateCleared = false;
+    if (expectedVideoId != null && activeFeedPlayerVideoId.value != null) {
+      if (activeFeedPlayerVideoId.value == expectedVideoId) {
+        print("[DataController] Clearing video transition state for expected video ID: $expectedVideoId");
+        activeFeedPlayerController.value = null;
+        activeFeedPlayerVideoId.value = null;
+        activeFeedPlayerPosition.value = null;
+        isTransitioningVideo.value = false;
+        stateCleared = true;
+      } else {
+        print("[DataController] clearVideoTransitionState called for $expectedVideoId, but active ID is ${activeFeedPlayerVideoId.value}. State not cleared by this call.");
+      }
+    } else if (expectedVideoId == null && isTransitioningVideo.value) {
+      // If no specific video ID is expected, clear if a transition is marked as active.
+      // This is a more general cleanup, use cautiously.
+      print("[DataController] Clearing video transition state (no specific video ID expected, but isTransitioningVideo was true). Active ID was ${activeFeedPlayerVideoId.value}");
+      activeFeedPlayerController.value = null;
+      activeFeedPlayerVideoId.value = null;
+      activeFeedPlayerPosition.value = null;
+      isTransitioningVideo.value = false;
+      stateCleared = true;
+    }
+
+    if (stateCleared) {
+      print("[DataController] Video transition state has been cleared.");
+    } else {
+      print("[DataController] Video transition state was not cleared by this call (conditions not met or already clear). isTransitioningVideo: ${isTransitioningVideo.value}, activeFeedPlayerVideoId: ${activeFeedPlayerVideoId.value}");
+    }
+  }
+
+
   @override
   void onInit() {
     super.onInit();

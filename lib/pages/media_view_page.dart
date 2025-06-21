@@ -79,27 +79,27 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
 
   @override
   void dispose() {
-    if (widget.transitionVideoId != null &&
-        _dataController.isTransitioningVideo.value &&
-        _dataController.activeFeedPlayerVideoId.value == widget.transitionVideoId) {
-      final activeController = _dataController.activeFeedPlayerController.value;
-      bool controllerMatchesTransitionType = false;
-      if (widget.transitionControllerType == 'better_player' && activeController is BetterPlayerController) {
-        controllerMatchesTransitionType = true;
-      } else if (widget.transitionControllerType == 'video_player' && activeController is VideoPlayerController) {
-        controllerMatchesTransitionType = true;
-      }
-
-      if (controllerMatchesTransitionType) {
-        _dataController.isTransitioningVideo.value = false;
-      } else {
-        debugPrint("MediaViewPage disposing: Transition mismatch for ${widget.transitionVideoId}.");
-        _dataController.isTransitioningVideo.value = false;
-      }
+    debugPrint("MediaViewPage disposing for video ID: ${widget.transitionVideoId ?? 'N/A'}");
+    if (widget.transitionVideoId != null) {
+        // Clear the transition state, specifically for this video ID.
+        // This ensures that if MediaViewPage is disposed, the DataController doesn't mistakenly
+        // think a transition for this video is still pending.
+        _dataController.clearVideoTransitionState(expectedVideoId: widget.transitionVideoId);
+    } else {
+        // If there's no specific transitionVideoId, but isTransitioningVideo is somehow true,
+        // it might indicate a broader issue or a different kind of active transition not tied to this page's specific video.
+        // Calling clearVideoTransitionState without an ID is more aggressive, so use with caution or specific logic.
+        // For now, we only clear if a specific video ID was involved with this MediaViewPage instance.
+        if (_dataController.isTransitioningVideo.value) {
+            debugPrint("MediaViewPage disposing: isTransitioningVideo is true, but no specific transitionVideoId for this page. Review this case.");
+            // Optionally, call _dataController.clearVideoTransitionState() if it's deemed safe to clear any active transition.
+        }
     }
+
     _pageController.dispose();
     _transformationController?.dispose();
     _transformationAnimationController?.dispose();
+    debugPrint("MediaViewPage disposed successfully.");
     super.dispose();
   }
 
@@ -669,8 +669,8 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> {
           widget.url!,
           cacheConfiguration: const BetterPlayerCacheConfiguration(
             useCache: true,
-            maxCacheSize: 10 * 1024 * 1024,
-            maxCacheFileSize: 10 * 1024 * 1024,
+            maxCacheSize: 50 * 1024 * 1024, // 50 MB (Consistent with global widget)
+            maxCacheFileSize: 8 * 1024 * 1024, // 8 MB per file (Consistent with global widget)
           ),
         );
       } else if (widget.file != null) {

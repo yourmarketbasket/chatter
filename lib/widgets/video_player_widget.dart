@@ -307,43 +307,39 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
     _currentlyPlayingVideoSubscription?.cancel();
     _isTransitioningVideoSubscription?.cancel();
 
-    _controller?.removeListener(_onControllerUpdate); // Remove the consolidated listener
+    _controller?.removeListener(_onControllerUpdate);
 
-    // Conditional disposal for seamless transition
-    if (widget.isFeedContext &&
-        _dataController.isTransitioningVideo.value &&
-        _dataController.activeFeedPlayerVideoId.value == _videoUniqueId) {
-      // This feed player's controller is being handed over to MediaViewPage.
-      // Do NOT dispose the _controller here.
-      print("VideoPlayerWidget ($_videoUniqueId in feed) NOT disposing controller due to transition.");
-    } else if (!widget.isFeedContext &&
-               _dataController.activeFeedPlayerVideoId.value == _videoUniqueId &&
-               _dataController.activeFeedPlayerController.value == _controller ) {
+    final bool isCurrentlyTransitioningThisVideo = _dataController.isTransitioningVideo.value &&
+                                                 _dataController.activeFeedPlayerVideoId.value == _videoUniqueId;
+    final bool isMediaViewPageUsingThisController = !widget.isFeedContext &&
+                                                  _dataController.activeFeedPlayerVideoId.value == _videoUniqueId &&
+                                                  _dataController.activeFeedPlayerController.value == _controller;
+
+    print("VideoPlayerWidget dispose for ID: $_videoUniqueId, isFeedContext: ${widget.isFeedContext}, isCurrentlyTransitioningThisVideo: $isCurrentlyTransitioningThisVideo, isMediaViewPageUsingThisController: $isMediaViewPageUsingThisController, current controller: ${_controller.hashCode}");
+
+    if (widget.isFeedContext && isCurrentlyTransitioningThisVideo) {
+      // Feed player is being transitioned TO MediaViewPage. Do not dispose controller.
+      print("VideoPlayerWidget ($_videoUniqueId in feed) NOT disposing controller due to outgoing transition.");
+    } else if (isMediaViewPageUsingThisController) {
       // This player (in MediaViewPage) was using a controller from the feed.
-      // Do NOT dispose it here. It will be reclaimed by the feed player.
-      print("VideoPlayerWidget ($_videoUniqueId in MediaViewPage) NOT disposing shared controller.");
-      // When MediaViewPage is closed (widget is disposed), signal that the transition is over.
-      if (_dataController.isTransitioningVideo.value && _dataController.activeFeedPlayerVideoId.value == _videoUniqueId) {
-        // Update DataController with the final position from MediaViewPage
-        if (_controller != null && _controller!.value.isInitialized) {
-           _dataController.activeFeedPlayerPosition.value = _controller!.value.position;
-        }
-        _dataController.isTransitioningVideo.value = false; // Signal end of transition
-        print("VideoPlayerWidget ($_videoUniqueId in MediaViewPage) signalling end of transition.");
+      // Do NOT dispose it here. MediaViewPage's dispose will handle clearing transition state.
+      print("VideoPlayerWidget ($_videoUniqueId in MediaViewPage) NOT disposing shared controller. MediaViewPage dispose should call clearVideoTransitionState.");
+      // Update position before its own dispose, as MediaViewPage might rely on this final position.
+      if (_controller != null && _controller!.value.isInitialized) {
+        _dataController.activeFeedPlayerPosition.value = _controller!.value.position;
+        print("VideoPlayerWidget ($_videoUniqueId in MediaViewPage) updated position before its own dispose: ${_dataController.activeFeedPlayerPosition.value}");
       }
-    }
-     else {
-      // Standard disposal logic if not part of an active transition
+    } else {
+      // Standard disposal logic.
+      print("VideoPlayerWidget ($_videoUniqueId): Proceeding with standard disposal.");
       _controller?.dispose();
-      print("VideoPlayerWidget ($_videoUniqueId) normally disposing controller.");
-      // If this was the active feed player and it's disposed normally (not transitioning out)
-      // and it's indeed THIS controller that's active (e.g. another video didn't take over)
-      if (widget.isFeedContext &&
-          _dataController.activeFeedPlayerVideoId.value == _videoUniqueId &&
-          !_dataController.isTransitioningVideo.value) { // Ensure not transitioning
-          _dataController.activeFeedPlayerController.value = null;
-          _dataController.activeFeedPlayerVideoId.value = null;
-          _dataController.activeFeedPlayerPosition.value = null;
+      _controller = null; // Ensure controller is null after dispose
+      print("VideoPlayerWidget ($_videoUniqueId): Controller disposed.");
+
+      // If this instance was the one tracked in DataController and it's not transitioning.
+      if (_dataController.activeFeedPlayerVideoId.value == _videoUniqueId && !isCurrentlyTransitioningThisVideo) {
+        print("VideoPlayerWidget ($_videoUniqueId): This was the active DataController video, but it's not transitioning. Clearing DC state.");
+        _dataController.clearVideoTransitionState(expectedVideoId: _videoUniqueId);
       }
     }
 
