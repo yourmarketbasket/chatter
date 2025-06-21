@@ -796,7 +796,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         borderRadius: BorderRadius.zero, // Border radius handled by outer ClipRRect
         androidVersion: androidVersion,
         isLoadingAndroidVersion: isLoadingAndroidVersion,
-        boxFit: fit, // Pass fit to video widget
+        // boxFit: fit, 
         isFeedContext: true, // This video is in the feed
       );
     } else if (attachmentType == "audio") {

@@ -1,11 +1,15 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:better_player_enhanced/better_player.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:chatter/controllers/data-controller.dart';
 import 'package:chatter/pages/media_view_page.dart'; // For MediaViewPage
 import 'package:chatter/services/custom_cache_manager.dart';
 import 'package:feather_icons/feather_icons.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:get/get_core/src/get_main.dart';
 import 'package:video_player/video_player.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
@@ -44,7 +48,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
   String? _videoUniqueId; // To identify this video instance
 
   // Get DataController instance
-  final DataController _dataController = Get.find<DataController>();
+  final DataController _dataController = Get.put(DataController());
   StreamSubscription? _isTransitioningVideoSubscription;
 
 

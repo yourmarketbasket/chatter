@@ -49,7 +49,7 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
   String? _videoUniqueId;
   StreamSubscription? _currentlyPlayingVideoSubscription;
   StreamSubscription? _isTransitioningVideoSubscription; // For seamless transition
-  BetterPlayerListener? _eventListener;
+  void Function(BetterPlayerEvent)? _eventListener;
 
 
   @override

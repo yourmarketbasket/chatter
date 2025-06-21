@@ -1,8 +1,11 @@
 import 'package:better_player_enhanced/better_player.dart';
+import 'package:chatter/controllers/data-controller.dart';
 // import 'package:chatter/models/feed_models.dart'; // Removed import
 import 'package:chatter/pages/home-feed-screen.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:get/get_core/src/get_main.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -53,6 +56,7 @@ class MediaViewPage extends StatefulWidget {
 }
 
 class _MediaViewPageState extends State<MediaViewPage> {
+  DataController _dataController = Get.put(DataController());
   late PageController _pageController;
   late int _currentPageIndex;
   bool _isDownloading = false;
