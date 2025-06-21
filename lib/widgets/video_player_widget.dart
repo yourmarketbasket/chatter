@@ -15,6 +15,10 @@ class VideoPlayerWidget extends StatefulWidget {
   final String displayPath;
   final String? thumbnailUrl;
   final bool isFeedContext; // Added to identify if this player is in the home feed
+  final bool loop;
+  final bool showPlayerControls;
+  final BoxFit fit;
+  final double? aspectRatio;
 
   const VideoPlayerWidget({
     Key? key,
@@ -23,6 +27,10 @@ class VideoPlayerWidget extends StatefulWidget {
     required this.displayPath,
     this.thumbnailUrl,
     this.isFeedContext = false, // Default to false
+    this.loop = false,
+    this.showPlayerControls = true,
+    this.fit = BoxFit.contain,
+    this.aspectRatio,
   }) : super(key: key);
 
   @override
@@ -31,9 +39,13 @@ class VideoPlayerWidget extends StatefulWidget {
 
 class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTickerProviderStateMixin {
   VideoPlayerController? _controller;
-  bool _isInitialized = false;
+  bool _isControllerInitialized = false; // Renamed from _isInitialized for clarity
+  bool get isVideoInitialized => _isControllerInitialized; // Public getter
+
   bool _isLoading = true;
-  bool _isPlaying = false;
+  bool _currentIsPlaying = false; // Renamed from _isPlaying to avoid conflict with getter
+  bool get isPlaying => _currentIsPlaying; // Public getter for playing state
+
   int _retryCount = 0;
   final int _maxRetries = 3;
   String? _errorMessage;
@@ -71,20 +83,22 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
       // This feed player is returning from MediaViewPage
       _controller = _dataController.activeFeedPlayerController.value as VideoPlayerController?;
       if (_controller != null) {
-        _isInitialized = true;
+        _isControllerInitialized = true;
         _isLoading = false;
         _duration = _controller!.value.duration;
         _position = _controller!.value.position;
-        _isPlaying = _controller!.value.isPlaying;
-        _showControls = true;
-        _animationController.forward();
+        _currentIsPlaying = _controller!.value.isPlaying;
+        _showControls = widget.showPlayerControls; // Use widget prop
+        if (_showControls) _animationController.forward(); else _animationController.reset();
         _controller!.addListener(_onControllerUpdate); // Add consolidated listener
         // Important: Clear the transitioning state as we've reclaimed the controller
         _dataController.isTransitioningVideo.value = false;
          // Ensure it plays if it was playing
-        if (_isPlaying) {
+        if (_currentIsPlaying) {
           _controller!.play();
            // _onControllerUpdate will handle DataController updates for playing state
+        }
+        _controller!.setLooping(widget.loop);
         }
       } else {
         _initializeVideoPlayer(); // Fallback if controller is null
@@ -135,32 +149,25 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
       changed = true;
     }
 
-    if (_isPlaying != newIsPlayingState) {
-      if (newIsPlayingState && !_isPlaying) { // Just started playing
+    if (_currentIsPlaying != newIsPlayingState) {
+      if (newIsPlayingState && !_currentIsPlaying) { // Just started playing
         _dataController.videoDidStartPlaying(_videoUniqueId!);
         if (widget.isFeedContext) { // Update active player only if in feed and starts playing
           _dataController.activeFeedPlayerController.value = _controller;
           _dataController.activeFeedPlayerVideoId.value = _videoUniqueId;
         }
-      } else if (!newIsPlayingState && _isPlaying) { // Just paused or finished
+      } else if (!newIsPlayingState && _currentIsPlaying) { // Just paused or finished
         _dataController.videoDidStopPlaying(_videoUniqueId!);
-        // If in feed, and this video stops, and it's not being transitioned, clear it from DataController
-        // This part is tricky: if another video starts, currentlyPlayingVideoId will change,
-        // and that video's listener will set activeFeedPlayerController.
-        // Clearing here might be redundant or conflict.
-        // Let's rely on dispose and new video playing to manage activeFeedPlayerController.
       }
-      _isPlaying = newIsPlayingState;
+      _currentIsPlaying = newIsPlayingState;
       changed = true;
     }
 
-    // If in feed and playing, always update position for potential transition
-    if (widget.isFeedContext && _isPlaying) {
+    if (widget.isFeedContext && _currentIsPlaying) {
       _dataController.activeFeedPlayerPosition.value = _position;
     }
 
-    // Show controls when video stops
-    if (!_isPlaying && !_showControls) {
+    if (!_currentIsPlaying && !_showControls && widget.showPlayerControls) {
       _showControls = true;
       _animationController.forward();
       changed = true;
@@ -171,55 +178,38 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
     }
   }
 
-
   Future<void> _initializeVideoPlayer() async {
-    // Check if we are using a controller passed from DataController (for MediaViewPage)
     if (_dataController.isTransitioningVideo.value &&
         _dataController.activeFeedPlayerVideoId.value == _videoUniqueId &&
         _dataController.activeFeedPlayerController.value is VideoPlayerController &&
-        !widget.isFeedContext) { // This condition is for MediaViewPage using feed's controller
-
+        !widget.isFeedContext) {
       _controller = _dataController.activeFeedPlayerController.value as VideoPlayerController;
-      // The controller is already initialized and likely playing.
-      // We just need to update local state and attach listeners.
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _isInitialized = true;
+          _isControllerInitialized = true;
           _duration = _controller!.value.duration;
           _position = _controller!.value.position;
-          _isPlaying = _controller!.value.isPlaying;
-          _showControls = true;
-          _animationController.forward();
+          _currentIsPlaying = _controller!.value.isPlaying;
+          _showControls = widget.showPlayerControls;
+          if (_showControls) _animationController.forward(); else _animationController.reset();
         });
-        _controller!.addListener(_onControllerUpdate); // Add consolidated listener
-
-        // If MediaViewPage is taking controller, ensure it seeks and plays if needed
+        _controller!.addListener(_onControllerUpdate);
+        _controller!.setLooping(widget.loop);
         if (_dataController.activeFeedPlayerPosition.value != null) {
           _controller!.seekTo(_dataController.activeFeedPlayerPosition.value!);
         }
-        // The _onControllerUpdate listener will now manage _isPlaying and DataController updates.
-        // If the controller's internal state is already "playing", _onControllerUpdate will reflect that.
-        // If it needs an explicit play() call:
-        bool wasPlaying = (_dataController.activeFeedPlayerController.value as VideoPlayerController?)?.value.isPlaying ?? false; // Example check
-        // A more robust way might be to store 'isPlaying' in DataController during transition start.
-        // For now, let's assume if controller is passed, its state is preserved.
-        // If _controller was playing (from feed), and it's the same instance, it should continue.
-        // If a new controller was somehow created for MediaViewPage (not ideal for seamless), then play if needed.
-        // The current logic reuses the controller instance, so its state should persist.
-
-         // MediaViewPage should NOT set isTransitioningVideo to false here.
-         // It remains true while MediaViewPage has control.
+        // If it was playing, it should continue. If MediaViewPage needs explicit play:
+        // if (_currentIsPlaying) _controller!.play();
       }
       return;
     }
 
-    // Standard initialization
     setState(() {
       _isLoading = true;
       _errorMessage = null;
-      _showControls = true;
-      _animationController.forward();
+      _showControls = widget.showPlayerControls;
+      if (_showControls) _animationController.forward(); else _animationController.reset();
     });
 
     try {
@@ -230,9 +220,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
             mixWithOthers: true,
             allowBackgroundPlayback: false,
           ),
-          httpHeaders: {
-            'Cache-Control': 'max-age=604800',
-          },
+          httpHeaders: {'Cache-Control': 'max-age=604800'},
         );
       } else if (widget.file != null) {
         _controller = VideoPlayerController.file(widget.file!);
@@ -240,7 +228,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
         if (mounted) {
           setState(() {
             _isLoading = false;
-            _isInitialized = false;
+            _isControllerInitialized = false;
             _errorMessage = 'No video source available';
           });
         }
@@ -248,13 +236,17 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
       }
 
       await _controller!.initialize();
+      await _controller!.setLooping(widget.loop);
+
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _isInitialized = true;
+          _isControllerInitialized = true;
           _duration = _controller!.value.duration;
+          // If autoPlay is desired and not part of a transition, can call play() here.
+          // For VideoAttachmentWidget, play is typically controlled by VisibilityDetector.
         });
-        _controller!.addListener(_onControllerUpdate); // Add consolidated listener
+        _controller!.addListener(_onControllerUpdate);
       }
     } catch (e) {
       if (_retryCount < _maxRetries && mounted) {
@@ -265,12 +257,30 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
         if (mounted) {
           setState(() {
             _isLoading = false;
-            _isInitialized = false;
+            _isControllerInitialized = false;
             _errorMessage = 'Failed to load video after $_maxRetries attempts: $e';
           });
         }
       }
     }
+  }
+
+  Future<void> play() async {
+    if (_controller != null && _isControllerInitialized && !_currentIsPlaying) {
+      await _controller!.play();
+      // _onControllerUpdate will set _currentIsPlaying and update DataController
+    }
+  }
+
+  Future<void> pause() async {
+    if (_controller != null && _isControllerInitialized && _currentIsPlaying) {
+      await _controller!.pause();
+      // _onControllerUpdate will set _currentIsPlaying and update DataController
+    }
+  }
+
+  Future<void> setVolume(double volume) async {
+    await _controller?.setVolume(volume);
   }
 
   void _seekToPosition(double value) {
@@ -327,9 +337,9 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
         // Update DataController with the final position from MediaViewPage
         if (_controller != null && _controller!.value.isInitialized) {
            _dataController.activeFeedPlayerPosition.value = _controller!.value.position;
+           // isTransitioningVideo remains true; the feed player will set it to false upon reclaiming.
+           print("VideoPlayerWidget ($_videoUniqueId in MediaViewPage) updating position. Transition active.");
         }
-        _dataController.isTransitioningVideo.value = false; // Signal end of transition
-        print("VideoPlayerWidget ($_videoUniqueId in MediaViewPage) signalling end of transition.");
       }
     }
      else {
@@ -395,7 +405,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
       );
     }
 
-    if (!_isInitialized || _controller == null || _errorMessage != null) {
+    if (!_isControllerInitialized || _controller == null || _errorMessage != null) {
       print('Error: $_errorMessage');
       return Center(
         child: Text(
@@ -406,97 +416,107 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
       );
     }
 
+    final videoAspectRatio = widget.aspectRatio ?? _controller!.value.aspectRatio;
+
     return Center(
       child: GestureDetector(
-        onTap: _toggleControls, // Toggle controls on tap
+        onTap: widget.showPlayerControls ? _toggleControls : null, // Toggle controls on tap only if they are shown
         child: Stack(
           alignment: Alignment.bottomCenter,
           children: [
             AspectRatio(
-              aspectRatio: _controller!.value.aspectRatio,
-              child: VideoPlayer(_controller!),
-            ),
-            Positioned(
-              bottom: 20,
-              left: 20,
-              right: 20,
-              child: AnimatedOpacity(
-                opacity: _fadeAnimation.value,
-                duration: const Duration(milliseconds: 300),
-                child: _showControls
-                    ? Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
-                        decoration: const BoxDecoration(
-                          color: Colors.transparent, // Transparent background
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            IconButton(
-                              icon: Icon(
-                                _isPlaying ? Icons.pause : Icons.play_arrow,
-                                color: Colors.tealAccent,
-                                size: 30,
-                              ),
-                              onPressed: _isInitialized
-                                  ? () async {
-                                      if (_isPlaying) {
-                                        await _controller!.pause();
-                                      } else {
-                                        await _controller!.play();
-                                        // Hide controls after 3 seconds if playing
-                                        setState(() {
-                                          _showControls = true;
-                                          _animationController.forward();
-                                        });
-                                        _hideControlsTimer?.cancel();
-                                        _hideControlsTimer = Timer(const Duration(seconds: 3), () {
-                                          if (mounted && _isPlaying) {
-                                            setState(() {
-                                              _showControls = false;
-                                              _animationController.reverse();
-                                            });
-                                          }
-                                        });
-                                      }
-                                      setState(() {});
-                                    }
-                                  : null,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              _formatDuration(_position),
-                              style: GoogleFonts.roboto(
-                                color: Colors.white70,
-                                fontSize: 12,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Slider(
-                                value: _duration.inMilliseconds > 0
-                                    ? _position.inMilliseconds / _duration.inMilliseconds
-                                    : 0.0,
-                                onChanged: _isInitialized ? (value) => _seekToPosition(value) : null,
-                                activeColor: Colors.tealAccent,
-                                inactiveColor: Colors.grey,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              _formatDuration(_duration),
-                              style: GoogleFonts.roboto(
-                                color: Colors.white70,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : const SizedBox.shrink(),
+              aspectRatio: videoAspectRatio,
+              child: FittedBox(
+                fit: widget.fit,
+                child: SizedBox(
+                  width: _controller!.value.size.width,
+                  height: _controller!.value.size.height,
+                  child: VideoPlayer(_controller!),
+                ),
               ),
             ),
+            if (widget.showPlayerControls)
+              Positioned(
+                bottom: 20,
+                left: 20,
+                right: 20,
+                child: AnimatedOpacity(
+                  opacity: _fadeAnimation.value,
+                  duration: const Duration(milliseconds: 300),
+                  child: _showControls
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
+                          decoration: const BoxDecoration(
+                            color: Colors.transparent, // Transparent background
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              IconButton(
+                                icon: Icon(
+                                  _currentIsPlaying ? Icons.pause : Icons.play_arrow,
+                                  color: Colors.tealAccent,
+                                  size: 30,
+                                ),
+                                onPressed: _isControllerInitialized
+                                    ? () async {
+                                        if (_currentIsPlaying) {
+                                          await pause();
+                                        } else {
+                                          await play();
+                                          // Hide controls after 3 seconds if playing
+                                          setState(() {
+                                            _showControls = true;
+                                            _animationController.forward();
+                                          });
+                                          _hideControlsTimer?.cancel();
+                                          _hideControlsTimer = Timer(const Duration(seconds: 3), () {
+                                            if (mounted && _currentIsPlaying) {
+                                              setState(() {
+                                                _showControls = false;
+                                                _animationController.reverse();
+                                              });
+                                            }
+                                          });
+                                        }
+                                        // setState(() {}); // play/pause methods will trigger _onControllerUpdate -> setState
+                                      }
+                                    : null,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _formatDuration(_position),
+                                style: GoogleFonts.roboto(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Slider(
+                                  value: _duration.inMilliseconds > 0
+                                      ? _position.inMilliseconds / _duration.inMilliseconds
+                                      : 0.0,
+                                  onChanged: _isControllerInitialized ? (value) => _seekToPosition(value) : null,
+                                  activeColor: Colors.tealAccent,
+                                  inactiveColor: Colors.grey,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                _formatDuration(_duration),
+                                style: GoogleFonts.roboto(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ),
           ],
         ),
       ),

@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:feather_icons/feather_icons.dart';
+import 'package:chatter/widgets/video_player_widget.dart'; // Added import
 import 'package:pdfrx/pdfrx.dart';
 import 'package:video_player/video_player.dart';
 import 'package:audioplayers/audioplayers.dart' as audioplayers;
@@ -234,16 +235,26 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
                         mediaWidget = _buildPdfViewer(context, currentAttachment, displayPath, optimizedUrl);
                         break;
                       case 'video':
-                        mediaWidget = VideoPlayerContainer(
+                        // Ensure you have imported the main VideoPlayerWidget:
+                        // import 'package:chatter/widgets/video_player_widget.dart' as main_vpw;
+                        // Using an alias if there's a name clash, or just VideoPlayerWidget if not.
+                        // For this example, assuming direct use is fine:
+                        mediaWidget = VideoPlayerWidget(
+                          key: ValueKey(displayPath + "_mvp"), // Unique key for PageView context
                           url: optimizedUrl.isNotEmpty ? optimizedUrl : url,
                           file: file,
                           displayPath: displayPath,
-                          useBetterPlayer: true,
                           thumbnailUrl: currentAttachment['thumbnailUrl'] as String?,
-                          aspectRatioString: currentAttachment['aspectRatio'] as String?, // Keep as string fallback
-                          numericAspectRatio: (currentAttachment['width'] is num && currentAttachment['height'] is num && (currentAttachment['height'] as num) > 0)
+                          isFeedContext: false, // Crucial for MediaViewPage
+                          showPlayerControls: true, // Show controls in full-screen
+                          loop: false, // Typically no loop in full-screen viewer
+                          fit: BoxFit.contain, // Standard for media viewers
+                          // Pass aspect ratio if available, otherwise VideoPlayerWidget uses intrinsic
+                          aspectRatio: (currentAttachment['width'] is num &&
+                                        currentAttachment['height'] is num &&
+                                        (currentAttachment['height'] as num) > 0)
                               ? (currentAttachment['width'] as num) / (currentAttachment['height'] as num)
-                              : null, // Calculate and pass numeric aspect ratio
+                              : null,
                         );
                         break;
                       case 'audio':
@@ -749,7 +760,7 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> {
       );
     }
 
-    return ConstrainedBox(
+    return ConstrainedBox( // This seems to be the end of the local BetterPlayerWidget's build method
       constraints: const BoxConstraints(maxWidth: double.infinity),
       child: AspectRatio(
         aspectRatio: _videoAspectRatio ?? 16 / 9,
@@ -758,6 +769,10 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> {
     );
   }
 }
+
+// AudioPlayerWidget and its related classes (WaveformPlayerController, CustomWaveform, WaveformPainter)
+// are separate and will be kept. The SEARCH block above targets the end of the local BetterPlayerWidget.
+// The REPLACE block effectively removes the local BetterPlayerWidget and VideoPlayerContainer.
 
 class AudioPlayerWidget extends StatefulWidget {
   final String? url;
