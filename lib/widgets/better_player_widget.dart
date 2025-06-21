@@ -42,7 +42,7 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
   Timer? _hideControlsTimer;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
-  double? _aspectRatio;
+  // double? _aspectRatio; // No longer needed, BetterPlayer will use intrinsic video aspect ratio
 
   // For single video playback
   final DataController _dataController = Get.find<DataController>();
@@ -77,7 +77,7 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
         _duration = _controller!.videoPlayerController!.value.duration ?? Duration.zero;
         _position = _controller!.videoPlayerController!.value.position ?? Duration.zero;
         _isPlaying = _controller!.isPlaying() ?? false;
-        _aspectRatio = _controller!.getAspectRatio();
+        // _aspectRatio = _controller!.getAspectRatio(); // Not strictly needed to store if not used to set config
         _showControls = true;
         _animationController.forward();
         _attachListeners(); // Attach local listeners
@@ -227,46 +227,28 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
         return;
       }
 
-      // Create a temporary controller to get video dimensions
-      final tempController = BetterPlayerController(
-        const BetterPlayerConfiguration(
+      // Removed temporary controller logic for aspect ratio calculation
+      // final tempController = BetterPlayerController(...);
+      // await tempController.setupDataSource(dataSource);
+      // if (mounted) { ... tempController.dispose(); }
+
+      _controller = BetterPlayerController(
+        BetterPlayerConfiguration(
           autoPlay: false,
           looping: false,
-          handleLifecycle: false,
+          aspectRatio: null, // Use video's intrinsic aspect ratio
+          fit: BoxFit.contain, // Ensure entire video is visible
+          placeholder: _buildPlaceholder(),
+          controlsConfiguration: const BetterPlayerControlsConfiguration(
+            showControls: false,
+            loadingWidget: SizedBox.shrink(),
+          ),
+          handleLifecycle: true,
           autoDispose: true,
         ),
         betterPlayerDataSource: dataSource,
       );
 
-      await tempController.setupDataSource(dataSource);
-      if (mounted) {
-        final videoPlayerController = tempController.videoPlayerController;
-        if (videoPlayerController != null && videoPlayerController.value.size != null && videoPlayerController.value.size!.width > 0) {
-          final size = videoPlayerController.value.size;
-          _aspectRatio = (size!.width / size!.height)!;
-        }
-        tempController.dispose();
-      }
-
-      // Initialize the actual controller with the determined aspect ratio
-      _controller = BetterPlayerController(
-        BetterPlayerConfiguration(
-          autoPlay: false, // We will manage play state explicitly
-          looping: false,
-          aspectRatio: _aspectRatio ?? 16 / 9, // Fallback to 16:9
-          placeholder: _buildPlaceholder(),
-          controlsConfiguration: const BetterPlayerControlsConfiguration(
-            showControls: false, // We'll use custom controls
-            loadingWidget: SizedBox.shrink(), // Hide default loading widget as placeholder handles it
-          ),
-          handleLifecycle: true, // Important for BetterPlayer to manage resources
-          autoDispose: true, // Let BetterPlayer handle its own disposal unless we are transitioning
-        ),
-        betterPlayerDataSource: dataSource,
-      );
-
-      // setupDataSource is called internally by BetterPlayerController constructor.
-      // We listen for the initialized event to confirm setup.
       _eventListener = (BetterPlayerEvent event) {
         if (event.betterPlayerEventType == BetterPlayerEventType.initialized) {
           if (mounted) {
@@ -274,10 +256,9 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
               _isLoading = false;
               _isInitialized = true;
               _duration = _controller!.videoPlayerController!.value.duration ?? Duration.zero;
-              _aspectRatio = _controller!.getAspectRatio() ?? _aspectRatio ?? 16 / 9; // Update aspect ratio if available
+              // _aspectRatio = _controller!.getAspectRatio() ?? _aspectRatio ?? 16 / 9; // No longer storing _aspectRatio
             });
-            // Remove this specific listener after initialization and attach the main one
-            _controller!.removeEventsListener(_eventListener!);
+            _controller!.removeEventsListener(_eventListener!); // Remove this init listener
             _attachListeners(); // Attach the comprehensive event listener now
 
             // If this controller was taken over for MediaViewPage and was playing
@@ -473,10 +454,10 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
             alignment: Alignment.bottomCenter,
             children: [
               Center(
-                child: AspectRatio(
-                  aspectRatio: _aspectRatio ?? 16 / 9, // Use dynamic aspect ratio
-                  child: BetterPlayer(controller: _controller!),
-                ),
+                // Removed the explicit AspectRatio widget wrapper.
+                // BetterPlayer with aspectRatio: null in its config will use intrinsic video ratio.
+                // The Center widget will handle centering if BoxFit.contain leads to letter/pillarboxing.
+                child: BetterPlayer(controller: _controller!),
               ),
               Positioned(
                 bottom: 20,
