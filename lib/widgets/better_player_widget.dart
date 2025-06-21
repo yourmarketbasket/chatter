@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:better_player_enhanced/better_player.dart';
+import 'package:better_player_plus/better_player_plus.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:async';

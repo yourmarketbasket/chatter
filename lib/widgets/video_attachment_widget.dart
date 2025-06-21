@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:better_player_enhanced/better_player.dart';
+import 'package:better_player_plus/better_player_plus.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:chatter/controllers/data-controller.dart';
 import 'package:chatter/pages/media_view_page.dart';
