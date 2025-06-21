@@ -258,9 +258,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
           child: Container(
             color: Colors.grey[900],
             child: Center(
-              child: CircularProgressIndicator(
-                color: Colors.tealAccent,
-              ),
+              child: Text("loading..."),
             ),
           ),
         ),

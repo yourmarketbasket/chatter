@@ -191,6 +191,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     };
 
     final result = await dataController.createPost(postData);
+    // print(result);
 
     if (result['success'] == true) {
       if (result['post'] != null) {
@@ -833,22 +834,6 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           child: const Icon(FeatherIcons.fileText, color: Colors.grey, size: 40),
         );
       }
-    } else {
-      contentWidget = Container(
-        color: Colors.grey[900],
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              attachmentType == "audio" ? FeatherIcons.music : FeatherIcons.file,
-              color: Colors.tealAccent,
-              size: 20,
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      );
     }
 
     return GestureDetector(
