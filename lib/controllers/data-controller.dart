@@ -60,7 +60,36 @@ class DataController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    init();
+    init(); // Existing init logic
+
+    // Add listeners for logging changes to transition properties
+    ever(isTransitioningVideo, (bool isTransitioning) {
+      print("[DataController LOG] isTransitioningVideo changed to: $isTransitioning");
+      if (!isTransitioning) {
+        // If transition ends, it's a good time to ensure the controller reference is cleared if not picked up.
+        // However, this might be too aggressive if the feed item is still visible and should reclaim it.
+        // The current logic relies on BetterPlayerWidget.dispose() to set isTransitioningVideo = false,
+        // and VideoAttachmentWidget.initState() or its visibility detector to reclaim.
+        // Let's defer clearing activeFeedPlayerController here, relying on widget logic.
+        // print("[DataController LOG] Transition ended. If controller not reclaimed by feed, it might be orphaned if not disposed elsewhere.");
+      }
+    });
+    ever(activeFeedPlayerVideoId, (String? videoId) {
+      print("[DataController LOG] activeFeedPlayerVideoId changed to: $videoId");
+    });
+    ever(currentlyPlayingVideoId, (String? videoId) {
+      print("[DataController LOG] currentlyPlayingVideoId changed to: $videoId (Global Play Lock)");
+    });
+     ever(activeFeedPlayerController, (Object? controller) {
+      print("[DataController LOG] activeFeedPlayerController changed. Type: ${controller?.runtimeType}, Null: ${controller == null}");
+      // If controller becomes null, and we are not in a transition, ensure related states are also null.
+      // This helps clean up if a controller is disposed and nulled out from a widget.
+      if (controller == null && !isTransitioningVideo.value) {
+        // print("[DataController LOG] activeFeedPlayerController became null outside of transition. Clearing related active states.");
+        // activeFeedPlayerVideoId.value = null; // This might be too broad.
+        // activeFeedPlayerPosition.value = null;
+      }
+    });
   }
 
   @override
@@ -694,16 +723,56 @@ class DataController extends GetxController {
 
   void videoDidStartPlaying(String videoId) {
     if (currentlyPlayingVideoId.value != videoId) {
+      if (currentlyPlayingVideoId.value != null) {
+        print("[DataController] Video ${currentlyPlayingVideoId.value} implicitly stopped because $videoId started playing.");
+      }
       currentlyPlayingVideoId.value = videoId;
-      print("[DataController] Video $videoId started playing. Setting global lock.");
+      print("[DataController] VIDEO STARTED: $videoId. Global lock set.");
     }
   }
 
-  // Optional: Call this if a video is explicitly paused by the user or finishes.
   void videoDidStopPlaying(String videoId) {
     if (currentlyPlayingVideoId.value == videoId) {
       currentlyPlayingVideoId.value = null;
-      print("[DataController] Video $videoId stopped playing. Releasing global lock.");
+      print("[DataController] VIDEO STOPPED: $videoId. Global lock released.");
     }
   }
+
+  // Called by the feed widget (VideoAttachmentWidget) when it prepares to transition TO MediaViewPage
+  void prepareForTransitionToMediaView(String videoId, Object controller, Duration currentPosition) {
+    print("[DataController] Preparing for transition TO MediaViewPage for $videoId.");
+    activeFeedPlayerVideoId.value = videoId;
+    activeFeedPlayerController.value = controller; // Controller instance is passed
+    activeFeedPlayerPosition.value = currentPosition;
+    isTransitioningVideo.value = true; // Critical: Set transition mode
+  }
+
+  // Called by MediaViewPage's dispose method when it's closing and was handling a transitioned video
+  void transitionFromMediaViewFinished() {
+    print("[DataController] Transition FROM MediaViewPage FINISHED for ${activeFeedPlayerVideoId.value}.");
+    // isTransitioningVideo is set to false.
+    // The activeFeedPlayerController, activeFeedPlayerVideoId, and activeFeedPlayerPosition
+    // are *intentionally not cleared here*. They are left for the original feed widget (VideoAttachmentWidget)
+    // to inspect and potentially reclaim the controller or use the position.
+    // If the feed widget is no longer visible or decides not to reclaim, its own logic should handle disposal/cleanup.
+    isTransitioningVideo.value = false;
+    // activeFeedPlayerController.value = null; // DO NOT NULL THIS HERE. Feed widget needs it.
+    // activeFeedPlayerVideoId.value = null;   // Feed widget uses this to identify if it should reclaim.
+    print("[DataController] isTransitioningVideo is now FALSE. Feed widget for ${activeFeedPlayerVideoId.value} can reclaim.");
+  }
+
+  // Call this to clear all video transition states, e.g., on major navigation or cleanup.
+  void resetVideoTransitionStates() {
+    print("[DataController] Resetting ALL video transition and active player states.");
+    activeFeedPlayerController.value = null;
+    activeFeedPlayerVideoId.value = null;
+    activeFeedPlayerPosition.value = null;
+    isTransitioningVideo.value = false;
+    // also clear the global playing lock, as a full reset implies no video should be considered active.
+    if (currentlyPlayingVideoId.value != null) {
+        print("[DataController] Clearing currentlyPlayingVideoId: ${currentlyPlayingVideoId.value} as part of full reset.");
+        currentlyPlayingVideoId.value = null;
+    }
+  }
+
 }

@@ -42,29 +42,31 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
     super.initState();
     _videoUniqueId = widget.attachment['url'] as String? ?? widget.key.toString();
 
-    // Pre-cache the thumbnail
     final String? thumbnailUrl = widget.attachment['thumbnailUrl'] as String?;
     if (thumbnailUrl != null && thumbnailUrl.isNotEmpty) {
       _precacheThumbnail(thumbnailUrl);
     }
 
-    // Initialize video player (unchanged)
+    // Attempt to reclaim controller if returning from transition
     if (widget.isFeedContext &&
-        _dataController.isTransitioningVideo.value &&
-        _dataController.activeFeedPlayerVideoId.value == _videoUniqueId) {
-      Object? controllerFromDataController = _dataController.activeFeedPlayerController.value;
-      if (controllerFromDataController is BetterPlayerController) {
-        _betterPlayerController = controllerFromDataController;
+        _dataController.isTransitioningVideo.value == false && // Important: check if transition *just finished*
+        _dataController.activeFeedPlayerVideoId.value == _videoUniqueId &&
+        _dataController.activeFeedPlayerController.value is BetterPlayerController) {
+
+      print("[VideoAttachmentWidget initState] Reclaiming controller for $_videoUniqueId");
+      _betterPlayerController = _dataController.activeFeedPlayerController.value as BetterPlayerController?;
+      if (_betterPlayerController != null) {
         _isInitialized = true;
         _betterPlayerController!.setVolume(_isMuted ? 0.0 : 1.0);
-        _betterPlayerController!.setLooping(true);
-        if (_dataController.activeFeedPlayerPosition.value != null) {
-          _betterPlayerController!.seekTo(_dataController.activeFeedPlayerPosition.value!);
-        }
-        _betterPlayerController!.play();
-        _dataController.isTransitioningVideo.value = false;
+        _betterPlayerController!.setLooping(true); // Ensure looping is set for feed
+        // Don't auto-play here, VisibilityDetector will handle it.
+        // Clear the controller from DataController as it's now locally managed
+        // _dataController.activeFeedPlayerController.value = null;
+        // _dataController.activeFeedPlayerVideoId.value = null;
+        // _dataController.activeFeedPlayerPosition.value = null;
+        // No, let MediaViewPage's dispose handle clearing these when it's truly done.
       } else {
-        _initializeVideoPlayer();
+        _initializeVideoPlayer(); // Fallback if controller is somehow null
       }
     } else {
       _initializeVideoPlayer();
@@ -79,190 +81,245 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
     );
     _pulseAnimationController.repeat(reverse: true);
 
+    // Listen for when this video *starts* a transition TO MediaViewPage
     if (widget.isFeedContext) {
       _isTransitioningVideoSubscription = _dataController.isTransitioningVideo.listen((isTransitioning) {
         if (isTransitioning && _dataController.activeFeedPlayerVideoId.value == _videoUniqueId) {
+          // This video is about to be transitioned. Pause it if playing.
           if (_betterPlayerController != null && _betterPlayerController!.isPlaying()!) {
+            print("[VideoAttachmentWidget] Transitioning out $_videoUniqueId, pausing.");
             _betterPlayerController!.pause();
+            // The controller instance itself will be passed via DataController
           }
         }
       });
     }
   }
 
-  // New method to pre-cache thumbnail
   void _precacheThumbnail(String thumbnailUrl) async {
     try {
       await CustomCacheManager.instance.getSingleFile(thumbnailUrl);
-      print('[VideoAttachmentWidget] Pre-cached thumbnail for $_videoUniqueId: $thumbnailUrl');
+      // print('[VideoAttachmentWidget] Pre-cached thumbnail for $_videoUniqueId: $thumbnailUrl');
     } catch (e) {
       print('[VideoAttachmentWidget] Error pre-caching thumbnail for $_videoUniqueId: $e');
     }
   }
 
-  void _updateDataControllerWithCurrentState() {
-    if (!widget.isFeedContext || _videoUniqueId == null) return;
+  void _updateDataControllerForTransition() {
+    if (!widget.isFeedContext || _videoUniqueId == null || _betterPlayerController == null) return;
 
-    bool isCurrentlyPlaying = _betterPlayerController != null && _betterPlayerController!.isPlaying()!;
-    if (isCurrentlyPlaying) {
-      _dataController.activeFeedPlayerController.value = _betterPlayerController;
-      _dataController.activeFeedPlayerVideoId.value = _videoUniqueId;
-      if (_betterPlayerController!.videoPlayerController != null &&
-          _betterPlayerController!.videoPlayerController!.value.initialized) {
-        _dataController.activeFeedPlayerPosition.value = _betterPlayerController!.videoPlayerController!.value.position;
-      }
-    } else {
-      if (_dataController.activeFeedPlayerVideoId.value == _videoUniqueId &&
-          !_dataController.isTransitioningVideo.value) {
-        _dataController.activeFeedPlayerController.value = null;
-        _dataController.activeFeedPlayerVideoId.value = null;
-        _dataController.activeFeedPlayerPosition.value = null;
-      }
+    print("[VideoAttachmentWidget] Preparing $_videoUniqueId for transition to MediaViewPage.");
+    _dataController.activeFeedPlayerController.value = _betterPlayerController;
+    _dataController.activeFeedPlayerVideoId.value = _videoUniqueId;
+    if (_betterPlayerController!.videoPlayerController != null &&
+        _betterPlayerController!.videoPlayerController!.value.initialized) {
+      _dataController.activeFeedPlayerPosition.value = _betterPlayerController!.videoPlayerController!.value.position;
     }
+    _dataController.isTransitioningVideo.value = true; // Signal that transition is starting
   }
 
-  void _initializeVideoPlayer() {
-    if (_isInitialized) return;
 
+  void _initializeVideoPlayer() {
+    if (_isInitialized && _betterPlayerController != null) {
+        // If already initialized and controller exists, ensure settings like volume are correct
+        _betterPlayerController!.setVolume(_isMuted ? 0.0 : 1.0);
+        _betterPlayerController!.setLooping(true);
+        return;
+    }
+    // If controller exists but not initialized, dispose it first
     _betterPlayerController?.dispose();
     _betterPlayerController = null;
+    _isInitialized = false; // Reset initialization state
 
     final String? attachmentUrl = widget.attachment['url'] as String?;
     if (attachmentUrl == null) {
-      print("Video attachment URL is null for ID: $_videoUniqueId");
-      if (mounted) setState(() => _isInitialized = false);
+      print("[VideoAttachmentWidget initializeVideoPlayer] Video attachment URL is null for ID: $_videoUniqueId");
+      if (mounted) setState(() {}); // Update UI to reflect no player
       return;
     }
 
+    print("[VideoAttachmentWidget initializeVideoPlayer] Initializing for $_videoUniqueId");
+
     final optimizedUrl = attachmentUrl.replaceAll(
       '/upload/',
-      '/upload/q_auto:good,w_1280,h_960,c_fill/',
+      '/upload/q_auto:good,w_1280,h_960,c_fill/', // Consider making dimensions dynamic or appropriate for 4:3
     );
 
     _betterPlayerController = BetterPlayerController(
       BetterPlayerConfiguration(
-        autoPlay: false,
+        autoPlay: false, // VisibilityDetector will handle play
         looping: true,
-        aspectRatio: 4 / 3,
+        aspectRatio: 4 / 3, // Maintained for feed context
         fit: BoxFit.cover,
         controlsConfiguration: BetterPlayerControlsConfiguration(
           showControls: false,
-          enablePlayPause: true,
+          enablePlayPause: true, // Internal flags, not visible UI controls
           enableMute: true,
           muteIcon: FeatherIcons.volumeX,
           unMuteIcon: FeatherIcons.volume2,
-          loadingWidget: const SizedBox.shrink(),
+          loadingWidget: const SizedBox.shrink(), // Minimal loading indicator
         ),
-        handleLifecycle: false,
+        handleLifecycle: true, // Changed to true
+        autoDispose: false,    // Changed to false
       ),
       betterPlayerDataSource: BetterPlayerDataSource(
         BetterPlayerDataSourceType.network,
         optimizedUrl,
-        videoFormat: BetterPlayerVideoFormat.other,
+        videoFormat: BetterPlayerVideoFormat.other, // Let BetterPlayer determine
         cacheConfiguration: BetterPlayerCacheConfiguration(
           useCache: true,
-          preCacheSize: 10 * 1024 * 1024, // 10MB
-          maxCacheSize: 100 * 1024 * 1024, // 100MB
-          maxCacheFileSize: 10 * 1024 * 1024, // 10MB per file
+          preCacheSize: 10 * 1024 * 1024,
+          maxCacheSize: 100 * 1024 * 1024,
+          maxCacheFileSize: 10 * 1024 * 1024,
         ),
       ),
     )..addEventsListener((event) {
-        if (event.betterPlayerEventType == BetterPlayerEventType.initialized) {
-          if (mounted) {
+        if (!mounted) return;
+
+        switch (event.betterPlayerEventType) {
+          case BetterPlayerEventType.initialized:
+            print("[VideoAttachmentWidget] Initialized: $_videoUniqueId");
             setState(() => _isInitialized = true);
             _betterPlayerController!.setVolume(_isMuted ? 0.0 : 1.0);
-            widget.post['views'] = (widget.post['views'] as int? ?? 0) + 1;
-            _updateDataControllerWithCurrentState();
-          }
-        } else if (event.betterPlayerEventType == BetterPlayerEventType.exception) {
-          print('BetterPlayer error for $_videoUniqueId: ${event.parameters}');
-          if (mounted) setState(() => _isInitialized = false);
-        } else if (event.betterPlayerEventType == BetterPlayerEventType.play ||
-            event.betterPlayerEventType == BetterPlayerEventType.pause) {
-          _updateDataControllerWithCurrentState();
-        } else if (event.betterPlayerEventType == BetterPlayerEventType.progress &&
-            _betterPlayerController!.isPlaying()!) {
-          if (widget.isFeedContext) {
-            _dataController.activeFeedPlayerPosition.value = event.parameters!['progress'] as Duration;
-          }
+            // widget.post['views'] = (widget.post['views'] as int? ?? 0) + 1; // Consider moving view count logic
+            // Playback will be handled by VisibilityDetector
+            break;
+          case BetterPlayerEventType.exception:
+            print('[VideoAttachmentWidget] Error for $_videoUniqueId: ${event.parameters?['message']}');
+            _disposePlayer(); // Dispose on exception
+            break;
+          case BetterPlayerEventType.play:
+            // print("[VideoAttachmentWidget] Playing: $_videoUniqueId");
+            if (_dataController.currentlyPlayingVideoId.value != _videoUniqueId) {
+                 _dataController.videoDidStartPlaying(_videoUniqueId!); // Manage single active player
+            }
+            break;
+          case BetterPlayerEventType.pause:
+            // print("[VideoAttachmentWidget] Paused: $_videoUniqueId");
+            break;
+          case BetterPlayerEventType.progress:
+            if (widget.isFeedContext && (_betterPlayerController?.isPlaying() ?? false) && _dataController.isTransitioningVideo.value && _dataController.activeFeedPlayerVideoId.value == _videoUniqueId) {
+               _dataController.activeFeedPlayerPosition.value = event.parameters!['progress'] as Duration;
+            }
+            break;
+          default:
+            break;
         }
       });
   }
 
+  void _disposePlayer({bool dueToTransition = false}) {
+    if (_betterPlayerController == null) return;
+
+    if (dueToTransition) {
+      print("[VideoAttachmentWidget _disposePlayer] Preparing $_videoUniqueId for transition. Not disposing controller instance.");
+      // State (position, etc.) should have been captured by _updateDataControllerForTransition()
+      // The controller instance is passed to DataController.
+    } else {
+      print("[VideoAttachmentWidget _disposePlayer] Disposing controller for $_videoUniqueId.");
+      _betterPlayerController!.dispose();
+      _betterPlayerController = null;
+    }
+    if (mounted) {
+      setState(() {
+        _isInitialized = false;
+      });
+    }
+  }
+
+
   @override
   void dispose() {
     _isTransitioningVideoSubscription?.cancel();
-    bool isTransitioningThisVideo = widget.isFeedContext &&
-        _dataController.isTransitioningVideo.value &&
-        _dataController.activeFeedPlayerVideoId.value == _videoUniqueId;
-
-    if (isTransitioningThisVideo) {
-      print("VideoAttachmentWidget ($_videoUniqueId) NOT disposing BetterPlayerController due to transition.");
-    } else {
-      _betterPlayerController?.dispose();
-      print("VideoAttachmentWidget ($_videoUniqueId) normally disposing BetterPlayerController.");
-      if (widget.isFeedContext && _dataController.activeFeedPlayerVideoId.value == _videoUniqueId) {
-        _dataController.activeFeedPlayerController.value = null;
-        _dataController.activeFeedPlayerVideoId.value = null;
-        _dataController.activeFeedPlayerPosition.value = null;
-      }
-    }
     _pulseAnimationController.dispose();
+
+    // If this widget is disposed, and it was the one holding the controller that MediaViewPage might be using,
+    // MediaViewPage's own dispose logic should handle clearing DataController's transition state.
+    // Here, we only dispose if it's not part of an *active* transition *originating from this instance*.
+    bool isCurrentlyTransitioningThisVideoOut = widget.isFeedContext &&
+        _dataController.isTransitioningVideo.value &&
+        _dataController.activeFeedPlayerVideoId.value == _videoUniqueId &&
+        _dataController.activeFeedPlayerController.value == _betterPlayerController;
+
+    if (!isCurrentlyTransitioningThisVideoOut) {
+        _disposePlayer();
+    } else {
+        print("[VideoAttachmentWidget dispose] $_videoUniqueId is transitioning out. Controller not disposed here.");
+    }
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final String? thumbnailUrl = widget.attachment['thumbnailUrl'] as String?;
-    final String thumbnailKey = thumbnailUrl ?? _videoUniqueId!;
+    final String thumbnailKey = thumbnailUrl ?? _videoUniqueId!; // Unique key for VisibilityDetector and Cache
 
     return VisibilityDetector(
-      key: Key(thumbnailKey),
-      onVisibilityChanged: (info) {
-        bool isCurrentlyTransitioningThisVideo = widget.isFeedContext &&
-            _dataController.isTransitioningVideo.value &&
-            _dataController.activeFeedPlayerVideoId.value == _videoUniqueId;
+      key: Key("vis_${_videoUniqueId}_${widget.key.toString()}"), // More unique key for VisibilityDetector
+      onVisibilityChanged: (visibilityInfo) {
+        if (!mounted) return;
 
-        if (isCurrentlyTransitioningThisVideo) {
-          return;
+        final bool isVisible = visibilityInfo.visibleFraction > 0.5;
+        final bool canPlay = _isInitialized && _betterPlayerController != null;
+
+        // Check if this video is currently being transitioned to MediaViewPage
+        bool isTransitioningThisVideoToMediaView = _dataController.isTransitioningVideo.value &&
+                                                 _dataController.activeFeedPlayerVideoId.value == _videoUniqueId &&
+                                                 _dataController.activeFeedPlayerController.value == _betterPlayerController;
+        if (isTransitioningThisVideoToMediaView) {
+            // If it's being transitioned, don't interfere with its state from here.
+            // MediaViewPage will take control.
+            print("[VideoAttachmentWidget Visibility] $_videoUniqueId is transitioning. Visibility changes ignored.");
+            return;
         }
 
-        if (info.visibleFraction == 0) {
-          if (_betterPlayerController != null) {
-            if (_dataController.activeFeedPlayerVideoId.value != _videoUniqueId ||
-                !_dataController.isTransitioningVideo.value) {
-              _betterPlayerController!.pause();
-              _betterPlayerController!.dispose();
-              _betterPlayerController = null;
+        // Check if another video is transitioning from feed (which is not this one)
+        bool anotherVideoIsTransitioning = _dataController.isTransitioningVideo.value &&
+                                           _dataController.activeFeedPlayerVideoId.value != _videoUniqueId;
+        if (anotherVideoIsTransitioning) {
+            if (_betterPlayerController?.isPlaying() ?? false) {
+                _betterPlayerController?.pause();
             }
-          }
-          if (_isInitialized && mounted) {
-            if (_dataController.activeFeedPlayerVideoId.value != _videoUniqueId ||
-                !_dataController.isTransitioningVideo.value) {
-              setState(() => _isInitialized = false);
-            }
-          }
-          _updateDataControllerWithCurrentState();
-        } else {
-          if (!_isInitialized && mounted) {
+            print("[VideoAttachmentWidget Visibility] Another video is transitioning. $_videoUniqueId paused if playing.");
+            return; // Don't manage this player if another is actively transitioning
+        }
+
+
+        if (isVisible) {
+          if (!_isInitialized) {
             _initializeVideoPlayer();
-          } else if (_isInitialized && _betterPlayerController != null) {
-            if (info.visibleFraction > 0.5 && !_betterPlayerController!.isPlaying()!) {
+          } else if (canPlay && !(_betterPlayerController!.isPlaying()!)) {
+            // Only play if this is the designated currentlyPlayingVideo or no video is playing
+            if (_dataController.currentlyPlayingVideoId.value == null || _dataController.currentlyPlayingVideoId.value == _videoUniqueId) {
               _betterPlayerController!.play();
-            } else if (info.visibleFraction <= 0.5 && _betterPlayerController!.isPlaying()!) {
+            } else {
+               // Another video is supposed to be playing, so ensure this one is paused.
               _betterPlayerController!.pause();
             }
-            _updateDataControllerWithCurrentState();
+          }
+        } else { // Not visible enough
+          if (canPlay && _betterPlayerController!.isPlaying()!) {
+            _betterPlayerController!.pause();
+          }
+          // More aggressive disposal: if completely off-screen (visibleFraction == 0)
+          // and not part of any transition process.
+          if (visibilityInfo.visibleFraction == 0 && _betterPlayerController != null) {
+             bool isThisVideoInActiveTransition = _dataController.isTransitioningVideo.value &&
+                                                 _dataController.activeFeedPlayerVideoId.value == _videoUniqueId;
+             if (!isThisVideoInActiveTransition) {
+                print("[VideoAttachmentWidget Visibility] $_videoUniqueId is off-screen. Disposing player.");
+                _disposePlayer();
+             } else {
+                print("[VideoAttachmentWidget Visibility] $_videoUniqueId is off-screen but in transition. Not disposing.");
+             }
           }
         }
       },
       child: GestureDetector(
         onTap: () {
-          if (widget.isFeedContext) {
-            _updateDataControllerWithCurrentState();
-            bool isPlayingInFeed = _betterPlayerController != null && _betterPlayerController!.isPlaying()!;
-            if (isPlayingInFeed) {
-              _dataController.isTransitioningVideo.value = true;
+          if (widget.isFeedContext && _betterPlayerController != null && _isInitialized) {
+            // Prepare DataController for transition
+            _updateDataControllerForTransition();
             }
           }
 
