@@ -214,14 +214,30 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
         final int fileSize = await file.length();
         final sizeInMB = fileSize / (1024 * 1024);
         if (sizeInMB <= 10) {
-          print('[NewPostScreen] Adding to _selectedAttachments: type=audio, path=${file.path}');
+          // Attempt to get duration
+          int? durationMs;
+          final tempAudioPlayer = AudioPlayer();
+          try {
+            await tempAudioPlayer.setSourceDeviceFile(file.path);
+            durationMs = (await tempAudioPlayer.getDuration())?.inMilliseconds;
+            await tempAudioPlayer.release(); // Release promptly
+          } catch (e) {
+            print('[NewPostScreen] Error getting audio duration: $e');
+            await tempAudioPlayer.release(); // Ensure release on error
+          }
+          final durationSeconds = durationMs != null ? (durationMs / 1000).round() : null;
+
+          print('[NewPostScreen] Adding to _selectedAttachments: type=audio, path=${file.path}, duration=${durationSeconds}s');
+          final attachmentData = {
+            'file': file,
+            'type': 'audio',
+            'filename': file.path.split('/').last,
+            'size': fileSize,
+            if (durationSeconds != null) 'duration': durationSeconds,
+            // Audio doesn't typically have width/height/orientation/aspectRatio in this context
+          };
           setState(() {
-            _selectedAttachments.add({
-              'file': file,
-              'type': 'audio',
-              'filename': file.path.split('/').last,
-              'size': fileSize,
-            });
+            _selectedAttachments.add(attachmentData);
             _isRecordingAudio = false;
           });
           _pulseController.reset();
@@ -257,10 +273,12 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
           orientation = 'square';
         }
         print('[NewPostScreen] Image Decoded Dimensions: width=$width, height=$height, orientation=$orientation');
+        double aspectRatio = (width != 0 && height != 0) ? (width / height) : 1.0;
         return {
           'width': width,
           'height': height,
           'orientation': orientation,
+          'aspectRatio': aspectRatio.toStringAsFixed(2),
         };
       } else {
         print('[NewPostScreen] Error decoding image with image package.');
@@ -300,10 +318,12 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
 
 
         print('[NewPostScreen] Video Decoded Dimensions: width=$width, height=$height, orientation=$determinedOrientation, duration=$duration (Package Orientation: $packageOrientation)');
+        double aspectRatio = (width != 0 && height != 0) ? (width / height) : 1.0;
         return {
           'width': width,
           'height': height,
           'orientation': determinedOrientation,
+          'aspectRatio': aspectRatio.toStringAsFixed(2),
           if (duration != null) 'duration': duration,
         };
       } else {

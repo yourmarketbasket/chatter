@@ -59,6 +59,7 @@ class UploadService {
       final int? height = attachmentMap['height'] as int?;
       final String? orientation = attachmentMap['orientation'] as String?;
       final int? duration = attachmentMap['duration'] as int?; // For videos
+      final String? aspectRatio = attachmentMap['aspectRatio'] as String?; // Extract aspectRatio
       final String attachmentType = attachmentMap['type'] as String? ?? 'unknown';
 
 
@@ -79,6 +80,7 @@ class UploadService {
             'height': height,
             'orientation': orientation,
             'duration': duration,
+            'aspectRatio': aspectRatio, // Carry over aspectRatio
             'type': attachmentType, // Use 'type' from attachmentMap as primary type
             'filename': path.basename(originalFilePath),
           });
@@ -96,13 +98,14 @@ class UploadService {
             'height': height,
             'orientation': orientation,
             'duration': duration,
+            'aspectRatio': aspectRatio, // Carry over aspectRatio
             'type': attachmentType,
             'filename': path.basename(originalFilePath),
           });
           continue;
         }
 
-        print('[UploadService uploadFilesToCloudinary] Processing file: path=$originalFilePath, size=$originalFileSize bytes, type: $attachmentType, width: $width, height: $height, orientation: $orientation, duration: $duration');
+        print('[UploadService uploadFilesToCloudinary] Processing file: path=$originalFilePath, size=$originalFileSize bytes, type: $attachmentType, width: $width, height: $height, orientation: $orientation, duration: $duration, aspectRatio: $aspectRatio');
 
         final fileExtension = path.extension(originalFilePath).toLowerCase().replaceFirst('.', '');
         final resourceType = extensionToResourceType[fileExtension] ?? 'auto';
@@ -215,8 +218,9 @@ class UploadService {
             'height': height,
             'orientation': orientation,
             'duration': duration,
+            'aspectRatio': aspectRatio, // Include aspectRatio in success result
           });
-          print('[UploadService uploadFilesToCloudinary] Successfully uploaded: $originalFilePath, URL: ${response.data['secure_url']}, Thumbnail: $uploadedThumbnailUrl, Width: $width, Height: $height, Orientation: $orientation, Duration: $duration');
+          print('[UploadService uploadFilesToCloudinary] Successfully uploaded: $originalFilePath, URL: ${response.data['secure_url']}, Thumbnail: $uploadedThumbnailUrl, Width: $width, Height: $height, Orientation: $orientation, Duration: $duration, AspectRatio: $aspectRatio');
         } else {
           final errorMessage = response.data?['error']?['message'] ?? 'Upload failed with status: ${response.statusCode}';
           print('[UploadService uploadFilesToCloudinary] Upload failed for $originalFilePath: $errorMessage');
@@ -233,6 +237,7 @@ class UploadService {
             'height': height,
             'orientation': orientation,
             'duration': duration,
+            'aspectRatio': aspectRatio, // Include aspectRatio in failure result
           });
         }
       } catch (e, stackTrace) {
@@ -250,6 +255,7 @@ class UploadService {
           'height': height,
           'orientation': orientation,
           'duration': duration,
+          'aspectRatio': aspectRatio, // Include aspectRatio in exception result
         });
       } finally {
         // Cleanup: Delete compressed file if it's different from original and not null

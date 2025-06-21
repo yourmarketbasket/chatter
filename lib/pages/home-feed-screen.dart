@@ -183,6 +183,10 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
             'type': att['type'],
             'thumbnailUrl': att['thumbnailUrl'],
             'aspectRatio': att['aspectRatio'],
+            'width': att['width'],
+            'height': att['height'],
+            'orientation': att['orientation'],
+            'duration': att['duration'],
           }).toList(),
     };
 
@@ -238,13 +242,35 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         'username': newReply['username'] ?? 'YourName',
         'content': newReply['content']?.trim() ?? '',
         'useravatar': newReply['useravatar'] ?? '',
-        'attachments': (newReply['attachments'] as List<Map<String, dynamic>>?)?.map((att) => {
-              'filename': (att['file'] as File?)?.path.split('/').last ?? att['filename'] ?? 'unknown',
-              'url': att['url'],
-              'size': (att['file'] as File?) != null ? (att['file'] as File).lengthSync() : att['size'] ?? 0,
-              'type': att['type'],
-              'thumbnailUrl': att['thumbnailUrl'],
-              'aspectRatio': att['aspectRatio'],
+        'attachments': (newReply['attachments'] as List<Map<String, dynamic>>?)?.map((att) {
+              // The 'att' map here comes from NewPostScreen's _selectedAttachments
+              // which should now contain all necessary metadata including width, height, orientation, duration, aspectRatio
+              return {
+                'filename': att['filename'] ?? (att['file'] as File?)?.path.split('/').last ?? 'unknown',
+                'url': att['url'], // This will be populated after upload by the reply service logic
+                'size': att['size'] ?? ((att['file'] as File?)?.lengthSync() ?? 0),
+                'type': att['type'],
+                'thumbnailUrl': att['thumbnailUrl'], // This will be populated after upload
+                'aspectRatio': att['aspectRatio'],
+                'width': att['width'],
+                'height': att['height'],
+                'orientation': att['orientation'],
+                'duration': att['duration'],
+                // We also need the 'file' for the DataController.replyToPost to upload if it's a new file.
+                // The DataController.replyToPost will need to handle uploads similar to createPost.
+                // For now, assuming the structure matches what createPost expects (i.e., URLs populated after upload).
+                // This part might need adjustment based on how replyToPost handles new file uploads.
+                // If replyToPost calls uploadFiles internally, then 'file' is needed.
+                // If replyToPost expects already uploaded URLs, then NewPostScreen for replies needs to upload first.
+
+                // For simplicity, let's assume newReply['attachments'] contains results from an upload step if they are new files,
+                // or contains existing attachment data if merely re-attaching (not typical for replies).
+                // The current _navigateToReplyPage doesn't show an explicit upload step for new attachments in replies.
+                // This implies attachments in replies are more for linking existing media or simple text replies.
+                // However, the schema allows attachments.
+                // Let's assume the 'newReply' attachments are already processed by an uploader if they are new.
+                // The 'url' and 'thumbnailUrl' should be present if uploaded.
+              };
             }).toList() ??
             [],
       };
@@ -704,6 +730,17 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       {BoxFit fit = BoxFit.contain}) {
     final String attachmentType = attachmentMap['type'] as String? ?? 'unknown';
     final String? displayUrl = attachmentMap['url'] as String?;
+    final num? attWidth = attachmentMap['width'] as num?;
+    final num? attHeight = attachmentMap['height'] as num?;
+    final String? attAspectRatioString = attachmentMap['aspectRatio'] as String?;
+
+    double aspectRatio = 16 / 9; // Default aspect ratio
+
+    if (attAspectRatioString != null) {
+      aspectRatio = double.tryParse(attAspectRatioString) ?? aspectRatio;
+    } else if (attWidth != null && attHeight != null && attHeight > 0) {
+      aspectRatio = attWidth / attHeight;
+    }
 
     List<Map<String, dynamic>> correctlyTypedPostAttachments = [];
     if (post['attachments'] is List) {
@@ -767,11 +804,25 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         );
       }
       contentWidget = AspectRatio(
-        aspectRatio: 4 / 3,
+        aspectRatio: aspectRatio > 0 ? aspectRatio : 4 / 3, // Use dynamic aspectRatio
         child: imageContent,
       );
-    } else if (attachmentType == "pdf") {
-      if (displayUrl != null && displayUrl.isNotEmpty) {
+    } else if (attachmentType == "pdf") { // PDFs are often displayed in a fixed aspect ratio viewer or take full space
+      contentWidget = AspectRatio(
+        aspectRatio: aspectRatio > 0 ? aspectRatio : 3/4, // Use calculated or a default for PDF
+        child: (displayUrl != null && displayUrl.isNotEmpty)
+          ? PdfViewer.uri(
+              Uri.parse(displayUrl),
+              params: const PdfViewerParams(margin: 0, maxScale: 1.0, backgroundColor: Colors.grey),
+            )
+          : Container(
+              color: Colors.grey[900],
+              child: const Icon(FeatherIcons.fileText, color: Colors.grey, size: 40),
+            ),
+      );
+    } else {
+      // Fallback for other types or if URL is missing for PDF
+      if (displayUrl != null && displayUrl.isNotEmpty && attachmentType == "pdf") { // This specific check might be redundant due to above
         contentWidget = PdfViewer.uri(
           Uri.parse(displayUrl),
           params: const PdfViewerParams(margin: 0, maxScale: 1.0, backgroundColor: Colors.grey),
