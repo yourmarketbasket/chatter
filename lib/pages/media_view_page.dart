@@ -1,6 +1,6 @@
-import 'package:better_player_enhanced/better_player.dart';
 import 'package:chatter/controllers/data-controller.dart';
-import 'package:chatter/pages/home-feed-screen.dart';
+// import 'package:chatter/pages/home-feed-screen.dart'; // Not directly used, consider removing if VideoPlayerWidget is self-contained
+import 'package:chatter/widgets/video_player_widget.dart' as chatter; // Added import
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -79,24 +79,33 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
 
   @override
   void dispose() {
-    if (widget.transitionVideoId != null &&
-        _dataController.isTransitioningVideo.value &&
-        _dataController.activeFeedPlayerVideoId.value == widget.transitionVideoId) {
-      final activeController = _dataController.activeFeedPlayerController.value;
-      bool controllerMatchesTransitionType = false;
-      if (widget.transitionControllerType == 'better_player' && activeController is BetterPlayerController) {
-        controllerMatchesTransitionType = true;
-      } else if (widget.transitionControllerType == 'video_player' && activeController is VideoPlayerController) {
-        controllerMatchesTransitionType = true;
-      }
-
-      if (controllerMatchesTransitionType) {
+    // When MediaViewPage is disposed, if it was part of a transition,
+    // ensure DataController knows the transition is over.
+    // The actual controller is managed by VideoPlayerWidget or VideoAttachmentWidget now.
+    if (widget.transitionVideoId != null && _dataController.activeFeedPlayerVideoId.value == widget.transitionVideoId) {
+        // If this MediaViewPage was showing the video that was transitioned from the feed,
+        // and that video is still the active one in DataController,
+        // then this MediaViewPage is "releasing" its control.
+        if (_dataController.isTransitioningVideo.value) {
+             // If the controller was passed to this MediaViewPage (via VideoPlayerWidget using DataController)
+             // and it's time to return to the feed, the feed's VideoAttachmentWidget will reclaim it.
+             // We just need to signal the transition is over.
+            final currentControllerInDC = _dataController.activeFeedPlayerController.value;
+            if (currentControllerInDC is VideoPlayerController && currentControllerInDC.value.isInitialized) {
+                 _dataController.activeFeedPlayerPosition.value = currentControllerInDC.value.position;
+            }
+            _dataController.isTransitioningVideo.value = false;
+            debugPrint("MediaViewPage disposing: Signalled end of transition for ${widget.transitionVideoId}. Feed player should reclaim.");
+        }
+    } else if (_dataController.isTransitioningVideo.value) {
+        // If a transition was active but not for *this* video, it's an odd state.
+        // For safety, if MediaViewPage is closing, any active transition should probably be considered ended.
+        // This depends on app logic: can another video be transitioning while one is in MediaViewPage?
+        // Assuming only one transition at a time for simplicity.
         _dataController.isTransitioningVideo.value = false;
-      } else {
-        debugPrint("MediaViewPage disposing: Transition mismatch for ${widget.transitionVideoId}.");
-        _dataController.isTransitioningVideo.value = false;
-      }
+        debugPrint("MediaViewPage disposing: Ending a potentially orphaned transition for ${_dataController.activeFeedPlayerVideoId.value}.");
     }
+
     _pageController.dispose();
     _transformationController?.dispose();
     _transformationAnimationController?.dispose();
@@ -234,17 +243,21 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
                         mediaWidget = _buildPdfViewer(context, currentAttachment, displayPath, optimizedUrl);
                         break;
                       case 'video':
-                        mediaWidget = VideoPlayerContainer(
-                          url: optimizedUrl.isNotEmpty ? optimizedUrl : url,
-                          file: file,
-                          displayPath: displayPath,
-                          useBetterPlayer: true,
-                          thumbnailUrl: currentAttachment['thumbnailUrl'] as String?,
-                          aspectRatioString: currentAttachment['aspectRatio'] as String?, // Keep as string fallback
-                          numericAspectRatio: (currentAttachment['width'] is num && currentAttachment['height'] is num && (currentAttachment['height'] as num) > 0)
-                              ? (currentAttachment['width'] as num) / (currentAttachment['height'] as num)
-                              : null, // Calculate and pass numeric aspect ratio
-                        );
+                        // Directly use the new VideoPlayerWidget (or the refactored VideoAttachmentWidget if it's meant for full-screen too)
+                        // For now, assuming a generic VideoPlayerWidget for full-screen context.
+                        // This part needs to align with how VideoAttachmentWidget was refactored and if a separate full-screen player is used.
+                        // Let's use a placeholder for `chatter/widgets/video_player_widget.dart` which should be the standard video_player based widget.
+                        // This might require creating/using the existing `lib/widgets/video_player_widget.dart` and ensuring it's suitable.
+                        // For the purpose of this step, I'm assuming VideoPlayerWidget is the one from `lib/widgets/video_player_widget.dart`
+                        // and it's already using `video_player`.
+                        mediaWidget = chatter.VideoPlayerWidget( // Assuming chatter is the package name or an import alias
+                           key: Key(currentAttachment['url'] ?? currentAttachment['file']?.path ?? index.toString()), // Ensure unique key
+                           url: optimizedUrl.isNotEmpty ? optimizedUrl : url,
+                           file: file,
+                           displayPath: displayPath,
+                           thumbnailUrl: currentAttachment['thumbnailUrl'] as String?,
+                           isFeedContext: false, // Explicitly false for MediaViewPage
+                         );
                         break;
                       case 'audio':
                         mediaWidget = AudioPlayerWidget(
@@ -548,6 +561,7 @@ Widget buildError(
   );
 }
 
+/*
 class VideoPlayerContainer extends StatefulWidget {
   final String? url;
   final File? file;
@@ -758,7 +772,9 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> {
     );
   }
 }
+*/
 
+/*
 class AudioPlayerWidget extends StatefulWidget {
   final String? url;
   final File? file;
