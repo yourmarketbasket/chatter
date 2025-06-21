@@ -176,11 +176,15 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
         looping: true,
         aspectRatio: 4 / 3, // Enforce 4:3 aspect ratio in feed
         fit: BoxFit.cover,   // Cover the 4:3 area, cropping if necessary
-        controlsConfiguration: BetterPlayerControlsConfiguration(showControls: false, enablePlayPause: true, enableMute: true, muteIcon: FeatherIcons.volumeX, unMuteIcon: FeatherIcons.volume2,),
-        handleLifecycle: false, // We manage lifecycle via VisibilityDetector mostly
-        bufferingConfiguration: BetterPlayerBufferingConfiguration(
-          showBufferingSpinner: false, // Hide the default buffering spinner
+        controlsConfiguration: BetterPlayerControlsConfiguration(
+          showControls: false,
+          enablePlayPause: true,
+          enableMute: true,
+          muteIcon: FeatherIcons.volumeX,
+          unMuteIcon: FeatherIcons.volume2,
+          loadingWidget: const SizedBox.shrink(), // Hide the loading spinner
         ),
+        handleLifecycle: false, // We manage lifecycle via VisibilityDetector mostly
       ),
       betterPlayerDataSource: BetterPlayerDataSource(BetterPlayerDataSourceType.network, optimizedUrl, videoFormat: BetterPlayerVideoFormat.other,),
     )..addEventsListener((event) {
