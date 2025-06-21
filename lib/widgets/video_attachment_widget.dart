@@ -178,6 +178,9 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
         fit: BoxFit.cover,   // Cover the 4:3 area, cropping if necessary
         controlsConfiguration: BetterPlayerControlsConfiguration(showControls: false, enablePlayPause: true, enableMute: true, muteIcon: FeatherIcons.volumeX, unMuteIcon: FeatherIcons.volume2,),
         handleLifecycle: false, // We manage lifecycle via VisibilityDetector mostly
+        bufferingConfiguration: BetterPlayerBufferingConfiguration(
+          showBufferingSpinner: false, // Hide the default buffering spinner
+        ),
       ),
       betterPlayerDataSource: BetterPlayerDataSource(BetterPlayerDataSourceType.network, optimizedUrl, videoFormat: BetterPlayerVideoFormat.other,),
     )..addEventsListener((event) {
@@ -404,12 +407,10 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
                 // Always display BetterPlayer if initialized
                 if (_isInitialized && _betterPlayerController != null && _betterPlayerController!.videoPlayerController != null && _betterPlayerController!.videoPlayerController!.value.initialized)
                   BetterPlayer(controller: _betterPlayerController!)
-                else if (!_isInitialized) // Show progress if not initialized (covers case where controller is null or not ready)
-                  Center(
-                    child: CircularProgressIndicator(
-                      color: Colors.tealAccent,
-                    ),
-                  ),
+                // else if (!_isInitialized) removed to keep showing thumbnail instead of progress indicator for video
+                // The CachedNetworkImage below will act as the background/thumbnail until the BetterPlayer is ready.
+                // The placeholder within CachedNetworkImage handles the thumbnail's own loading.
+                ,
                 Positioned(
                   bottom: 8,
                   right: 8,
