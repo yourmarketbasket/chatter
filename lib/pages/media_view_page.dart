@@ -532,7 +532,7 @@ class _VideoPlayerContainerState extends State<VideoPlayerContainer> {
             url: widget.url,
             file: widget.file,
             displayPath: widget.displayPath,
-            aspectRatio: widget.aspectRatio,
+            // aspectRatio: widget.aspectRatio, // Removed as VideoPlayerWidget doesn't have this param
           );
   }
 }
