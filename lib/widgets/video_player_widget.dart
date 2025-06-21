@@ -406,10 +406,10 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
       );
     }
 
-    return Center(
-      child: GestureDetector(
-        onTap: _toggleControls, // Toggle controls on tap
-        child: Stack(
+    // If in feed context, keep it centered. Otherwise, let the parent (MediaViewPage) handle alignment and width.
+    final videoPlayerStack = GestureDetector(
+      onTap: _toggleControls, // Toggle controls on tap
+      child: Stack(
           alignment: Alignment.bottomCenter,
           children: [
             AspectRatio(
@@ -501,6 +501,15 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
         ),
       ),
     );
+
+    if (widget.isFeedContext) {
+      return Center(child: videoPlayerStack);
+    } else {
+      // In MediaViewPage, we want the VideoPlayerWidget to potentially take full width.
+      // The PageView in MediaViewPage will provide the width constraint.
+      // The AspectRatio inside videoPlayerStack will then determine the height.
+      return videoPlayerStack;
+    }
   }
 }
 

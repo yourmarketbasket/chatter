@@ -275,6 +275,12 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
                           iconColor: Colors.grey[600],
                         );
                     }
+                    // For videos in MediaViewPage, we don't want to Center them,
+                    // as VideoPlayerWidget will handle its own sizing (full width, aspect ratio height).
+                    // Other media types can still be centered.
+                    if (type == 'video') {
+                      return mediaWidget;
+                    }
                     return Center(child: mediaWidget);
                   },
                 ),

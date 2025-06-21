@@ -396,9 +396,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
         child: ClipRRect(
           borderRadius: widget.borderRadius,
           child: AspectRatio(
-            aspectRatio: (_videoPlayerController?.value.isInitialized ?? false) && _videoPlayerController!.value.aspectRatio != 0
-                         ? _videoPlayerController!.value.aspectRatio
-                         : 4 / 3, // Default or use attachment metadata for aspect ratio
+            aspectRatio: 4 / 3, // Enforce 4:3 aspect ratio for the feed
             child: Stack(
               alignment: Alignment.center,
               children: [
@@ -438,7 +436,16 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
 
                 // Video player widget
                 if (isControllerInitialized)
-                  VideoPlayer(_videoPlayerController!),
+                  SizedBox.expand( // Ensure the FittedBox has a defined size to work against
+                    child: FittedBox(
+                      fit: BoxFit.cover, // Make the video cover the 4:3 AspectRatio
+                      child: SizedBox( // Required by FittedBox: child must have a size
+                        width: _videoPlayerController!.value.size.width,
+                        height: _videoPlayerController!.value.size.height,
+                        child: VideoPlayer(_videoPlayerController!),
+                      ),
+                    ),
+                  ),
 
                 // Mute button
                 Positioned(
