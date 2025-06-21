@@ -93,7 +93,7 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
       _initializeVideoPlayer();
     }
 
-    _currentlyPlayingVideoSubscription = _dataController.currentlyPlayingVideoId.listen((playingId) {
+    _currentlyPlayingVideoSubscription = _dataController.activeFeedPlayerVideoId.listen((playingId) {
       if (_controller != null && (_controller!.isPlaying() ?? false)) {
         if (playingId != null && playingId != _videoUniqueId) {
           _controller!.pause();

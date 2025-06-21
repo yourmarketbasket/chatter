@@ -40,7 +40,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
   final DataController _dataController = Get.find<DataController>();
   final MediaVisibilityService _mediaVisibilityService = Get.find<MediaVisibilityService>();
   StreamSubscription? _isTransitioningVideoSubscription;
-  StreamSubscription? _currentlyPlayingMediaSubscription;
+  Worker? _currentlyPlayingMediaSubscription;
 
   @override
   void initState() {
@@ -142,7 +142,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
 
   void _initializeVideoPlayer({bool autoplay = false}) {
     // If already initialized and trying to initialize again with the same settings, can return.
-    if (_isInitialized && _betterPlayerController != null && _betterPlayerController!.configuration.autoPlay == autoplay) {
+    if (_isInitialized && _betterPlayerController != null) {
         // If autoplay is requested and it's not playing, play it.
         if (autoplay && !_betterPlayerController!.isPlaying()!) {
              _betterPlayerController!.play();
@@ -234,7 +234,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
             _dataController.activeFeedPlayerPosition.value = null;
         }
         break;
-      case BetterPlayerEventType.completed:
+      case BetterPlayerEventType.finished:
         _dataController.mediaDidStopPlaying(_videoUniqueId, 'video');
         if (widget.isFeedContext && _dataController.activeFeedPlayerVideoId.value == _videoUniqueId && !_dataController.isTransitioningVideo.value) {
             _dataController.activeFeedPlayerController.value = null;
@@ -257,7 +257,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
   void dispose() {
     _mediaVisibilityService.unregisterItem(_videoUniqueId);
     _isTransitioningVideoSubscription?.cancel();
-    _currentlyPlayingMediaSubscription?.cancel();
+    _currentlyPlayingMediaSubscription?.dispose();
 
     bool isTransitioningThisVideo = widget.isFeedContext &&
         _dataController.isTransitioningVideo.value &&

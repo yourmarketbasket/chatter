@@ -544,7 +544,10 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         borderRadius: BorderRadius.zero, // Border radius handled by ClipRRect wrapper usually
         isFeedContext: true,
         onVideoCompletedInGrid: isVideoGrid
-            ? (completedVideoId) => _handleVideoCompletionInGrid(completedVideoId, postId, _postVideoIds[postId] ?? [])
+            ? (completedVideoId) => _handleVideoCompletionInGrid(
+                completedVideoId,
+                postId,
+                (_postVideoIds[postId] as List?)?.cast<Map<String, dynamic>>() ?? [])
             : null,
       );
     } else if (attachmentType == "audio") {
@@ -578,7 +581,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     return GestureDetector(
       onTap: () {
         // Determine initial index for MediaViewPage
-        int currentIdxInAllAttachments = attachmentsArg.indexWhere((att) =>
+        int currentIdxInAllAttachments = correctlyTypedPostAttachments.indexWhere((att) =>
             (att['url'] != null && att['url'] == attachmentMap['url']) ||
             (att['_id'] != null && att['_id'] == attachmentMap['_id']) ||
             (att.hashCode == attachmentMap.hashCode) // Fallback, less reliable

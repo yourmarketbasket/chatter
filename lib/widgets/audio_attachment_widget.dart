@@ -34,7 +34,7 @@ class _AudioAttachmentWidgetState extends State<AudioAttachmentWidget> {
   final MediaVisibilityService _mediaVisibilityService = Get.find<MediaVisibilityService>();
   String _audioId = ""; // Ensure initialized
   StreamSubscription? _playerStateSubscription;
-  StreamSubscription? _currentlyPlayingMediaSubscription;
+  Worker? _currentlyPlayingMediaSubscription;
 
   @override
   void initState() {
@@ -108,7 +108,7 @@ class _AudioAttachmentWidgetState extends State<AudioAttachmentWidget> {
       _dataController.mediaDidStopPlaying(_audioId, 'audio');
     }
     _playerStateSubscription?.cancel();
-    _currentlyPlayingMediaSubscription?.cancel();
+    _currentlyPlayingMediaSubscription?.dispose();
     _audioPlayer.dispose();
     super.dispose();
   }

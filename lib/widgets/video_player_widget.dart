@@ -93,7 +93,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
       _initializeVideoPlayer();
     }
 
-    _currentlyPlayingVideoSubscription = _dataController.currentlyPlayingVideoId.listen((playingId) {
+    _currentlyPlayingVideoSubscription = _dataController.activeFeedPlayerVideoId.listen((playingId) {
       if (_controller != null && _controller!.value.isInitialized && _controller!.value.isPlaying) {
         if (playingId != null && playingId != _videoUniqueId) {
           _controller!.pause();
