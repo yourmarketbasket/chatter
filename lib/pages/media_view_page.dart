@@ -1,5 +1,5 @@
-import 'package:better_player_enhanced/better_player.dart';
 import 'package:chatter/controllers/data-controller.dart';
+import 'package:chatter/widgets/video_player_widget.dart' as global_video_player; // Alias to avoid name clash if any
 import 'package:chatter/pages/home-feed-screen.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -234,16 +234,18 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
                         mediaWidget = _buildPdfViewer(context, currentAttachment, displayPath, optimizedUrl);
                         break;
                       case 'video':
-                        mediaWidget = VideoPlayerContainer(
+                        // Determine if this video is the one being transitioned
+                        final String videoUniqueIdForTransition = url ?? file?.path ?? '';
+                        bool isTransitioningVideo = _dataController.isTransitioningVideo.value &&
+                                                  _dataController.activeFeedPlayerVideoId.value == videoUniqueIdForTransition;
+
+                        mediaWidget = global_video_player.VideoPlayerWidget(
+                          key: ValueKey(videoUniqueIdForTransition), // Ensure widget rebuilds if source changes
                           url: optimizedUrl.isNotEmpty ? optimizedUrl : url,
                           file: file,
                           displayPath: displayPath,
-                          useBetterPlayer: true,
                           thumbnailUrl: currentAttachment['thumbnailUrl'] as String?,
-                          aspectRatioString: currentAttachment['aspectRatio'] as String?, // Keep as string fallback
-                          numericAspectRatio: (currentAttachment['width'] is num && currentAttachment['height'] is num && (currentAttachment['height'] as num) > 0)
-                              ? (currentAttachment['width'] as num) / (currentAttachment['height'] as num)
-                              : null, // Calculate and pass numeric aspect ratio
+                          isFeedContext: false, // This instance is in MediaViewPage
                         );
                         break;
                       case 'audio':
@@ -548,216 +550,8 @@ Widget buildError(
   );
 }
 
-class VideoPlayerContainer extends StatefulWidget {
-  final String? url;
-  final File? file;
-  final String displayPath;
-  final bool useBetterPlayer;
-  final String? thumbnailUrl;
-  final String? aspectRatioString; // Backend-provided aspect ratio as string (renamed)
-  final double? numericAspectRatio; // Added for direct aspect ratio
-
-  const VideoPlayerContainer({
-    Key? key,
-    this.url,
-    this.file,
-    required this.displayPath,
-    required this.useBetterPlayer,
-    this.thumbnailUrl,
-    this.aspectRatioString,
-    this.numericAspectRatio,
-  }) : super(key: key);
-
-  @override
-  _VideoPlayerContainerState createState() => _VideoPlayerContainerState();
-}
-
-class _VideoPlayerContainerState extends State<VideoPlayerContainer> {
-  @override
-  Widget build(BuildContext context) {
-    return BetterPlayerWidget(
-      url: widget.url,
-      file: widget.file,
-      displayPath: widget.displayPath,
-      thumbnailUrl: widget.thumbnailUrl,
-      aspectRatioString: widget.aspectRatioString,
-      numericAspectRatio: widget.numericAspectRatio,
-    );
-  }
-}
-
-class BetterPlayerWidget extends StatefulWidget {
-  final String? url;
-  final File? file;
-  final String displayPath;
-  final String? thumbnailUrl;
-  final String? aspectRatioString; // Renamed
-  final double? numericAspectRatio; // Added
-
-  const BetterPlayerWidget({
-    Key? key,
-    this.url,
-    this.file,
-    required this.displayPath,
-    this.thumbnailUrl,
-    this.aspectRatioString,
-    this.numericAspectRatio,
-  }) : super(key: key);
-
-  @override
-  _BetterPlayerWidgetState createState() => _BetterPlayerWidgetState();
-}
-
-class _BetterPlayerWidgetState extends State<BetterPlayerWidget> {
-  BetterPlayerController? _betterPlayerController;
-  bool _isLoading = true;
-  String? _errorMessage;
-  double? _videoAspectRatio;
-
-  @override
-  void initState() {
-    super.initState();
-    _initializePlayer();
-  }
-
-  Future<void> _initializePlayer() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      // Prioritize numeric aspect ratio if provided and valid
-      if (widget.numericAspectRatio != null && widget.numericAspectRatio! > 0 && widget.numericAspectRatio!.isFinite) {
-        _videoAspectRatio = widget.numericAspectRatio;
-      }
-      // Fallback to parsing the aspect ratio string
-      else if (widget.aspectRatioString != null && widget.aspectRatioString!.isNotEmpty) {
-        final parsedAspectRatioFromString = double.tryParse(widget.aspectRatioString!);
-        if (parsedAspectRatioFromString != null && parsedAspectRatioFromString.isFinite && parsedAspectRatioFromString > 0) {
-          _videoAspectRatio = parsedAspectRatioFromString;
-        } else {
-          debugPrint('Invalid aspect ratio string from backend: ${widget.aspectRatioString}, falling back to player or default');
-        }
-      }
-      // If _videoAspectRatio is still null here, it will be determined after player initialization or default to 16/9.
-
-      final configuration = BetterPlayerConfiguration(
-        autoPlay: true,
-        looping: false,
-        fit: BoxFit.contain, // Changed to BoxFit.contain for MediaViewPage
-        aspectRatio: _videoAspectRatio ?? 16 / 9, // Use determined aspect ratio or default
-        placeholder: widget.thumbnailUrl != null
-            ? CachedNetworkImage(
-                imageUrl: widget.thumbnailUrl!,
-                fit: BoxFit.contain, // Consistent fit for placeholder
-                width: double.infinity,
-                errorWidget: (context, url, error) => const SizedBox.shrink(),
-              )
-            : null,
-        errorBuilder: (context, errorMessage) => buildError(
-          context,
-          message: errorMessage ?? 'Error playing video',
-          fileName: widget.displayPath.split('/').last,
-        ),
-      );
-
-      BetterPlayerDataSource dataSource;
-      if (widget.url != null && widget.url!.isNotEmpty) {
-        dataSource = BetterPlayerDataSource(
-          BetterPlayerDataSourceType.network,
-          widget.url!,
-          cacheConfiguration: const BetterPlayerCacheConfiguration(
-            useCache: true,
-            maxCacheSize: 50 * 1024 * 1024, // 50 MB (Consistent with global widget)
-            maxCacheFileSize: 8 * 1024 * 1024, // 8 MB per file (Consistent with global widget)
-          ),
-        );
-      } else if (widget.file != null) {
-        dataSource = BetterPlayerDataSource(
-          BetterPlayerDataSourceType.file,
-          widget.file!.path,
-        );
-      } else {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = 'No video source available';
-        });
-        return;
-      }
-
-      _betterPlayerController = BetterPlayerController(
-        configuration,
-        betterPlayerDataSource: dataSource,
-      );
-
-      // If no valid backend aspect ratio, get it from the video player after initialization
-      if (_videoAspectRatio == null) {
-        _betterPlayerController!.addEventsListener((event) {
-          if (event.betterPlayerEventType == BetterPlayerEventType.initialized) {
-            final videoPlayerController = _betterPlayerController!.videoPlayerController;
-            if (videoPlayerController != null && videoPlayerController.value.initialized) {
-              double aspectRatio = videoPlayerController.value.aspectRatio;
-              if (aspectRatio.isFinite && aspectRatio > 0) {
-                if (mounted) {
-                  setState(() {
-                    _videoAspectRatio = aspectRatio;
-                  });
-                }
-              } else {
-                debugPrint('Invalid aspect ratio from video: $aspectRatio, using default 16:9');
-                if (mounted) {
-                  setState(() {
-                    _videoAspectRatio = 16 / 9;
-                  });
-                }
-              }
-            }
-          }
-        });
-      }
-
-      setState(() {
-        _isLoading = false;
-      });
-    } catch (e) {
-      debugPrint('Error initializing video player: $e');
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Failed to initialize video player: $e';
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _betterPlayerController?.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator(color: Colors.tealAccent));
-    }
-
-    if (_errorMessage != null) {
-      return buildError(
-        context,
-        message: _errorMessage,
-        fileName: widget.displayPath.split('/').last,
-      );
-    }
-
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: double.infinity),
-      child: AspectRatio(
-        aspectRatio: _videoAspectRatio ?? 16 / 9,
-        child: BetterPlayer(controller: _betterPlayerController!),
-      ),
-    );
-  }
-}
+// Removed local VideoPlayerContainer and BetterPlayerWidget classes as they are no longer needed.
+// MediaViewPage will now use the global VideoPlayerWidget from lib/widgets/video_player_widget.dart
 
 class AudioPlayerWidget extends StatefulWidget {
   final String? url;

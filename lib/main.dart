@@ -7,6 +7,8 @@ import 'package:chatter/controllers/data-controller.dart'; // Added import
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter/painting.dart'; // Required for PaintingBinding
+import 'package:chatter/services/custom_cache_manager.dart'; // Required for CustomCacheManager
 // import 'package:device_info_plus/device_info_plus.dart'; // No longer needed for player selection
 // import 'dart:io'; // No longer needed for player selection (Platform check)
 
@@ -37,13 +39,14 @@ class ChatterApp extends StatefulWidget {
   _ChatterAppState createState() => _ChatterAppState();
 }
 
-class _ChatterAppState extends State<ChatterApp> {
+class _ChatterAppState extends State<ChatterApp> with WidgetsBindingObserver { // Mixin WidgetsBindingObserver
   late FlutterSecureStorage _storage;
   final  DataController _dataController = Get.put(DataController());
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this); // Add observer
     _dataController.init(); // Initialize DataController
     // Initialize secure storage with platform-specific options
     _storage = const FlutterSecureStorage(
@@ -56,6 +59,28 @@ class _ChatterAppState extends State<ChatterApp> {
     );
     // Check initial screen after initialization
     _checkInitialScreen();
+  }
+
+  @override
+  void didHaveMemoryPressure() {
+    super.didHaveMemoryPressure();
+    print('[ChatterApp] System reported low memory pressure. Clearing caches.');
+
+    // Clear custom thumbnail cache (which also handles CachedNetworkImage default disk cache if same manager key is used)
+    CustomCacheManager.instance.emptyCache().then((_) {
+      print('[ChatterApp] Cleared CustomCacheManager (thumbnails & possibly default CachedNetworkImage disk cache).');
+    }).catchError((e) {
+      print('[ChatterApp] Error clearing CustomCacheManager: $e');
+    });
+
+    // Clear Flutter's global image cache (in-memory)
+    PaintingBinding.instance.imageCache.clear();
+    print('[ChatterApp] Cleared PaintingBinding imageCache (in-memory images).');
+
+    // Note: video_player does not offer a direct global cache clear API.
+    // It relies on HTTP caching headers and OS-level caching.
+    // If specific BetterPlayerController instances were accessible globally, one might call clearCache on them.
+    // For now, these are the main caches we can proactively clear.
   }
 
   Future<void> _checkInitialScreen() async {
@@ -77,6 +102,7 @@ class _ChatterAppState extends State<ChatterApp> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this); // Remove observer
     // Clean up SocketService when the app is disposed
     final socketService = Get.find<SocketService>();
     socketService.disconnect();

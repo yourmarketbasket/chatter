@@ -7,6 +7,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:get/get.dart';
 import 'package:chatter/controllers/data-controller.dart';
+import 'package:visibility_detector/visibility_detector.dart';
 
 // Widget for video playback with seeking and progress bar using video_player
 class VideoPlayerWidget extends StatefulWidget {
@@ -350,16 +351,16 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
 
   @override
   Widget build(BuildContext context) {
+    Widget playerContent;
     if (_isLoading) {
-      return Center(
+      playerContent = Center(
         child: Stack(
           alignment: Alignment.center,
           children: [
-            // Display thumbnail if available
             if (widget.thumbnailUrl != null && widget.thumbnailUrl!.isNotEmpty)
               CachedNetworkImage(
                 imageUrl: widget.thumbnailUrl!,
-                fit: BoxFit.contain, // Or BoxFit.cover, depending on desired behavior
+                fit: BoxFit.contain,
                 placeholder: (context, url) => const Center(
                   child: CircularProgressIndicator(
                     valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
@@ -374,129 +375,134 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
                 ),
               )
             else
-              Container(color: Colors.black), // Fallback if no thumbnail URL
-
-            // Always show a progress indicator on top if still loading,
-            // or remove if thumbnail itself has an indicator.
-            // For this setup, CachedNetworkImage's placeholder handles it.
-            // If no thumbnail, then a direct progress indicator is good.
+              Container(color: Colors.black),
             if (widget.thumbnailUrl == null || widget.thumbnailUrl!.isEmpty)
               const CircularProgressIndicator(
                 valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
-                backgroundColor: Colors.transparent, // Make background transparent
+                backgroundColor: Colors.transparent,
                 strokeWidth: 2,
               ),
           ],
         ),
       );
-    }
-
-    if (!_isInitialized || _controller == null || _errorMessage != null) {
-      print('Error: $_errorMessage');
-      return Center(
+    } else if (!_isInitialized || _controller == null || _errorMessage != null) {
+      print('Error in VideoPlayerWidget build: $_errorMessage');
+      playerContent = Center(
         child: Text(
           _errorMessage ?? 'Video player not initialized',
           style: const TextStyle(color: Colors.red, fontSize: 16),
           textAlign: TextAlign.center,
         ),
       );
+    } else {
+      playerContent = Center(
+        child: GestureDetector(
+          onTap: _toggleControls,
+          child: Stack(
+            alignment: Alignment.bottomCenter,
+            children: [
+              AspectRatio(
+                aspectRatio: _controller!.value.aspectRatio,
+                child: VideoPlayer(_controller!),
+              ),
+              Positioned(
+                bottom: 20,
+                left: 20,
+                right: 20,
+                child: AnimatedOpacity(
+                  opacity: _fadeAnimation.value,
+                  duration: const Duration(milliseconds: 300),
+                  child: _showControls
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
+                          decoration: const BoxDecoration(color: Colors.transparent),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              IconButton(
+                                icon: Icon(
+                                  _isPlaying ? Icons.pause : Icons.play_arrow,
+                                  color: Colors.tealAccent,
+                                  size: 30,
+                                ),
+                                onPressed: _isInitialized
+                                    ? () async {
+                                        if (_isPlaying) {
+                                          await _controller!.pause();
+                                        } else {
+                                          await _controller!.play();
+                                          setState(() { _showControls = true; _animationController.forward(); });
+                                          _hideControlsTimer?.cancel();
+                                          _hideControlsTimer = Timer(const Duration(seconds: 3), () {
+                                            if (mounted && _isPlaying) {
+                                              setState(() { _showControls = false; _animationController.reverse(); });
+                                            }
+                                          });
+                                        }
+                                        // setState is called by _onControllerUpdate
+                                      }
+                                    : null,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(_formatDuration(_position), style: GoogleFonts.roboto(color: Colors.white70, fontSize: 12)),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Slider(
+                                  value: _duration.inMilliseconds > 0 ? _position.inMilliseconds / _duration.inMilliseconds : 0.0,
+                                  onChanged: _isInitialized ? (value) => _seekToPosition(value) : null,
+                                  activeColor: Colors.tealAccent,
+                                  inactiveColor: Colors.grey,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(_formatDuration(_duration), style: GoogleFonts.roboto(color: Colors.white70, fontSize: 12)),
+                            ],
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
-    return Center(
-      child: GestureDetector(
-        onTap: _toggleControls, // Toggle controls on tap
-        child: Stack(
-          alignment: Alignment.bottomCenter,
-          children: [
-            AspectRatio(
-              aspectRatio: _controller!.value.aspectRatio,
-              child: VideoPlayer(_controller!),
-            ),
-            Positioned(
-              bottom: 20,
-              left: 20,
-              right: 20,
-              child: AnimatedOpacity(
-                opacity: _fadeAnimation.value,
-                duration: const Duration(milliseconds: 300),
-                child: _showControls
-                    ? Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
-                        decoration: const BoxDecoration(
-                          color: Colors.transparent, // Transparent background
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            IconButton(
-                              icon: Icon(
-                                _isPlaying ? Icons.pause : Icons.play_arrow,
-                                color: Colors.tealAccent,
-                                size: 30,
-                              ),
-                              onPressed: _isInitialized
-                                  ? () async {
-                                      if (_isPlaying) {
-                                        await _controller!.pause();
-                                      } else {
-                                        await _controller!.play();
-                                        // Hide controls after 3 seconds if playing
-                                        setState(() {
-                                          _showControls = true;
-                                          _animationController.forward();
-                                        });
-                                        _hideControlsTimer?.cancel();
-                                        _hideControlsTimer = Timer(const Duration(seconds: 3), () {
-                                          if (mounted && _isPlaying) {
-                                            setState(() {
-                                              _showControls = false;
-                                              _animationController.reverse();
-                                            });
-                                          }
-                                        });
-                                      }
-                                      setState(() {});
-                                    }
-                                  : null,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              _formatDuration(_position),
-                              style: GoogleFonts.roboto(
-                                color: Colors.white70,
-                                fontSize: 12,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Slider(
-                                value: _duration.inMilliseconds > 0
-                                    ? _position.inMilliseconds / _duration.inMilliseconds
-                                    : 0.0,
-                                onChanged: _isInitialized ? (value) => _seekToPosition(value) : null,
-                                activeColor: Colors.tealAccent,
-                                inactiveColor: Colors.grey,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              _formatDuration(_duration),
-                              style: GoogleFonts.roboto(
-                                color: Colors.white70,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : const SizedBox.shrink(),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    // Wrap the player content with VisibilityDetector if it's in a feed context.
+    if (widget.isFeedContext) {
+      return VisibilityDetector(
+        key: Key(_videoUniqueId ?? widget.key.toString()), // Ensure unique key for VisibilityDetector
+        onVisibilityChanged: (visibilityInfo) {
+          if (!mounted) return;
+
+          final bool isCurrentlyTransitioningThisVideo = _dataController.isTransitioningVideo.value &&
+                                                       _dataController.activeFeedPlayerVideoId.value == _videoUniqueId;
+
+          if (isCurrentlyTransitioningThisVideo) {
+            // If transitioning, don't auto-pause based on visibility, let MediaViewPage handle it.
+            return;
+          }
+
+          if (visibilityInfo.visibleFraction < 0.5) { // Auto-pause if less than 50% visible
+            if (_controller != null && _controller!.value.isInitialized && _controller!.value.isPlaying) {
+              _controller!.pause();
+              print("VideoPlayerWidget [ID: $_videoUniqueId] automatically paused due to low visibility.");
+            }
+          } else { // Auto-play if more than 50% visible and was paused by visibility logic (optional)
+            // This auto-play part can be tricky and might not be desired.
+            // For now, let's only handle auto-pause. User can tap to play if it becomes visible again.
+            // if (_controller != null && _controller!.value.isInitialized && !_controller!.value.isPlaying) {
+            //   _controller!.play();
+            // }
+          }
+        },
+        child: playerContent,
+      );
+    } else {
+      // If not in feed context (e.g., in MediaViewPage), return player content directly.
+      return playerContent;
+    }
   }
 }
 
