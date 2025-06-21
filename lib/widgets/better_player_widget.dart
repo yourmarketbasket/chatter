@@ -182,7 +182,6 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
           _duration = _controller!.videoPlayerController!.value.duration ?? Duration.zero;
           _position = _controller!.videoPlayerController!.value.position ?? Duration.zero;
           _isPlaying = _controller!.isPlaying() ?? false;
-          _aspectRatio = _controller!.getAspectRatio();
           _showControls = true;
           _animationController.forward();
         });
@@ -355,7 +354,7 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
       // When MediaViewPage is closed (widget is disposed), signal that the transition is over.
       if (_dataController.isTransitioningVideo.value && _dataController.activeFeedPlayerVideoId.value == _videoUniqueId) {
         // Update DataController with the final position from MediaViewPage
-        if (_controller != null && _controller!.videoPlayerController!.value.isInitialized) {
+        if (_controller != null && _controller!.videoPlayerController!.value.initialized) {
            _dataController.activeFeedPlayerPosition.value = _controller!.videoPlayerController!.value.position;
         }
         _dataController.isTransitioningVideo.value = false; // Signal end of transition

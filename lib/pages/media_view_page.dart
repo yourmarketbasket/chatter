@@ -1,30 +1,25 @@
 import 'package:better_player_enhanced/better_player.dart';
 import 'package:chatter/controllers/data-controller.dart';
-// import 'package:chatter/models/feed_models.dart'; // Removed import
 import 'package:chatter/pages/home-feed-screen.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:get/get_core/src/get_main.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:feather_icons/feather_icons.dart';
 import 'package:pdfrx/pdfrx.dart';
-import 'package:video_player/video_player.dart'; // This is for the general video_player package, might still be used by better_player internally or for types. Keep for now.
+import 'package:video_player/video_player.dart';
 import 'package:audioplayers/audioplayers.dart' as audioplayers;
 import 'package:cached_network_image/cached_network_image.dart';
-// import 'package:chatter/widgets/video_player_widget.dart'; // Removed as the file is deleted
-import 'package:chatter/widgets/better_player_widget.dart';
 import 'dart:io';
 import 'dart:async';
 import 'dart:math';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:intl/intl.dart';
 
-// MediaViewPage displays attachments with metadata and social interactions.
 class MediaViewPage extends StatefulWidget {
-  final List<Map<String, dynamic>> attachments; // Changed to List<Map<String, dynamic>>
+  final List<Map<String, dynamic>> attachments;
   final int initialIndex;
   final String message;
   final String userName;
@@ -33,8 +28,8 @@ class MediaViewPage extends StatefulWidget {
   final int viewsCount;
   final int likesCount;
   final int repostsCount;
-  final String? transitionVideoId; // For seamless transition
-  final String? transitionControllerType; // 'video_player' or 'better_player'
+  final String? transitionVideoId;
+  final String? transitionControllerType;
 
   const MediaViewPage({
     Key? key,
@@ -55,35 +50,28 @@ class MediaViewPage extends StatefulWidget {
   _MediaViewPageState createState() => _MediaViewPageState();
 }
 
-class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateMixin { // Added TickerProviderStateMixin for animations
-  DataController _dataController = Get.put(DataController());
+class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateMixin {
+  final DataController _dataController = Get.find<DataController>();
   late PageController _pageController;
   late int _currentPageIndex;
   bool _isDownloading = false;
   double _downloadProgress = 0.0;
-  AnimationController? _transformationAnimationController; // For smooth zoom animation
-  TransformationController? _transformationController; // For image zoom
-
+  AnimationController? _transformationAnimationController;
+  TransformationController? _transformationController;
   final Dio _dio = Dio();
 
   @override
   void initState() {
     super.initState();
     _transformationController = TransformationController();
-
-    // Defensive runtime check for attachments type
-    if (widget.attachments.any((item) => item is! Map<String, dynamic>)) {
-      print("CRITICAL WARNING: MediaViewPage received an attachments list where one or more elements are NOT Map<String, dynamic>.");
-      print("Problematic attachments list: ${widget.attachments}");
-      // Example of filtering (use with caution, might hide issues):
-      // widget.attachments = widget.attachments.where((item) => item is Map<String, dynamic>).toList();
-    }
-
-    // Assert for development builds
-    assert(
-      widget.attachments.every((item) => item is Map<String, dynamic>),
-      "MediaViewPage attachments list contains elements that are not of type Map<String, dynamic>. Data: ${widget.attachments.where((item) => item is! Map<String, dynamic>).toList()}"
+    _transformationAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
     );
+
+    if (widget.attachments.any((item) => item is! Map<String, dynamic>)) {
+      debugPrint("CRITICAL WARNING: MediaViewPage received invalid attachments list.");
+    }
 
     _currentPageIndex = widget.initialIndex;
     _pageController = PageController(initialPage: widget.initialIndex);
@@ -91,14 +79,10 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
 
   @override
   void dispose() {
-    // If this MediaViewPage was part of a video transition, signal that it's over.
     if (widget.transitionVideoId != null &&
         _dataController.isTransitioningVideo.value &&
         _dataController.activeFeedPlayerVideoId.value == widget.transitionVideoId) {
-
-      // Check if the controller in DataController is still the one we might have used.
-      // This is a safeguard. The primary check is isTransitioningVideo and activeFeedPlayerVideoId.
-      Object? activeController = _dataController.activeFeedPlayerController.value;
+      final activeController = _dataController.activeFeedPlayerController.value;
       bool controllerMatchesTransitionType = false;
       if (widget.transitionControllerType == 'better_player' && activeController is BetterPlayerController) {
         controllerMatchesTransitionType = true;
@@ -107,35 +91,21 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
       }
 
       if (controllerMatchesTransitionType) {
-          print("MediaViewPage disposing: Ending video transition for ${widget.transitionVideoId}. Feed can reclaim controller.");
-          // The controller itself is not disposed here; it's handed back to the feed widget.
-          // The feed widget's initState or VisibilityDetector will reclaim it.
-          // Setting isTransitioningVideo to false is the main signal.
-          _dataController.isTransitioningVideo.value = false;
-          // DataController's activeFeedPlayerController, videoId, position should remain for the feed player to pick up.
-      } else {
-        // This case should ideally not happen if logic is correct.
-        // It means MediaViewPage thought it was transitioning, but DataController state doesn't match.
-        print("MediaViewPage disposing: Transition mismatch for ${widget.transitionVideoId}. Forcing transition end.");
         _dataController.isTransitioningVideo.value = false;
-        // Clear active player state as a precaution, as it might be stale or incorrect.
-        // _dataController.activeFeedPlayerController.value = null;
-        // _dataController.activeFeedPlayerVideoId.value = null;
-        // _dataController.activeFeedPlayerPosition.value = null;
+      } else {
+        debugPrint("MediaViewPage disposing: Transition mismatch for ${widget.transitionVideoId}.");
+        _dataController.isTransitioningVideo.value = false;
       }
     }
     _pageController.dispose();
-     _transformationController?.dispose();
-     _transformationAnimationController?.dispose();
+    _transformationController?.dispose();
+    _transformationAnimationController?.dispose();
     super.dispose();
   }
 
-  // Optimize Cloudinary URL for videos
   String _optimizeCloudinaryVideoUrl(String? url) {
     if (url == null || !url.contains('cloudinary.com')) return url ?? '';
     final uri = Uri.parse(url);
-    
-    // Video-specific optimization parameters
     final optimizedParams = {
       ...uri.queryParameters,
       'q': 'auto:good',
@@ -151,34 +121,22 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
       'r': '24',
       'b': 'auto',
     };
-    
     return uri.replace(queryParameters: optimizedParams).toString();
   }
 
-  // Original _optimizeCloudinaryUrl for non-video assets
   String _optimizeCloudinaryUrl(String? url) {
     if (url == null || !url.contains('cloudinary.com')) return url ?? '';
     final uri = Uri.parse(url);
-    final optimizedUrl = uri.replace(queryParameters: {
+    return uri.replace(queryParameters: {
       ...uri.queryParameters,
       'q': 'auto',
       'f': 'auto',
-    });
-    return optimizedUrl.toString();
+    }).toString();
   }
 
-  // Check Android version for player compatibility
-  // Removed _isAndroid13OrLower, will use DataController.androidSDKVersion directly
-  // Future<bool> _isAndroid13OrLower() async {
-  //   if (!Platform.isAndroid) return false;
-  //   final deviceInfo = DeviceInfoPlugin();
-  //   final androidInfo = await deviceInfo.androidInfo;
-  //   return androidInfo.version.sdkInt <= 33;
-  // }
-
-  String _getPageTitle(Map<String, dynamic> attachment) { // Changed Attachment to Map<String, dynamic>
-    final String type = attachment['type'] as String? ?? 'unknown';
-    switch (type.toLowerCase()) {
+  String _getPageTitle(Map<String, dynamic> attachment) {
+    final String type = attachment['type']?.toString().toLowerCase() ?? 'unknown';
+    switch (type) {
       case 'image':
         return 'View Image';
       case 'pdf':
@@ -195,13 +153,13 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBodyBehindAppBar: true, // Allow body to go behind AppBar
+      extendBodyBehindAppBar: true,
       backgroundColor: Colors.black,
       appBar: AppBar(
-        backgroundColor: Colors.transparent, // Make AppBar transparent
-        elevation: 0, // No shadow for transparent AppBar
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         leading: IconButton(
-          icon: Icon(FeatherIcons.arrowLeft, color: Colors.white),
+          icon: const Icon(FeatherIcons.arrowLeft, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
         title: Row(
@@ -211,8 +169,8 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
               backgroundImage: widget.userAvatarUrl != null && widget.userAvatarUrl!.isNotEmpty
                   ? CachedNetworkImageProvider(_optimizeCloudinaryUrl(widget.userAvatarUrl!))
                   : null,
-              child: (widget.userAvatarUrl == null || widget.userAvatarUrl!.isEmpty)
-                  ? Icon(FeatherIcons.user, size: 18, color: Colors.white)
+              child: widget.userAvatarUrl == null || widget.userAvatarUrl!.isEmpty
+                  ? const Icon(FeatherIcons.user, size: 18, color: Colors.white)
                   : null,
             ),
             const SizedBox(width: 12),
@@ -238,20 +196,18 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
                     ),
                   )
                 : IconButton(
-                    icon: Icon(FeatherIcons.download, color: Colors.white),
-                    onPressed: () {
-                      _downloadAttachment(widget.attachments[_currentPageIndex]);
-                    },
+                    icon: const Icon(FeatherIcons.download, color: Colors.white),
+                    onPressed: () => _downloadAttachment(widget.attachments[_currentPageIndex]),
                   ),
           IconButton(
-            icon: Icon(FeatherIcons.moreVertical, color: Colors.white),
-            onPressed: () { /* TODO: Implement more options */ },
+            icon: const Icon(FeatherIcons.moreVertical, color: Colors.white),
+            onPressed: () {},
           ),
         ],
       ),
-      body: Stack( // Wrap body in Stack for gradient mask
+      body: Stack(
         children: [
-          Column( // Original body structure
+          Column(
             children: [
               Expanded(
                 child: PageView.builder(
@@ -263,36 +219,27 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
                     });
                   },
                   itemBuilder: (context, index) {
-                    final Map<String, dynamic> currentAttachment = widget.attachments[index]; // Now a Map
+                    final Map<String, dynamic> currentAttachment = widget.attachments[index];
                     final String? url = currentAttachment['url'] as String?;
                     final File? file = currentAttachment['file'] as File?;
-                    final String type = currentAttachment['type'] as String? ?? 'unknown';
-
+                    final String type = currentAttachment['type']?.toString().toLowerCase() ?? 'unknown';
                     final String displayPath = url ?? file?.path ?? 'Unknown attachment';
-                    final String optimizedUrl = type.toLowerCase() == 'video'
-                        ? _optimizeCloudinaryVideoUrl(url)
-                        : _optimizeCloudinaryUrl(url);
+                    final String optimizedUrl = type == 'video' ? _optimizeCloudinaryVideoUrl(url) : _optimizeCloudinaryUrl(url);
 
                     Widget mediaWidget;
-                    switch (type.toLowerCase()) {
+                    switch (type) {
                       case 'image':
-                        mediaWidget = _buildFullScreenImageViewer(context, currentAttachment, displayPath, optimizedUrl);
-                        // For images, we don't want the Center widget wrapping it.
-                        return mediaWidget; // Return directly
+                        return _buildFullScreenImageViewer(context, currentAttachment, displayPath, optimizedUrl);
                       case 'pdf':
                         mediaWidget = _buildPdfViewer(context, currentAttachment, displayPath, optimizedUrl);
                         break;
                       case 'video':
-                        // final int currentAndroidSDKVersion = _dataController.androidSDKVersion.value; // Removed, no longer used for player choice
-                        // SDK version check is no longer used to decide player type here.
-                        // Always use BetterPlayer via VideoPlayerContainer.
-                        // The useBetterPlayer flag in VideoPlayerContainer will be set to true.
                         final String? thumbnailUrl = currentAttachment['thumbnailUrl'] as String?;
                         mediaWidget = VideoPlayerContainer(
                           url: optimizedUrl.isNotEmpty ? optimizedUrl : url,
                           file: file,
                           displayPath: displayPath,
-                          useBetterPlayer: true, // Always true now
+                          useBetterPlayer: true,
                           thumbnailUrl: thumbnailUrl,
                         );
                         break;
@@ -312,19 +259,13 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
                           iconColor: Colors.grey[600],
                         );
                     }
-                    // For video, return mediaWidget directly to allow it to fill PageView item.
-                    // For other types, keep the Center for now.
-                    if (type.toLowerCase() == 'video') {
-                      return mediaWidget;
-                    }
-                    return Center(child: mediaWidget);
+                    return type == 'video' ? mediaWidget : Center(child: mediaWidget);
                   },
                 ),
               ),
-              // Removed the Padding widget containing metadata and engagement counts
             ],
           ),
-          _buildAppBarGradientMask(context), // Add the gradient mask on top
+          _buildAppBarGradientMask(context),
         ],
       ),
     );
@@ -332,7 +273,7 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
 
   Widget _buildAppBarGradientMask(BuildContext context) {
     final statusBarHeight = MediaQuery.of(context).padding.top;
-    final appBarHeight = AppBar().preferredSize.height; // Default AppBar height
+    final appBarHeight = AppBar().preferredSize.height;
     return Positioned(
       top: 0,
       left: 0,
@@ -341,126 +282,62 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
         height: statusBarHeight + appBarHeight,
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Colors.black.withOpacity(0.6), Colors.transparent], // Adjusted opacity
+            colors: [Colors.black.withOpacity(0.6), Colors.transparent],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            stops: [0.0, 1.0] // Ensure gradient covers the full height
           ),
         ),
-        // This container is just for the gradient, AppBar content will be drawn by Scaffold's AppBar
       ),
     );
   }
 
-
-  Widget _buildSocialButton(IconData icon, String label, VoidCallback onPressed) {
-    return TextButton.icon(
-      icon: Icon(icon, color: Colors.white70, size: 20),
-      label: Text(label, style: GoogleFonts.poppins(color: Colors.white70, fontSize: 12)),
-      onPressed: onPressed,
-      style: TextButton.styleFrom(
-        padding: EdgeInsets.zero,
-        minimumSize: Size(50, 30),
-      ),
-    );
-  }
-
-  // Renamed to _buildFullScreenImageViewer and removed Center widget, LayoutBuilder
-  Widget _buildFullScreenImageViewer(BuildContext context, Map<String, dynamic> attachment, String displayPath, String optimizedUrl) {
+  Widget _buildFullScreenImageViewer(BuildContext context, Map<String, dynamic> attachment, String displayPath, String? optimizedUrl) {
     final String? url = attachment['url'] as String?;
     final File? file = attachment['file'] as File?;
 
-    final String currentOptimizedUrl = _optimizeCloudinaryUrl(url);
-
-    // Reset the transformation controller when the image source changes (e.g., when swiping in PageView)
-    // This is important if _buildFullScreenImageViewer is called for different images within the same _MediaViewPageState
     _transformationController?.value = Matrix4.identity();
 
-
-    final imageWidget = currentOptimizedUrl.isNotEmpty
-      ? CachedNetworkImage(
-          imageUrl: currentOptimizedUrl,
-          fit: BoxFit.contain,
-          placeholder: (context, url) => Center(child: LinearProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent), backgroundColor: Colors.grey)),
-          errorWidget: (context, url, error) => buildError(context, message: 'Error loading image: $error'),
-          cacheKey: url,
-          width: MediaQuery.of(context).size.width,
-          alignment: Alignment.center,
-        )
-      : (file != null
-          ? Image.file(
-              file,
-              fit: BoxFit.contain,
-              width: MediaQuery.of(context).size.width,
-              alignment: Alignment.center,
-              errorBuilder: (context, error, stackTrace) => buildError(context, message: 'Error loading image file: $error'),
-            )
-          : buildError(context, message: 'No image source available for $displayPath'));
+    final imageWidget = optimizedUrl?.isNotEmpty == true
+        ? CachedNetworkImage(
+            imageUrl: optimizedUrl!,
+            fit: BoxFit.contain,
+            placeholder: (context, url) => const Center(child: LinearProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent))),
+            errorWidget: (context, url, error) => buildError(context, message: 'Error loading image: $error'),
+            cacheKey: url,
+            width: MediaQuery.of(context).size.width,
+            alignment: Alignment.center,
+          )
+        : file != null
+            ? Image.file(
+                file,
+                fit: BoxFit.contain,
+                width: MediaQuery.of(context).size.width,
+                alignment: Alignment.center,
+                errorBuilder: (context, error, stackTrace) => buildError(context, message: 'Error loading image file: $error'),
+              )
+            : buildError(context, message: 'No image source available for $displayPath');
 
     return GestureDetector(
-      onDoubleTapDown: (details) {
-        _handleDoubleTap(details.localPosition);
-      },
+      onDoubleTapDown: (details) => _handleDoubleTap(details.localPosition),
       child: InteractiveViewer(
         transformationController: _transformationController,
         minScale: 0.5,
         maxScale: 4.0,
-        // onInteractionEnd: (details) { // Can be used for more complex scenarios like spring back
-        // },
         child: imageWidget,
       ),
     );
-
-    /* Old structure:
-    if (currentOptimizedUrl.isNotEmpty) {
-      return InteractiveViewer(
-        minScale: 0.5,
-        maxScale: 4.0,
-        child: CachedNetworkImage(
-          imageUrl: currentOptimizedUrl,
-          fit: BoxFit.contain,
-          placeholder: (context, url) => Center(child: LinearProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent), backgroundColor: Colors.grey)),
-          errorWidget: (context, url, error) => buildError(context, message: 'Error loading image: $error'),
-          cacheKey: url,
-          width: MediaQuery.of(context).size.width, // Ensure it takes full width
-          alignment: Alignment.center, // Center the image within the full width
-        ),
-      );
-    } else if (file != null) {
-      return InteractiveViewer(
-        minScale: 0.5,
-        maxScale: 4.0,
-        child: Image.file(
-          file,
-          fit: BoxFit.contain,
-          width: MediaQuery.of(context).size.width, // Ensure it takes full width
-          alignment: Alignment.center, // Center the image within the full width
-          errorBuilder: (context, error, stackTrace) => buildError(context, message: 'Error loading image file: $error'),
-        ),
-      );
-    } else {
-      return buildError(context, message: 'No image source available for $displayPath');
-    }
   }
 
   void _handleDoubleTap(Offset tapPosition) {
     if (_transformationController == null) return;
 
-    _transformationAnimationController?.dispose(); // Dispose previous animation controller
-    _transformationAnimationController = AnimationController(
-      vsync: this, // Requires TickerProviderStateMixin
-      duration: const Duration(milliseconds: 300),
-    );
-
+    _transformationAnimationController?.reset();
     final currentMatrix = _transformationController!.value;
     final double currentScale = currentMatrix.getMaxScaleOnAxis();
 
     Matrix4 targetMatrix;
-
-    if (currentScale <= 1.01) { // If at initial scale or slightly off, zoom in
+    if (currentScale <= 1.01) {
       const double targetScale = 2.0;
-      // Zoom to the tap position
-      // Calculate the offset to center the tap position after scaling
       final Offset centeredTapPosition = Offset(
         tapPosition.dx * (targetScale - 1),
         tapPosition.dy * (targetScale - 1),
@@ -468,7 +345,7 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
       targetMatrix = Matrix4.identity()
         ..translate(-centeredTapPosition.dx, -centeredTapPosition.dy)
         ..scale(targetScale);
-    } else { // If zoomed in, zoom out to initial scale
+    } else {
       targetMatrix = Matrix4.identity();
     }
 
@@ -477,24 +354,18 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
     );
 
     animation.addListener(() {
-      if (_transformationController != null) {
-        _transformationController!.value = animation.value;
-      }
+      _transformationController?.value = animation.value;
     });
 
     _transformationAnimationController!.forward();
   }
 
-
-  Widget _buildPdfViewer(BuildContext context, Map<String, dynamic> attachment, String displayPath, String optimizedUrl) {
+  Widget _buildPdfViewer(BuildContext context, Map<String, dynamic> attachment, String displayPath, String? optimizedUrl) {
     final String? url = attachment['url'] as String?;
     final File? file = attachment['file'] as File?;
 
-    final String currentOptimizedUrl = _optimizeCloudinaryUrl(url);
-    if (currentOptimizedUrl.isNotEmpty || file != null) {
-      final Uri pdfUri = currentOptimizedUrl.isNotEmpty
-          ? Uri.parse(currentOptimizedUrl)
-          : Uri.file(file!.path);
+    if (optimizedUrl?.isNotEmpty == true || file != null) {
+      final Uri pdfUri = optimizedUrl?.isNotEmpty == true ? Uri.parse(optimizedUrl!) : Uri.file(file!.path);
       return PdfViewer.uri(
         pdfUri,
         params: const PdfViewerParams(
@@ -504,9 +375,8 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
           minScale: 0.5,
         ),
       );
-    } else {
-      return buildError(context, message: 'No PDF source available for $displayPath');
     }
+    return buildError(context, message: 'No PDF source available for $displayPath');
   }
 
   Future<void> _downloadAttachment(Map<String, dynamic> attachment) async {
@@ -520,7 +390,6 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
       return;
     }
 
-    // 1. Check and Request Permissions
     bool permissionGranted = await _requestStoragePermission();
     if (!permissionGranted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -529,38 +398,31 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
       return;
     }
 
-    // 2. Get Downloads Directory
     Directory? targetDirectory;
     String downloadsPathMessage = "Downloaded to ";
 
     if (Platform.isAndroid) {
       try {
-        // Attempt to get the primary external storage directory
         Directory? externalDir = await getExternalStorageDirectory();
         if (externalDir != null) {
-          String publicDownloadsPath = '${externalDir.path}/Download'; // Common name
+          String publicDownloadsPath = '${externalDir.path}/Download';
           targetDirectory = Directory(publicDownloadsPath);
           if (!await targetDirectory.exists()) {
             await targetDirectory.create(recursive: true);
           }
-          downloadsPathMessage = "Downloaded to Downloads folder (external storage). Path: ";
+          downloadsPathMessage = "Downloaded to Downloads folder. Path: ";
         }
       } catch (e) {
-        print("Error accessing external storage Downloads directory: $e. Falling back.");
-        // Fallback to app-specific downloads if public external path fails
+        debugPrint("Error accessing external storage: $e");
       }
     }
 
-    // Fallback for iOS or if Android public path failed
     if (targetDirectory == null) {
       try {
-        targetDirectory = await getDownloadsDirectory(); // App-specific on Android, standard on iOS
-        if (targetDirectory == null && Platform.isIOS) {
-          targetDirectory = await getApplicationDocumentsDirectory();
-        }
+        targetDirectory = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
         downloadsPathMessage = Platform.isIOS ? "Downloaded to app files. Path: " : "Downloaded to app-specific folder. Path: ";
       } catch (e) {
-        print("Error getting downloads directory: $e");
+        debugPrint("Error getting downloads directory: $e");
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Could not get downloads directory.', style: GoogleFonts.roboto())),
         );
@@ -568,23 +430,17 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
       }
     }
 
-    if (targetDirectory == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Could not determine downloads directory.', style: GoogleFonts.roboto())),
-        );
-        return;
-    }
-
-    String fileName = attachment['filename'] as String? ?? url.split('/').last;
-    // Sanitize filename if necessary, or ensure it's valid
+    String fileName = attachment['filename']?.toString() ?? url.split('/').last;
     if (fileName.isEmpty || !fileName.contains('.')) {
-        final String type = attachment['type'] as String? ?? 'unknown';
-        String extension = ".dat"; // default extension
-        if (type == 'image') extension = ".jpg"; // Be more specific if possible from mime type
-        else if (type == 'video') extension = ".mp4";
-        else if (type == 'audio') extension = ".mp3";
-        else if (type == 'pdf') extension = ".pdf";
-        fileName = "downloaded_file_${DateTime.now().millisecondsSinceEpoch}$extension";
+      final String type = attachment['type']?.toString().toLowerCase() ?? 'unknown';
+      String extension = switch (type) {
+        'image' => '.jpg',
+        'video' => '.mp4',
+        'audio' => '.mp3',
+        'pdf' => '.pdf',
+        _ => '.dat',
+      };
+      fileName = "downloaded_file_${DateTime.now().millisecondsSinceEpoch}$extension";
     }
 
     final String savePath = "${targetDirectory.path}/$fileName";
@@ -610,9 +466,9 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
         SnackBar(content: Text('$downloadsPathMessage$savePath', style: GoogleFonts.roboto())),
       );
     } catch (e) {
-      print("Download error: $e");
+      debugPrint("Download error: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Download failed: ${e.toString()}', style: GoogleFonts.roboto())),
+        SnackBar(content: Text('Download failed: $e', style: GoogleFonts.roboto())),
       );
     } finally {
       setState(() {
@@ -623,27 +479,21 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
   }
 
   Future<bool> _requestStoragePermission() async {
-    if (Platform.isIOS) return true; // iOS doesn't require explicit permission for saving to app's sandbox / getDownloadsDirectory
+    if (Platform.isIOS) return true;
 
-    PermissionStatus status;
-    if (await DeviceInfoPlugin().androidInfo.then((value) => value.version.sdkInt) >= 33) { // Android 13+
-        // For Android 13+, no specific storage permission needed for own app's directory or public media collections if using MediaStore.
-        // getDownloadsDirectory() should work. If targeting specific media types, READ_MEDIA_IMAGES, etc. would be for *reading*.
-        // For saving to a common "Downloads" folder, it's generally permissible.
-        return true;
-    } else { // Android 12 and below
-        status = await Permission.storage.request();
+    final androidInfo = await DeviceInfoPlugin().androidInfo;
+    if (androidInfo.version.sdkInt >= 33) {
+      return true;
     }
 
+    final status = await Permission.storage.request();
     if (status.isGranted) {
       return true;
     } else if (status.isPermanentlyDenied) {
-      // Consider guiding user to app settings
       openAppSettings();
       return false;
-    } else {
-      return false;
     }
+    return false;
   }
 }
 
@@ -665,20 +515,14 @@ Widget buildError(
       const SizedBox(height: 10),
       Text(
         message ?? 'Error loading content',
-        style: GoogleFonts.roboto(
-          color: Colors.white70,
-          fontSize: 16,
-        ),
+        style: GoogleFonts.roboto(color: Colors.white70, fontSize: 16),
         textAlign: TextAlign.center,
       ),
       if (fileName != null) ...[
         const SizedBox(height: 10),
         Text(
           fileName,
-          style: GoogleFonts.roboto(
-            color: Colors.grey[500],
-            fontSize: 12,
-          ),
+          style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 12),
           textAlign: TextAlign.center,
           overflow: TextOverflow.ellipsis,
         ),
@@ -687,12 +531,11 @@ Widget buildError(
   );
 }
 
-// VideoPlayerContainer to handle optimized video playback
 class VideoPlayerContainer extends StatefulWidget {
   final String? url;
   final File? file;
   final String displayPath;
-  final bool useBetterPlayer; // Changed from isAndroid13OrLower
+  final bool useBetterPlayer;
   final String? thumbnailUrl;
 
   const VideoPlayerContainer({
@@ -700,7 +543,7 @@ class VideoPlayerContainer extends StatefulWidget {
     this.url,
     this.file,
     required this.displayPath,
-    required this.useBetterPlayer, // Changed from isAndroid13OrLower
+    required this.useBetterPlayer,
     this.thumbnailUrl,
   }) : super(key: key);
 
@@ -709,44 +552,159 @@ class VideoPlayerContainer extends StatefulWidget {
 }
 
 class _VideoPlayerContainerState extends State<VideoPlayerContainer> {
-  // Controllers and detailed state are managed by BetterPlayerWidget or VideoPlayerWidget.
-  // This container just decides which one to show.
-
-  // String? _errorMessage; // If any error logic remains specific to this container's setup
-
-  @override
-  void initState() {
-    super.initState();
-    // Initialization is handled by child widgets (BetterPlayerWidget or VideoPlayerWidget)
-    // The logic for choosing player (based on DataController.androidSDKVersion) is now in the parent PageView builder,
-    // so widget.useBetterPlayer is determined before this widget is built.
-  }
-
-  @override
-  void dispose() {
-    // Controllers are disposed by their respective widgets.
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
-    // If there was any setup error specific to VideoPlayerContainer decision logic:
-    // if (_errorMessage != null) {
-    //   return buildError(context, message: _errorMessage!);
-    // }
-
-    // Directly render the appropriate player widget based on useBetterPlayer.
-    // They will handle their own loading indicators and thumbnail display.
-    // Always use BetterPlayerWidget as per new requirement.
-    // The widget.useBetterPlayer flag will always be true when this is called from PageView builder.
     return BetterPlayerWidget(
       url: widget.url,
       file: widget.file,
       displayPath: widget.displayPath,
       thumbnailUrl: widget.thumbnailUrl,
-      // isFeedContext is false by default in BetterPlayerWidget, which is correct for MediaViewPage
     );
-    // Removed VideoPlayerWidget instantiation path.
+  }
+}
+
+class BetterPlayerWidget extends StatefulWidget {
+  final String? url;
+  final File? file;
+  final String displayPath;
+  final String? thumbnailUrl;
+
+  const BetterPlayerWidget({
+    Key? key,
+    this.url,
+    this.file,
+    required this.displayPath,
+    this.thumbnailUrl,
+  }) : super(key: key);
+
+  @override
+  _BetterPlayerWidgetState createState() => _BetterPlayerWidgetState();
+}
+
+class _BetterPlayerWidgetState extends State<BetterPlayerWidget> {
+  BetterPlayerController? _betterPlayerController;
+  bool _isLoading = true;
+  String? _errorMessage;
+  double? _videoAspectRatio;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializePlayer();
+  }
+
+  Future<void> _initializePlayer() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final configuration = BetterPlayerConfiguration(
+        autoPlay: true,
+        looping: false,
+        fit: BoxFit.fitWidth, // Scale video to fill width, maintain aspect ratio
+        placeholder: widget.thumbnailUrl != null
+            ? CachedNetworkImage(
+                imageUrl: widget.thumbnailUrl!,
+                fit: BoxFit.fitWidth, // Match video scaling
+                width: double.infinity,
+                errorWidget: (context, url, error) => const SizedBox.shrink(),
+              )
+            : null,
+        errorBuilder: (context, errorMessage) => buildError(
+          context,
+          message: errorMessage ?? 'Error playing video',
+          fileName: widget.displayPath.split('/').last,
+        ),
+      );
+
+      BetterPlayerDataSource dataSource;
+      if (widget.url != null && widget.url!.isNotEmpty) {
+        dataSource = BetterPlayerDataSource(
+          BetterPlayerDataSourceType.network,
+          widget.url!,
+          cacheConfiguration: const BetterPlayerCacheConfiguration(
+            useCache: true,
+            maxCacheSize: 10 * 1024 * 1024,
+            maxCacheFileSize: 10 * 1024 * 1024,
+          ),
+        );
+      } else if (widget.file != null) {
+        dataSource = BetterPlayerDataSource(
+          BetterPlayerDataSourceType.file,
+          widget.file!.path,
+        );
+      } else {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'No video source available';
+        });
+        return;
+      }
+
+      _betterPlayerController = BetterPlayerController(
+        configuration,
+        betterPlayerDataSource: dataSource,
+      );
+
+      // Listen for video initialization to get aspect ratio
+      _betterPlayerController!.addEventsListener((event) {
+        if (event.betterPlayerEventType == BetterPlayerEventType.initialized) {
+          final videoPlayerController = _betterPlayerController!.videoPlayerController;
+          if (videoPlayerController != null && videoPlayerController.value.initialized) {
+            double aspectRatio = videoPlayerController.value.aspectRatio;
+            // Validate aspect ratio to avoid invalid values
+            if (aspectRatio.isFinite && aspectRatio > 0) {
+              setState(() {
+                _videoAspectRatio = aspectRatio;
+              });
+            } else {
+              // Fallback to default 16:9 aspect ratio
+              setState(() {
+                _videoAspectRatio = 16 / 9;
+              });
+            }
+          }
+        }
+      });
+
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Failed to initialize video player: $e';
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _betterPlayerController?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator(color: Colors.tealAccent));
+    }
+
+    if (_errorMessage != null) {
+      return buildError(
+        context,
+        message: _errorMessage,
+        fileName: widget.displayPath.split('/').last,
+      );
+    }
+
+    // Use AspectRatio if video aspect ratio is available, otherwise fallback to default 16:9
+    return AspectRatio(
+      aspectRatio: _videoAspectRatio ?? 16 / 9,
+      child: BetterPlayer(controller: _betterPlayerController!),
+    );
   }
 }
 
@@ -799,7 +757,7 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget> with SingleTicker
 
     try {
       audioplayers.Source audioSource;
-      if (widget.url != null) {
+      if (widget.url != null && widget.url!.isNotEmpty) {
         audioSource = audioplayers.UrlSource(widget.url!);
       } else if (widget.file != null) {
         audioSource = audioplayers.DeviceFileSource(widget.file!.path);
@@ -822,11 +780,7 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget> with SingleTicker
       }
 
       _audioPlayer.onDurationChanged.listen((duration) {
-        if (mounted) {
-          setState(() {
-            _duration = duration;
-          });
-        }
+        if (mounted) setState(() => _duration = duration);
       });
 
       _audioPlayer.onPositionChanged.listen((position) {
@@ -878,9 +832,7 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget> with SingleTicker
     final position = _duration * value;
     _audioPlayer.seek(position);
     _waveformController.updatePosition(value);
-    setState(() {
-      _position = position;
-    });
+    setState(() => _position = position);
   }
 
   @override
@@ -911,7 +863,7 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget> with SingleTicker
     }
 
     if (!_isInitialized || _errorMessage != null) {
-      print('Error: $_errorMessage');
+      debugPrint('Error: $_errorMessage');
       return Center(
         child: Text(
           _errorMessage ?? 'Audio player not initialized',
@@ -924,18 +876,11 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget> with SingleTicker
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(
-          FeatherIcons.music,
-          color: Colors.tealAccent,
-          size: 100,
-        ),
+        const Icon(FeatherIcons.music, color: Colors.tealAccent, size: 100),
         const SizedBox(height: 10),
         Text(
           widget.displayPath.split('/').last,
-          style: GoogleFonts.roboto(
-            color: Colors.white70,
-            fontSize: 16,
-          ),
+          style: GoogleFonts.roboto(color: Colors.white70, fontSize: 16),
           textAlign: TextAlign.center,
           overflow: TextOverflow.ellipsis,
         ),

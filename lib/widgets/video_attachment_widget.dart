@@ -119,7 +119,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
       _dataController.activeFeedPlayerController.value = _betterPlayerController;
       _dataController.activeFeedPlayerVideoId.value = _videoUniqueId;
       if (_betterPlayerController!.videoPlayerController != null &&
-          _betterPlayerController!.videoPlayerController!.value.isInitialized) {
+          _betterPlayerController!.videoPlayerController!.value.initialized) {
         _dataController.activeFeedPlayerPosition.value = _betterPlayerController!.videoPlayerController!.value.position;
       }
     } else {
@@ -402,7 +402,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
                   ),
                 ),
                 // Always display BetterPlayer if initialized
-                if (_isInitialized && _betterPlayerController != null && _betterPlayerController!.videoPlayerController != null && _betterPlayerController!.videoPlayerController!.value.isInitialized)
+                if (_isInitialized && _betterPlayerController != null && _betterPlayerController!.videoPlayerController != null && _betterPlayerController!.videoPlayerController!.value.initialized)
                   BetterPlayer(controller: _betterPlayerController!)
                 else if (!_isInitialized) // Show progress if not initialized (covers case where controller is null or not ready)
                   Center(
