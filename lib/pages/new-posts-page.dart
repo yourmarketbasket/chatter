@@ -14,6 +14,7 @@ import 'package:pdfrx/pdfrx.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 import 'package:video_thumbnail/video_thumbnail.dart' as video_thumb;
+import 'package:video_player/video_player.dart'; // Added for video dimensions
 
 // NewPostScreen allows users to create a new post with text and attachments (image, PDF, audio, video).
 class NewPostScreen extends StatefulWidget {

@@ -45,21 +45,85 @@ class MediaViewPage extends StatefulWidget {
   _MediaViewPageState createState() => _MediaViewPageState();
 }
 
-class _MediaViewPageState extends State<MediaViewPage> {
+class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateMixin { // Added TickerProviderStateMixin
   late PageController _pageController;
   late int _currentPageIndex;
+
+  // For double-tap to zoom
+  final Map<String, TransformationController> _transformationControllers = {};
+  final Map<String, AnimationController> _animationControllers = {};
+  final Map<String, Animation<Matrix4>> _zoomAnimations = {};
+  final Map<String, bool> _isZoomedMap = {};
 
   @override
   void initState() {
     super.initState();
     _currentPageIndex = widget.initialIndex;
     _pageController = PageController(initialPage: widget.initialIndex);
+
+    for (var att in widget.attachments) {
+      if (att.type.toLowerCase() == 'image') {
+        final key = att.url ?? att.file?.path;
+        if (key != null) {
+          _transformationControllers[key] = TransformationController();
+          _isZoomedMap[key] = false;
+          // Animation controller will be initialized when needed
+        }
+      }
+    }
   }
 
   @override
   void dispose() {
     _pageController.dispose();
+    _transformationControllers.values.forEach((controller) => controller.dispose());
+    _animationControllers.values.forEach((controller) => controller.dispose());
     super.dispose();
+  }
+
+  void _handleImageDoubleTap(String key, BuildContext context, BoxConstraints constraints) {
+    final transformationController = _transformationControllers[key];
+    if (transformationController == null) return;
+
+    _animationControllers[key]?.dispose(); // Dispose previous animation controller if any
+
+    final animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _animationControllers[key] = animationController;
+
+    Matrix4 begin = transformationController.value;
+    Matrix4 end;
+
+    final bool currentZoomState = _isZoomedMap[key] ?? false;
+
+    if (!currentZoomState) {
+      // Zoom in
+      // Calculate the scale to fit the width of the screen, or a max scale of 3.0
+      // This is a simplified zoom-to-center. More complex logic might be needed for specific focal points.
+      final double scale = 3.0; // Arbitrary zoom scale
+      end = Matrix4.identity()
+        ..translate(constraints.maxWidth / 2, constraints.maxHeight / 2)
+        ..scale(scale)
+        ..translate(-constraints.maxWidth / 2, -constraints.maxHeight / 2);
+      _isZoomedMap[key] = true;
+    } else {
+      // Zoom out
+      end = Matrix4.identity();
+      _isZoomedMap[key] = false;
+    }
+
+    final zoomAnimation = Matrix4Tween(begin: begin, end: end).animate(
+      CurvedAnimation(parent: animationController, curve: Curves.easeInOut),
+    );
+    _zoomAnimations[key] = zoomAnimation;
+
+    zoomAnimation.addListener(() {
+      transformationController.value = zoomAnimation.value;
+    });
+
+    animationController.forward(from: 0);
   }
 
   // Optimize Cloudinary URL for videos
@@ -72,19 +136,33 @@ class _MediaViewPageState extends State<MediaViewPage> {
       ...uri.queryParameters,
       'q': 'auto:good',
       'f': 'auto',
-      'c': 'scale',
+      'c': 'scale', // 'scale' is good, ensures it fits within dimensions if w/h are specified
       'ac': 'aac',
       'vc': 'auto',
       'dpr': 'auto',
-      'ar': '16:9',
-      'cs': 'hls',
-      'w': '1280',
-      'h': '720',
-      'r': '24',
-      'b': 'auto',
+      // 'ar': '16:9', // Removed: We will control aspect ratio client-side
+      'cs': 'hls', // Keep HLS for adaptive streaming if supported and desired
+      // 'w': '1280', // Optional: Set a max width for delivery
+      // 'h': '720',  // Optional: Set a max height for delivery
+      // If width/height are set, Cloudinary will scale while preserving original AR unless 'c_fill', 'c_crop' etc. are used with 'ar'.
+      // 'r': '24', // Removed: Let client decide or use source frame rate
+      'b': 'auto', // Removed: Bandwidth can be auto, or let HLS handle it.
+    };
+    // Clean up any existing ar, w, h, r, b params if we want to fully override
+    final cleanUriParams = Map.from(uri.queryParameters);
+    cleanUriParams.remove('ar');
+    // cleanUriParams.remove('w'); // Decide if we want to control max delivery dimensions
+    // cleanUriParams.remove('h');
+    cleanUriParams.remove('r');
+    // cleanUriParams.remove('b');
+
+
+    final newParams = {
+        ...cleanUriParams,
+        ...optimizedParams
     };
     
-    return uri.replace(queryParameters: optimizedParams).toString();
+    return uri.replace(queryParameters: newParams).toString();
   }
 
   // Original _optimizeCloudinaryUrl for non-video assets
@@ -163,6 +241,7 @@ class _MediaViewPageState extends State<MediaViewPage> {
                             file: currentAttachment.file,
                             displayPath: displayPath,
                             isAndroid13OrLower: snapshot.data!,
+                            aspectRatioString: currentAttachment.aspectRatio, // Pass aspect ratio
                           );
                         }
                         return const Center(
@@ -256,38 +335,52 @@ class _MediaViewPageState extends State<MediaViewPage> {
   }
 
   Widget _buildImageViewer(BuildContext context, Attachment attachment, String displayPath, String optimizedUrl) {
+    final key = attachment.url ?? attachment.file?.path;
+    if (key == null) {
+      return buildError(context, message: 'No image source key available for $displayPath');
+    }
+
+    // Ensure controller exists for this key, might happen if page is rebuilt with new attachments
+    if (!_transformationControllers.containsKey(key)) {
+      _transformationControllers[key] = TransformationController();
+      _isZoomedMap[key] = false;
+    }
+    final transformationController = _transformationControllers[key]!;
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final String currentOptimizedUrl = _optimizeCloudinaryUrl(attachment.url);
+
+        Widget imageChild;
         if (currentOptimizedUrl.isNotEmpty) {
-          return InteractiveViewer(
-            minScale: 0.5,
-            maxScale: 4.0,
-            child: Center(
-              child: CachedNetworkImage(
-                imageUrl: currentOptimizedUrl,
-                fit: BoxFit.contain,
-                placeholder: (context, url) => Center(child: LinearProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent), backgroundColor: Colors.grey)),
-                errorWidget: (context, url, error) => buildError(context, message: 'Error loading image: $error'),
-                cacheKey: attachment.url,
-              ),
-            ),
+          imageChild = CachedNetworkImage(
+            imageUrl: currentOptimizedUrl,
+            fit: BoxFit.contain,
+            placeholder: (context, url) => Center(child: LinearProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent), backgroundColor: Colors.grey)),
+            errorWidget: (context, url, error) => buildError(context, message: 'Error loading image: $error'),
+            cacheKey: attachment.url,
           );
         } else if (attachment.file != null) {
-          return InteractiveViewer(
-            minScale: 0.5,
-            maxScale: 4.0,
-            child: Center(
-              child: Image.file(
-                attachment.file!,
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) => buildError(context, message: 'Error loading image file: $error'),
-              ),
-            ),
+          imageChild = Image.file(
+            attachment.file!,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) => buildError(context, message: 'Error loading image file: $error'),
           );
         } else {
           return buildError(context, message: 'No image source available for $displayPath');
         }
+
+        return GestureDetector(
+          onDoubleTap: () => _handleImageDoubleTap(key, context, constraints),
+          child: InteractiveViewer(
+            transformationController: transformationController,
+            minScale: 0.5,
+            maxScale: 4.0, // InteractiveViewer's own maxScale for pinch zoom
+            panEnabled: true,
+            scaleEnabled: true,
+            child: Center(child: imageChild),
+          ),
+        );
       },
     );
   }
@@ -360,6 +453,7 @@ class VideoPlayerContainer extends StatefulWidget {
   final File? file;
   final String displayPath;
   final bool isAndroid13OrLower;
+  final String? aspectRatioString; // Added aspectRatioString
 
   const VideoPlayerContainer({
     Key? key,
@@ -367,6 +461,7 @@ class VideoPlayerContainer extends StatefulWidget {
     this.file,
     required this.displayPath,
     required this.isAndroid13OrLower,
+    this.aspectRatioString, // Added to constructor
   }) : super(key: key);
 
   @override
@@ -375,16 +470,36 @@ class VideoPlayerContainer extends StatefulWidget {
 
 class _VideoPlayerContainerState extends State<VideoPlayerContainer> {
   BetterPlayerController? betterPlayerController;
-  VideoPlayerController? videoPlayerController;
+  VideoPlayerController? _videoPlayerController; // Renamed to avoid conflict with local var
   bool _isLoading = true;
   String? _errorMessage;
   int _retryCount = 0;
   final int _maxRetries = 3;
+  double? _calculatedAspectRatio;
 
   @override
   void initState() {
     super.initState();
+    _parseInitialAspectRatio();
     _initializeVideoPlayer();
+  }
+
+  void _parseInitialAspectRatio() {
+    if (widget.aspectRatioString != null) {
+      try {
+        final parts = widget.aspectRatioString!.split('/');
+        if (parts.length == 2) {
+          final double width = double.parse(parts[0]);
+          final double height = double.parse(parts[1]);
+          if (width > 0 && height > 0) {
+            _calculatedAspectRatio = width / height;
+            print("[VideoPlayerContainer] Initial aspect ratio from string '${widget.aspectRatioString}': $_calculatedAspectRatio");
+          }
+        }
+      } catch (e) {
+        print("[VideoPlayerContainer] Error parsing aspect ratio string '${widget.aspectRatioString}': $e");
+      }
+    }
   }
 
   Future<void> _initializeVideoPlayer() async {
@@ -395,78 +510,50 @@ class _VideoPlayerContainerState extends State<VideoPlayerContainer> {
 
     try {
       if (widget.isAndroid13OrLower) {
-        // Configure BetterPlayer for older Android versions
         final betterPlayerDataSource = widget.url != null
             ? BetterPlayerDataSource(
                 BetterPlayerDataSourceType.network,
                 widget.url!,
-                cacheConfiguration: BetterPlayerCacheConfiguration(
-                  useCache: true,
-                  preCacheSize: 10 * 1024 * 1024,
-                  maxCacheSize: 100 * 1024 * 1024,
-                  maxCacheFileSize: 10 * 1024 * 1024,
-                ),
-                bufferingConfiguration: BetterPlayerBufferingConfiguration(
-                  minBufferMs: 5000,
-                  maxBufferMs: 15000,
-                  bufferForPlaybackMs: 2500,
-                  bufferForPlaybackAfterRebufferMs: 5000,
-                ),
+                cacheConfiguration: BetterPlayerCacheConfiguration(useCache: true, preCacheSize: 10 * 1024 * 1024, maxCacheSize: 100 * 1024 * 1024, maxCacheFileSize: 10 * 1024 * 1024),
+                bufferingConfiguration: BetterPlayerBufferingConfiguration(minBufferMs: 5000, maxBufferMs: 15000, bufferForPlaybackMs: 2500, bufferForPlaybackAfterRebufferMs: 5000),
                 resolutions: {
                   'low': widget.url!.replaceAll('q_auto:good', 'q_auto:low'),
                   'medium': widget.url!,
                   'high': widget.url!.replaceAll('q_auto:good', 'q_auto:best'),
                 },
               )
-            : BetterPlayerDataSource(
-                BetterPlayerDataSourceType.file,
-                widget.file!.path,
-              );
+            : BetterPlayerDataSource(BetterPlayerDataSourceType.file, widget.file!.path);
 
         betterPlayerController = BetterPlayerController(
           BetterPlayerConfiguration(
+            aspectRatio: _calculatedAspectRatio, // Use parsed aspect ratio
             autoPlay: false,
-            fit: BoxFit.contain,
+            fit: BoxFit.contain, // BoxFit.contain is generally good for video
             errorBuilder: (context, errorMessage) => buildError(context, message: errorMessage ?? 'Video playback error'),
             controlsConfiguration: BetterPlayerControlsConfiguration(
               enableSkips: false,
               enableFullscreen: true,
               enablePip: true,
               enableQualities: widget.url != null,
-              loadingWidget: const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
-              ),
+              loadingWidget: const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent)),
             ),
           ),
           betterPlayerDataSource: betterPlayerDataSource,
         );
-
-        // Preload video
         await betterPlayerController?.preCache(betterPlayerDataSource);
+        // For BetterPlayer, aspect ratio is set in configuration.
+        // If it can also be determined after load, we could update it.
+        // betterPlayerController.videoPlayerController?.addListener(_updateAspectRatioFromController);
+
       } else {
-        // Configure VideoPlayer for newer Android versions
-        videoPlayerController = widget.url != null
+        _videoPlayerController = widget.url != null
             ? VideoPlayerController.networkUrl(Uri.parse(widget.url!))
             : VideoPlayerController.file(widget.file!);
 
-        await videoPlayerController!.initialize();
-        videoPlayerController!.setLooping(true);
-        
-        // Monitor buffer health
-        videoPlayerController!.addListener(() {
-          final buffered = videoPlayerController!.value.buffered;
-          if (buffered.isNotEmpty && mounted) {
-            final bufferDuration = buffered.last.end - buffered.last.start;
-            if (bufferDuration.inSeconds < 5 && videoPlayerController!.value.isPlaying) {
-              videoPlayerController!.pause();
-              Future.delayed(Duration(seconds: 2), () {
-                if (mounted && videoPlayerController!.value.buffered.last.end.inSeconds > 10) {
-                  videoPlayerController!.play();
-                }
-              });
-            }
-          }
-        });
+        await _videoPlayerController!.initialize();
+        _videoPlayerController!.setLooping(true);
+        _updateAspectRatioFromController(); // Get aspect ratio from controller after init
+        _videoPlayerController!.addListener(_updateAspectRatioFromController); // Listen for changes (though rare after init)
       }
 
       if (mounted) {
@@ -488,38 +575,63 @@ class _VideoPlayerContainerState extends State<VideoPlayerContainer> {
     }
   }
 
+  void _updateAspectRatioFromController() {
+    if (!mounted) return;
+    final controllerAspectRatio = _videoPlayerController?.value.aspectRatio;
+    if (controllerAspectRatio != null && controllerAspectRatio > 0 && _calculatedAspectRatio != controllerAspectRatio) {
+      print("[VideoPlayerContainer] Aspect ratio updated from controller: $controllerAspectRatio");
+      setState(() {
+        _calculatedAspectRatio = controllerAspectRatio;
+      });
+    }
+  }
+
   @override
   void dispose() {
+    _videoPlayerController?.removeListener(_updateAspectRatioFromController);
     betterPlayerController?.dispose();
-    videoPlayerController?.dispose();
+    _videoPlayerController?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
-        ),
-      );
+      return const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent)));
     }
 
     if (_errorMessage != null) {
       return buildError(context, message: _errorMessage!);
     }
 
-    return widget.isAndroid13OrLower
-        ? BetterPlayerWidget(
-            url: widget.url,
-            file: widget.file,
-            displayPath: widget.displayPath,
-          )
-        : VideoPlayerWidget(
-            url: widget.url,
-            file: widget.file,
-            displayPath: widget.displayPath,
-          );
+    Widget playerWidget;
+    if (widget.isAndroid13OrLower) {
+      playerWidget = BetterPlayerWidget( // This widget likely needs to be adapted or we use BetterPlayer directly
+        controller: betterPlayerController, // Pass controller if BetterPlayerWidget is a wrapper
+        // url: widget.url, // Or pass individual params
+        // file: widget.file,
+        // displayPath: widget.displayPath,
+      );
+    } else {
+      playerWidget = _videoPlayerController != null && _videoPlayerController!.value.isInitialized
+          ? VideoPlayerWidget( // This widget also needs adaptation or direct use of VideoPlayer
+              controller: _videoPlayerController, // Pass controller
+              // url: widget.url,
+              // file: widget.file,
+              // displayPath: widget.displayPath,
+            )
+          : const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent)));
+    }
+
+    // Apply aspect ratio for full width display
+    final screenWidth = MediaQuery.of(context).size.width;
+    final currentAspectRatio = _calculatedAspectRatio ?? (16 / 9); // Default to 16/9 if null
+
+    return Container(
+      width: screenWidth,
+      height: screenWidth / currentAspectRatio,
+      child: playerWidget,
+    );
   }
 }
 

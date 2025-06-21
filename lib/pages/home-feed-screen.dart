@@ -171,6 +171,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
             size: attachments[i].file != null ? await attachments[i].file!.length() : 0,
             url: originalUrl,
             thumbnailUrl: thumbnailUrl,
+            aspectRatio: attachments[i].aspectRatio, // Carry over aspect ratio
           ));
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -200,6 +201,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         'size': att.size,
         'type': att.type,
         'thumbnailUrl': att.thumbnailUrl,
+        if (att.type == 'video' && att.aspectRatio != null) 'aspectRatio': att.aspectRatio,
       }).toList(),
     };
 
