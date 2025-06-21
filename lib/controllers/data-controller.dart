@@ -427,9 +427,9 @@ class DataController extends GetxController {
   }
 
   // Method to be called from UI (e.g. home-feed-screen.dart)
-  Future<List<Map<String, dynamic>>> uploadFiles(List<File> files) async {
+  Future<List<Map<String, dynamic>>> uploadFiles(List<Map<String, dynamic>> attachmentsData) async {
     // Delegate the call to the UploadService
-    return await _uploadService.uploadFilesToCloudinary(files);
+    return await _uploadService.uploadFilesToCloudinary(attachmentsData);
   }
 
   // Add these placeholder methods inside DataController class
