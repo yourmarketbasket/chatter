@@ -12,6 +12,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
+import 'package:video_player/video_player.dart';
 import 'package:video_thumbnail/video_thumbnail.dart' as video_thumb;
 import 'package:image/image.dart' as img; // Added for image processing
 import 'package:flutter_video_info/flutter_video_info.dart'; // Added for video processing
@@ -292,50 +293,60 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
 
   Future<Map<String, dynamic>?> _getVideoDimensions(File file) async {
     try {
-      final videoInfo = FlutterVideoInfo();
-      final info = await videoInfo.getVideoInfo(file.path);
+      // Initialize VideoPlayerController
+      final controller = VideoPlayerController.file(file);
+      await controller.initialize();
 
-      if (info != null && info.width != null && info.height != null) {
-        final width = info.width!.toInt();
-        final height = info.height!.toInt();
-        final duration = info.duration != null ? (info.duration! / 1000).round() : null; // Convert ms to seconds
-        String determinedOrientation;
+      // Get video dimensions
+      final size = controller.value.size;
+      final width = size.width.toInt();
+      final height = size.height.toInt();
 
-        // Primary determination based on width and height
-        if (width > height) {
-          determinedOrientation = 'landscape';
-        } else if (height > width) {
-          determinedOrientation = 'portrait';
-        } else {
-          determinedOrientation = 'square';
-        }
+      // Get duration in seconds
+      final duration = controller.value.duration.inSeconds;
 
-        // Log the orientation provided by the package for debugging, but don't let it override.
-        int? packageOrientation = info.orientation;
-        if (packageOrientation != null) {
-            print('[NewPostScreen] Video Info: Package orientation "$packageOrientation" (int) found. Using dimension-based "$determinedOrientation".');
-        }
-
-
-        print('[NewPostScreen] Video Decoded Dimensions: width=$width, height=$height, orientation=$determinedOrientation, duration=$duration (Package Orientation: $packageOrientation)');
-        double aspectRatio = (width != 0 && height != 0) ? (width / height) : 1.0;
-        return {
-          'width': width,
-          'height': height,
-          'orientation': determinedOrientation,
-          'aspectRatio': aspectRatio.toStringAsFixed(2),
-          if (duration != null) 'duration': duration,
-        };
+      // Determine orientation
+      String orientation;
+      if (width > height) {
+        orientation = 'landscape';
+      } else if (height > width) {
+        orientation = 'portrait';
       } else {
-        print('[NewPostScreen] Error decoding video or width/height is null.');
-        return null;
+        orientation = 'square';
       }
+
+      // Calculate aspect ratio
+      double aspectRatio = (width != 0 && height != 0) ? (width / height) : 1.0;
+
+      // Log details for debugging
+      print('[NewPostScreen] Video Dimensions: width=$width, height=$height, orientation=$orientation, duration=$duration, aspectRatio=${aspectRatio.toStringAsFixed(2)}');
+
+      // Clean up controller
+      await controller.dispose();
+
+      return {
+        'width': width,
+        'height': height,
+        'orientation': orientation,
+        'aspectRatio': aspectRatio.toStringAsFixed(2),
+        'duration': duration,
+      };
     } catch (e) {
-      print('[NewPostScreen] Error getting video dimensions using flutter_video_info: $e');
+      print('[NewPostScreen] Error getting video dimensions using video_player: $e');
+      // Fallback to thumbnail-based dimensions if needed
+      final thumbnailDimensions = await _getVideoThumbnailDimensions(file.path);
+      if (thumbnailDimensions != null) {
+        print('[NewPostScreen] Using thumbnail dimensions as fallback');
+        return {
+          ...thumbnailDimensions,
+          'duration': 0, // Duration unavailable in fallback
+        };
+      }
       return null;
     }
   }
-
+  
+  
   Future<void> _pickImage({required bool fromCamera}) async {
     try {
       if (await _requestMediaPermissions(fromCamera ? 'camera' : 'image')) {
