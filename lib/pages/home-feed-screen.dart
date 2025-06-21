@@ -26,7 +26,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:chatter/widgets/video_attachment_widget.dart';
 import 'package:chatter/widgets/audio_attachment_widget.dart';
-// import 'package:chatter/models/feed_models.dart'; Removed import
 import 'package:flutter_expandable_fab/flutter_expandable_fab.dart';
 
 class HomeFeedScreen extends StatefulWidget {
@@ -37,16 +36,12 @@ class HomeFeedScreen extends StatefulWidget {
 }
 
 class _HomeFeedScreenState extends State<HomeFeedScreen> {
-  // Access DataController, which now holds the Android SDK version
   final DataController dataController = Get.find<DataController>();
-  // int? androidVersion; // Removed, use dataController.androidSDKVersion.value
-  // bool isLoadingAndroidVersion = true; // Removed, version loaded at startup
   final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
-    // _loadAndroidVersion(); // Removed, version is loaded in main.dart
   }
 
   @override
@@ -55,52 +50,26 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     super.dispose();
   }
 
-  // Future<void> _loadAndroidVersion() async { // Entire method removed
-  //   SharedPreferences prefs = await SharedPreferences.getInstance();
-  //   int? storedVersion = prefs.getInt('android_version');
-  //   if (storedVersion != null) {
-  //     setState(() {
-  //       androidVersion = storedVersion;
-  //       isLoadingAndroidVersion = false;
-  //     });
-  //   } else {
-  //     if (Platform.isAndroid) {
-  //       DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
-  //       AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
-  //       int sdkInt = androidInfo.version.sdkInt;
-  //       await prefs.setInt('android_version', sdkInt);
-  //       setState(() {
-  //         androidVersion = sdkInt;
-  //         isLoadingAndroidVersion = false;
-  //       });
-  //     } else {
-  //       setState(() {
-  //         androidVersion = 33;
-  //         isLoadingAndroidVersion = false;
-  //       });
-  //     }
-  //   }
-  // }
-
   void _navigateToPostScreen() async {
     final result = await Get.bottomSheet<Map<String, dynamic>>(
       Container(
-        decoration: BoxDecoration(
-          color: Color(0xFF1E1E1E), // Dark grey background color
+        decoration: const BoxDecoration(
+          color: Color(0xFF1E1E1E),
           borderRadius: BorderRadius.only(
             topLeft: Radius.circular(16),
             topRight: Radius.circular(16),
           ),
         ),
-        child: NewPostScreen(),
+        child: const NewPostScreen(),
       ),
       isScrollControlled: true,
-      backgroundColor: Colors.transparent, // Important to keep this transparent
+      backgroundColor: Colors.transparent,
     );
 
     if (result != null && result is Map<String, dynamic>) {
       final String content = result['content'] as String? ?? '';
-      final List<Map<String, dynamic>> attachments = (result['attachments'] as List?)?.whereType<Map<String, dynamic>>().toList() ?? <Map<String, dynamic>>[];
+      final List<Map<String, dynamic>> attachments =
+          (result['attachments'] as List?)?.whereType<Map<String, dynamic>>().toList() ?? <Map<String, dynamic>>[];
 
       if (content.isNotEmpty || attachments.isNotEmpty) {
         _addPost(content, attachments);
@@ -137,9 +106,14 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     for (int i = 0; i < attachments.length; i++) {
       final a = attachments[i];
       try {
-        print('[HomeFeedScreen _addPost] Attachment ${i+1}: type=${a['type']}, path=${(a['file'] as File?)?.path}, file_exists_sync=${(a['file'] as File?)?.existsSync()}, length_sync=${(a['file'] as File?)?.lengthSync()}, filename=${a['filename']}, size=${a['size']}, url=${a['url']}');
+        print(
+            '[HomeFeedScreen _addPost] Attachment ${i + 1}: type=${a['type']}, path=${(a['file'] as File?)?.path}, '
+            'file_exists_sync=${(a['file'] as File?)?.existsSync()}, length_sync=${(a['file'] as File?)?.lengthSync()}, '
+            'filename=${a['filename']}, size=${a['size']}, url=${a['url']}');
       } catch (e) {
-        print('[HomeFeedScreen _addPost] Attachment ${i+1}: type=${a['type']}, path=${(a['file'] as File?)?.path}, url=${a['url']} - Error getting file stats: $e');
+        print(
+            '[HomeFeedScreen _addPost] Attachment ${i + 1}: type=${a['type']}, path=${(a['file'] as File?)?.path}, '
+            'url=${a['url']} - Error getting file stats: $e');
       }
     }
 
@@ -150,29 +124,34 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       for (int i = 0; i < files.length; i++) {
         final f = files[i];
         try {
-          print('[HomeFeedScreen _addPost] File ${i+1} for upload: path=${f.path}, exists_sync=${f.existsSync()}, length_sync=${f.lengthSync()}');
+          print('[HomeFeedScreen _addPost] File ${i + 1} for upload: path=${f.path}, exists_sync=${f.existsSync()}, '
+              'length_sync=${f.lengthSync()}');
         } catch (e) {
-          print('[HomeFeedScreen _addPost] File ${i+1} for upload: path=${f.path} - Error getting file stats: $e');
+          print('[HomeFeedScreen _addPost] File ${i + 1} for upload: path=${f.path} - Error getting file stats: $e');
         }
       }
       List<Map<String, dynamic>> uploadResults = await dataController.uploadFiles(files);
 
       for (int i = 0; i < attachments.length; i++) {
-        var result = uploadResults[i]; // Assuming uploadResults corresponds to the order of files derived from attachments
-        final originalAttachment = attachments.firstWhere((att) => (att['file'] as File?)?.path == result['filePath'], orElse: () => attachments[i]);
+        var result = uploadResults[i];
+        final originalAttachment = attachments.firstWhere(
+            (att) => (att['file'] as File?)?.path == result['filePath'],
+            orElse: () => attachments[i]);
 
         print(result);
         if (result['success'] == true) {
           String originalUrl = result['url'] as String;
-          // Use the thumbnailUrl directly from the upload result
           String? thumbnailUrl = result['thumbnailUrl'] as String?;
           uploadedAttachments.add({
-            'file': originalAttachment['file'], // Keep the original file object if needed, or null
+            'file': originalAttachment['file'],
             'type': originalAttachment['type'],
-            'filename': (originalAttachment['file'] as File?)?.path.split('/').last ?? result['filename'] ?? 'unknown',
-            'size': result['size'] ?? ((originalAttachment['file'] as File?) != null ? await (originalAttachment['file'] as File)!.length() : 0),
+            'filename':
+                (originalAttachment['file'] as File?)?.path.split('/').last ?? result['filename'] ?? 'unknown',
+            'size': result['size'] ??
+                ((originalAttachment['file'] as File?) != null ? await (originalAttachment['file'] as File)!.length() : 0),
             'url': originalUrl,
-            'thumbnailUrl': thumbnailUrl, // Assign the new thumbnailUrl here
+            'thumbnailUrl': thumbnailUrl,
+            'aspectRatio': result['aspectRatio'] ?? 16 / 9, // Aspect ratio from uploadFiles
           });
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -202,6 +181,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
             'size': att['size'],
             'type': att['type'],
             'thumbnailUrl': att['thumbnailUrl'],
+            'aspectRatio': att['aspectRatio'],
           }).toList(),
     };
 
@@ -209,9 +189,6 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
 
     if (result['success'] == true) {
       if (result['post'] != null) {
-        // Add the new post to the reactive list in DataController
-        // Ensure the post data from backend matches the structure expected by the UI
-        // Or transform it here if necessary.
         dataController.addNewPost(result['post'] as Map<String, dynamic>);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -223,9 +200,6 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           ),
         );
       } else {
-        // Post creation was successful on backend but post data wasn't returned.
-        // UI won't update automatically. User might need to refresh.
-        // Fetching all feeds again to see the new post.
         dataController.fetchFeeds();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -233,7 +207,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
               'Chatter posted! Refreshing feed to show it.',
               style: GoogleFonts.roboto(color: Colors.white),
             ),
-            backgroundColor: Colors.orange[700], // Indicate a slightly different state
+            backgroundColor: Colors.orange[700],
           ),
         );
       }
@@ -264,17 +238,16 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         'content': newReply['content']?.trim() ?? '',
         'useravatar': newReply['useravatar'] ?? '',
         'attachments': (newReply['attachments'] as List<Map<String, dynamic>>?)?.map((att) => {
-          'filename': (att['file'] as File?)?.path.split('/').last ?? att['filename'] ?? 'unknown',
-          'url': att['url'],
-          'size': (att['file'] as File?) != null ? (att['file'] as File).lengthSync() : att['size'] ?? 0,
-          'type': att['type'],
-          'thumbnailUrl': att['thumbnailUrl'],
-        }).toList() ?? [],
+              'filename': (att['file'] as File?)?.path.split('/').last ?? att['filename'] ?? 'unknown',
+              'url': att['url'],
+              'size': (att['file'] as File?) != null ? (att['file'] as File).lengthSync() : att['size'] ?? 0,
+              'type': att['type'],
+              'thumbnailUrl': att['thumbnailUrl'],
+              'aspectRatio': att['aspectRatio'],
+            }).toList() ??
+            [],
       };
 
-      // Assuming replyToPost is the correct method in DataController for replies
-      // And it expects postId, content, and attachments.
-      // The original post's ID is needed here.
       final postId = post['_id'] as String?;
       if (postId == null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -293,23 +266,10 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       );
 
       if (result['success'] == true) {
-        // Optionally, update the local post's reply count or add reply to a local list
-        // This depends on how you want the UI to reflect the new reply immediately
         final postIndex = dataController.posts.indexWhere((p) => p['_id'] == postId);
         if (postIndex != -1) {
           final postMap = dataController.posts[postIndex];
-          // Assuming the backend returns the new reply details and you want to add it
-          // or simply increment a counter. For simplicity, let's assume a counter.
-          // If 'replies' is a list of reply objects:
-          // List<dynamic> repliesList = List.from(postMap['replies'] ?? []);
-          // repliesList.add(result['reply']); // Assuming 'reply' contains the new reply data
-          // postMap['replies'] = repliesList;
-
-          // If 'replies' is just a count or you're managing it as a count in the UI:
-          postMap['replyCount'] = (postMap['replyCount'] ?? 0) + 1; // Example if it's a count
-          // Or if 'replies' is a list of IDs or full objects:
-          // (postMap['replies'] as List<dynamic>).add(result['reply']['_id']); // If adding ID
-
+          postMap['replyCount'] = (postMap['replyCount'] ?? 0) + 1;
           dataController.posts[postIndex] = postMap;
           dataController.posts.refresh();
         }
@@ -337,17 +297,15 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     final String username = post['username'] as String? ?? 'Unknown User';
     final String content = post['content'] as String? ?? '';
     final String? userAvatar = post['useravatar'] as String?;
-    // Ensure 'username' is not null and not empty before accessing its first character.
     final String avatarInitial = (username.isNotEmpty ? username[0].toUpperCase() : '?');
-    final DateTime timestamp = post['createdAt'] is String ? DateTime.parse(post['createdAt'] as String) : DateTime.now();
+    final DateTime timestamp =
+        post['createdAt'] is String ? DateTime.parse(post['createdAt'] as String) : DateTime.now();
     int likes = post['likes'] as int? ?? 0;
     int reposts = post['reposts'] as int? ?? 0;
     int views = post['views'] as int? ?? 0;
-    List<Map<String, dynamic>> attachments = (post['attachments'] as List<dynamic>?)?.map((e) => e as Map<String, dynamic>).toList() ?? [];
-    // Assuming 'replies' is a list of reply objects/IDs, its length is the count.
-    // If your backend sends a specific count field like 'replyCount', use that instead.
+    List<Map<String, dynamic>> attachments =
+        (post['attachments'] as List<dynamic>?)?.map((e) => e as Map<String, dynamic>).toList() ?? [];
     int replyCount = (post['replies'] as List<dynamic>?)?.length ?? post['replyCount'] as int? ?? 0;
-
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -358,9 +316,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
             CircleAvatar(
               radius: isReply ? 16 : 20,
               backgroundColor: Colors.tealAccent.withOpacity(0.2),
-              backgroundImage: userAvatar != null && userAvatar.isNotEmpty
-                  ? NetworkImage(userAvatar)
-                  : null,
+              backgroundImage: userAvatar != null && userAvatar.isNotEmpty ? NetworkImage(userAvatar) : null,
               child: userAvatar == null || userAvatar.isEmpty
                   ? Text(
                       avatarInitial,
@@ -372,7 +328,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                     )
                   : null,
             ),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -393,13 +349,13 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
-                            SizedBox(width: 4.0),
+                            const SizedBox(width: 4.0),
                             Icon(
                               Icons.verified,
                               color: Colors.amber,
                               size: isReply ? 13 : 15,
                             ),
-                            SizedBox(width: 4.0),
+                            const SizedBox(width: 4.0),
                             Text(
                               ' · @$username',
                               style: GoogleFonts.poppins(
@@ -420,7 +376,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                       ),
                     ],
                   ),
-                  SizedBox(height: 6),
+                  const SizedBox(height: 6),
                   Text(
                     content,
                     style: GoogleFonts.roboto(
@@ -430,28 +386,25 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                     ),
                   ),
                   if (attachments.isNotEmpty) ...[
-                    SizedBox(height: 12),
+                    const SizedBox(height: 12),
                     _buildAttachmentGrid(attachments, post),
                   ],
-                  SizedBox(height: 12),
+                  const SizedBox(height: 12),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Row(
                         children: [
                           IconButton(
-                            icon: Icon(
+                            icon: const Icon(
                               FeatherIcons.heart,
                               color: Colors.grey,
                               size: 20,
                             ),
                             onPressed: () {
-                              // Optimistically update UI and call backend
                               setState(() {
-                                post['likes'] = (post['likes'] as int? ?? 0) + 1; // Use 'likes' here
-                                // Add logic to reflect if the user has liked this post
+                                post['likes'] = (post['likes'] as int? ?? 0) + 1;
                               });
-                              // Example: dataController.likePost(post['_id']);
                             },
                           ),
                           Text(
@@ -466,7 +419,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                       Row(
                         children: [
                           IconButton(
-                            icon: Icon(
+                            icon: const Icon(
                               FeatherIcons.messageCircle,
                               color: Colors.grey,
                               size: 20,
@@ -476,7 +429,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                             },
                           ),
                           Text(
-                            '$replyCount', // Use the calculated replyCount
+                            '$replyCount',
                             style: GoogleFonts.roboto(
                               color: Colors.grey[400],
                               fontSize: 14,
@@ -487,7 +440,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                       Row(
                         children: [
                           IconButton(
-                            icon: Icon(
+                            icon: const Icon(
                               FeatherIcons.repeat,
                               color: Colors.grey,
                               size: 20,
@@ -508,14 +461,12 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                       Row(
                         children: [
                           IconButton(
-                            icon: Icon(
+                            icon: const Icon(
                               FeatherIcons.eye,
                               color: Colors.grey,
                               size: 20,
                             ),
-                            onPressed: () {
-                               // Optionally, increment views or handle view logic
-                            },
+                            onPressed: () {},
                           ),
                           Text(
                             '$views',
@@ -538,37 +489,35 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   }
 
   Widget _buildAttachmentGrid(List<Map<String, dynamic>> attachmentsArg, Map<String, dynamic> post) {
-    final double itemSpacing = 4.0;
-    // final double outerBorderRadius = 12.0; // Keep this for ClipRRect if used globally for the block
+    const double itemSpacing = 4.0;
 
     if (attachmentsArg.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    // Layout for 1 attachment
     if (attachmentsArg.length == 1) {
       return AspectRatio(
         aspectRatio: 16 / 9,
         child: _buildAttachmentWidget(
-          attachmentsArg[0], 0, post,
-          BorderRadius.circular(12.0), // Apply outerBorderRadius directly
+          attachmentsArg[0],
+          0,
+          post,
+          BorderRadius.circular(12.0),
           fit: BoxFit.cover,
         ),
       );
-    }
-    // Layout for 2 attachments
-    else if (attachmentsArg.length == 2) {
+    } else if (attachmentsArg.length == 2) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(12.0),
         child: AspectRatio(
-          aspectRatio: 2 * (4/3), // Assuming items are 4:3, total width is 2 * item_width
+          aspectRatio: 2 * (4 / 3),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(
                 child: _buildAttachmentWidget(attachmentsArg[0], 0, post, BorderRadius.zero, fit: BoxFit.cover),
               ),
-              SizedBox(width: itemSpacing),
+              const SizedBox(width: itemSpacing),
               Expanded(
                 child: _buildAttachmentWidget(attachmentsArg[1], 1, post, BorderRadius.zero, fit: BoxFit.cover),
               ),
@@ -576,42 +525,33 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           ),
         ),
       );
-    }
-    // Layout for 3 attachments
-    else if (attachmentsArg.length == 3) {
+    } else if (attachmentsArg.length == 3) {
       return LayoutBuilder(
         builder: (context, constraints) {
           double width = constraints.maxWidth;
-          double BORDER_RADIUS = 12.0;
-          // For 3 items, aim for overall aspect ratio ~1.9 to 2.0 (e.g. Twitter's wide format)
-          // Let left item be squarer, right items combine to similar height.
-          // Example: Left item 1:1, Right items combine to 1:1 height-wise.
-          // Total height derived from left item: (width - itemSpacing) / 2
-          // This makes the right items also (width - itemSpacing) / 2 total height.
-          // So rightItemHeight = ((width - itemSpacing) / 2 - itemSpacing) / 2
-
-          double leftItemWidth = (width * 0.66) - (itemSpacing / 2) ; // Left item takes 2/3 width
-          double rightColumnWidth = width * 0.33 - (itemSpacing / 2); // Right column takes 1/3
-          // Let's make the total height based on the width of the container, aiming for a 16/9 or similar.
-          double totalHeight = width * (9 / 16); // Common overall aspect ratio
-
+          const double borderRadius = 12.0;
+          double leftItemWidth = (width * 0.66) - (itemSpacing / 2);
+          double rightColumnWidth = width * 0.33 - (itemSpacing / 2);
+          double totalHeight = width * (9 / 16);
 
           return ClipRRect(
-            borderRadius: BorderRadius.circular(BORDER_RADIUS),
+            borderRadius: BorderRadius.circular(borderRadius),
             child: SizedBox(
-              height: totalHeight, // Constrain the height of the entire block
+              height: totalHeight,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   SizedBox(
                     width: leftItemWidth,
                     child: _buildAttachmentWidget(
-                      attachmentsArg[0], 0, post,
+                      attachmentsArg[0],
+                      0,
+                      post,
                       BorderRadius.zero,
                       fit: BoxFit.cover,
                     ),
                   ),
-                  SizedBox(width: itemSpacing),
+                  const SizedBox(width: itemSpacing),
                   SizedBox(
                     width: rightColumnWidth,
                     child: Column(
@@ -619,15 +559,19 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                       children: [
                         Expanded(
                           child: _buildAttachmentWidget(
-                            attachmentsArg[1], 1, post,
+                            attachmentsArg[1],
+                            1,
+                            post,
                             BorderRadius.zero,
                             fit: BoxFit.cover,
                           ),
                         ),
-                        SizedBox(height: itemSpacing),
+                        const SizedBox(height: itemSpacing),
                         Expanded(
                           child: _buildAttachmentWidget(
-                            attachmentsArg[2], 2, post,
+                            attachmentsArg[2],
+                            2,
+                            post,
                             BorderRadius.zero,
                             fit: BoxFit.cover,
                           ),
@@ -641,21 +585,19 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           );
         },
       );
-    }
-    // Layout for 4 attachments (2x2 grid)
-    else if (attachmentsArg.length == 4) {
-       return ClipRRect(
+    } else if (attachmentsArg.length == 4) {
+      return ClipRRect(
         borderRadius: BorderRadius.circular(12.0),
         child: AspectRatio(
-          aspectRatio: 1 / 1, // Overall square block for 2x2
+          aspectRatio: 1 / 1,
           child: GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
               crossAxisSpacing: itemSpacing,
               mainAxisSpacing: itemSpacing,
-              childAspectRatio: 1, // Square items
+              childAspectRatio: 1,
             ),
             itemCount: 4,
             itemBuilder: (context, index) {
@@ -664,109 +606,101 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           ),
         ),
       );
-    }
-    // Layout for 5 attachments (2 items in first row, 3 in second)
-    else if (attachmentsArg.length == 5) {
-      return LayoutBuilder(builder: (context, constraints) {
-        double BORDER_RADIUS = 12.0;
-        double containerWidth = constraints.maxWidth;
-        // Let each item be roughly square.
-        // Row 1 (2 items): item width w1 = (containerWidth - itemSpacing) / 2. Height h1 = w1.
-        // Row 2 (3 items): item width w2 = (containerWidth - 2 * itemSpacing) / 3. Height h2 = w2.
-        // Total height = h1 + itemSpacing + h2.
-        double h1 = (containerWidth - itemSpacing) / 2;
-        double h2 = (containerWidth - 2 * itemSpacing) / 3;
-        double totalHeight = h1 + itemSpacing + h2;
+    } else if (attachmentsArg.length == 5) {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          const double borderRadius = 12.0;
+          double containerWidth = constraints.maxWidth;
+          double h1 = (containerWidth - itemSpacing) / 2;
+          double h2 = (containerWidth - 2 * itemSpacing) / 3;
+          double totalHeight = h1 + itemSpacing + h2;
 
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(BORDER_RADIUS),
-          child: SizedBox(
-            height: totalHeight,
-            child: Column(
-              children: [
-                SizedBox(
-                  height: h1,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(child: _buildAttachmentWidget(attachmentsArg[0], 0, post, BorderRadius.zero, fit: BoxFit.cover)),
-                      SizedBox(width: itemSpacing),
-                      Expanded(child: _buildAttachmentWidget(attachmentsArg[1], 1, post, BorderRadius.zero, fit: BoxFit.cover)),
-                    ],
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(borderRadius),
+            child: SizedBox(
+              height: totalHeight,
+              child: Column(
+                children: [
+                  SizedBox(
+                    height: h1,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: _buildAttachmentWidget(attachmentsArg[0], 0, post, BorderRadius.zero, fit: BoxFit.cover),
+                        ),
+                        const SizedBox(width: itemSpacing),
+                        Expanded(
+                          child: _buildAttachmentWidget(attachmentsArg[1], 1, post, BorderRadius.zero, fit: BoxFit.cover),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                SizedBox(height: itemSpacing),
-                SizedBox(
-                  height: h2,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(child: _buildAttachmentWidget(attachmentsArg[2], 2, post, BorderRadius.zero, fit: BoxFit.cover)),
-                      SizedBox(width: itemSpacing),
-                      Expanded(child: _buildAttachmentWidget(attachmentsArg[3], 3, post, BorderRadius.zero, fit: BoxFit.cover)),
-                      SizedBox(width: itemSpacing),
-                      Expanded(child: _buildAttachmentWidget(attachmentsArg[4], 4, post, BorderRadius.zero, fit: BoxFit.cover)),
-                    ],
+                  const SizedBox(height: itemSpacing),
+                  SizedBox(
+                    height: h2,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: _buildAttachmentWidget(attachmentsArg[2], 2, post, BorderRadius.zero, fit: BoxFit.cover),
+                        ),
+                        const SizedBox(width: itemSpacing),
+                        Expanded(
+                          child: _buildAttachmentWidget(attachmentsArg[3], 3, post, BorderRadius.zero, fit: BoxFit.cover),
+                        ),
+                        const SizedBox(width: itemSpacing),
+                        Expanded(
+                          child: _buildAttachmentWidget(attachmentsArg[4], 4, post, BorderRadius.zero, fit: BoxFit.cover),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        );
-      });
-    }
-    // Default fallback for other counts (e.g., 6, 7, 8, 9, 10, 11+)
-    // Uses a 2-column grid. Max items displayed effectively will be limited by UI space or could be capped.
-    // For now, let it flow.
-    else {
-      int crossAxisCount = 3; // Default to 3 columns for > 5 items
-      double childAspectRatio = 1.0; // Square items
-
-      if (attachmentsArg.length > 9) { // For very many items, use smaller aspect ratio or more columns
-          // This part can be refined based on how many items we want to show before a "+N"
-          // For now, stick to 3 columns.
-      }
-
-      // Calculate number of rows for a 3-column grid
-      int numRows = (attachmentsArg.length / crossAxisCount).ceil();
-      // Calculate total height assuming square items and 3 columns
-      // Item width = (constraints.maxWidth - 2 * itemSpacing) / 3
-      // Item height = item width
-      // Total height = numRows * itemHeight + (numRows - 1) * itemSpacing
-      // This needs LayoutBuilder to get constraints.maxWidth
+          );
+        },
+      );
+    } else {
+      const int crossAxisCount = 3;
+      const double childAspectRatio = 1.0;
 
       return LayoutBuilder(
         builder: (context, constraints) {
           double itemWidth = (constraints.maxWidth - (crossAxisCount - 1) * itemSpacing) / crossAxisCount;
-          double itemHeight = itemWidth / childAspectRatio; // itemWidth since aspect is 1.0
+          double itemHeight = itemWidth / childAspectRatio;
+          int numRows = (attachmentsArg.length / crossAxisCount).ceil();
           double totalHeight = numRows * itemHeight + (numRows - 1) * itemSpacing;
 
           return ClipRRect(
             borderRadius: BorderRadius.circular(12.0),
             child: SizedBox(
-              height: totalHeight, // Constrain height to prevent overflow
+              height: totalHeight,
               child: GridView.builder(
-                shrinkWrap: true, // Important if inside a ListView
+                shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: crossAxisCount,
                   crossAxisSpacing: itemSpacing,
                   mainAxisSpacing: itemSpacing,
                   childAspectRatio: childAspectRatio,
                 ),
-                itemCount: attachmentsArg.length, // Show all attachments
+                itemCount: attachmentsArg.length,
                 itemBuilder: (context, index) {
                   return _buildAttachmentWidget(attachmentsArg[index], index, post, BorderRadius.zero, fit: BoxFit.cover);
                 },
               ),
             ),
           );
-        }
+        },
       );
     }
   }
 
-  Widget _buildAttachmentWidget(Map<String, dynamic> attachmentMap, int idx, Map<String, dynamic> post, BorderRadius borderRadius, {BoxFit fit = BoxFit.contain}) {
+  Widget _buildAttachmentWidget(
+      Map<String, dynamic> attachmentMap, int idx, Map<String, dynamic> post, BorderRadius borderRadius,
+      {BoxFit fit = BoxFit.contain}) {
     final String attachmentType = attachmentMap['type'] as String? ?? 'unknown';
     final String? displayUrl = attachmentMap['url'] as String?;
 
@@ -794,69 +728,66 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         key: Key('video_${attachmentMap['url'] ?? idx}'),
         attachment: attachmentMap,
         post: post,
-        borderRadius: BorderRadius.zero, // Border radius handled by outer ClipRRect
-        // androidVersion and isLoadingAndroidVersion are no longer passed,
-        // VideoAttachmentWidget will get version from DataController
-        // boxFit: fit, 
-        isFeedContext: true, // This video is in the feed
+        borderRadius: BorderRadius.zero,
+        isFeedContext: true,
       );
     } else if (attachmentType == "audio") {
       contentWidget = AudioAttachmentWidget(
         key: Key('audio_${attachmentMap['url'] ?? idx}'),
         attachment: attachmentMap,
         post: post,
-        borderRadius: BorderRadius.zero, // Border radius handled by outer ClipRRect
-        // Audio might not use BoxFit, its layout is intrinsic
+        borderRadius: BorderRadius.zero,
       );
     } else if (attachmentType == "image") {
       if (displayUrl != null && displayUrl.isNotEmpty) {
         contentWidget = CachedNetworkImage(
           imageUrl: displayUrl,
-          fit: fit, // Use the passed fit
+          fit: fit,
           errorWidget: (context, url, error) => Container(
             color: Colors.grey[900],
-            child: Icon(FeatherIcons.image, color: Colors.grey[500], size: 40),
+            child: const Icon(FeatherIcons.image, color: Colors.grey, size: 40),
           ),
         );
       } else if ((attachmentMap['file'] as File?) != null) {
         contentWidget = Image.file(
           attachmentMap['file'] as File,
-          fit: fit, // Use the passed fit
+          fit: fit,
           errorBuilder: (context, error, stackTrace) => Container(
             color: Colors.grey[900],
-            child: Icon(FeatherIcons.image, color: Colors.grey[500], size: 40),
+            child: const Icon(FeatherIcons.image, color: Colors.grey, size: 40),
           ),
         );
       } else {
         contentWidget = Container(
           color: Colors.grey[900],
-          child: Icon(FeatherIcons.image, color: Colors.grey[500], size: 40),
+          child: const Icon(FeatherIcons.image, color: Colors.grey, size: 40),
         );
       }
     } else if (attachmentType == "pdf") {
       if (displayUrl != null && displayUrl.isNotEmpty) {
         contentWidget = PdfViewer.uri(
           Uri.parse(displayUrl),
-          params: PdfViewerParams(margin: 0, maxScale: 1.0, backgroundColor: Colors.grey[900]!),
+          params: const PdfViewerParams(margin: 0, maxScale: 1.0, backgroundColor: Colors.grey),
         );
       } else {
         contentWidget = Container(
           color: Colors.grey[900],
-          child: Icon(FeatherIcons.fileText, color: Colors.grey[500], size: 40),
+          child: const Icon(FeatherIcons.fileText, color: Colors.grey, size: 40),
         );
       }
-      // PDF viewer might not respect BoxFit in the same way, it has its own scaling.
-      // Wrapping in AspectRatio might be needed if specific aspect ratio is desired for PDF cell.
-      // For now, let it fill.
-    } else { // Fallback for other/unknown types
+    } else {
       contentWidget = Container(
         color: Colors.grey[900],
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(attachmentType == "audio" ? FeatherIcons.music : FeatherIcons.file, color: Colors.tealAccent, size: 20),
-            SizedBox(height: 8),
+            Icon(
+              attachmentType == "audio" ? FeatherIcons.music : FeatherIcons.file,
+              color: Colors.tealAccent,
+              size: 20,
+            ),
+            const SizedBox(height: 8),
           ],
         ),
       );
@@ -877,19 +808,24 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
               viewsCount: post['views'] as int? ?? 0,
               likesCount: post['likes'] as int? ?? 0,
               repostsCount: post['reposts'] as int? ?? 0,
-              // Pass transition details if this is a video and it's the one being transitioned
-              transitionVideoId: (attachmentType == "video" && dataController.isTransitioningVideo.value && dataController.activeFeedPlayerVideoId.value == attachmentMap['url'])
+              transitionVideoId: (attachmentType == "video" &&
+                      dataController.isTransitioningVideo.value &&
+                      dataController.activeFeedPlayerVideoId.value == attachmentMap['url'])
                   ? dataController.activeFeedPlayerVideoId.value
                   : null,
-              transitionControllerType: (attachmentType == "video" && dataController.isTransitioningVideo.value && dataController.activeFeedPlayerVideoId.value == attachmentMap['url'])
-                  ? (dataController.activeFeedPlayerController.value is BetterPlayerController ? 'better_player' : 'video_player')
+              transitionControllerType: (attachmentType == "video" &&
+                      dataController.isTransitioningVideo.value &&
+                      dataController.activeFeedPlayerVideoId.value == attachmentMap['url'])
+                  ? (dataController.activeFeedPlayerController.value is BetterPlayerController
+                      ? 'better_player'
+                      : 'video_player')
                   : null,
             ),
           ),
         );
       },
       child: ClipRRect(
-        borderRadius: borderRadius, // Apply the overall border radius here
+        borderRadius: borderRadius,
         child: contentWidget,
       ),
     );
@@ -898,7 +834,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFF000000),
+      backgroundColor: const Color(0xFF000000),
       appBar: AppBar(
         title: Text(
           'Chatter',
@@ -909,13 +845,13 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
             color: Colors.white,
           ),
         ),
-        backgroundColor: Color(0xFF000000),
+        backgroundColor: const Color(0xFF000000),
         elevation: 0,
       ),
       drawer: const AppDrawer(),
       body: Obx(() {
         if (dataController.posts.isEmpty) {
-          return Center(
+          return const Center(
             child: CircularProgressIndicator(
               valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
             ),
@@ -929,11 +865,10 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
             height: 1,
           ),
           itemBuilder: (context, index) {
-            final postMap = dataController.posts[index] as Map<String, dynamic>; // Ensure it's a Map
-            // Directly use postMap, no need to instantiate ChatterPost or Attachment
+            final postMap = dataController.posts[index] as Map<String, dynamic>;
             return Padding(
-              padding: EdgeInsets.symmetric(horizontal: 1, vertical: 5),
-              child: _buildPostContent(postMap, isReply: false), // Pass postMap directly
+              padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 5),
+              child: _buildPostContent(postMap, isReply: false),
             );
           },
         );
@@ -949,46 +884,52 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         openButtonBuilder: RotateFloatingActionButtonBuilder(
           backgroundColor: Colors.tealAccent,
           foregroundColor: Colors.black,
-          child: Icon(FeatherIcons.menu),
+          child: const Icon(FeatherIcons.menu),
         ),
         closeButtonBuilder: RotateFloatingActionButtonBuilder(
           backgroundColor: Colors.tealAccent,
           foregroundColor: Colors.black,
-          child: Icon(FeatherIcons.x),
+          child: const Icon(Icons.close),
         ),
         children: [
           FloatingActionButton.small(
             heroTag: 'fab_add_post',
             backgroundColor: Colors.black,
-            shape: RoundedRectangleBorder(side: BorderSide(color: Colors.tealAccent, width: 1), borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(
+                side: const BorderSide(color: Colors.tealAccent, width: 1),
+                borderRadius: BorderRadius.circular(10)),
             onPressed: _navigateToPostScreen,
             tooltip: 'Add Post',
-            child: Icon(FeatherIcons.plusCircle, color: Colors.tealAccent),
+            child: const Icon(FeatherIcons.plusCircle, color: Colors.tealAccent),
           ),
           FloatingActionButton.small(
             heroTag: 'fab_home',
             backgroundColor: Colors.black,
-            shape: RoundedRectangleBorder(side: BorderSide(color: Colors.tealAccent, width: 1), borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(
+                side: const BorderSide(color: Colors.tealAccent, width: 1),
+                borderRadius: BorderRadius.circular(10)),
             onPressed: () {
               _scrollController.animateTo(
                 0,
-                duration: Duration(milliseconds: 300),
+                duration: const Duration(milliseconds: 300),
                 curve: Curves.easeInOut,
               );
               dataController.fetchFeeds();
             },
             tooltip: 'Home',
-            child: Icon(FeatherIcons.home, color: Colors.tealAccent),
+            child: const Icon(FeatherIcons.home, color: Colors.tealAccent),
           ),
           FloatingActionButton.small(
             heroTag: 'fab_search',
             backgroundColor: Colors.black,
-            shape: RoundedRectangleBorder(side: BorderSide(color: Colors.tealAccent, width: 1), borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(
+                side: const BorderSide(color: Colors.tealAccent, width: 1),
+                borderRadius: BorderRadius.circular(10)),
             onPressed: () {
               Get.to(() => const SearchPage(), transition: Transition.rightToLeft);
             },
             tooltip: 'Search',
-            child: Icon(FeatherIcons.search, color: Colors.tealAccent),
+            child: const Icon(FeatherIcons.search, color: Colors.tealAccent),
           ),
         ],
       ),

@@ -60,6 +60,7 @@ dependencies:
   better_player_enhanced: ^0.0.5
   image_cropper: ^9.1.0
   flutter_expandable_fab: ^2.5.2
+  image: ^4.5.4
 
 dev_dependencies:
   flutter_test:

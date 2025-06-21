@@ -114,7 +114,6 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
       'ac': 'aac',
       'vc': 'auto',
       'dpr': 'auto',
-      'ar': '16:9',
       'cs': 'hls',
       'w': '1280',
       'h': '720',
@@ -229,18 +228,19 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
                     Widget mediaWidget;
                     switch (type) {
                       case 'image':
-                        return _buildFullScreenImageViewer(context, currentAttachment, displayPath, optimizedUrl);
+                        mediaWidget = _buildFullScreenImageViewer(context, currentAttachment, displayPath, optimizedUrl);
+                        break;
                       case 'pdf':
                         mediaWidget = _buildPdfViewer(context, currentAttachment, displayPath, optimizedUrl);
                         break;
                       case 'video':
-                        final String? thumbnailUrl = currentAttachment['thumbnailUrl'] as String?;
                         mediaWidget = VideoPlayerContainer(
                           url: optimizedUrl.isNotEmpty ? optimizedUrl : url,
                           file: file,
                           displayPath: displayPath,
                           useBetterPlayer: true,
-                          thumbnailUrl: thumbnailUrl,
+                          thumbnailUrl: currentAttachment['thumbnailUrl'] as String?,
+                          aspectRatio: currentAttachment['aspectRatio'] as String?, // Pass string aspect ratio
                         );
                         break;
                       case 'audio':
@@ -259,7 +259,7 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
                           iconColor: Colors.grey[600],
                         );
                     }
-                    return type == 'video' ? mediaWidget : Center(child: mediaWidget);
+                    return Center(child: mediaWidget);
                   },
                 ),
               ),
@@ -537,6 +537,7 @@ class VideoPlayerContainer extends StatefulWidget {
   final String displayPath;
   final bool useBetterPlayer;
   final String? thumbnailUrl;
+  final String? aspectRatio; // Backend-provided aspect ratio as string
 
   const VideoPlayerContainer({
     Key? key,
@@ -545,6 +546,7 @@ class VideoPlayerContainer extends StatefulWidget {
     required this.displayPath,
     required this.useBetterPlayer,
     this.thumbnailUrl,
+    this.aspectRatio,
   }) : super(key: key);
 
   @override
@@ -559,6 +561,7 @@ class _VideoPlayerContainerState extends State<VideoPlayerContainer> {
       file: widget.file,
       displayPath: widget.displayPath,
       thumbnailUrl: widget.thumbnailUrl,
+      aspectRatio: widget.aspectRatio,
     );
   }
 }
@@ -568,6 +571,7 @@ class BetterPlayerWidget extends StatefulWidget {
   final File? file;
   final String displayPath;
   final String? thumbnailUrl;
+  final String? aspectRatio; // Backend-provided aspect ratio as string
 
   const BetterPlayerWidget({
     Key? key,
@@ -575,6 +579,7 @@ class BetterPlayerWidget extends StatefulWidget {
     this.file,
     required this.displayPath,
     this.thumbnailUrl,
+    this.aspectRatio,
   }) : super(key: key);
 
   @override
@@ -600,14 +605,25 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> {
     });
 
     try {
+      // Parse backend-provided aspect ratio string
+      if (widget.aspectRatio != null && widget.aspectRatio!.isNotEmpty) {
+        final parsedAspectRatio = double.tryParse(widget.aspectRatio!);
+        if (parsedAspectRatio != null && parsedAspectRatio.isFinite && parsedAspectRatio > 0) {
+          _videoAspectRatio = parsedAspectRatio;
+        } else {
+          debugPrint('Invalid aspect ratio string from backend: ${widget.aspectRatio}, falling back to player or default');
+        }
+      }
+
       final configuration = BetterPlayerConfiguration(
         autoPlay: true,
         looping: false,
-        fit: BoxFit.fitWidth, // Scale video to fill width, maintain aspect ratio
+        fit: BoxFit.fitWidth, // Fill device width, adjust height based on aspect ratio
+        aspectRatio: _videoAspectRatio ?? 16 / 9, // Use parsed aspect ratio or default
         placeholder: widget.thumbnailUrl != null
             ? CachedNetworkImage(
                 imageUrl: widget.thumbnailUrl!,
-                fit: BoxFit.fitWidth, // Match video scaling
+                fit: BoxFit.fitWidth,
                 width: double.infinity,
                 errorWidget: (context, url, error) => const SizedBox.shrink(),
               )
@@ -648,31 +664,37 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> {
         betterPlayerDataSource: dataSource,
       );
 
-      // Listen for video initialization to get aspect ratio
-      _betterPlayerController!.addEventsListener((event) {
-        if (event.betterPlayerEventType == BetterPlayerEventType.initialized) {
-          final videoPlayerController = _betterPlayerController!.videoPlayerController;
-          if (videoPlayerController != null && videoPlayerController.value.initialized) {
-            double aspectRatio = videoPlayerController.value.aspectRatio;
-            // Validate aspect ratio to avoid invalid values
-            if (aspectRatio.isFinite && aspectRatio > 0) {
-              setState(() {
-                _videoAspectRatio = aspectRatio;
-              });
-            } else {
-              // Fallback to default 16:9 aspect ratio
-              setState(() {
-                _videoAspectRatio = 16 / 9;
-              });
+      // If no valid backend aspect ratio, get it from the video player after initialization
+      if (_videoAspectRatio == null) {
+        _betterPlayerController!.addEventsListener((event) {
+          if (event.betterPlayerEventType == BetterPlayerEventType.initialized) {
+            final videoPlayerController = _betterPlayerController!.videoPlayerController;
+            if (videoPlayerController != null && videoPlayerController.value.initialized) {
+              double aspectRatio = videoPlayerController.value.aspectRatio;
+              if (aspectRatio.isFinite && aspectRatio > 0) {
+                if (mounted) {
+                  setState(() {
+                    _videoAspectRatio = aspectRatio;
+                  });
+                }
+              } else {
+                debugPrint('Invalid aspect ratio from video: $aspectRatio, using default 16:9');
+                if (mounted) {
+                  setState(() {
+                    _videoAspectRatio = 16 / 9;
+                  });
+                }
+              }
             }
           }
-        }
-      });
+        });
+      }
 
       setState(() {
         _isLoading = false;
       });
     } catch (e) {
+      debugPrint('Error initializing video player: $e');
       setState(() {
         _isLoading = false;
         _errorMessage = 'Failed to initialize video player: $e';
@@ -700,10 +722,12 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> {
       );
     }
 
-    // Use AspectRatio if video aspect ratio is available, otherwise fallback to default 16:9
-    return AspectRatio(
-      aspectRatio: _videoAspectRatio ?? 16 / 9,
-      child: BetterPlayer(controller: _betterPlayerController!),
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: double.infinity),
+      child: AspectRatio(
+        aspectRatio: _videoAspectRatio ?? 16 / 9,
+        child: BetterPlayer(controller: _betterPlayerController!),
+      ),
     );
   }
 }
