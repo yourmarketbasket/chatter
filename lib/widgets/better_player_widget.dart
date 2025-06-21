@@ -4,6 +4,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:async';
 import 'dart:io';
+import 'package:get/get.dart';
+import 'package:chatter/controllers/data-controller.dart';
 
 // Widget for video playback using better_player for Android 13 and lower
 class BetterPlayerWidget extends StatefulWidget {
@@ -40,9 +42,17 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
   late Animation<double> _fadeAnimation;
   double? _aspectRatio;
 
+  // For single video playback
+  final DataController _dataController = Get.find<DataController>();
+  String? _videoUniqueId;
+  StreamSubscription? _currentlyPlayingVideoSubscription;
+
+
   @override
   void initState() {
     super.initState();
+    _videoUniqueId = widget.url ?? widget.file?.path ?? widget.key.toString();
+
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -51,6 +61,20 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
     _initializeVideoPlayer();
+
+    // Listen to global playback changes
+    // Using GetX's `listen` method for Rx variables for more directness with GetX patterns.
+    _currentlyPlayingVideoSubscription = _dataController.currentlyPlayingVideoId.listen((playingId) {
+      if (_controller != null && (_controller!.isPlaying() ?? false)) {
+        if (playingId != null && playingId != _videoUniqueId) {
+          _controller!.pause();
+           // Update local _isPlaying state if needed, though BetterPlayer events should also catch this.
+          setState(() {
+            _isPlaying = false;
+          });
+        }
+      }
+    });
   }
 
   Future<void> _initializeVideoPlayer() async {
@@ -142,7 +166,15 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
               if (event.betterPlayerEventType == BetterPlayerEventType.progress) {
                 _position = event.parameters?['progress'] ?? _position;
               }
-              _isPlaying = _controller!.isPlaying() ?? false;
+
+              bool newIsPlayingState = _controller!.isPlaying() ?? false;
+              if (newIsPlayingState && !_isPlaying) { // Just started playing
+                _dataController.videoDidStartPlaying(_videoUniqueId!);
+              } else if (!newIsPlayingState && _isPlaying) { // Just paused or finished
+                _dataController.videoDidStopPlaying(_videoUniqueId!);
+              }
+              _isPlaying = newIsPlayingState;
+
               _duration = _controller!.videoPlayerController!.value.duration ?? _duration;
               if (!_isPlaying && !_showControls) {
                 _showControls = true;
@@ -199,6 +231,7 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
 
   @override
   void dispose() {
+    _currentlyPlayingVideoSubscription?.cancel(); // Cancel subscription
     _controller?.dispose();
     _hideControlsTimer?.cancel();
     _animationController.dispose();

@@ -47,6 +47,9 @@ class DataController extends GetxController {
   final RxList<Map<String, dynamic>> following = <Map<String, dynamic>>[].obs;
   final RxBool isLoadingFollowing = false.obs;
 
+  // For managing single video playback
+  final Rxn<String> currentlyPlayingVideoId = Rxn<String>();
+
   @override
   void onInit() {
     super.onInit();
@@ -110,12 +113,19 @@ class DataController extends GetxController {
           },
         ),
       );
-      if (response.statusCode == 200 && response.data['success'] == true) {
-        return {'success': true, 'message': 'Post created successfully'};
-      } else {
+      if (response.statusCode == 200 && response.data['success'] == true && response.data['post'] != null) {
+        // Assuming the backend returns the created post object under the key 'post'
+        return {'success': true, 'message': 'Post created successfully', 'post': response.data['post']};
+      } else if (response.statusCode == 200 && response.data['success'] == true && response.data['post'] == null) {
+        // Backend indicated success but didn't return the post, this is a fallback
+        print('[DataController] createPost success, but no post data returned from backend.');
+        return {'success': true, 'message': 'Post created successfully (no post data returned)'};
+      }
+      else {
         return {
           'success': false,
-          'message': response.data['message'] ?? 'Post creation failed'
+          'message': response.data['message'] ?? 'Post creation failed',
+          'post': null // Ensure 'post' key is present even on failure for consistent access
         };
       }
     } catch (e) {
@@ -604,12 +614,24 @@ class DataController extends GetxController {
         String returnedAvatarUrl = response.data['avatarUrl'] ?? avatarUrl; // Use returned URL if available
 
         // Update local user state
-        var updatedUser = Map<String, dynamic>.from(user.value);
-        updatedUser['avatar'] = returnedAvatarUrl;
-        user.value = updatedUser; // Update reactive user object
+        // Create a deep copy to ensure nested map 'user' is also new
+        var updatedUserData = Map<String, dynamic>.from(user.value);
+        if (updatedUserData['user'] is Map) {
+          // Ensure 'user' key exists and is a map
+          var nestedUserMap = Map<String, dynamic>.from(updatedUserData['user'] as Map);
+          nestedUserMap['avatar'] = returnedAvatarUrl;
+          updatedUserData['user'] = nestedUserMap;
 
-        // Save updated user object to secure storage
-        await _storage.write(key: 'user', value: jsonEncode(updatedUser));
+          user.value = updatedUserData; // Update reactive user object
+          user.refresh(); // Explicitly call refresh if nested changes aren't automatically picked up by all listeners
+
+          // Save updated user object to secure storage
+          await _storage.write(key: 'user', value: jsonEncode(updatedUserData));
+        } else {
+          // Handle case where 'user' map might not exist or is not a map (should not happen in normal flow)
+          print('[DataController] Error: User data structure is not as expected. Cannot update avatar in nested map.');
+          // Potentially return an error or don't update if structure is broken
+        }
 
         print('[DataController] Avatar updated successfully on backend and locally. New URL: $returnedAvatarUrl');
         return {
@@ -628,6 +650,21 @@ class DataController extends GetxController {
       isLoading.value = false;
       print('[DataController] Error in updateUserAvatar: ${e.toString()}');
       return {'success': false, 'message': 'An error occurred: ${e.toString()}'};
+    }
+  }
+
+  void videoDidStartPlaying(String videoId) {
+    if (currentlyPlayingVideoId.value != videoId) {
+      currentlyPlayingVideoId.value = videoId;
+      print("[DataController] Video $videoId started playing. Setting global lock.");
+    }
+  }
+
+  // Optional: Call this if a video is explicitly paused by the user or finishes.
+  void videoDidStopPlaying(String videoId) {
+    if (currentlyPlayingVideoId.value == videoId) {
+      currentlyPlayingVideoId.value = null;
+      print("[DataController] Video $videoId stopped playing. Releasing global lock.");
     }
   }
 }

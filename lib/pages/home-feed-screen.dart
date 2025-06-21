@@ -207,20 +207,40 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     final result = await dataController.createPost(postData);
 
     if (result['success'] == true) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Fantastic! Your chatter is live!',
-            style: GoogleFonts.roboto(color: Colors.white),
+      if (result['post'] != null) {
+        // Add the new post to the reactive list in DataController
+        // Ensure the post data from backend matches the structure expected by the UI
+        // Or transform it here if necessary.
+        dataController.addNewPost(result['post'] as Map<String, dynamic>);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Fantastic! Your chatter is live!',
+              style: GoogleFonts.roboto(color: Colors.white),
+            ),
+            backgroundColor: Colors.teal[700],
           ),
-          backgroundColor: Colors.teal[700],
-        ),
-      );
+        );
+      } else {
+        // Post creation was successful on backend but post data wasn't returned.
+        // UI won't update automatically. User might need to refresh.
+        // Fetching all feeds again to see the new post.
+        dataController.fetchFeeds();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Chatter posted! Refreshing feed to show it.',
+              style: GoogleFonts.roboto(color: Colors.white),
+            ),
+            backgroundColor: Colors.orange[700], // Indicate a slightly different state
+          ),
+        );
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Could not create post, please try again later',
+            result['message'] ?? 'Could not create post, please try again later',
             style: GoogleFonts.roboto(color: Colors.white),
           ),
           backgroundColor: Colors.red[700],
@@ -517,57 +537,108 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   }
 
   Widget _buildAttachmentGrid(List<Map<String, dynamic>> attachmentsArg, Map<String, dynamic> post) {
-    // Use attachmentsArg to avoid confusion with post['attachments']
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: NeverScrollableScrollPhysics(),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: attachmentsArg.length == 1 ? 1 : 2,
-        crossAxisSpacing: 4,
-        mainAxisSpacing: 4,
-        childAspectRatio: 4 / 3,
-      ),
-      itemCount: attachmentsArg.length,
-      itemBuilder: (context, index) {
-        final attachmentMap = attachmentsArg[index]; // Use attachmentMap for clarity
-        final displayUrl = attachmentMap['url'] as String? ?? '';
-        BorderRadius borderRadius;
-        if (attachmentsArg.length == 1) {
-          borderRadius = BorderRadius.circular(12);
-        } else {
-          if (attachmentsArg.length == 2) {
+    final double itemSpacing = 4.0;
+    final double outerBorderRadius = 12.0;
+
+    if (attachmentsArg.length == 3) {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          double width = constraints.maxWidth;
+          // Define overall aspect ratio for the 3-image block, e.g., 16:9 or similar to Twitter
+          double BORDER_RADIUS = 12;
+          double TOTAL_ASPECT_RATIO = 16 / 9; // Or experiment with 1.8 or 2.0
+
+          double totalHeight = width / TOTAL_ASPECT_RATIO;
+          double leftWidth = (width - itemSpacing) / 2;
+          double rightWidth = (width - itemSpacing) / 2;
+          double rightItemHeight = (totalHeight - itemSpacing) / 2;
+
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(BORDER_RADIUS),
+            child: SizedBox(
+              height: totalHeight,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Left item (larger)
+                  SizedBox(
+                    width: leftWidth,
+                    child: _buildAttachmentWidget(
+                      attachmentsArg[0], 0, post,
+                      BorderRadius.zero, // Individual border radius handled by ClipRRect on content
+                      fit: BoxFit.cover, // Ensure it covers the area
+                    ),
+                  ),
+                  SizedBox(width: itemSpacing),
+                  // Right column with two items
+                  SizedBox(
+                    width: rightWidth,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: _buildAttachmentWidget(
+                            attachmentsArg[1], 1, post,
+                            BorderRadius.zero,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        SizedBox(height: itemSpacing),
+                        Expanded(
+                          child: _buildAttachmentWidget(
+                            attachmentsArg[2], 2, post,
+                            BorderRadius.zero,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    } else {
+      // Existing GridView.builder logic for other counts (1, 2, 4+)
+      return GridView.builder(
+        shrinkWrap: true,
+        physics: NeverScrollableScrollPhysics(),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: attachmentsArg.length == 1 ? 1 : 2,
+          crossAxisSpacing: itemSpacing,
+          mainAxisSpacing: itemSpacing,
+          childAspectRatio: attachmentsArg.length == 1 ? (16/9) : (4/3), // Use a common aspect ratio for single, and 4/3 for 2 or 4+
+        ),
+        itemCount: attachmentsArg.length,
+        itemBuilder: (context, index) {
+          final attachmentMap = attachmentsArg[index];
+          BorderRadius borderRadius;
+          // Simplified borderRadius for GridView, applied by ClipRRect in _buildAttachmentWidget
+          if (attachmentsArg.length == 1) {
+            borderRadius = BorderRadius.circular(outerBorderRadius);
+          } else if (attachmentsArg.length == 2) {
             borderRadius = index == 0
-                ? BorderRadius.only(
-                    topLeft: Radius.circular(12),
-                    bottomLeft: Radius.circular(12),
-                  )
-                : BorderRadius.only(
-                    topRight: Radius.circular(12),
-                    bottomRight: Radius.circular(12),
-                  );
-          } else {
-            if (index == 0) borderRadius = BorderRadius.only(topLeft: Radius.circular(12));
-            else if (index == 1) borderRadius = BorderRadius.only(topRight: Radius.circular(12));
-            else if (index == attachmentsArg.length - 2 && attachmentsArg.length % 2 == 0) borderRadius = BorderRadius.only(bottomLeft: Radius.circular(12));
-            else if (index == attachmentsArg.length -1) {
-                if (attachmentsArg.length % 2 == 1 && index == attachmentsArg.length -1) {
-                    borderRadius = BorderRadius.only(bottomLeft: Radius.circular(12));
-                } else {
-                    borderRadius = BorderRadius.only(bottomRight: Radius.circular(12));
-                }
-            }
+                ? BorderRadius.only(topLeft: Radius.circular(outerBorderRadius), bottomLeft: Radius.circular(outerBorderRadius))
+                : BorderRadius.only(topRight: Radius.circular(outerBorderRadius), bottomRight: Radius.circular(outerBorderRadius));
+          } else { // 4+ items in a 2-column grid
+            if (index == 0) borderRadius = BorderRadius.only(topLeft: Radius.circular(outerBorderRadius));
+            else if (index == 1) borderRadius = BorderRadius.only(topRight: Radius.circular(outerBorderRadius));
+            // For 4 items, index 2 is bottomLeft, index 3 is bottomRight
+            else if (index == attachmentsArg.length - 2 && (index == 2 || attachmentsArg.length %2 != 0 ) ) borderRadius = BorderRadius.only(bottomLeft: Radius.circular(outerBorderRadius));
+            else if (index == attachmentsArg.length - 1 && (index == 3 || attachmentsArg.length %2 == 0) ) borderRadius = BorderRadius.only(bottomRight: Radius.circular(outerBorderRadius));
             else borderRadius = BorderRadius.zero;
           }
-        }
-        // Pass attachmentMap instead of individual fields where _buildAttachmentWidget expects a map
-        return _buildAttachmentWidget(attachmentMap, index, post, borderRadius);
-      },
-    );
+          return _buildAttachmentWidget(attachmentMap, index, post, borderRadius, fit: BoxFit.cover);
+        },
+      );
+    }
   }
 
-  Widget _buildAttachmentWidget(Map<String, dynamic> attachmentMap, int idx, Map<String, dynamic> post, BorderRadius borderRadius) {
+  Widget _buildAttachmentWidget(Map<String, dynamic> attachmentMap, int idx, Map<String, dynamic> post, BorderRadius borderRadius, {BoxFit fit = BoxFit.contain}) {
     final String attachmentType = attachmentMap['type'] as String? ?? 'unknown';
-    final String? displayUrl = attachmentMap['url'] as String?; // Get URL from attachmentMap
+    final String? displayUrl = attachmentMap['url'] as String?;
 
     List<Map<String, dynamic>> correctlyTypedPostAttachments = [];
     if (post['attachments'] is List) {
@@ -586,187 +657,104 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       }
     }
 
+    Widget contentWidget;
+
     if (attachmentType == "video") {
-      return GestureDetector(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => MediaViewPage(
-                attachments: correctlyTypedPostAttachments,
-                initialIndex: idx,
-                message: post['content'] as String? ?? '',
-                userName: post['username'] as String? ?? 'Unknown User',
-                userAvatarUrl: post['useravatar'] as String?,
-                timestamp: post['createdAt'] is String ? DateTime.parse(post['createdAt'] as String) : DateTime.now(),
-                viewsCount: post['views'] as int? ?? 0,
-                likesCount: post['likes'] as int? ?? 0,
-                repostsCount: post['reposts'] as int? ?? 0,
-              ),
-            ),
-          );
-        },
-        child: VideoAttachmentWidget(
-          key: Key('video_${attachmentMap['url'] ?? idx}'),
-          attachment: attachmentMap, // Pass the map directly
-          post: post,
-          borderRadius: borderRadius,
-          androidVersion: androidVersion,
-          isLoadingAndroidVersion: isLoadingAndroidVersion,
-        ),
+      contentWidget = VideoAttachmentWidget(
+        key: Key('video_${attachmentMap['url'] ?? idx}'),
+        attachment: attachmentMap,
+        post: post,
+        borderRadius: BorderRadius.zero, // Border radius handled by outer ClipRRect
+        androidVersion: androidVersion,
+        isLoadingAndroidVersion: isLoadingAndroidVersion,
+        boxFit: fit, // Pass fit to video widget
       );
     } else if (attachmentType == "audio") {
-      return AudioAttachmentWidget(
+      contentWidget = AudioAttachmentWidget(
         key: Key('audio_${attachmentMap['url'] ?? idx}'),
-        attachment: attachmentMap, // Pass the map directly
+        attachment: attachmentMap,
         post: post,
-        borderRadius: borderRadius,
+        borderRadius: BorderRadius.zero, // Border radius handled by outer ClipRRect
+        // Audio might not use BoxFit, its layout is intrinsic
       );
     } else if (attachmentType == "image") {
-      return GestureDetector(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => MediaViewPage(
-                attachments: correctlyTypedPostAttachments, // Use the new robustly typed list
-                initialIndex: idx,
-                message: post['content'] as String? ?? '',
-                userName: post['username'] as String? ?? 'Unknown User',
-                userAvatarUrl: post['useravatar'] as String?,
-                timestamp: post['createdAt'] is String ? DateTime.parse(post['createdAt'] as String) : DateTime.now(),
-                viewsCount: post['views'] as int? ?? 0, // Use 'views'
-                likesCount: post['likes'] as int? ?? 0, // Use 'likes'
-                repostsCount: post['reposts'] as int? ?? 0, // Use 'reposts'
-              ),
-            ),
-          );
-        },
-        child: ClipRRect(
-          borderRadius: borderRadius,
-          child: AspectRatio(
-            aspectRatio: 4 / 3,
-            child: displayUrl != null && displayUrl.isNotEmpty
-                ? CachedNetworkImage(
-                    imageUrl: displayUrl, // Use the local displayUrl
-                    fit: BoxFit.cover,
-                    errorWidget: (context, url, error) => Container(
-                      color: Colors.grey[900],
-                      child: Icon(
-                        FeatherIcons.image,
-                        color: Colors.grey[500],
-                        size: 40,
-                      ),
-                    ),
-                  )
-                : (attachmentMap['file'] as File?) != null // Check for local file from attachmentMap
-                    ? Image.file(
-                        attachmentMap['file'] as File,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => Container(
-                          color: Colors.grey[900],
-                          child: Icon(
-                            FeatherIcons.image,
-                            color: Colors.grey[500],
-                            size: 40,
-                          ),
-                        ),
-                      )
-                    : Container( // Fallback for no URL and no file
-                        color: Colors.grey[900],
-                        child: Icon(
-                          FeatherIcons.image,
-                          color: Colors.grey[500],
-                          size: 40,
-                        ),
-                      ),
+      if (displayUrl != null && displayUrl.isNotEmpty) {
+        contentWidget = CachedNetworkImage(
+          imageUrl: displayUrl,
+          fit: fit, // Use the passed fit
+          errorWidget: (context, url, error) => Container(
+            color: Colors.grey[900],
+            child: Icon(FeatherIcons.image, color: Colors.grey[500], size: 40),
           ),
-        ),
-      );
+        );
+      } else if ((attachmentMap['file'] as File?) != null) {
+        contentWidget = Image.file(
+          attachmentMap['file'] as File,
+          fit: fit, // Use the passed fit
+          errorBuilder: (context, error, stackTrace) => Container(
+            color: Colors.grey[900],
+            child: Icon(FeatherIcons.image, color: Colors.grey[500], size: 40),
+          ),
+        );
+      } else {
+        contentWidget = Container(
+          color: Colors.grey[900],
+          child: Icon(FeatherIcons.image, color: Colors.grey[500], size: 40),
+        );
+      }
     } else if (attachmentType == "pdf") {
-      return GestureDetector(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => MediaViewPage(
-                attachments: correctlyTypedPostAttachments, // Use the new robustly typed list
-                initialIndex: idx,
-                message: post['content'] as String? ?? '',
-                userName: post['username'] as String? ?? 'Unknown User',
-                userAvatarUrl: post['useravatar'] as String?,
-                timestamp: post['createdAt'] is String ? DateTime.parse(post['createdAt'] as String) : DateTime.now(),
-                viewsCount: post['views'] as int? ?? 0, // Use 'views'
-                likesCount: post['likes'] as int? ?? 0, // Use 'likes'
-                repostsCount: post['reposts'] as int? ?? 0, // Use 'reposts'
-              ),
-            ),
-          );
-        },
-        child: ClipRRect(
-          borderRadius: borderRadius,
-          child: AspectRatio(
-            aspectRatio: 4 / 3,
-            child: displayUrl != null && displayUrl.isNotEmpty
-                ? PdfViewer.uri(
-                    Uri.parse(displayUrl), // Use the local displayUrl
-                    params: PdfViewerParams(
-                      margin: 0,
-                      maxScale: 1.0, // Adjust as needed
-                    ),
-                  )
-                : Container( // Fallback if URL is null
-                    color: Colors.grey[900],
-                    child: Icon(FeatherIcons.fileText, color: Colors.grey[500], size: 40),
-                  ),
-          ),
-        ),
-      );
+      if (displayUrl != null && displayUrl.isNotEmpty) {
+        contentWidget = PdfViewer.uri(
+          Uri.parse(displayUrl),
+          params: PdfViewerParams(margin: 0, maxScale: 1.0, backgroundColor: Colors.grey[900]!),
+        );
+      } else {
+        contentWidget = Container(
+          color: Colors.grey[900],
+          child: Icon(FeatherIcons.fileText, color: Colors.grey[500], size: 40),
+        );
+      }
+      // PDF viewer might not respect BoxFit in the same way, it has its own scaling.
+      // Wrapping in AspectRatio might be needed if specific aspect ratio is desired for PDF cell.
+      // For now, let it fill.
     } else { // Fallback for other/unknown types
-      return GestureDetector(
-        onTap: () {
-           Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => MediaViewPage(
-                attachments: correctlyTypedPostAttachments, // Use the new robustly typed list
-                initialIndex: idx,
-                message: post['content'] as String? ?? '',
-                userName: post['username'] as String? ?? 'Unknown User',
-                userAvatarUrl: post['useravatar'] as String?,
-                timestamp: post['createdAt'] is String ? DateTime.parse(post['createdAt'] as String) : DateTime.now(),
-                viewsCount: post['views'] as int? ?? 0, // Use 'views'
-                likesCount: post['likes'] as int? ?? 0, // Use 'likes'
-                repostsCount: post['reposts'] as int? ?? 0, // Use 'reposts'
-              ),
-            ),
-          );
-        },
-        child: ClipRRect(
-          borderRadius: borderRadius,
-          child: AspectRatio(
-            aspectRatio: 4 / 3,
-            child: Container(
-              color: Colors.grey[900],
-              padding: EdgeInsets.all(16),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    attachmentType == "audio" ? FeatherIcons.music : FeatherIcons.file,
-                    color: Colors.tealAccent,
-                    size: 20, // Reduced size
-                  ),
-                  SizedBox(height: 8),
-                  // Optionally display filename if available
-                  // Text(attachment['filename'] ?? 'File', style: TextStyle(color: Colors.white, fontSize: 10), textAlign: TextAlign.center, overflow: TextOverflow.ellipsis),
-                ],
-              ),
-            ),
-          ),
+      contentWidget = Container(
+        color: Colors.grey[900],
+        padding: EdgeInsets.all(16),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(attachmentType == "audio" ? FeatherIcons.music : FeatherIcons.file, color: Colors.tealAccent, size: 20),
+            SizedBox(height: 8),
+          ],
         ),
       );
     }
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MediaViewPage(
+              attachments: correctlyTypedPostAttachments,
+              initialIndex: idx,
+              message: post['content'] as String? ?? '',
+              userName: post['username'] as String? ?? 'Unknown User',
+              userAvatarUrl: post['useravatar'] as String?,
+              timestamp: post['createdAt'] is String ? DateTime.parse(post['createdAt'] as String) : DateTime.now(),
+              viewsCount: post['views'] as int? ?? 0,
+              likesCount: post['likes'] as int? ?? 0,
+              repostsCount: post['reposts'] as int? ?? 0,
+            ),
+          ),
+        );
+      },
+      child: ClipRRect(
+        borderRadius: borderRadius, // Apply the overall border radius here
+        child: contentWidget,
+      ),
+    );
   }
 
   @override

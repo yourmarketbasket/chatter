@@ -1,7 +1,10 @@
 import 'package:better_player_enhanced/better_player.dart';
 // import 'package:chatter/models/feed_models.dart'; // Removed import
 import 'package:chatter/pages/home-feed-screen.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:feather_icons/feather_icons.dart';
 import 'package:pdfrx/pdfrx.dart';
@@ -48,6 +51,10 @@ class MediaViewPage extends StatefulWidget {
 class _MediaViewPageState extends State<MediaViewPage> {
   late PageController _pageController;
   late int _currentPageIndex;
+  bool _isDownloading = false;
+  double _downloadProgress = 0.0;
+
+  final Dio _dio = Dio();
 
   @override
   void initState() {
@@ -141,10 +148,11 @@ class _MediaViewPageState extends State<MediaViewPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBodyBehindAppBar: true, // Allow body to go behind AppBar
       backgroundColor: Colors.black,
       appBar: AppBar(
-        backgroundColor: Colors.black,
-        elevation: 0,
+        backgroundColor: Colors.transparent, // Make AppBar transparent
+        elevation: 0, // No shadow for transparent AppBar
         leading: IconButton(
           icon: Icon(FeatherIcons.arrowLeft, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -168,90 +176,139 @@ class _MediaViewPageState extends State<MediaViewPage> {
           ],
         ),
         actions: [
+          if (widget.attachments.isNotEmpty && widget.attachments[_currentPageIndex]['url'] != null)
+            _isDownloading
+                ? Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        value: _downloadProgress > 0 ? _downloadProgress : null,
+                        strokeWidth: 2.0,
+                        color: Colors.white,
+                      ),
+                    ),
+                  )
+                : IconButton(
+                    icon: Icon(FeatherIcons.download, color: Colors.white),
+                    onPressed: () {
+                      _downloadAttachment(widget.attachments[_currentPageIndex]);
+                    },
+                  ),
           IconButton(
             icon: Icon(FeatherIcons.moreVertical, color: Colors.white),
             onPressed: () { /* TODO: Implement more options */ },
           ),
         ],
       ),
-      body: Column(
+      body: Stack( // Wrap body in Stack for gradient mask
         children: [
-          // SizedBox(height: 20), // Removed as AppBar provides top structure
-          Expanded(
-            child: PageView.builder(
-              controller: _pageController,
-              itemCount: widget.attachments.length,
-              onPageChanged: (index) {
-                setState(() {
-                  _currentPageIndex = index;
-                });
-              },
-              itemBuilder: (context, index) {
-                final Map<String, dynamic> currentAttachment = widget.attachments[index]; // Now a Map
-                final String? url = currentAttachment['url'] as String?;
-                final File? file = currentAttachment['file'] as File?;
-                final String type = currentAttachment['type'] as String? ?? 'unknown';
+          Column( // Original body structure
+            children: [
+              Expanded(
+                child: PageView.builder(
+                  controller: _pageController,
+                  itemCount: widget.attachments.length,
+                  onPageChanged: (index) {
+                    setState(() {
+                      _currentPageIndex = index;
+                    });
+                  },
+                  itemBuilder: (context, index) {
+                    final Map<String, dynamic> currentAttachment = widget.attachments[index]; // Now a Map
+                    final String? url = currentAttachment['url'] as String?;
+                    final File? file = currentAttachment['file'] as File?;
+                    final String type = currentAttachment['type'] as String? ?? 'unknown';
 
-                final String displayPath = url ?? file?.path ?? 'Unknown attachment';
-                final String optimizedUrl = type.toLowerCase() == 'video'
-                    ? _optimizeCloudinaryVideoUrl(url)
-                    : _optimizeCloudinaryUrl(url);
+                    final String displayPath = url ?? file?.path ?? 'Unknown attachment';
+                    final String optimizedUrl = type.toLowerCase() == 'video'
+                        ? _optimizeCloudinaryVideoUrl(url)
+                        : _optimizeCloudinaryUrl(url);
 
-                Widget mediaWidget;
-                switch (type.toLowerCase()) {
-                  case 'image':
-                    mediaWidget = _buildImageViewer(context, currentAttachment, displayPath, optimizedUrl);
-                    break;
-                  case 'pdf':
-                    mediaWidget = _buildPdfViewer(context, currentAttachment, displayPath, optimizedUrl);
-                    break;
-                  case 'video':
-                    mediaWidget = FutureBuilder<bool>(
-                      future: _isAndroid13OrLower(),
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.done && snapshot.data != null) {
-                          final String? thumbnailUrl = currentAttachment['thumbnailUrl'] as String?;
-                          return VideoPlayerContainer(
-                            url: optimizedUrl.isNotEmpty ? optimizedUrl : url,
-                            file: file,
-                            displayPath: displayPath,
-                            isAndroid13OrLower: snapshot.data!,
-                            thumbnailUrl: thumbnailUrl,
-                          );
-                        }
-                        return const Center(
-                          child: CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
-                          ),
+                    Widget mediaWidget;
+                    switch (type.toLowerCase()) {
+                      case 'image':
+                        mediaWidget = _buildFullScreenImageViewer(context, currentAttachment, displayPath, optimizedUrl);
+                        // For images, we don't want the Center widget wrapping it.
+                        return mediaWidget; // Return directly
+                      case 'pdf':
+                        mediaWidget = _buildPdfViewer(context, currentAttachment, displayPath, optimizedUrl);
+                        break;
+                      case 'video':
+                        mediaWidget = FutureBuilder<bool>(
+                          future: _isAndroid13OrLower(),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState == ConnectionState.done && snapshot.data != null) {
+                              final String? thumbnailUrl = currentAttachment['thumbnailUrl'] as String?;
+                              return VideoPlayerContainer(
+                                url: optimizedUrl.isNotEmpty ? optimizedUrl : url,
+                                file: file,
+                                displayPath: displayPath,
+                                isAndroid13OrLower: snapshot.data!,
+                                thumbnailUrl: thumbnailUrl,
+                              );
+                            }
+                            return const Center(
+                              child: CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
+                              ),
+                            );
+                          },
                         );
-                      },
-                    );
-                    break;
-                  case 'audio':
-                    mediaWidget = AudioPlayerWidget(
-                      url: optimizedUrl.isNotEmpty ? optimizedUrl : url,
-                      file: file,
-                      displayPath: displayPath,
-                    );
-                    break;
-                  default:
-                    mediaWidget = buildError(
-                      context,
-                      icon: FeatherIcons.file,
-                      message: 'Unsupported attachment type: $type',
-                      fileName: displayPath.split('/').last,
-                      iconColor: Colors.grey[600],
-                    );
-                }
-                return Center(child: mediaWidget);
-              },
-            ),
+                        break;
+                      case 'audio':
+                        mediaWidget = AudioPlayerWidget(
+                          url: optimizedUrl.isNotEmpty ? optimizedUrl : url,
+                          file: file,
+                          displayPath: displayPath,
+                        );
+                        break;
+                      default:
+                        mediaWidget = buildError(
+                          context,
+                          icon: FeatherIcons.file,
+                          message: 'Unsupported attachment type: $type',
+                          fileName: displayPath.split('/').last,
+                          iconColor: Colors.grey[600],
+                        );
+                    }
+                    // For other types, keep the Center for now, or adjust as needed.
+                    return Center(child: mediaWidget);
+                  },
+                ),
+              ),
+              // Removed the Padding widget containing metadata and engagement counts
+            ],
           ),
-          // Removed the Padding widget containing metadata and engagement counts
+          _buildAppBarGradientMask(context), // Add the gradient mask on top
         ],
       ),
     );
   }
+
+  Widget _buildAppBarGradientMask(BuildContext context) {
+    final statusBarHeight = MediaQuery.of(context).padding.top;
+    final appBarHeight = AppBar().preferredSize.height; // Default AppBar height
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: Container(
+        height: statusBarHeight + appBarHeight,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.black.withOpacity(0.6), Colors.transparent], // Adjusted opacity
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            stops: [0.0, 1.0] // Ensure gradient covers the full height
+          ),
+        ),
+        // This container is just for the gradient, AppBar content will be drawn by Scaffold's AppBar
+      ),
+    );
+  }
+
 
   Widget _buildSocialButton(IconData icon, String label, VoidCallback onPressed) {
     return TextButton.icon(
@@ -265,44 +322,41 @@ class _MediaViewPageState extends State<MediaViewPage> {
     );
   }
 
-  Widget _buildImageViewer(BuildContext context, Map<String, dynamic> attachment, String displayPath, String optimizedUrl) {
+  // Renamed to _buildFullScreenImageViewer and removed Center widget, LayoutBuilder
+  Widget _buildFullScreenImageViewer(BuildContext context, Map<String, dynamic> attachment, String displayPath, String optimizedUrl) {
     final String? url = attachment['url'] as String?;
     final File? file = attachment['file'] as File?;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final String currentOptimizedUrl = _optimizeCloudinaryUrl(url);
-        if (currentOptimizedUrl.isNotEmpty) {
-          return InteractiveViewer(
-            minScale: 0.5,
-            maxScale: 4.0,
-            child: Center(
-              child: CachedNetworkImage(
-                imageUrl: currentOptimizedUrl,
-                fit: BoxFit.contain,
-                placeholder: (context, url) => Center(child: LinearProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent), backgroundColor: Colors.grey)),
-                errorWidget: (context, url, error) => buildError(context, message: 'Error loading image: $error'),
-                cacheKey: url,
-              ),
-            ),
-          );
-        } else if (file != null) {
-          return InteractiveViewer(
-            minScale: 0.5,
-            maxScale: 4.0,
-            child: Center(
-              child: Image.file(
-                file,
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) => buildError(context, message: 'Error loading image file: $error'),
-              ),
-            ),
-          );
-        } else {
-          return buildError(context, message: 'No image source available for $displayPath');
-        }
-      },
-    );
+    final String currentOptimizedUrl = _optimizeCloudinaryUrl(url);
+    if (currentOptimizedUrl.isNotEmpty) {
+      return InteractiveViewer(
+        minScale: 0.5,
+        maxScale: 4.0,
+        child: CachedNetworkImage(
+          imageUrl: currentOptimizedUrl,
+          fit: BoxFit.contain,
+          placeholder: (context, url) => Center(child: LinearProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent), backgroundColor: Colors.grey)),
+          errorWidget: (context, url, error) => buildError(context, message: 'Error loading image: $error'),
+          cacheKey: url,
+          width: MediaQuery.of(context).size.width, // Ensure it takes full width
+          alignment: Alignment.center, // Center the image within the full width
+        ),
+      );
+    } else if (file != null) {
+      return InteractiveViewer(
+        minScale: 0.5,
+        maxScale: 4.0,
+        child: Image.file(
+          file,
+          fit: BoxFit.contain,
+          width: MediaQuery.of(context).size.width, // Ensure it takes full width
+          alignment: Alignment.center, // Center the image within the full width
+          errorBuilder: (context, error, stackTrace) => buildError(context, message: 'Error loading image file: $error'),
+        ),
+      );
+    } else {
+      return buildError(context, message: 'No image source available for $displayPath');
+    }
   }
 
   Widget _buildPdfViewer(BuildContext context, Map<String, dynamic> attachment, String displayPath, String optimizedUrl) {
@@ -328,6 +382,119 @@ class _MediaViewPageState extends State<MediaViewPage> {
     }
   }
 
+  Future<void> _downloadAttachment(Map<String, dynamic> attachment) async {
+    if (_isDownloading) return;
+
+    final String? url = attachment['url'] as String?;
+    if (url == null || url.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No downloadable URL found.', style: GoogleFonts.roboto())),
+      );
+      return;
+    }
+
+    // 1. Check and Request Permissions
+    bool permissionGranted = await _requestStoragePermission();
+    if (!permissionGranted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Storage permission denied.', style: GoogleFonts.roboto())),
+      );
+      return;
+    }
+
+    // 2. Get Downloads Directory
+    Directory? downloadsDirectory;
+    try {
+      downloadsDirectory = await getDownloadsDirectory();
+      if (downloadsDirectory == null && Platform.isIOS) { // Fallback for iOS if getDownloadsDirectory is null
+          downloadsDirectory = await getApplicationDocumentsDirectory();
+      }
+    } catch (e) {
+      print("Error getting downloads directory: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not get downloads directory.', style: GoogleFonts.roboto())),
+      );
+      return;
+    }
+
+    if (downloadsDirectory == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Could not determine downloads directory.', style: GoogleFonts.roboto())),
+        );
+        return;
+    }
+
+
+    String fileName = attachment['filename'] as String? ?? url.split('/').last;
+    // Sanitize filename if necessary, or ensure it's valid
+    if (fileName.isEmpty || !fileName.contains('.')) {
+        final String type = attachment['type'] as String? ?? 'unknown';
+        String extension = ".dat"; // default extension
+        if (type == 'image') extension = ".jpg"; // Be more specific if possible from mime type
+        else if (type == 'video') extension = ".mp4";
+        else if (type == 'audio') extension = ".mp3";
+        else if (type == 'pdf') extension = ".pdf";
+        fileName = "downloaded_file_${DateTime.now().millisecondsSinceEpoch}$extension";
+    }
+
+    final String savePath = "${downloadsDirectory.path}/$fileName";
+
+    setState(() {
+      _isDownloading = true;
+      _downloadProgress = 0.0;
+    });
+
+    try {
+      await _dio.download(
+        url,
+        savePath,
+        onReceiveProgress: (received, total) {
+          if (total != -1) {
+            setState(() {
+              _downloadProgress = received / total;
+            });
+          }
+        },
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Downloaded to ${savePath.split('/').last}', style: GoogleFonts.roboto())),
+      );
+    } catch (e) {
+      print("Download error: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Download failed: ${e.toString()}', style: GoogleFonts.roboto())),
+      );
+    } finally {
+      setState(() {
+        _isDownloading = false;
+        _downloadProgress = 0.0;
+      });
+    }
+  }
+
+  Future<bool> _requestStoragePermission() async {
+    if (Platform.isIOS) return true; // iOS doesn't require explicit permission for saving to app's sandbox / getDownloadsDirectory
+
+    PermissionStatus status;
+    if (await DeviceInfoPlugin().androidInfo.then((value) => value.version.sdkInt) >= 33) { // Android 13+
+        // For Android 13+, no specific storage permission needed for own app's directory or public media collections if using MediaStore.
+        // getDownloadsDirectory() should work. If targeting specific media types, READ_MEDIA_IMAGES, etc. would be for *reading*.
+        // For saving to a common "Downloads" folder, it's generally permissible.
+        return true;
+    } else { // Android 12 and below
+        status = await Permission.storage.request();
+    }
+
+    if (status.isGranted) {
+      return true;
+    } else if (status.isPermanentlyDenied) {
+      // Consider guiding user to app settings
+      openAppSettings();
+      return false;
+    } else {
+      return false;
+    }
+  }
 }
 
 Widget buildError(
@@ -392,183 +559,49 @@ class VideoPlayerContainer extends StatefulWidget {
 }
 
 class _VideoPlayerContainerState extends State<VideoPlayerContainer> {
-  BetterPlayerController? betterPlayerController;
-  VideoPlayerController? videoPlayerController;
-  bool _isLoading = true;
-  String? _errorMessage;
-  int _retryCount = 0;
-  final int _maxRetries = 3;
+  // Controllers and detailed state are managed by BetterPlayerWidget or VideoPlayerWidget.
+  // This container just decides which one to show.
+
+  // String? _errorMessage; // If any error logic remains specific to this container's setup
 
   @override
   void initState() {
     super.initState();
-    _initializeVideoPlayer();
-  }
-
-  Future<void> _initializeVideoPlayer() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      if (widget.isAndroid13OrLower) {
-        // Configure BetterPlayer for older Android versions
-        final betterPlayerDataSource = widget.url != null
-            ? BetterPlayerDataSource(
-                BetterPlayerDataSourceType.network,
-                widget.url!,
-                cacheConfiguration: BetterPlayerCacheConfiguration(
-                  useCache: true,
-                  preCacheSize: 10 * 1024 * 1024,
-                  maxCacheSize: 100 * 1024 * 1024,
-                  maxCacheFileSize: 10 * 1024 * 1024,
-                ),
-                bufferingConfiguration: BetterPlayerBufferingConfiguration(
-                  minBufferMs: 5000,
-                  maxBufferMs: 15000,
-                  bufferForPlaybackMs: 2500,
-                  bufferForPlaybackAfterRebufferMs: 5000,
-                ),
-                resolutions: widget.url != null ? { // Check if widget.url is null
-                  'low': widget.url!.replaceAll('q_auto:good', 'q_auto:low'),
-                  'medium': widget.url!,
-                  'high': widget.url!.replaceAll('q_auto:good', 'q_auto:best'),
-                } : null,
-                liveStream: false, // Added default for liveStream
-                notificationConfiguration: widget.thumbnailUrl != null ? BetterPlayerNotificationConfiguration( // Add notification configuration for thumbnail
-                  showNotification: true,
-                  title: widget.displayPath.split('/').last,
-                  author: "Chatter App", // Replace with actual author if available
-                  imageUrl: widget.thumbnailUrl,
-                  activityName: "MainActivity", // Replace with your actual activity name
-                ) : null,
-              )
-            : BetterPlayerDataSource(
-                BetterPlayerDataSourceType.file,
-                widget.file!.path,
-              );
-
-        betterPlayerController = BetterPlayerController(
-          BetterPlayerConfiguration(
-            autoPlay: false,
-            fit: BoxFit.contain,
-            errorBuilder: (context, errorMessage) => buildError(context, message: errorMessage ?? 'Video playback error'),
-            controlsConfiguration: BetterPlayerControlsConfiguration(
-              enableSkips: false,
-              enableFullscreen: true,
-              enablePip: true,
-              enableQualities: widget.url != null,
-              loadingWidget: const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
-              ),
-              playerTheme: BetterPlayerTheme.custom, // Example: using custom theme
-              customControlsBuilder: (controller, onControlsVisibilityChanged) { // Example: Custom controls
-                return Container(); // Replace with your custom controls widget
-              }
-            ),
-            placeholder: widget.thumbnailUrl != null && widget.thumbnailUrl!.isNotEmpty // Add placeholder for thumbnail
-                ? CachedNetworkImage(
-                    imageUrl: widget.thumbnailUrl!,
-                    fit: BoxFit.contain,
-                    errorWidget: (context, url, error) => Container(color: Colors.black), // Fallback if thumbnail fails
-                  )
-                : Container(color: Colors.black), // Fallback if no thumbnail
-          ),
-          betterPlayerDataSource: betterPlayerDataSource,
-        );
-
-        // Preload video
-        // Consider removing preCache if it causes issues or is not needed for your use case
-        // await betterPlayerController?.preCache(betterPlayerDataSource);
-      } else {
-        // Configure VideoPlayer for newer Android versions
-        videoPlayerController = widget.url != null
-            ? VideoPlayerController.networkUrl(Uri.parse(widget.url!))
-            : VideoPlayerController.file(widget.file!);
-
-        await videoPlayerController!.initialize();
-        videoPlayerController!.setLooping(true);
-        
-        // Monitor buffer health
-        // Consider adjusting or removing this listener if it's too aggressive or causes issues
-        videoPlayerController!.addListener(() {
-          if (!mounted) return; // Ensure widget is still mounted
-          final value = videoPlayerController!.value;
-          final buffered = value.buffered;
-          if (buffered.isNotEmpty) {
-            // Check if buffer is running low
-            final currentPosition = value.position;
-            final lastBufferedPosition = buffered.last.end;
-            final remainingBuffer = lastBufferedPosition - currentPosition;
-
-            if (remainingBuffer < Duration(seconds: 5) && value.isPlaying && !value.isBuffering) {
-              videoPlayerController!.pause();
-              // Optionally, show a buffering indicator here
-              // Wait for buffer to fill up a bit before resuming
-              Future.delayed(Duration(seconds: 2), () {
-                if (mounted && videoPlayerController!.value.buffered.last.end > currentPosition + Duration(seconds: 10)) {
-                  videoPlayerController!.play();
-                }
-              });
-            }
-          }
-        });
-      }
-
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (_retryCount < _maxRetries && mounted) {
-        _retryCount++;
-        await Future.delayed(const Duration(seconds: 2));
-        return _initializeVideoPlayer();
-      } else if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = 'Failed to load video after $_maxRetries attempts: $e';
-        });
-      }
-    }
+    // Initialization is handled by child widgets (BetterPlayerWidget or VideoPlayerWidget)
+    // The parent FutureBuilder for _isAndroid13OrLower ensures this widget is built
+    // only after widget.isAndroid13OrLower is determined.
   }
 
   @override
   void dispose() {
-    betterPlayerController?.dispose();
-    videoPlayerController?.dispose();
+    // Controllers are disposed by their respective widgets.
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
-        ),
+    // If there was any setup error specific to VideoPlayerContainer decision logic:
+    // if (_errorMessage != null) {
+    //   return buildError(context, message: _errorMessage!);
+    // }
+
+    // Directly render the appropriate player widget.
+    // They will handle their own loading indicators and thumbnail display.
+    if (widget.isAndroid13OrLower) {
+      return BetterPlayerWidget(
+        url: widget.url,
+        file: widget.file,
+        displayPath: widget.displayPath,
+        thumbnailUrl: widget.thumbnailUrl,
+      );
+    } else {
+      return VideoPlayerWidget(
+        url: widget.url,
+        file: widget.file,
+        displayPath: widget.displayPath,
+        thumbnailUrl: widget.thumbnailUrl,
       );
     }
-
-    if (_errorMessage != null) {
-      return buildError(context, message: _errorMessage!);
-    }
-
-    return widget.isAndroid13OrLower
-        ? BetterPlayerWidget(
-            url: widget.url,
-            file: widget.file,
-            displayPath: widget.displayPath,
-            thumbnailUrl: widget.thumbnailUrl,
-          )
-        : VideoPlayerWidget(
-            url: widget.url,
-            file: widget.file,
-            displayPath: widget.displayPath,
-            thumbnailUrl: widget.thumbnailUrl,
-          );
   }
 }
 

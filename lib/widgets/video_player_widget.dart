@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:chatter/pages/media_view_page.dart'; // For MediaViewPage._buildError
 import 'dart:async';
 import 'dart:io';
+import 'package:get/get.dart';
+import 'package:chatter/controllers/data-controller.dart';
 
 // Widget for video playback with seeking and progress bar using video_player
 class VideoPlayerWidget extends StatefulWidget {
@@ -40,9 +42,16 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
   late AnimationController _animationController; // For fade animation
   late Animation<double> _fadeAnimation; // Fade animation for controls
 
+  // For single video playback
+  final DataController _dataController = Get.find<DataController>();
+  String? _videoUniqueId;
+  StreamSubscription? _currentlyPlayingVideoSubscription;
+
   @override
   void initState() {
     super.initState();
+    _videoUniqueId = widget.url ?? widget.file?.path ?? widget.key.toString();
+
     // Initialize animation controller for fade effect
     _animationController = AnimationController(
       vsync: this,
@@ -52,6 +61,18 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
     _initializeVideoPlayer();
+
+    _currentlyPlayingVideoSubscription = _dataController.currentlyPlayingVideoId.listen((playingId) {
+      if (_controller != null && _controller!.value.isPlaying) {
+        if (playingId != null && playingId != _videoUniqueId) {
+          _controller!.pause();
+          // Update local _isPlaying state if needed
+          setState(() {
+            _isPlaying = false;
+          });
+        }
+      }
+    });
   }
 
   Future<void> _initializeVideoPlayer() async {
@@ -97,7 +118,15 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
           if (mounted) {
             setState(() {
               _position = _controller!.value.position;
-              _isPlaying = _controller!.value.isPlaying;
+              bool newIsPlayingState = _controller!.value.isPlaying;
+
+              if (newIsPlayingState && !_isPlaying) { // Just started playing
+                _dataController.videoDidStartPlaying(_videoUniqueId!);
+              } else if (!newIsPlayingState && _isPlaying) { // Just paused or finished
+                _dataController.videoDidStopPlaying(_videoUniqueId!);
+              }
+              _isPlaying = newIsPlayingState;
+
               // Show controls when video stops
               if (!_isPlaying && !_showControls) {
                 _showControls = true;
@@ -156,6 +185,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
 
   @override
   void dispose() {
+    _currentlyPlayingVideoSubscription?.cancel();
     _controller?.dispose();
     _hideControlsTimer?.cancel();
     _animationController.dispose();
