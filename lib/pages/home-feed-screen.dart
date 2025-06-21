@@ -119,45 +119,46 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
 
     List<Map<String, dynamic>> uploadedAttachments = [];
     if (attachments.isNotEmpty) {
-      List<File> files = attachments.where((a) => a['file'] != null).map((a) => a['file']! as File).toList();
-      print('[HomeFeedScreen _addPost] Extracted ${files.length} files for upload:');
-      for (int i = 0; i < files.length; i++) {
-        final f = files[i];
-        try {
-          print('[HomeFeedScreen _addPost] File ${i + 1} for upload: path=${f.path}, exists_sync=${f.existsSync()}, '
-              'length_sync=${f.lengthSync()}');
-        } catch (e) {
-          print('[HomeFeedScreen _addPost] File ${i + 1} for upload: path=${f.path} - Error getting file stats: $e');
-        }
-      }
-      List<Map<String, dynamic>> uploadResults = await dataController.uploadFiles(files);
+      // The 'attachments' variable is already List<Map<String, dynamic>> from NewPostScreen,
+      // containing all metadata like 'file', 'type', 'width', 'height', 'orientation', 'duration'.
+      // This list should be passed directly to dataController.uploadFiles.
 
+      print('[HomeFeedScreen _addPost] Preparing to upload ${attachments.length} attachments with their metadata.');
       for (int i = 0; i < attachments.length; i++) {
-        var result = uploadResults[i];
-        final originalAttachment = attachments.firstWhere(
-            (att) => (att['file'] as File?)?.path == result['filePath'],
-            orElse: () => attachments[i]);
+        final att = attachments[i];
+        print('[HomeFeedScreen _addPost] Attachment ${i+1} details: type=${att['type']}, filename=${att['filename']}, width=${att['width']}, height=${att['height']}, orientation=${att['orientation']}');
+      }
 
-        print(result);
+      // Pass the 'attachments' list (which is List<Map<String, dynamic>>) directly
+      List<Map<String, dynamic>> uploadResults = await dataController.uploadFiles(attachments);
+
+      // The uploadResults should now directly map to the input attachments if the service processes them in order.
+      // The UploadService now returns a richer map, including the original width, height, etc.
+      // We should use these directly.
+
+      for (var result in uploadResults) { // Iterate through results
         if (result['success'] == true) {
-          String originalUrl = result['url'] as String;
-          String? thumbnailUrl = result['thumbnailUrl'] as String?;
           uploadedAttachments.add({
-            'file': originalAttachment['file'],
-            'type': originalAttachment['type'],
-            'filename':
-                (originalAttachment['file'] as File?)?.path.split('/').last ?? result['filename'] ?? 'unknown',
-            'size': result['size'] ??
-                ((originalAttachment['file'] as File?) != null ? await (originalAttachment['file'] as File)!.length() : 0),
-            'url': originalUrl,
-            'thumbnailUrl': thumbnailUrl,
-            'aspectRatio': result['aspectRatio'] ?? 16 / 9, // Aspect ratio from uploadFiles
+            // 'file' object is not needed for backend post creation, only URLs and metadata
+            'type': result['type'], // This should be the type from NewPostScreen (image, video, etc.)
+            'filename': result['filename'],
+            'size': result['size'],
+            'url': result['url'],
+            'thumbnailUrl': result['thumbnailUrl'],
+            'width': result['width'], // from UploadService result
+            'height': result['height'], // from UploadService result
+            'orientation': result['orientation'], // from UploadService result
+            'duration': result['duration'], // from UploadService result (for videos)
+            // 'aspectRatio' string might be redundant if backend uses width/height, but include if schema expects it
+            'aspectRatio': (result['width'] != null && result['height'] != null && result['height'] > 0)
+                           ? (result['width'] / result['height']).toStringAsFixed(2)
+                           : (16/9).toStringAsFixed(2),
           });
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'Failed to upload ${(originalAttachment['file'] as File?)?.path.split('/').last}: ${result['message']}',
+                'Failed to upload ${result['filename'] ?? 'attachment'}: ${result['message']}',
                 style: GoogleFonts.roboto(color: Colors.white),
               ),
               backgroundColor: Colors.red[700],
