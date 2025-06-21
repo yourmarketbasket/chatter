@@ -163,12 +163,13 @@ class _MediaViewPageState extends State<MediaViewPage> {
   }
 
   // Check Android version for player compatibility
-  Future<bool> _isAndroid13OrLower() async {
-    if (!Platform.isAndroid) return false;
-    final deviceInfo = DeviceInfoPlugin();
-    final androidInfo = await deviceInfo.androidInfo;
-    return androidInfo.version.sdkInt <= 33;
-  }
+  // Removed _isAndroid13OrLower, will use DataController.androidSDKVersion directly
+  // Future<bool> _isAndroid13OrLower() async {
+  //   if (!Platform.isAndroid) return false;
+  //   final deviceInfo = DeviceInfoPlugin();
+  //   final androidInfo = await deviceInfo.androidInfo;
+  //   return androidInfo.version.sdkInt <= 33;
+  // }
 
   String _getPageTitle(Map<String, dynamic> attachment) { // Changed Attachment to Map<String, dynamic>
     final String type = attachment['type'] as String? ?? 'unknown';
@@ -277,28 +278,29 @@ class _MediaViewPageState extends State<MediaViewPage> {
                         mediaWidget = _buildPdfViewer(context, currentAttachment, displayPath, optimizedUrl);
                         break;
                       case 'video':
-                        mediaWidget = FutureBuilder<bool>(
-                          future: _isAndroid13OrLower(),
-                          builder: (context, snapshot) {
-                            if (snapshot.connectionState == ConnectionState.done && snapshot.data != null) {
-                              final String? thumbnailUrl = currentAttachment['thumbnailUrl'] as String?;
-                              return VideoPlayerContainer(
-                                url: optimizedUrl.isNotEmpty ? optimizedUrl : url,
-                                file: file,
-                                displayPath: displayPath,
-                                isAndroid13OrLower: snapshot.data!,
-                                thumbnailUrl: thumbnailUrl,
-                                // No need to pass isFeedContext, it defaults to false in VideoPlayerWidget/BetterPlayerWidget
-                                // The player widgets themselves will check DataController if isTransitioningVideo is true.
-                              );
-                            }
-                            return const Center(
-                              child: CircularProgressIndicator(
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
-                              ),
-                            );
-                          },
-                        );
+                        // Use DataController.androidSDKVersion directly
+                        final int currentAndroidSDKVersion = _dataController.androidSDKVersion.value;
+                        if (currentAndroidSDKVersion == 0 && Platform.isAndroid) {
+                          // SDK version not yet available, show loading or placeholder
+                          mediaWidget = const Center(
+                            child: CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
+                            ),
+                          );
+                        } else {
+                          // SDK 31 is Android 12. Use better_player if SDK < 31.
+                          bool useBetterPlayer = Platform.isAndroid && currentAndroidSDKVersion < 31;
+                          final String? thumbnailUrl = currentAttachment['thumbnailUrl'] as String?;
+                          mediaWidget = VideoPlayerContainer(
+                            url: optimizedUrl.isNotEmpty ? optimizedUrl : url,
+                            file: file,
+                            displayPath: displayPath,
+                            useBetterPlayer: useBetterPlayer, // Pass the decision
+                            thumbnailUrl: thumbnailUrl,
+                            // No need to pass isFeedContext, it defaults to false in VideoPlayerWidget/BetterPlayerWidget
+                            // The player widgets themselves will check DataController if isTransitioningVideo is true.
+                          );
+                        }
                         break;
                       case 'audio':
                         mediaWidget = AudioPlayerWidget(
@@ -585,7 +587,7 @@ class VideoPlayerContainer extends StatefulWidget {
   final String? url;
   final File? file;
   final String displayPath;
-  final bool isAndroid13OrLower;
+  final bool useBetterPlayer; // Changed from isAndroid13OrLower
   final String? thumbnailUrl;
 
   const VideoPlayerContainer({
@@ -593,7 +595,7 @@ class VideoPlayerContainer extends StatefulWidget {
     this.url,
     this.file,
     required this.displayPath,
-    required this.isAndroid13OrLower,
+    required this.useBetterPlayer, // Changed from isAndroid13OrLower
     this.thumbnailUrl,
   }) : super(key: key);
 
@@ -611,8 +613,8 @@ class _VideoPlayerContainerState extends State<VideoPlayerContainer> {
   void initState() {
     super.initState();
     // Initialization is handled by child widgets (BetterPlayerWidget or VideoPlayerWidget)
-    // The parent FutureBuilder for _isAndroid13OrLower ensures this widget is built
-    // only after widget.isAndroid13OrLower is determined.
+    // The logic for choosing player (based on DataController.androidSDKVersion) is now in the parent PageView builder,
+    // so widget.useBetterPlayer is determined before this widget is built.
   }
 
   @override
@@ -628,14 +630,15 @@ class _VideoPlayerContainerState extends State<VideoPlayerContainer> {
     //   return buildError(context, message: _errorMessage!);
     // }
 
-    // Directly render the appropriate player widget.
+    // Directly render the appropriate player widget based on useBetterPlayer.
     // They will handle their own loading indicators and thumbnail display.
-    if (widget.isAndroid13OrLower) {
+    if (widget.useBetterPlayer) {
       return BetterPlayerWidget(
         url: widget.url,
         file: widget.file,
         displayPath: widget.displayPath,
         thumbnailUrl: widget.thumbnailUrl,
+        // isFeedContext is false by default in BetterPlayerWidget, which is correct for MediaViewPage
       );
     } else {
       return VideoPlayerWidget(

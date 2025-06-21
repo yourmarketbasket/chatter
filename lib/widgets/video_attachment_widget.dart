@@ -20,8 +20,8 @@ class VideoAttachmentWidget extends StatefulWidget {
   final Map<String, dynamic> attachment; // Changed to Map<String, dynamic>
   final Map<String, dynamic> post; // Changed to Map<String, dynamic>
   final BorderRadius borderRadius;
-  final int? androidVersion;
-  final bool isLoadingAndroidVersion;
+  // final int? androidVersion; // Removed
+  // final bool isLoadingAndroidVersion; // Removed
   final bool isFeedContext; // Added for seamless transition logic
 
   const VideoAttachmentWidget({
@@ -29,8 +29,8 @@ class VideoAttachmentWidget extends StatefulWidget {
     required this.attachment,
     required this.post,
     required this.borderRadius,
-    required this.androidVersion,
-    required this.isLoadingAndroidVersion,
+    // required this.androidVersion, // Removed
+    // required this.isLoadingAndroidVersion, // Removed
     this.isFeedContext = false, // Default to false
   }) : super(key: key);
 
@@ -57,16 +57,20 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
     super.initState();
     _videoUniqueId = widget.attachment['url'] as String? ?? widget.key.toString();
 
+    // Use androidSDKVersion from DataController
+    final int currentAndroidSDKVersion = _dataController.androidSDKVersion.value;
+
     if (widget.isFeedContext &&
         _dataController.isTransitioningVideo.value &&
         _dataController.activeFeedPlayerVideoId.value == _videoUniqueId) {
       // This feed player is returning from MediaViewPage
       Object? controllerFromDataController = _dataController.activeFeedPlayerController.value;
       bool reclaimed = false;
-      if (controllerFromDataController is BetterPlayerController && (Platform.isAndroid && widget.androidVersion! < 33)) {
+      // Use currentAndroidSDKVersion for the check
+      if (controllerFromDataController is BetterPlayerController && (Platform.isAndroid && currentAndroidSDKVersion < 31)) { // SDK 31 is Android 12
         _betterPlayerController = controllerFromDataController;
         reclaimed = true;
-      } else if (controllerFromDataController is VideoPlayerController && !(Platform.isAndroid && widget.androidVersion! < 33)) {
+      } else if (controllerFromDataController is VideoPlayerController && !(Platform.isAndroid && currentAndroidSDKVersion < 31)) { // SDK 31 is Android 12
         _videoPlayerController = controllerFromDataController;
         reclaimed = true;
       }
@@ -125,23 +129,32 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
   void _updateDataControllerWithCurrentState() {
     if (!widget.isFeedContext || _videoUniqueId == null) return;
 
-    if (_betterPlayerController != null && _betterPlayerController!.isPlaying()!) {
-      _dataController.activeFeedPlayerController.value = _betterPlayerController;
-      _dataController.activeFeedPlayerVideoId.value = _videoUniqueId;
-      _dataController.activeFeedPlayerPosition.value = _betterPlayerController!.videoPlayerController!.value.position;
-      _dataController.videoDidStartPlaying(_videoUniqueId!);
-    } else if (_videoPlayerController != null && _videoPlayerController!.value.isPlaying) {
-      _dataController.activeFeedPlayerController.value = _videoPlayerController;
-      _dataController.activeFeedPlayerVideoId.value = _videoUniqueId;
-      _dataController.activeFeedPlayerPosition.value = _videoPlayerController!.value.position;
-      _dataController.videoDidStartPlaying(_videoUniqueId!);
+    bool isCurrentlyPlaying = (_betterPlayerController != null && _betterPlayerController!.isPlaying()!) ||
+                              (_videoPlayerController != null && _videoPlayerController!.value.isPlaying);
+
+    if (isCurrentlyPlaying) {
+      if (_betterPlayerController != null) {
+        _dataController.activeFeedPlayerController.value = _betterPlayerController;
+        _dataController.activeFeedPlayerVideoId.value = _videoUniqueId;
+        _dataController.activeFeedPlayerPosition.value = _betterPlayerController!.videoPlayerController!.value.position;
+      } else if (_videoPlayerController != null) {
+        _dataController.activeFeedPlayerController.value = _videoPlayerController;
+        _dataController.activeFeedPlayerVideoId.value = _videoUniqueId;
+        _dataController.activeFeedPlayerPosition.value = _videoPlayerController!.value.position;
+      }
+      // videoDidStartPlaying is managed by the individual player widgets now
+      // _dataController.videoDidStartPlaying(_videoUniqueId!);
     } else {
-      // If not playing, but this was the active video, clear it (unless transitioning)
-      if (_dataController.activeFeedPlayerVideoId.value == _videoUniqueId && !_dataController.isTransitioningVideo.value) {
+      // If not playing.
+      // If this video was the active one in DataController and it's NOT currently being transitioned out,
+      // then clear its active status in DataController.
+      if (_dataController.activeFeedPlayerVideoId.value == _videoUniqueId &&
+          !_dataController.isTransitioningVideo.value) {
         _dataController.activeFeedPlayerController.value = null;
         _dataController.activeFeedPlayerVideoId.value = null;
         _dataController.activeFeedPlayerPosition.value = null;
-        _dataController.videoDidStopPlaying(_videoUniqueId!);
+        // videoDidStopPlaying is managed by the individual player widgets now
+        // _dataController.videoDidStopPlaying(_videoUniqueId!);
       }
     }
   }
@@ -155,7 +168,11 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
     _betterPlayerController?.dispose(); _betterPlayerController = null;
     _videoPlayerController?.dispose(); _videoPlayerController = null;
 
-    if (widget.isLoadingAndroidVersion || widget.androidVersion == null) {
+    // Use androidSDKVersion from DataController
+    final int currentAndroidSDKVersion = _dataController.androidSDKVersion.value;
+    if (currentAndroidSDKVersion == 0 && Platform.isAndroid) { // Still loading or unknown for Android
+      // You might want a loading indicator or retry mechanism if version is crucial and not yet available
+      print("VideoAttachmentWidget: Android SDK version not yet available from DataController. Cannot initialize player yet.");
       return;
     }
 
@@ -171,34 +188,52 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
       '/upload/q_auto:good,w_1280,h_960,c_fill/',
     );
 
-    bool useBetterPlayer = Platform.isAndroid && widget.androidVersion! < 33;
+    // Use currentAndroidSDKVersion from DataController
+    final int currentAndroidSDKVersion = _dataController.androidSDKVersion.value;
+    // SDK 31 is Android 12. Use better_player if SDK < 31.
+    bool useBetterPlayer = Platform.isAndroid && currentAndroidSDKVersion < 31;
 
     if (useBetterPlayer) {
-      _betterPlayerController = BetterPlayerController(
-        BetterPlayerConfiguration(
-          autoPlay: false, looping: true, fit: BoxFit.contain, aspectRatio: 4 / 3,
-          controlsConfiguration: BetterPlayerControlsConfiguration(showControls: false, enablePlayPause: true, enableMute: true, muteIcon: FeatherIcons.volumeX, unMuteIcon: FeatherIcons.volume2,),
-          handleLifecycle: false, // We manage lifecycle via VisibilityDetector mostly
-        ),
-        betterPlayerDataSource: BetterPlayerDataSource(BetterPlayerDataSourceType.network, optimizedUrl, videoFormat: BetterPlayerVideoFormat.other,),
-      )..addEventsListener((event) {
-          if (event.betterPlayerEventType == BetterPlayerEventType.initialized) {
-            if (mounted) {
-              setState(() => _isInitialized = true);
-              _betterPlayerController!.setVolume(_isMuted ? 0.0 : 1.0);
-              widget.post['views'] = (widget.post['views'] as int? ?? 0) + 1;
-              _updateDataControllerWithCurrentState(); // Update controller state after init
+      // Ensure better_player is not initialized if we are on Android 12+
+      // This check is defensive, as useBetterPlayer should already be false.
+      if (Platform.isAndroid && currentAndroidSDKVersion >= 31) {
+          print("VideoAttachmentWidget: Attempted to use BetterPlayer on Android 12 (SDK $currentAndroidSDKVersion) or higher. This should not happen. Falling back to VideoPlayer logic or no player.");
+          // Optionally, force useVideoPlayer or handle as an error
+          // For now, let it proceed to the 'else' block if logic is consistent,
+          // or explicitly set _isInitialized to false and return.
+          useBetterPlayer = false; // Correct the logic
+      }
+
+      if (useBetterPlayer) { // Re-check after potential correction
+        _betterPlayerController = BetterPlayerController(
+          BetterPlayerConfiguration(
+            autoPlay: false, looping: true, fit: BoxFit.contain, aspectRatio: 4 / 3,
+            controlsConfiguration: BetterPlayerControlsConfiguration(showControls: false, enablePlayPause: true, enableMute: true, muteIcon: FeatherIcons.volumeX, unMuteIcon: FeatherIcons.volume2,),
+            handleLifecycle: false, // We manage lifecycle via VisibilityDetector mostly
+          ),
+          betterPlayerDataSource: BetterPlayerDataSource(BetterPlayerDataSourceType.network, optimizedUrl, videoFormat: BetterPlayerVideoFormat.other,),
+        )..addEventsListener((event) {
+            if (event.betterPlayerEventType == BetterPlayerEventType.initialized) {
+              if (mounted) {
+                setState(() => _isInitialized = true);
+                _betterPlayerController!.setVolume(_isMuted ? 0.0 : 1.0);
+                widget.post['views'] = (widget.post['views'] as int? ?? 0) + 1;
+                _updateDataControllerWithCurrentState(); // Update controller state after init
+              }
+            } else if (event.betterPlayerEventType == BetterPlayerEventType.exception) {
+              print('BetterPlayer error for $_videoUniqueId: ${event.parameters}');
+              if (mounted) setState(() => _isInitialized = false);
+            } else if (event.betterPlayerEventType == BetterPlayerEventType.play || event.betterPlayerEventType == BetterPlayerEventType.pause) {
+               _updateDataControllerWithCurrentState();
+            } else if (event.betterPlayerEventType == BetterPlayerEventType.progress && _betterPlayerController!.isPlaying()!) {
+               if (widget.isFeedContext) _dataController.activeFeedPlayerPosition.value = event.parameters!['progress'] as Duration;
             }
-          } else if (event.betterPlayerEventType == BetterPlayerEventType.exception) {
-            print('BetterPlayer error for $_videoUniqueId: ${event.parameters}');
-            if (mounted) setState(() => _isInitialized = false);
-          } else if (event.betterPlayerEventType == BetterPlayerEventType.play || event.betterPlayerEventType == BetterPlayerEventType.pause) {
-             _updateDataControllerWithCurrentState();
-          } else if (event.betterPlayerEventType == BetterPlayerEventType.progress && _betterPlayerController!.isPlaying()!) {
-             if (widget.isFeedContext) _dataController.activeFeedPlayerPosition.value = event.parameters!['progress'] as Duration;
-          }
-        });
-    } else {
+          });
+      }
+    }
+
+    // If not using BetterPlayer (either by original logic or corrected logic)
+    if (!useBetterPlayer) {
       _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(optimizedUrl))
         ..initialize().then((_) {
           if (mounted) {
@@ -254,7 +289,9 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
 
   @override
   Widget build(BuildContext context) {
-    if (widget.isLoadingAndroidVersion || widget.androidVersion == null) {
+    // Use androidSDKVersion from DataController
+    final int currentAndroidSDKVersion = _dataController.androidSDKVersion.value;
+    if (currentAndroidSDKVersion == 0 && Platform.isAndroid) { // Still loading or unknown for Android
       return ClipRRect(
         borderRadius: widget.borderRadius,
         child: AspectRatio(
@@ -285,20 +322,29 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
           return;
         }
 
-        bool useBetterPlayer = Platform.isAndroid && widget.androidVersion! < 33;
+        // Use currentAndroidSDKVersion from DataController
+        final int currentAndroidSDKVersion = _dataController.androidSDKVersion.value;
+        bool useBetterPlayer = Platform.isAndroid && currentAndroidSDKVersion < 31; // SDK 31 is Android 12
 
         if (info.visibleFraction == 0) { // Not visible
           if (useBetterPlayer && _betterPlayerController != null) {
-            _betterPlayerController!.pause(); // Pause then dispose
-            _betterPlayerController!.dispose();
-            _betterPlayerController = null;
+            if (_dataController.activeFeedPlayerVideoId.value != _videoUniqueId || !_dataController.isTransitioningVideo.value) {
+              _betterPlayerController!.pause();
+              _betterPlayerController!.dispose();
+              _betterPlayerController = null;
+            }
           } else if (!useBetterPlayer && _videoPlayerController != null) {
-            _videoPlayerController!.pause(); // Pause then dispose
-            _videoPlayerController!.dispose();
-            _videoPlayerController = null;
+             if (_dataController.activeFeedPlayerVideoId.value != _videoUniqueId || !_dataController.isTransitioningVideo.value) {
+              _videoPlayerController!.pause();
+              _videoPlayerController!.dispose();
+              _videoPlayerController = null;
+            }
           }
           if (_isInitialized && mounted) {
-            setState(() => _isInitialized = false);
+            // Only set to false if not transitioning this specific video
+            if (_dataController.activeFeedPlayerVideoId.value != _videoUniqueId || !_dataController.isTransitioningVideo.value) {
+                 setState(() => _isInitialized = false);
+            }
           }
            _updateDataControllerWithCurrentState(); // Update data controller that it stopped
         } else { // Visible
@@ -327,8 +373,8 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
           // Ensure DataController has the latest state if this video is playing in feed
           if (widget.isFeedContext) {
             _updateDataControllerWithCurrentState(); // Capture current state before transition
-             bool isPlayingInFeed = (_betterPlayerController != null && _betterPlayerController!.isPlaying()!) ||
-                                 (_videoPlayerController != null && _videoPlayerController!.value.isPlaying);
+             bool isPlayingInFeed = (useBetterPlayer && _betterPlayerController != null && _betterPlayerController!.isPlaying()!) ||
+                                 (!useBetterPlayer && _videoPlayerController != null && _videoPlayerController!.value.isPlaying);
             if (isPlayingInFeed) {
                  _dataController.isTransitioningVideo.value = true;
                  // activeFeedPlayerController, videoId, position are already set by _updateDataControllerWithCurrentState
@@ -415,14 +461,14 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
                   ),
                 ),
                 if (_isInitialized)
-                  (Platform.isAndroid && widget.androidVersion! < 33)
+                  (Platform.isAndroid && currentAndroidSDKVersion < 31) // SDK 31 is Android 12
                       ? (_betterPlayerController != null && _betterPlayerController!.videoPlayerController != null && _betterPlayerController!.videoPlayerController!.value.initialized
                           ? BetterPlayer(controller: _betterPlayerController!)
                           : SizedBox.shrink())
                       : (_videoPlayerController != null && _videoPlayerController!.value.isInitialized
                           ? VideoPlayer(_videoPlayerController!)
                           : SizedBox.shrink()),
-                if (!_isInitialized)
+                if (!_isInitialized && !(currentAndroidSDKVersion == 0 && Platform.isAndroid)) // Show progress only if not waiting for SDK version
                   Center(
                     child: CircularProgressIndicator(
                       color: Colors.tealAccent,
@@ -435,7 +481,9 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
                     onTap: () {
                       setState(() {
                         _isMuted = !_isMuted;
-                        if (Platform.isAndroid && widget.androidVersion! < 33) {
+                        // Use currentAndroidSDKVersion from DataController
+                        final int currentAndroidSDKVersion = _dataController.androidSDKVersion.value;
+                        if (Platform.isAndroid && currentAndroidSDKVersion < 31) { // SDK 31 is Android 12
                           _betterPlayerController?.setVolume(_isMuted ? 0.0 : 1.0);
                         } else {
                           _videoPlayerController?.setVolume(_isMuted ? 0.0 : 1.0);

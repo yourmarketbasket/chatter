@@ -55,6 +55,7 @@ class DataController extends GetxController {
   final Rxn<String> activeFeedPlayerVideoId = Rxn<String>();
   final Rxn<Duration> activeFeedPlayerPosition = Rxn<Duration>();
   final RxBool isTransitioningVideo = false.obs; // True if a video is being transitioned to MediaViewPage
+  final RxInt androidSDKVersion = 0.obs; // To store Android SDK version, 0 means unknown or not Android
 
   @override
   void onInit() {

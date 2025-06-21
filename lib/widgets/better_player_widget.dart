@@ -368,13 +368,27 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
     } else if (!widget.isFeedContext &&
                _dataController.activeFeedPlayerVideoId.value == _videoUniqueId &&
                _dataController.activeFeedPlayerController.value == _controller) {
+      // This player (in MediaViewPage) was using a controller from the feed.
+      // Do NOT dispose it here. It will be reclaimed by the feed player.
       print("BetterPlayerWidget ($_videoUniqueId in MediaViewPage) NOT disposing shared controller.");
-      // When MediaViewPage is closed, signal that the transition is over so feed can reclaim.
-      // This is now handled by MediaViewPage explicitly setting isTransitioningVideo to false.
+      // When MediaViewPage is closed (widget is disposed), signal that the transition is over.
+      if (_dataController.isTransitioningVideo.value && _dataController.activeFeedPlayerVideoId.value == _videoUniqueId) {
+        // Update DataController with the final position from MediaViewPage
+        if (_controller != null && _controller!.videoPlayerController!.value.isInitialized) {
+           _dataController.activeFeedPlayerPosition.value = _controller!.videoPlayerController!.value.position;
+        }
+        _dataController.isTransitioningVideo.value = false; // Signal end of transition
+        print("BetterPlayerWidget ($_videoUniqueId in MediaViewPage) signalling end of transition.");
+      }
     } else {
+      // Standard disposal logic if not part of an active transition
       _controller?.dispose();
       print("BetterPlayerWidget ($_videoUniqueId) normally disposing controller.");
-      if (widget.isFeedContext && _dataController.activeFeedPlayerVideoId.value == _videoUniqueId) {
+      // If this was the active feed player and it's disposed normally (not transitioning out)
+      // and it's indeed THIS controller that's active
+      if (widget.isFeedContext &&
+          _dataController.activeFeedPlayerVideoId.value == _videoUniqueId &&
+          !_dataController.isTransitioningVideo.value) { // Ensure not transitioning
           _dataController.activeFeedPlayerController.value = null;
           _dataController.activeFeedPlayerVideoId.value = null;
           _dataController.activeFeedPlayerPosition.value = null;

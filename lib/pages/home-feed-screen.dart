@@ -37,15 +37,16 @@ class HomeFeedScreen extends StatefulWidget {
 }
 
 class _HomeFeedScreenState extends State<HomeFeedScreen> {
-  DataController dataController = Get.put(DataController());
-  int? androidVersion;
-  bool isLoadingAndroidVersion = true;
+  // Access DataController, which now holds the Android SDK version
+  final DataController dataController = Get.find<DataController>();
+  // int? androidVersion; // Removed, use dataController.androidSDKVersion.value
+  // bool isLoadingAndroidVersion = true; // Removed, version loaded at startup
   final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
-    _loadAndroidVersion();
+    // _loadAndroidVersion(); // Removed, version is loaded in main.dart
   }
 
   @override
@@ -54,32 +55,32 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     super.dispose();
   }
 
-  Future<void> _loadAndroidVersion() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    int? storedVersion = prefs.getInt('android_version');
-    if (storedVersion != null) {
-      setState(() {
-        androidVersion = storedVersion;
-        isLoadingAndroidVersion = false;
-      });
-    } else {
-      if (Platform.isAndroid) {
-        DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
-        AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
-        int sdkInt = androidInfo.version.sdkInt;
-        await prefs.setInt('android_version', sdkInt);
-        setState(() {
-          androidVersion = sdkInt;
-          isLoadingAndroidVersion = false;
-        });
-      } else {
-        setState(() {
-          androidVersion = 33;
-          isLoadingAndroidVersion = false;
-        });
-      }
-    }
-  }
+  // Future<void> _loadAndroidVersion() async { // Entire method removed
+  //   SharedPreferences prefs = await SharedPreferences.getInstance();
+  //   int? storedVersion = prefs.getInt('android_version');
+  //   if (storedVersion != null) {
+  //     setState(() {
+  //       androidVersion = storedVersion;
+  //       isLoadingAndroidVersion = false;
+  //     });
+  //   } else {
+  //     if (Platform.isAndroid) {
+  //       DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
+  //       AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
+  //       int sdkInt = androidInfo.version.sdkInt;
+  //       await prefs.setInt('android_version', sdkInt);
+  //       setState(() {
+  //         androidVersion = sdkInt;
+  //         isLoadingAndroidVersion = false;
+  //       });
+  //     } else {
+  //       setState(() {
+  //         androidVersion = 33;
+  //         isLoadingAndroidVersion = false;
+  //       });
+  //     }
+  //   }
+  // }
 
   void _navigateToPostScreen() async {
     final result = await Get.bottomSheet<Map<String, dynamic>>(
@@ -794,8 +795,8 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         attachment: attachmentMap,
         post: post,
         borderRadius: BorderRadius.zero, // Border radius handled by outer ClipRRect
-        androidVersion: androidVersion,
-        isLoadingAndroidVersion: isLoadingAndroidVersion,
+        // androidVersion and isLoadingAndroidVersion are no longer passed,
+        // VideoAttachmentWidget will get version from DataController
         // boxFit: fit, 
         isFeedContext: true, // This video is in the feed
       );
