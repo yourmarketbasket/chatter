@@ -55,18 +55,21 @@ class MediaViewPage extends StatefulWidget {
   _MediaViewPageState createState() => _MediaViewPageState();
 }
 
-class _MediaViewPageState extends State<MediaViewPage> {
+class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateMixin { // Added TickerProviderStateMixin for animations
   DataController _dataController = Get.put(DataController());
   late PageController _pageController;
   late int _currentPageIndex;
   bool _isDownloading = false;
   double _downloadProgress = 0.0;
+  AnimationController? _transformationAnimationController; // For smooth zoom animation
+  TransformationController? _transformationController; // For image zoom
 
   final Dio _dio = Dio();
 
   @override
   void initState() {
     super.initState();
+    _transformationController = TransformationController();
 
     // Defensive runtime check for attachments type
     if (widget.attachments.any((item) => item is! Map<String, dynamic>)) {
@@ -122,6 +125,8 @@ class _MediaViewPageState extends State<MediaViewPage> {
       }
     }
     _pageController.dispose();
+     _transformationController?.dispose();
+     _transformationAnimationController?.dispose();
     super.dispose();
   }
 
@@ -307,7 +312,11 @@ class _MediaViewPageState extends State<MediaViewPage> {
                           iconColor: Colors.grey[600],
                         );
                     }
-                    // For other types, keep the Center for now, or adjust as needed.
+                    // For video, return mediaWidget directly to allow it to fill PageView item.
+                    // For other types, keep the Center for now.
+                    if (type.toLowerCase() == 'video') {
+                      return mediaWidget;
+                    }
                     return Center(child: mediaWidget);
                   },
                 ),
@@ -362,6 +371,47 @@ class _MediaViewPageState extends State<MediaViewPage> {
     final File? file = attachment['file'] as File?;
 
     final String currentOptimizedUrl = _optimizeCloudinaryUrl(url);
+
+    // Reset the transformation controller when the image source changes (e.g., when swiping in PageView)
+    // This is important if _buildFullScreenImageViewer is called for different images within the same _MediaViewPageState
+    _transformationController?.value = Matrix4.identity();
+
+
+    final imageWidget = currentOptimizedUrl.isNotEmpty
+      ? CachedNetworkImage(
+          imageUrl: currentOptimizedUrl,
+          fit: BoxFit.contain,
+          placeholder: (context, url) => Center(child: LinearProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent), backgroundColor: Colors.grey)),
+          errorWidget: (context, url, error) => buildError(context, message: 'Error loading image: $error'),
+          cacheKey: url,
+          width: MediaQuery.of(context).size.width,
+          alignment: Alignment.center,
+        )
+      : (file != null
+          ? Image.file(
+              file,
+              fit: BoxFit.contain,
+              width: MediaQuery.of(context).size.width,
+              alignment: Alignment.center,
+              errorBuilder: (context, error, stackTrace) => buildError(context, message: 'Error loading image file: $error'),
+            )
+          : buildError(context, message: 'No image source available for $displayPath'));
+
+    return GestureDetector(
+      onDoubleTapDown: (details) {
+        _handleDoubleTap(details.localPosition);
+      },
+      child: InteractiveViewer(
+        transformationController: _transformationController,
+        minScale: 0.5,
+        maxScale: 4.0,
+        // onInteractionEnd: (details) { // Can be used for more complex scenarios like spring back
+        // },
+        child: imageWidget,
+      ),
+    );
+
+    /* Old structure:
     if (currentOptimizedUrl.isNotEmpty) {
       return InteractiveViewer(
         minScale: 0.5,
@@ -392,6 +442,49 @@ class _MediaViewPageState extends State<MediaViewPage> {
       return buildError(context, message: 'No image source available for $displayPath');
     }
   }
+
+  void _handleDoubleTap(Offset tapPosition) {
+    if (_transformationController == null) return;
+
+    _transformationAnimationController?.dispose(); // Dispose previous animation controller
+    _transformationAnimationController = AnimationController(
+      vsync: this, // Requires TickerProviderStateMixin
+      duration: const Duration(milliseconds: 300),
+    );
+
+    final currentMatrix = _transformationController!.value;
+    final double currentScale = currentMatrix.getMaxScaleOnAxis();
+
+    Matrix4 targetMatrix;
+
+    if (currentScale <= 1.01) { // If at initial scale or slightly off, zoom in
+      const double targetScale = 2.0;
+      // Zoom to the tap position
+      // Calculate the offset to center the tap position after scaling
+      final Offset centeredTapPosition = Offset(
+        tapPosition.dx * (targetScale - 1),
+        tapPosition.dy * (targetScale - 1),
+      );
+      targetMatrix = Matrix4.identity()
+        ..translate(-centeredTapPosition.dx, -centeredTapPosition.dy)
+        ..scale(targetScale);
+    } else { // If zoomed in, zoom out to initial scale
+      targetMatrix = Matrix4.identity();
+    }
+
+    final animation = Matrix4Tween(begin: currentMatrix, end: targetMatrix).animate(
+      CurveTween(curve: Curves.easeInOut).animate(_transformationAnimationController!),
+    );
+
+    animation.addListener(() {
+      if (_transformationController != null) {
+        _transformationController!.value = animation.value;
+      }
+    });
+
+    _transformationAnimationController!.forward();
+  }
+
 
   Widget _buildPdfViewer(BuildContext context, Map<String, dynamic> attachment, String displayPath, String optimizedUrl) {
     final String? url = attachment['url'] as String?;
@@ -437,27 +530,50 @@ class _MediaViewPageState extends State<MediaViewPage> {
     }
 
     // 2. Get Downloads Directory
-    Directory? downloadsDirectory;
-    try {
-      downloadsDirectory = await getDownloadsDirectory();
-      if (downloadsDirectory == null && Platform.isIOS) { // Fallback for iOS if getDownloadsDirectory is null
-          downloadsDirectory = await getApplicationDocumentsDirectory();
+    Directory? targetDirectory;
+    String downloadsPathMessage = "Downloaded to ";
+
+    if (Platform.isAndroid) {
+      try {
+        // Attempt to get the primary external storage directory
+        Directory? externalDir = await getExternalStorageDirectory();
+        if (externalDir != null) {
+          String publicDownloadsPath = '${externalDir.path}/Download'; // Common name
+          targetDirectory = Directory(publicDownloadsPath);
+          if (!await targetDirectory.exists()) {
+            await targetDirectory.create(recursive: true);
+          }
+          downloadsPathMessage = "Downloaded to Downloads folder (external storage). Path: ";
+        }
+      } catch (e) {
+        print("Error accessing external storage Downloads directory: $e. Falling back.");
+        // Fallback to app-specific downloads if public external path fails
       }
-    } catch (e) {
-      print("Error getting downloads directory: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not get downloads directory.', style: GoogleFonts.roboto())),
-      );
-      return;
     }
 
-    if (downloadsDirectory == null) {
+    // Fallback for iOS or if Android public path failed
+    if (targetDirectory == null) {
+      try {
+        targetDirectory = await getDownloadsDirectory(); // App-specific on Android, standard on iOS
+        if (targetDirectory == null && Platform.isIOS) {
+          targetDirectory = await getApplicationDocumentsDirectory();
+        }
+        downloadsPathMessage = Platform.isIOS ? "Downloaded to app files. Path: " : "Downloaded to app-specific folder. Path: ";
+      } catch (e) {
+        print("Error getting downloads directory: $e");
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not get downloads directory.', style: GoogleFonts.roboto())),
+        );
+        return;
+      }
+    }
+
+    if (targetDirectory == null) {
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Could not determine downloads directory.', style: GoogleFonts.roboto())),
         );
         return;
     }
-
 
     String fileName = attachment['filename'] as String? ?? url.split('/').last;
     // Sanitize filename if necessary, or ensure it's valid
@@ -471,7 +587,7 @@ class _MediaViewPageState extends State<MediaViewPage> {
         fileName = "downloaded_file_${DateTime.now().millisecondsSinceEpoch}$extension";
     }
 
-    final String savePath = "${downloadsDirectory.path}/$fileName";
+    final String savePath = "${targetDirectory.path}/$fileName";
 
     setState(() {
       _isDownloading = true;
@@ -491,7 +607,7 @@ class _MediaViewPageState extends State<MediaViewPage> {
         },
       );
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Downloaded to ${savePath.split('/').last}', style: GoogleFonts.roboto())),
+        SnackBar(content: Text('$downloadsPathMessage$savePath', style: GoogleFonts.roboto())),
       );
     } catch (e) {
       print("Download error: $e");
