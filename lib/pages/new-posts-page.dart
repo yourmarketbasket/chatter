@@ -281,27 +281,29 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
         final width = info.width!.toInt();
         final height = info.height!.toInt();
         final duration = info.duration != null ? (info.duration! / 1000).round() : null; // Convert ms to seconds
-        String orientation = info.orientation?.toLowerCase() ?? ''; // e.g. "landscape" or "portrait"
+        String determinedOrientation;
 
-        if (orientation.isEmpty) { // Fallback if orientation is not directly provided
-            if (width > height) {
-            orientation = 'landscape';
-            } else if (height > width) {
-            orientation = 'portrait';
-            } else {
-            orientation = 'square';
-            }
+        // Primary determination based on width and height
+        if (width > height) {
+          determinedOrientation = 'landscape';
+        } else if (height > width) {
+          determinedOrientation = 'portrait';
+        } else {
+          determinedOrientation = 'square';
         }
-        // Normalize orientation string if it comes as "Landscape" or "Portrait"
-        if (orientation.contains("landscape")) orientation = "landscape";
-        if (orientation.contains("portrait")) orientation = "portrait";
+
+        // Log the orientation provided by the package for debugging, but don't let it override.
+        String? packageOrientation = info.orientation?.toLowerCase();
+        if (packageOrientation != null && packageOrientation.isNotEmpty && packageOrientation != determinedOrientation) {
+            print('[NewPostScreen] Video Info: Package orientation "$packageOrientation" differs from dimension-based "$determinedOrientation". Using dimension-based.');
+        }
 
 
-        print('[NewPostScreen] Video Decoded Dimensions: width=$width, height=$height, orientation=$orientation, duration=$duration');
+        print('[NewPostScreen] Video Decoded Dimensions: width=$width, height=$height, orientation=$determinedOrientation, duration=$duration (Package Orientation: $packageOrientation)');
         return {
           'width': width,
           'height': height,
-          'orientation': orientation,
+          'orientation': determinedOrientation,
           if (duration != null) 'duration': duration,
         };
       } else {
