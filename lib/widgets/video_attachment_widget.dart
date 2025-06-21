@@ -42,33 +42,15 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
     super.initState();
     _videoUniqueId = widget.attachment['url'] as String? ?? widget.key.toString();
 
-    // Pre-cache the thumbnail
     final String? thumbnailUrl = widget.attachment['thumbnailUrl'] as String?;
     if (thumbnailUrl != null && thumbnailUrl.isNotEmpty) {
       _precacheThumbnail(thumbnailUrl);
     }
 
-    // Initialize video player (unchanged)
-    if (widget.isFeedContext &&
-        _dataController.isTransitioningVideo.value &&
-        _dataController.activeFeedPlayerVideoId.value == _videoUniqueId) {
-      Object? controllerFromDataController = _dataController.activeFeedPlayerController.value;
-      if (controllerFromDataController is BetterPlayerController) {
-        _betterPlayerController = controllerFromDataController;
-        _isInitialized = true;
-        _betterPlayerController!.setVolume(_isMuted ? 0.0 : 1.0);
-        _betterPlayerController!.setLooping(true);
-        if (_dataController.activeFeedPlayerPosition.value != null) {
-          _betterPlayerController!.seekTo(_dataController.activeFeedPlayerPosition.value!);
-        }
-        _betterPlayerController!.play();
-        _dataController.isTransitioningVideo.value = false;
-      } else {
-        _initializeVideoPlayer();
-      }
-    } else {
-      _initializeVideoPlayer();
-    }
+    // Simplified initialization: always initialize its own player.
+    // VisibilityDetector will handle play/pause/creation/disposal.
+    // No direct adoption of controller from DataController here.
+    // _initializeVideoPlayer(); // Will be called by VisibilityDetector if visible
 
     _pulseAnimationController = AnimationController(
       vsync: this,
@@ -79,18 +61,22 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
     );
     _pulseAnimationController.repeat(reverse: true);
 
+    // This subscription is to pause this feed player if MediaViewPage starts playing *this* video.
+    // This is more of a "pause if another view takes over this specific video"
     if (widget.isFeedContext) {
       _isTransitioningVideoSubscription = _dataController.isTransitioningVideo.listen((isTransitioning) {
         if (isTransitioning && _dataController.activeFeedPlayerVideoId.value == _videoUniqueId) {
+          // If this video is the one being transitioned TO MediaViewPage,
+          // this feed instance should pause.
           if (_betterPlayerController != null && _betterPlayerController!.isPlaying()!) {
             _betterPlayerController!.pause();
+            print("VideoAttachmentWidget ($_videoUniqueId) paused because it's transitioning to MediaViewPage.");
           }
         }
       });
     }
   }
 
-  // New method to pre-cache thumbnail
   void _precacheThumbnail(String thumbnailUrl) async {
     try {
       await CustomCacheManager.instance.getSingleFile(thumbnailUrl);
@@ -100,37 +86,47 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
     }
   }
 
-  void _updateDataControllerWithCurrentState() {
-    if (!widget.isFeedContext || _videoUniqueId == null) return;
+  // _updateDataControllerWithCurrentState is primarily for when this feed player *is* the active one.
+  // With controller passing removed, this is less about setting activeFeedPlayerController.
+  // It's more about updating position if it's playing, for potential future transitions.
+  void _updateDataControllerWithPlayingState() {
+    if (!widget.isFeedContext || _videoUniqueId == null || _betterPlayerController == null) return;
 
-    bool isCurrentlyPlaying = _betterPlayerController != null && _betterPlayerController!.isPlaying()!;
+    bool isCurrentlyPlaying = _betterPlayerController!.isPlaying() ?? false;
     if (isCurrentlyPlaying) {
-      _dataController.activeFeedPlayerController.value = _betterPlayerController;
+      // If this video starts playing, it becomes the "active" one in terms of ID and position for transition purposes.
       _dataController.activeFeedPlayerVideoId.value = _videoUniqueId;
       if (_betterPlayerController!.videoPlayerController != null &&
           _betterPlayerController!.videoPlayerController!.value.initialized) {
         _dataController.activeFeedPlayerPosition.value = _betterPlayerController!.videoPlayerController!.value.position;
       }
     } else {
+      // If it stops, and it was the active one, clear its status *unless* it's currently transitioning.
       if (_dataController.activeFeedPlayerVideoId.value == _videoUniqueId &&
-          !_dataController.isTransitioningVideo.value) {
-        _dataController.activeFeedPlayerController.value = null;
-        _dataController.activeFeedPlayerVideoId.value = null;
-        _dataController.activeFeedPlayerPosition.value = null;
+          !(_dataController.isTransitioningVideo.value && _dataController.activeFeedPlayerVideoId.value == _videoUniqueId) ) {
+        // _dataController.activeFeedPlayerVideoId.value = null; // Don't null out ID, MediaView might need it briefly
+        // _dataController.activeFeedPlayerPosition.value = null; // Position is stale if not playing
       }
     }
   }
 
-  void _initializeVideoPlayer() {
-    if (_isInitialized) return;
 
-    _betterPlayerController?.dispose();
-    _betterPlayerController = null;
+  void _initializeVideoPlayer() {
+    // if (_isInitialized) return; // Allow re-initialization if disposed and then made visible again
+
+    if (_betterPlayerController != null) {
+        // If a controller exists, ensure it's disposed before creating a new one.
+        // This can happen if VisibilityDetector quickly toggles visibility.
+        _betterPlayerController!.dispose();
+        _betterPlayerController = null;
+        _isInitialized = false; // Reset initialization state
+        print("VideoAttachmentWidget ($_videoUniqueId) disposed existing controller before re-initializing.");
+    }
 
     final String? attachmentUrl = widget.attachment['url'] as String?;
     if (attachmentUrl == null) {
       print("Video attachment URL is null for ID: $_videoUniqueId");
-      if (mounted) setState(() => _isInitialized = false);
+      if (mounted) setState(() => _isInitialized = false); // Keep UI reflecting no player
       return;
     }
 
@@ -138,10 +134,11 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
       '/upload/',
       '/upload/q_auto:good,w_1280,h_960,c_fill/',
     );
+    print("VideoAttachmentWidget ($_videoUniqueId) initializing player.");
 
     _betterPlayerController = BetterPlayerController(
       BetterPlayerConfiguration(
-        autoPlay: false,
+        autoPlay: false, // VisibilityDetector will handle play
         looping: true,
         aspectRatio: 4 / 3,
         fit: BoxFit.cover,
@@ -153,7 +150,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
           unMuteIcon: FeatherIcons.volume2,
           loadingWidget: const SizedBox.shrink(),
         ),
-        handleLifecycle: false,
+        handleLifecycle: false, // We handle with VisibilityDetector
       ),
       betterPlayerDataSource: BetterPlayerDataSource(
         BetterPlayerDataSourceType.network,
@@ -167,23 +164,29 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
         ),
       ),
     )..addEventsListener((event) {
+        if (!mounted) return; // Widget might have been disposed while event was pending
+
         if (event.betterPlayerEventType == BetterPlayerEventType.initialized) {
-          if (mounted) {
-            setState(() => _isInitialized = true);
-            _betterPlayerController!.setVolume(_isMuted ? 0.0 : 1.0);
-            widget.post['views'] = (widget.post['views'] as int? ?? 0) + 1;
-            _updateDataControllerWithCurrentState();
-          }
+          setState(() => _isInitialized = true);
+          _betterPlayerController!.setVolume(_isMuted ? 0.0 : 1.0);
+          // widget.post['views'] = (widget.post['views'] as int? ?? 0) + 1; // View count can be handled differently, e.g., on first play or visibility
+           _updateDataControllerWithPlayingState();
         } else if (event.betterPlayerEventType == BetterPlayerEventType.exception) {
           print('BetterPlayer error for $_videoUniqueId: ${event.parameters}');
-          if (mounted) setState(() => _isInitialized = false);
+          setState(() => _isInitialized = false); // Reflect error state
+          // Consider disposing the controller on exception to free resources
+           _betterPlayerController?.dispose();
+           _betterPlayerController = null;
         } else if (event.betterPlayerEventType == BetterPlayerEventType.play ||
             event.betterPlayerEventType == BetterPlayerEventType.pause) {
-          _updateDataControllerWithCurrentState();
+           _updateDataControllerWithPlayingState();
         } else if (event.betterPlayerEventType == BetterPlayerEventType.progress &&
-            _betterPlayerController!.isPlaying()!) {
+            (_betterPlayerController?.isPlaying() ?? false)) {
           if (widget.isFeedContext) {
-            _dataController.activeFeedPlayerPosition.value = event.parameters!['progress'] as Duration;
+            // Update position in DataController if this video is considered the active one for transition
+            if(_dataController.activeFeedPlayerVideoId.value == _videoUniqueId){
+                 _dataController.activeFeedPlayerPosition.value = event.parameters!['progress'] as Duration;
+            }
           }
         }
       });
@@ -192,21 +195,29 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
   @override
   void dispose() {
     _isTransitioningVideoSubscription?.cancel();
-    bool isTransitioningThisVideo = widget.isFeedContext &&
-        _dataController.isTransitioningVideo.value &&
-        _dataController.activeFeedPlayerVideoId.value == _videoUniqueId;
 
-    if (isTransitioningThisVideo) {
-      print("VideoAttachmentWidget ($_videoUniqueId) NOT disposing BetterPlayerController due to transition.");
-    } else {
-      _betterPlayerController?.dispose();
-      print("VideoAttachmentWidget ($_videoUniqueId) normally disposing BetterPlayerController.");
-      if (widget.isFeedContext && _dataController.activeFeedPlayerVideoId.value == _videoUniqueId) {
-        _dataController.activeFeedPlayerController.value = null;
-        _dataController.activeFeedPlayerVideoId.value = null;
-        _dataController.activeFeedPlayerPosition.value = null;
-      }
-    }
+    // If this video is currently marked as transitioning in DataController,
+    // it means MediaViewPage *might* be about to use its details (URL, last position).
+    // However, this feed widget instance is being disposed.
+    // The controller itself should be disposed. MediaViewPage will create its own.
+    // The main concern is if DataController.isTransitioningVideo is not cleared
+    // after MediaViewPage is done. That's outside this widget's direct control post-disposal.
+
+    _betterPlayerController?.dispose();
+    print("VideoAttachmentWidget ($_videoUniqueId) disposed BetterPlayerController in main dispose method.");
+
+    // If this widget was the one whose details are in DataController for a potential transition,
+    // and now it's being disposed (e.g. scrolled far away, feed cleared),
+    // we should clear these details if they are specific to *this instance* preparing to transition.
+    // However, if MediaViewPage is already open using this video's ID/pos, clearing here might be too soon.
+    // This highlights the need for MediaViewPage to signal when it's done.
+    // For now, let's assume DataController.isTransitioningVideo will be managed externally (e.g., by MediaViewPage closing).
+    // if (_dataController.activeFeedPlayerVideoId.value == _videoUniqueId &&
+    //     !_dataController.isTransitioningVideo.value) { // Only clear if NOT currently in an active transition state
+    //   _dataController.activeFeedPlayerVideoId.value = null;
+    //   _dataController.activeFeedPlayerPosition.value = null;
+    // }
+
     _pulseAnimationController.dispose();
     super.dispose();
   }
@@ -219,52 +230,64 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
     return VisibilityDetector(
       key: Key(thumbnailKey),
       onVisibilityChanged: (info) {
-        bool isCurrentlyTransitioningThisVideo = widget.isFeedContext &&
-            _dataController.isTransitioningVideo.value &&
-            _dataController.activeFeedPlayerVideoId.value == _videoUniqueId;
-
-        if (isCurrentlyTransitioningThisVideo) {
-          return;
-        }
+        // If this video is currently flagged for transition TO MediaViewPage,
+        // its state in the feed should be managed carefully (e.g. stay paused).
+        // The primary concern is disposing it if it scrolls out of view *while* flagged.
+        bool isThisVideoTransitioningOut = _dataController.isTransitioningVideo.value &&
+                                        _dataController.activeFeedPlayerVideoId.value == _videoUniqueId;
 
         if (info.visibleFraction == 0) {
+          // Video is not visible
           if (_betterPlayerController != null) {
-            if (_dataController.activeFeedPlayerVideoId.value != _videoUniqueId ||
-                !_dataController.isTransitioningVideo.value) {
-              _betterPlayerController!.pause();
-              _betterPlayerController!.dispose();
-              _betterPlayerController = null;
-            }
+            print("VideoAttachmentWidget ($_videoUniqueId) became not visible. Pausing and disposing controller.");
+            _betterPlayerController!.pause();
+            _betterPlayerController!.dispose();
+            _betterPlayerController = null;
           }
-          if (_isInitialized && mounted) {
-            if (_dataController.activeFeedPlayerVideoId.value != _videoUniqueId ||
-                !_dataController.isTransitioningVideo.value) {
-              setState(() => _isInitialized = false);
-            }
+          if (mounted) {
+            setState(() => _isInitialized = false);
           }
-          _updateDataControllerWithCurrentState();
+          // If it became non-visible and it was the one transitioning, this is tricky.
+          // MediaViewPage should ideally have already launched or is about to.
+          // The isTransitioningVideo flag should be reset by MediaViewPage's lifecycle.
         } else {
+          // Video is visible
           if (!_isInitialized && mounted) {
+            print("VideoAttachmentWidget ($_videoUniqueId) became visible. Initializing player.");
             _initializeVideoPlayer();
           } else if (_isInitialized && _betterPlayerController != null) {
-            if (info.visibleFraction > 0.5 && !_betterPlayerController!.isPlaying()!) {
+            // If it's visible and initialized:
+            // Play if more than 50% visible and not currently transitioning out to MediaViewPage.
+            // Pause if less than 50% visible (and was playing).
+            if (info.visibleFraction > 0.5 && !_betterPlayerController!.isPlaying()! && !isThisVideoTransitioningOut) {
+              print("VideoAttachmentWidget ($_videoUniqueId) >50% visible. Playing.");
               _betterPlayerController!.play();
             } else if (info.visibleFraction <= 0.5 && _betterPlayerController!.isPlaying()!) {
+              print("VideoAttachmentWidget ($_videoUniqueId) <50% visible. Pausing.");
               _betterPlayerController!.pause();
             }
-            _updateDataControllerWithCurrentState();
           }
         }
+        _updateDataControllerWithPlayingState(); // Update position if playing
       },
       child: GestureDetector(
         onTap: () {
-          if (widget.isFeedContext) {
-            _updateDataControllerWithCurrentState();
-            bool isPlayingInFeed = _betterPlayerController != null && _betterPlayerController!.isPlaying()!;
-            if (isPlayingInFeed) {
-              _dataController.isTransitioningVideo.value = true;
+          Duration currentPosition = Duration.zero;
+          if (_betterPlayerController != null && _betterPlayerController!.videoPlayerController != null && _betterPlayerController!.videoPlayerController!.value.initialized) {
+            currentPosition = _betterPlayerController!.videoPlayerController!.value.position;
+            // Pause the feed player before navigating
+            if (_betterPlayerController!.isPlaying()!) {
+              _betterPlayerController!.pause();
             }
           }
+
+          // Set transition state in DataController
+          // This signals to MediaViewPage which video and from what position to potentially start.
+          _dataController.activeFeedPlayerVideoId.value = _videoUniqueId;
+          _dataController.activeFeedPlayerPosition.value = currentPosition;
+          _dataController.isTransitioningVideo.value = true; // Signal that a transition is starting
+
+          print("VideoAttachmentWidget ($_videoUniqueId) tapped. Transitioning to MediaViewPage. Position: $currentPosition");
 
           List<Map<String, dynamic>> correctlyTypedPostAttachments = [];
           final dynamic rawPostAttachments = widget.post['attachments'];

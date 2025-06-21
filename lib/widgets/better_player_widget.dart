@@ -14,6 +14,7 @@ class BetterPlayerWidget extends StatefulWidget {
   final String displayPath;
   final String? thumbnailUrl;
   final bool isFeedContext; // Added to identify if this player is in the home feed
+  final Duration? startAt; // New parameter to start playback at a specific position
 
   const BetterPlayerWidget({
     Key? key,
@@ -22,6 +23,7 @@ class BetterPlayerWidget extends StatefulWidget {
     required this.displayPath,
     this.thumbnailUrl,
     this.isFeedContext = false, // Default to false
+    this.startAt, // New parameter
   }) : super(key: key);
 
   @override
@@ -42,13 +44,11 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
   Timer? _hideControlsTimer;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
-  // double? _aspectRatio; // No longer needed, BetterPlayer will use intrinsic video aspect ratio
 
-  // For single video playback
   final DataController _dataController = Get.find<DataController>();
   String? _videoUniqueId;
   StreamSubscription? _currentlyPlayingVideoSubscription;
-  StreamSubscription? _isTransitioningVideoSubscription; // For seamless transition
+  StreamSubscription? _isTransitioningVideoSubscription;
   void Function(BetterPlayerEvent)? _eventListener;
 
 
@@ -65,50 +65,25 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
 
-    if (widget.isFeedContext &&
-        _dataController.isTransitioningVideo.value &&
-        _dataController.activeFeedPlayerVideoId.value == _videoUniqueId &&
-        _dataController.activeFeedPlayerController.value is BetterPlayerController) {
-      // This feed player is returning from MediaViewPage
-      _controller = _dataController.activeFeedPlayerController.value as BetterPlayerController?;
-      if (_controller != null) {
-        _isInitialized = true;
-        _isLoading = false;
-        _duration = _controller!.videoPlayerController!.value.duration ?? Duration.zero;
-        _position = _controller!.videoPlayerController!.value.position ?? Duration.zero;
-        _isPlaying = _controller!.isPlaying() ?? false;
-        // _aspectRatio = _controller!.getAspectRatio(); // Not strictly needed to store if not used to set config
-        _showControls = true;
-        _animationController.forward();
-        _attachListeners(); // Attach local listeners
-        _dataController.isTransitioningVideo.value = false; // Reclaimed
-        if (_isPlaying) {
-          _controller!.play();
-           _dataController.videoDidStartPlaying(_videoUniqueId!);
-        }
-      } else {
-        _initializeVideoPlayer(); // Fallback
-      }
-    } else {
-      _initializeVideoPlayer();
-    }
+    // Simplified initState: Always initialize its own player. No controller passing.
+    _initializeVideoPlayer();
 
     _currentlyPlayingVideoSubscription = _dataController.currentlyPlayingVideoId.listen((playingId) {
       if (_controller != null && (_controller!.isPlaying() ?? false)) {
         if (playingId != null && playingId != _videoUniqueId) {
           _controller!.pause();
-          setState(() {
-            _isPlaying = false;
-          });
+          // _isPlaying state will be updated by the event listener
         }
       }
     });
 
+    // If in feed, listen for transition signals to pause itself if it's the video being transitioned.
     if (widget.isFeedContext) {
       _isTransitioningVideoSubscription = _dataController.isTransitioningVideo.listen((isTransitioning) {
         if (isTransitioning && _dataController.activeFeedPlayerVideoId.value == _videoUniqueId) {
           if (_controller != null && (_controller!.isPlaying() ?? false)) {
             _controller!.pause();
+            print("BetterPlayerWidget ($_videoUniqueId in feed) paused because it's transitioning to MediaViewPage.");
           }
         }
       });
@@ -129,28 +104,20 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
 
         final newIsPlayingState = _controller?.isPlaying() ?? false;
         if (_isPlaying != newIsPlayingState) {
-          if (newIsPlayingState && !_isPlaying) {
+          if (newIsPlayingState && !_isPlaying) { // Started playing
             _dataController.videoDidStartPlaying(_videoUniqueId!);
-            if (widget.isFeedContext) {
-              _dataController.activeFeedPlayerController.value = _controller;
-              _dataController.activeFeedPlayerVideoId.value = _videoUniqueId;
-            }
-          } else if (!newIsPlayingState && _isPlaying) {
+            // No longer setting activeFeedPlayerController in DataController
+          } else if (!newIsPlayingState && _isPlaying) { // Paused or finished
             _dataController.videoDidStopPlaying(_videoUniqueId!);
-            if (widget.isFeedContext && _dataController.activeFeedPlayerVideoId.value == _videoUniqueId) {
-              if (!_dataController.isTransitioningVideo.value) {
-                // _dataController.activeFeedPlayerController.value = null;
-                // _dataController.activeFeedPlayerVideoId.value = null;
-                // _dataController.activeFeedPlayerPosition.value = null;
-              }
-            }
           }
           _isPlaying = newIsPlayingState;
           changed = true;
         }
 
+        // If in feed and playing, update DataController with current position for potential transition.
         if (widget.isFeedContext && _isPlaying) {
           _dataController.activeFeedPlayerPosition.value = _position;
+          _dataController.activeFeedPlayerVideoId.value = _videoUniqueId; // Ensure ID is set
         }
 
         _duration = _controller?.videoPlayerController?.value.duration ?? _duration;
@@ -170,25 +137,7 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
 
 
   Future<void> _initializeVideoPlayer() async {
-    if (_dataController.isTransitioningVideo.value &&
-        _dataController.activeFeedPlayerVideoId.value == _videoUniqueId &&
-        _dataController.activeFeedPlayerController.value is BetterPlayerController &&
-        !widget.isFeedContext) { // For MediaViewPage using feed's controller
-      _controller = _dataController.activeFeedPlayerController.value as BetterPlayerController;
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _isInitialized = true;
-          _duration = _controller!.videoPlayerController!.value.duration ?? Duration.zero;
-          _position = _controller!.videoPlayerController!.value.position ?? Duration.zero;
-          _isPlaying = _controller!.isPlaying() ?? false;
-          _showControls = true;
-          _animationController.forward();
-        });
-        _attachListeners();
-      }
-      return;
-    }
+    // Removed logic for adopting controller from DataController.
 
     setState(() {
       _isLoading = true;
@@ -196,6 +145,15 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
       _showControls = true;
       _animationController.forward();
     });
+
+    // Dispose existing controller if any (e.g. on retry or re-initialization)
+    if(_controller != null) {
+        await _controller!.dispose();
+        _controller = null;
+        _isInitialized = false;
+        print("BetterPlayerWidget ($_videoUniqueId) disposed existing controller before re-initializing.");
+    }
+
 
     try {
       BetterPlayerDataSource dataSource;
@@ -209,7 +167,7 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
             maxCacheFileSize: 10 * 1024 * 1024, // 10 MB per file
           ),
           headers: {
-            'Cache-Control': 'max-age=604800', // Cache videos for 7 days
+            'Cache-Control': 'max-age=604800',
           },
         );
       } else if (widget.file != null) {
@@ -218,32 +176,30 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
           widget.file!.path,
         );
       } else {
-        setState(() {
-          _isLoading = false;
-          _isInitialized = false;
-          _errorMessage = 'No video source available';
-        });
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _isInitialized = false;
+            _errorMessage = 'No video source available';
+          });
+        }
         return;
       }
 
-      // Removed temporary controller logic for aspect ratio calculation
-      // final tempController = BetterPlayerController(...);
-      // await tempController.setupDataSource(dataSource);
-      // if (mounted) { ... tempController.dispose(); }
-
       _controller = BetterPlayerController(
         BetterPlayerConfiguration(
-          autoPlay: false,
-          looping: false,
-          aspectRatio: null, // Use video's intrinsic aspect ratio
-          fit: BoxFit.contain, // Ensure entire video is visible
+          autoPlay: widget.isFeedContext ? false : true, // Autoplay if not in feed (e.g. MediaViewPage)
+          looping: widget.isFeedContext ? true : false, // Loop in feed, not necessarily in MediaViewPage
+          aspectRatio: null,
+          fit: BoxFit.contain,
           placeholder: _buildPlaceholder(),
+          startAt: widget.startAt, // Use the passed startAt parameter
           controlsConfiguration: const BetterPlayerControlsConfiguration(
             showControls: false,
             loadingWidget: SizedBox.shrink(),
           ),
-          handleLifecycle: true,
-          autoDispose: true,
+          handleLifecycle: true, // Let BetterPlayer handle app lifecycle
+          autoDispose: true, // Auto dispose controller with widget
         ),
         betterPlayerDataSource: dataSource,
       );
@@ -255,24 +211,10 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
               _isLoading = false;
               _isInitialized = true;
               _duration = _controller!.videoPlayerController!.value.duration ?? Duration.zero;
-              // _aspectRatio = _controller!.getAspectRatio() ?? _aspectRatio ?? 16 / 9; // No longer storing _aspectRatio
             });
-            _controller!.removeEventsListener(_eventListener!); // Remove this init listener
-            _attachListeners(); // Attach the comprehensive event listener now
-
-            // If this controller was taken over for MediaViewPage and was playing
-            if (!widget.isFeedContext &&
-                _dataController.isTransitioningVideo.value &&
-                _dataController.activeFeedPlayerVideoId.value == _videoUniqueId &&
-                _dataController.activeFeedPlayerController.value == _controller) {
-
-                final previousPosition = _dataController.activeFeedPlayerPosition.value;
-                if (previousPosition != null) {
-                    _controller!.seekTo(previousPosition);
-                }
-                _controller!.play(); // Resume playback
-            }
-
+            // If not in feed context (e.g. MediaViewPage) and a startAt was provided, it should have started there.
+            // Autoplay is true for non-feed contexts.
+            // If in feed, playback is typically controlled by VisibilityDetector or other logic.
           }
         } else if (event.betterPlayerEventType == BetterPlayerEventType.exception) {
             if (mounted) {
@@ -283,7 +225,13 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
                  });
             }
         }
-        // The main _attachListeners will handle other events like progress, play, pause.
+        // Call _attachListeners once after the first successful initialization
+        // to handle ongoing events like progress, play, pause.
+        // Ensure it's only attached once.
+        if (event.betterPlayerEventType == BetterPlayerEventType.initialized && _eventListener != null) {
+             _controller!.removeEventsListener(_eventListener!); // Remove this specific init-focused listener
+             _attachListeners(); // Attach the main event listener
+        }
       };
       _controller!.addEventsListener(_eventListener!);
 
@@ -291,7 +239,7 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
       if (_retryCount < _maxRetries && mounted) {
         _retryCount++;
         await Future.delayed(const Duration(seconds: 2));
-        return _initializeVideoPlayer();
+        _initializeVideoPlayer(); // Retry initialization
       } else {
         if (mounted) {
           setState(() {
@@ -337,43 +285,24 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
     _currentlyPlayingVideoSubscription?.cancel();
     _isTransitioningVideoSubscription?.cancel();
 
+    // Removed conditional disposal logic related to transitions.
+    // If autoDispose: true is set in BetterPlayerConfiguration,
+    // BetterPlayer itself should handle disposing the controller when the widget is disposed.
+    // Explicitly removing listeners is still good practice if autoDispose isn't fully relied upon
+    // or if there are scenarios where the controller might be swapped.
     if (_eventListener != null && _controller != null) {
       _controller!.removeEventsListener(_eventListener!);
     }
+    // _controller?.dispose(); // Rely on autoDispose or BetterPlayer's own disposal.
+    // If not relying on autoDispose, then uncomment the line above.
+    // For safety with the current refactor, let's ensure it's explicitly called if not autoDisposing.
+    // Since autoDispose is true, this should be redundant but harmless.
+    // However, if _controller was swapped or not managed by a BetterPlayer widget directly, manual dispose is key.
+    // Given it's part of _BetterPlayerWidgetState, autoDispose should handle it.
+    // Let's remove the explicit call to see if autoDispose works as expected.
+    // If issues arise, re-add: _controller?.dispose();
+    print("BetterPlayerWidget ($_videoUniqueId) dispose method called.");
 
-    if (widget.isFeedContext &&
-        _dataController.isTransitioningVideo.value &&
-        _dataController.activeFeedPlayerVideoId.value == _videoUniqueId) {
-      print("BetterPlayerWidget ($_videoUniqueId in feed) NOT disposing controller due to transition.");
-    } else if (!widget.isFeedContext &&
-               _dataController.activeFeedPlayerVideoId.value == _videoUniqueId &&
-               _dataController.activeFeedPlayerController.value == _controller) {
-      // This player (in MediaViewPage) was using a controller from the feed.
-      // Do NOT dispose it here. It will be reclaimed by the feed player.
-      print("BetterPlayerWidget ($_videoUniqueId in MediaViewPage) NOT disposing shared controller.");
-      // When MediaViewPage is closed (widget is disposed), signal that the transition is over.
-      if (_dataController.isTransitioningVideo.value && _dataController.activeFeedPlayerVideoId.value == _videoUniqueId) {
-        // Update DataController with the final position from MediaViewPage
-        if (_controller != null && _controller!.videoPlayerController!.value.initialized) {
-           _dataController.activeFeedPlayerPosition.value = _controller!.videoPlayerController!.value.position;
-        }
-        _dataController.isTransitioningVideo.value = false; // Signal end of transition
-        print("BetterPlayerWidget ($_videoUniqueId in MediaViewPage) signalling end of transition.");
-      }
-    } else {
-      // Standard disposal logic if not part of an active transition
-      _controller?.dispose();
-      print("BetterPlayerWidget ($_videoUniqueId) normally disposing controller.");
-      // If this was the active feed player and it's disposed normally (not transitioning out)
-      // and it's indeed THIS controller that's active
-      if (widget.isFeedContext &&
-          _dataController.activeFeedPlayerVideoId.value == _videoUniqueId &&
-          !_dataController.isTransitioningVideo.value) { // Ensure not transitioning
-          _dataController.activeFeedPlayerController.value = null;
-          _dataController.activeFeedPlayerVideoId.value = null;
-          _dataController.activeFeedPlayerPosition.value = null;
-      }
-    }
 
     _hideControlsTimer?.cancel();
     _animationController.dispose();

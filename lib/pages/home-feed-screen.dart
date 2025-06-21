@@ -851,18 +851,9 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
               viewsCount: post['views'] as int? ?? 0,
               likesCount: post['likes'] as int? ?? 0,
               repostsCount: post['reposts'] as int? ?? 0,
-              transitionVideoId: (attachmentType == "video" &&
-                      dataController.isTransitioningVideo.value &&
-                      dataController.activeFeedPlayerVideoId.value == attachmentMap['url'])
-                  ? dataController.activeFeedPlayerVideoId.value
-                  : null,
-              transitionControllerType: (attachmentType == "video" &&
-                      dataController.isTransitioningVideo.value &&
-                      dataController.activeFeedPlayerVideoId.value == attachmentMap['url'])
-                  ? (dataController.activeFeedPlayerController.value is BetterPlayerController
-                      ? 'better_player'
-                      : 'video_player')
-                  : null,
+              // transitionVideoId and transitionControllerType are removed as MediaViewPage
+              // will now use DataController's activeFeedPlayerVideoId and activeFeedPlayerPosition
+              // to initialize its own player if isTransitioningVideo is true for the specific video.
             ),
           ),
         );

@@ -28,8 +28,8 @@ class MediaViewPage extends StatefulWidget {
   final int viewsCount;
   final int likesCount;
   final int repostsCount;
-  final String? transitionVideoId;
-  final String? transitionControllerType;
+  // final String? transitionVideoId; // Removed
+  // final String? transitionControllerType; // Removed
 
   const MediaViewPage({
     Key? key,
@@ -42,8 +42,8 @@ class MediaViewPage extends StatefulWidget {
     required this.viewsCount,
     required this.likesCount,
     required this.repostsCount,
-    this.transitionVideoId,
-    this.transitionControllerType,
+    // this.transitionVideoId, // Removed
+    // this.transitionControllerType, // Removed
   }) : super(key: key);
 
   @override
@@ -75,28 +75,27 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
 
     _currentPageIndex = widget.initialIndex;
     _pageController = PageController(initialPage: widget.initialIndex);
+
+    // If MediaViewPage is opened for a video that was transitioning,
+    // it's responsible for its own player. The isTransitioningVideo flag
+    // primarily signals intent and starting position.
+    // Actual player setup is in VideoPlayerContainer/BetterPlayerWidget.
   }
 
   @override
   void dispose() {
-    if (widget.transitionVideoId != null &&
-        _dataController.isTransitioningVideo.value &&
-        _dataController.activeFeedPlayerVideoId.value == widget.transitionVideoId) {
-      final activeController = _dataController.activeFeedPlayerController.value;
-      bool controllerMatchesTransitionType = false;
-      if (widget.transitionControllerType == 'better_player' && activeController is BetterPlayerController) {
-        controllerMatchesTransitionType = true;
-      } else if (widget.transitionControllerType == 'video_player' && activeController is VideoPlayerController) {
-        controllerMatchesTransitionType = true;
-      }
-
-      if (controllerMatchesTransitionType) {
-        _dataController.isTransitioningVideo.value = false;
-      } else {
-        debugPrint("MediaViewPage disposing: Transition mismatch for ${widget.transitionVideoId}.");
-        _dataController.isTransitioningVideo.value = false;
-      }
+    // When MediaViewPage is closed, always reset the transition state in DataController.
+    // This is crucial for feed players to resume normal lifecycle management.
+    if (_dataController.isTransitioningVideo.value) {
+      print("MediaViewPage disposing: Resetting DataController transition state for video ID: ${_dataController.activeFeedPlayerVideoId.value}");
+      _dataController.isTransitioningVideo.value = false;
+      // Optionally clear the video ID and position if they are no longer relevant
+      // or if another mechanism isn't already handling their lifecycle.
+      // For now, setting isTransitioningVideo to false is the most important.
+      _dataController.activeFeedPlayerVideoId.value = null;
+      _dataController.activeFeedPlayerPosition.value = null;
     }
+
     _pageController.dispose();
     _transformationController?.dispose();
     _transformationAnimationController?.dispose();
@@ -609,6 +608,7 @@ class BetterPlayerWidget extends StatefulWidget {
 }
 
 class _BetterPlayerWidgetState extends State<BetterPlayerWidget> {
+  final DataController _dataController = Get.find<DataController>(); // Access DataController
   BetterPlayerController? _betterPlayerController;
   bool _isLoading = true;
   String? _errorMessage;
@@ -625,6 +625,15 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> {
       _isLoading = true;
       _errorMessage = null;
     });
+
+    Duration? startAtPosition;
+
+    // Check if this video was the one transitioning from the feed
+    if (_dataController.isTransitioningVideo.value &&
+        _dataController.activeFeedPlayerVideoId.value == widget.url) {
+      startAtPosition = _dataController.activeFeedPlayerPosition.value;
+      print("MediaViewPage's BetterPlayerWidget: Initializing with startAt position: $startAtPosition for video: ${widget.url}");
+    }
 
     try {
       // Prioritize numeric aspect ratio if provided and valid
@@ -647,6 +656,7 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> {
         looping: false,
         fit: BoxFit.contain, // Changed to BoxFit.contain for MediaViewPage
         aspectRatio: _videoAspectRatio ?? 16 / 9, // Use determined aspect ratio or default
+        startAt: startAtPosition, // Set startAt if available
         placeholder: widget.thumbnailUrl != null
             ? CachedNetworkImage(
                 imageUrl: widget.thumbnailUrl!,

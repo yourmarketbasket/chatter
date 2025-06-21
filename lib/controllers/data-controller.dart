@@ -51,9 +51,9 @@ class DataController extends GetxController {
   final Rxn<String> currentlyPlayingVideoId = Rxn<String>();
 
   // For seamless video transition
-  final Rxn<Object> activeFeedPlayerController = Rxn<Object>(); // Can be VideoPlayerController or BetterPlayerController
-  final Rxn<String> activeFeedPlayerVideoId = Rxn<String>();
-  final Rxn<Duration> activeFeedPlayerPosition = Rxn<Duration>();
+  // final Rxn<Object> activeFeedPlayerController = Rxn<Object>(); // REMOVED - To prevent holding controller instances
+  final Rxn<String> activeFeedPlayerVideoId = Rxn<String>(); // Can still be useful to identify which video *was* active
+  final Rxn<Duration> activeFeedPlayerPosition = Rxn<Duration>(); // Position to potentially start from
   final RxBool isTransitioningVideo = false.obs; // True if a video is being transitioned to MediaViewPage
   // final RxInt androidSDKVersion = 0.obs; // Removed as player choice is now fixed to better_player
 
