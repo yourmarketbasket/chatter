@@ -293,9 +293,9 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
         }
 
         // Log the orientation provided by the package for debugging, but don't let it override.
-        String? packageOrientation = info.orientation?.toLowerCase();
-        if (packageOrientation != null && packageOrientation.isNotEmpty && packageOrientation != determinedOrientation) {
-            print('[NewPostScreen] Video Info: Package orientation "$packageOrientation" differs from dimension-based "$determinedOrientation". Using dimension-based.');
+        int? packageOrientation = info.orientation;
+        if (packageOrientation != null) {
+            print('[NewPostScreen] Video Info: Package orientation "$packageOrientation" (int) found. Using dimension-based "$determinedOrientation".');
         }
 
 

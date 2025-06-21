@@ -113,7 +113,7 @@ class AppDrawer extends StatelessWidget {
     );
 
     try {
-      List<Map<String, dynamic>> cloudinaryUploadResults = await dataController.uploadFiles([imageFile]);
+      List<Map<String, dynamic>> cloudinaryUploadResults = await dataController.uploadFiles([{'file': imageFile}]);
 
       if (Get.isSnackbarOpen) {
         Get.closeCurrentSnackbar();

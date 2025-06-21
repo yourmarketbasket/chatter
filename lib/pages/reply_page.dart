@@ -428,7 +428,12 @@ class _ReplyPageState extends State<ReplyPage> {
         // Filter for attachments that have a 'file' key and are not null
         final filesToUpload = _replyAttachments
             .where((a) => a['file'] != null && a['file'] is File)
-            .map((a) => a['file'] as File)
+            .map((a) => {
+                  'file': a['file'],
+                  'type': a['type'],
+                  'filename': a['filename'],
+                  'size': a['size'],
+                })
             .toList();
 
         if (filesToUpload.isNotEmpty) {
