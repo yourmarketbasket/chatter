@@ -338,7 +338,7 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
     if (_errorMessage != null) {
       // If there's an error, display it using the buildError structure
       // (assuming buildError is a global helper or defined in this scope)
-      return buildError(
+      return _buildError(
           context,
           message: _errorMessage,
           fileName: widget.displayPath.split('/').last
@@ -469,5 +469,33 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
     return hours > 0
         ? '${twoDigits(hours)}:${twoDigits(minutes)}:${twoDigits(seconds)}'
         : '${twoDigits(minutes)}:${twoDigits(seconds)}';
+  }
+
+  Widget _buildError(BuildContext context, {String? message, String? fileName}) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
+            const SizedBox(height: 12),
+            Text(
+              message ?? 'An error occurred while loading the video.',
+              style: GoogleFonts.roboto(color: Colors.white, fontSize: 16),
+              textAlign: TextAlign.center,
+            ),
+            if (fileName != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                fileName,
+                style: GoogleFonts.roboto(color: Colors.white70, fontSize: 12),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 }

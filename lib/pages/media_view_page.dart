@@ -703,9 +703,6 @@ class _InternalBetterPlayerWidgetState extends State<InternalBetterPlayerWidget>
             showControlsOnInitialize: true, // Show controls immediately
             showControls: true, // Enable controls
         ),
-        cacheConfiguration: const BetterPlayerCacheConfiguration(
-          useCache: false,
-        ),
       );
 
       BetterPlayerDataSource dataSource;
@@ -744,7 +741,7 @@ class _InternalBetterPlayerWidgetState extends State<InternalBetterPlayerWidget>
            if (!_isInitialized) { // Or a more specific flag for "buffering placeholder"
             setState(() { _isLoading = true; });
            }
-        } else if (event.betterPlayerEventType == BetterPlayerEventType.bufferingEnd || event.betterPlayerEventType == BetterPlayerEventType.playing) {
+        } else if (event.betterPlayerEventType == BetterPlayerEventType.bufferingEnd) {
            setState(() { _isLoading = false; });
         } else if (event.betterPlayerEventType == BetterPlayerEventType.exception) {
            setState(() {
