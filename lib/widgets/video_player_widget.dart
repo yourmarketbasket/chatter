@@ -281,10 +281,8 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
         child: Stack(
           alignment: Alignment.bottomCenter,
           children: [
-            AspectRatio(
-              aspectRatio: _controller!.value.aspectRatio,
-              child: VideoPlayer(_controller!),
-            ),
+            // AspectRatio removed, VideoPlayer will fill the space given by VideoPlayerContainer's AspectRatio
+            VideoPlayer(_controller!),
             Positioned(
               bottom: 20,
               left: 20,

@@ -175,8 +175,8 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
         BetterPlayerConfiguration(
           autoPlay: false,
           looping: false,
-          aspectRatio: null, // Use video's intrinsic aspect ratio
-          fit: BoxFit.contain, // Ensure entire video is visible
+          aspectRatio: null, // Let parent AspectRatio control this
+          fit: BoxFit.fill, // Fill the parent AspectRatio
           placeholder: _buildPlaceholder(),
           controlsConfiguration: const BetterPlayerControlsConfiguration(
             showControls: false,

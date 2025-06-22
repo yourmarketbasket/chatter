@@ -575,28 +575,39 @@ class VideoPlayerContainer extends StatefulWidget {
 class _VideoPlayerContainerState extends State<VideoPlayerContainer> {
   @override
   Widget build(BuildContext context) {
-    // Conditionally return BetterPlayerWidget or VideoPlayerWidget (from video_player_widget.dart)
+    final double videoAspectRatio = widget.numericAspectRatio ??
+        (double.tryParse(widget.aspectRatioString ?? '') ?? 16 / 9);
+
+    Widget playerWidget;
     if (widget.preferBetterPlayer) {
-      return BetterPlayerWidget( // Use the imported BetterPlayerWidget
+      // The actual BetterPlayerWidget is defined in its own file.
+      // We assume it will correctly use BoxFit.fill or similar if its parent AspectRatio defines the size.
+      playerWidget = BetterPlayerWidget(
         url: widget.url,
         file: widget.file,
         displayPath: widget.displayPath,
         thumbnailUrl: widget.thumbnailUrl,
-        // aspectRatioString and numericAspectRatio are not direct props of BetterPlayerWidget
-        // BetterPlayerWidget handles aspect ratio internally or via its own config.
-        // If these were meant to configure BetterPlayer, that needs to be handled inside BetterPlayerWidget.
-        // For now, assuming BetterPlayerWidget's internal logic is sufficient.
-        isFeedContext: false, // In MediaViewPage, it's not feed context
+        isFeedContext: false,
       );
     } else {
-      return VideoPlayerWidget(
+      // VideoPlayerWidget needs to be adjusted to accept an aspectRatio hint or fill its parent.
+      playerWidget = VideoPlayerWidget(
         url: widget.url,
         file: widget.file,
         displayPath: widget.displayPath,
         thumbnailUrl: widget.thumbnailUrl,
-        isFeedContext: false, // In MediaViewPage, it's not feed context
+        isFeedContext: false,
+        // We might need to pass videoAspectRatio to VideoPlayerWidget if it's to enforce it,
+        // or ensure its internal AspectRatio is removed/modified if this parent one controls it.
       );
     }
+    // Ensure the player is centered and respects the calculated aspect ratio
+    return Center(
+      child: AspectRatio(
+        aspectRatio: videoAspectRatio,
+        child: playerWidget,
+      ),
+    );
   }
 }
 
