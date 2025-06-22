@@ -690,6 +690,7 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> {
         configuration,
         betterPlayerDataSource: dataSource,
       );
+      // testing new branch
 
       // If no valid backend aspect ratio, get it from the video player after initialization
       if (_videoAspectRatio == null) {
