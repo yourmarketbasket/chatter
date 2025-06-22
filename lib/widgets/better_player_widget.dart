@@ -67,13 +67,16 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
 
     _initializeVideoPlayer();
 
-    _currentlyPlayingVideoSubscription = _dataController.activeFeedPlayerVideoId.listen((playingId) {
-      if (_controller != null && (_controller!.isPlaying() ?? false)) {
-        if (playingId != null && playingId != _videoUniqueId) {
+    _currentlyPlayingVideoSubscription = _dataController.currentlyPlayingMediaId.listen((playingId) {
+      // Only enforce single video playback in feed context
+      if (widget.isFeedContext &&
+          _controller != null &&
+          (_controller!.isPlaying() ?? false)) {
+        if (playingId != null &&
+            playingId != _videoUniqueId &&
+            _dataController.currentlyPlayingMediaType.value == 'video') {
           _controller!.pause();
-          setState(() {
-            _isPlaying = false;
-          });
+          // _isPlaying state will be updated by the event listener
         }
       }
     });
@@ -81,7 +84,7 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
 
   void _attachListeners() {
     _eventListener = (event) {
-      if (mounted) {
+      if (mounted && _controller != null) { // Ensure controller is not null
         bool changed = false;
         if (event.betterPlayerEventType == BetterPlayerEventType.progress) {
           final newPosition = event.parameters?['progress'] as Duration? ?? _position;
@@ -91,19 +94,24 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
           }
         }
 
-        final newIsPlayingState = _controller?.isPlaying() ?? false;
+        final newIsPlayingState = _controller!.isPlaying() ?? false;
         if (_isPlaying != newIsPlayingState) {
           if (newIsPlayingState && !_isPlaying) { // Video started playing
-            _dataController.videoDidStartPlaying(_videoUniqueId!);
-            if (widget.isFeedContext) {
-              _dataController.activeFeedPlayerController.value = _controller;
-              _dataController.activeFeedPlayerVideoId.value = _videoUniqueId;
-            }
-          } else if (!newIsPlayingState && _isPlaying) { // Video stopped playing
-            _dataController.videoDidStopPlaying(_videoUniqueId!);
+            _dataController.mediaDidStartPlaying(_videoUniqueId!, 'video', _controller!);
+          } else if (!newIsPlayingState && _isPlaying) { // Video stopped playing (paused or finished)
+            _dataController.mediaDidStopPlaying(_videoUniqueId!, 'video');
           }
           _isPlaying = newIsPlayingState;
           changed = true;
+        }
+
+        // Handle finished event specifically to call mediaDidStopPlaying
+        if (event.betterPlayerEventType == BetterPlayerEventType.finished) {
+            if (_isPlaying) { // If it was playing and then finished
+                _dataController.mediaDidStopPlaying(_videoUniqueId!, 'video');
+                _isPlaying = false; // Explicitly set _isPlaying to false
+                changed = true;
+            }
         }
 
         _duration = _controller?.videoPlayerController?.value.duration ?? _duration;
@@ -259,11 +267,9 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
     }
     _controller?.dispose();
 
-    // If this was the active feed player, clear it from DataController
-    if (widget.isFeedContext && _dataController.activeFeedPlayerVideoId.value == _videoUniqueId) {
-        _dataController.activeFeedPlayerController.value = null;
-        _dataController.activeFeedPlayerVideoId.value = null;
-        _dataController.activeFeedPlayerPosition.value = null;
+    // If this video was playing, ensure DataController is updated
+    if (_isPlaying) {
+      _dataController.mediaDidStopPlaying(_videoUniqueId!, 'video');
     }
 
     _hideControlsTimer?.cancel();
