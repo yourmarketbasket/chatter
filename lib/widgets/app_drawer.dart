@@ -218,7 +218,11 @@ class AppDrawer extends StatelessWidget {
                         radius: 36,
                         backgroundColor: Colors.tealAccent.withOpacity(0.3),
                         backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
-                            ? CachedNetworkImageProvider(avatarUrl)
+                            ? CachedNetworkImageProvider(
+                                avatarUrl,
+                                maxWidth: 150, // Optimize memory for drawer avatar
+                                maxHeight: 150,
+                              )
                             : null,
                         child: (avatarUrl == null || avatarUrl.isEmpty)
                             ? Text(

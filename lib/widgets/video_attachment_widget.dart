@@ -369,6 +369,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
                   child: CachedNetworkImage(
                     imageUrl: thumbnailUrl ?? '',
                     fit: BoxFit.cover,
+                    memCacheWidth: 480, // Optimize memory for thumbnail
                     cacheManager: CustomCacheManager.instance,
                     cacheKey: thumbnailUrl ?? _videoUniqueId,
                     placeholder: (context, url) => ScaleTransition(

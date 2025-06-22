@@ -159,7 +159,11 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
             CircleAvatar(
               radius: 18,
               backgroundImage: widget.userAvatarUrl != null && widget.userAvatarUrl!.isNotEmpty
-                  ? CachedNetworkImageProvider(_optimizeCloudinaryUrl(widget.userAvatarUrl!))
+                  ? CachedNetworkImageProvider(
+                      _optimizeCloudinaryUrl(widget.userAvatarUrl!),
+                      maxWidth: 100, // Optimize memory for AppBar avatar
+                      maxHeight: 100,
+                    )
                   : null,
               child: widget.userAvatarUrl == null || widget.userAvatarUrl!.isEmpty
                   ? const Icon(FeatherIcons.user, size: 18, color: Colors.white)
@@ -309,10 +313,10 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
         ? CachedNetworkImage(
             imageUrl: optimizedUrl!,
             fit: BoxFit.contain,
+            memCacheWidth: 1080, // Cap memory for full-screen images
             placeholder: (context, url) => const Center(child: LinearProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent))),
             errorWidget: (context, url, error) => buildError(context, message: 'Error loading image: $error'),
             cacheKey: url,
-            // Width and alignment are handled by AspectRatio and InteractiveViewer
           )
         : file != null
             ? Image.file(

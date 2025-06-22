@@ -313,7 +313,13 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
             CircleAvatar(
               radius: isReply ? 16 : 20,
               backgroundColor: Colors.tealAccent.withOpacity(0.2),
-              backgroundImage: userAvatar != null && userAvatar.isNotEmpty ? NetworkImage(userAvatar) : null,
+              backgroundImage: userAvatar != null && userAvatar.isNotEmpty
+                  ? CachedNetworkImageProvider(
+                      userAvatar,
+                      maxWidth: 120, // Approx 2x of 20 radius * 2 for diameter, plus some buffer
+                      maxHeight: 120,
+                    )
+                  : null,
               child: userAvatar == null || userAvatar.isEmpty
                   ? Text(avatarInitial, style: GoogleFonts.poppins(color: Colors.tealAccent, fontWeight: FontWeight.w600, fontSize: isReply ? 14 : 16))
                   : null,
@@ -560,7 +566,12 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     } else if (attachmentType == "image") {
       Widget imageContent;
       if (displayUrl != null && displayUrl.isNotEmpty) {
-        imageContent = CachedNetworkImage(imageUrl: displayUrl, fit: BoxFit.cover, placeholder: (context, url) => Container(color: Colors.grey[900]), errorWidget: (context, url, error) => Container(color: Colors.grey[900], child: const Icon(FeatherIcons.image, color: Colors.grey, size: 40)));
+        imageContent = CachedNetworkImage(
+          imageUrl: displayUrl,
+          fit: BoxFit.cover,
+          memCacheWidth: 600, // Optimize memory for image attachments
+          placeholder: (context, url) => Container(color: Colors.grey[900]),
+          errorWidget: (context, url, error) => Container(color: Colors.grey[900], child: const Icon(FeatherIcons.image, color: Colors.grey, size: 40)));
       } else if ((attachmentMap['file'] as File?) != null) {
         imageContent = Image.file(attachmentMap['file'] as File, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => Container(color: Colors.grey[900], child: const Icon(FeatherIcons.image, color: Colors.grey, size: 40)));
       } else {
