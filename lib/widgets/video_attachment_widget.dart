@@ -37,7 +37,8 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
   bool _isMuted = true;
   bool _isInitialized = false;
   String _videoUniqueId = "";
-  bool _shouldAutoplayAfterInit = false; // Added state for autoplay intent
+  bool _shouldAutoplayAfterInit = false;
+  bool _shouldRenderPlayer = false; // New state variable
   final DataController _dataController = Get.find<DataController>();
   final MediaVisibilityService _mediaVisibilityService = Get.find<MediaVisibilityService>();
   StreamSubscription? _isTransitioningVideoSubscription;
@@ -55,12 +56,12 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
     }
 
     // Standard initialization, don't autoplay, visibility service will decide
-    _initializeVideoPlayer(autoplay: false);
+    // Player is not rendered initially, only initialized when it becomes visible.
+    // _initializeVideoPlayer(autoplay: false); // Deferred to onVisibilityChanged
 
     _currentlyPlayingMediaSubscription = ever(_dataController.currentlyPlayingMediaId, (String? playingId) {
       if (!mounted || _betterPlayerController == null || !_isInitialized) return;
 
-      // Only act if this widget is part of the feed context
       if (widget.isFeedContext) {
         final bool isThisVideoPlaying = _betterPlayerController!.isPlaying() ?? false;
         if (isThisVideoPlaying &&
@@ -68,6 +69,11 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
             playingId != _videoUniqueId &&
             _dataController.currentlyPlayingMediaType.value == 'video') {
           print('[VideoAttachmentWidget-$_videoUniqueId] Another video ($playingId) started in feed. Pausing this video.');
+          if (mounted) {
+            setState(() {
+              _shouldRenderPlayer = false; // Stop rendering if another video takes over
+            });
+          }
           _betterPlayerController!.pause();
         }
       }
@@ -93,22 +99,31 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
   }
 
   void _playVideo() {
+    print("[VideoAttachmentWidget-$_videoUniqueId] Play callback received.");
     if (!_isInitialized || _betterPlayerController == null) {
-      print("[VideoAttachmentWidget-$_videoUniqueId] Play callback: Initializing player to play.");
-      _initializeVideoPlayer(autoplay: true); // Initialize and tell it to play once ready
+      print("[VideoAttachmentWidget-$_videoUniqueId] Player not ready, initializing to play.");
+      _initializeVideoPlayer(autoplay: true);
     } else {
-      // Only play if not already playing this specific media or if it's paused
-      if (_dataController.currentlyPlayingMediaId.value != _videoUniqueId || !_betterPlayerController!.isPlaying()!) {
-        print("[VideoAttachmentWidget-$_videoUniqueId] Play callback executed.");
-        _betterPlayerController!.play();
+      if (mounted) {
+        setState(() {
+          _shouldRenderPlayer = true;
+        });
       }
+      _betterPlayerController!.play();
+      print("[VideoAttachmentWidget-$_videoUniqueId] Player ready, playing.");
     }
   }
 
   void _pauseVideo() {
-    if (_betterPlayerController != null && _isInitialized && (_betterPlayerController!.isPlaying() ?? false)) {
-      print("[VideoAttachmentWidget-$_videoUniqueId] Pause callback executed.");
+    print("[VideoAttachmentWidget-$_videoUniqueId] Pause callback received.");
+    if (_betterPlayerController != null && _isInitialized) { // Check _isInitialized
       _betterPlayerController!.pause();
+       print("[VideoAttachmentWidget-$_videoUniqueId] Player paused.");
+    }
+    if (mounted) {
+      setState(() {
+        _shouldRenderPlayer = false;
+      });
     }
   }
 
@@ -134,9 +149,10 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
       return;
     }
 
+    // Use lower resolution for feed previews
     final optimizedUrl = attachmentUrl.replaceAll(
       '/upload/',
-      '/upload/q_auto:good,w_1280,h_960,c_fill/',
+      '/upload/q_auto:low,w_480,c_limit/', // Lower quality, smaller width, limit to prevent upscaling
     );
 
     _betterPlayerController = BetterPlayerController(
@@ -248,21 +264,45 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
           context: context,
         );
 
+        // Initialize player when it becomes visible and not already initialized
+        if (visibleFraction > 0 && !_isInitialized && _betterPlayerController == null) {
+            print("[VideoAttachmentWidget-$_videoUniqueId] Becoming visible (fraction: $visibleFraction), ensuring player is initialized.");
+            _initializeVideoPlayer(autoplay: false); // _shouldRenderPlayer will be false by default
+        }
+
+        _mediaVisibilityService.itemVisibilityChanged(
+          mediaId: _videoUniqueId,
+          mediaType: 'video',
+          visibleFraction: visibleFraction,
+          playCallback: _playVideo,
+          pauseCallback: _pauseVideo,
+          context: context,
+        );
+
         // Aggressive disposal when completely invisible
         if (visibleFraction == 0) {
+          if (mounted && _shouldRenderPlayer) { // If it was rendering, update state
+            setState(() {
+              _shouldRenderPlayer = false;
+            });
+          } else {
+             _shouldRenderPlayer = false; // Ensure it's false
+          }
+
           if (_betterPlayerController != null) {
             print("[VideoAttachmentWidget-$_videoUniqueId] Became completely invisible. Aggressively disposing player.");
-            _betterPlayerController!.pause(); // Ensure paused
+            _betterPlayerController!.pause();
             _betterPlayerController!.removeEventsListener(_onPlayerEvent);
             _betterPlayerController!.dispose();
             _betterPlayerController = null;
           }
-          if (_isInitialized && mounted) { // Only call setState if it was initialized
+          // Update _isInitialized state
+          if (_isInitialized && mounted) {
             setState(() {
               _isInitialized = false;
             });
           } else {
-            _isInitialized = false; // Ensure it's false even if not mounted or not previously init
+            _isInitialized = false;
           }
         }
       },
@@ -356,11 +396,23 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
                     ),
                   ),
                 ),
-                if (_isInitialized &&
-                    _betterPlayerController != null &&
-                    _betterPlayerController!.videoPlayerController != null &&
-                    _betterPlayerController!.videoPlayerController!.value.initialized)
-                  BetterPlayer(controller: _betterPlayerController!),
+                // Conditionally render the player only when it should be visible and active
+                if (_isInitialized && _shouldRenderPlayer && _betterPlayerController != null)
+                  Positioned.fill( // Ensure player fills the AspectRatio
+                    child: BetterPlayer(controller: _betterPlayerController!),
+                  )
+                else if (!_isInitialized && _shouldRenderPlayer) // Show loading if trying to render but not ready
+                  const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent))),
+
+                // Play icon overlay if not rendering player but it's supposed to be playable (managed by MediaVisibilityService)
+                if (!_shouldRenderPlayer && thumbnailUrl != null && thumbnailUrl.isNotEmpty)
+                  Center(
+                    child: Icon(
+                      FeatherIcons.playCircle,
+                      color: Colors.white.withOpacity(0.7),
+                      size: 48,
+                    ),
+                  ),
                 Positioned(
                   bottom: 8,
                   right: 8,
