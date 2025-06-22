@@ -13,7 +13,8 @@ class BetterPlayerWidget extends StatefulWidget {
   final File? file;
   final String displayPath;
   final String? thumbnailUrl;
-  final bool isFeedContext; // Added to identify if this player is in the home feed
+  final bool isFeedContext;
+  final double? videoAspectRatioProp; // Added to receive aspect ratio for placeholder
 
   const BetterPlayerWidget({
     Key? key,
@@ -21,7 +22,8 @@ class BetterPlayerWidget extends StatefulWidget {
     this.file,
     required this.displayPath,
     this.thumbnailUrl,
-    this.isFeedContext = false, // Default to false
+    this.isFeedContext = false,
+    this.videoAspectRatioProp, // Added
   }) : super(key: key);
 
   @override
@@ -55,6 +57,7 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
   @override
   void initState() {
     super.initState();
+    _isLoading = true; // Start in loading state for the placeholder
     _videoUniqueId = widget.url ?? widget.file?.path ?? widget.key.toString();
 
     _animationController = AnimationController(
@@ -173,13 +176,13 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
 
       _controller = BetterPlayerController(
         BetterPlayerConfiguration(
-          autoPlay: false,
+          autoPlay: false, // Should be false for feed, true for MediaViewPage (handled by caller)
           looping: false,
-          aspectRatio: null, // Let parent AspectRatio control this
-          fit: BoxFit.fill, // Fill the parent AspectRatio
-          placeholder: _buildPlaceholder(),
+          aspectRatio: null,
+          fit: BoxFit.cover, // Ensure it covers the area
+          placeholder: _buildPlaceholder(), // Use the new placeholder
           controlsConfiguration: const BetterPlayerControlsConfiguration(
-            showControls: false,
+            showControls: false, // Custom controls are built on top usually
             loadingWidget: SizedBox.shrink(),
           ),
           handleLifecycle: true,
@@ -211,7 +214,29 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
         }
         // The main _attachListeners will handle other events like progress, play, pause.
       };
+      _eventListener = (BetterPlayerEvent event) { // Re-assign _eventListener here
+        if (event.betterPlayerEventType == BetterPlayerEventType.initialized) {
+          if (mounted) {
+            setState(() {
+              _isLoading = false; // Initialized, stop loading indicator for placeholder
+              _isInitialized = true;
+              _duration = _controller!.videoPlayerController!.value.duration ?? Duration.zero;
+            });
+            _controller!.removeEventsListener(_eventListener!);
+            _attachListeners(); // Attach the comprehensive event listener
+          }
+        } else if (event.betterPlayerEventType == BetterPlayerEventType.exception) {
+            if (mounted) {
+                 setState(() {
+                    _isLoading = false;
+                    _isInitialized = false;
+                    _errorMessage = event.parameters?['message']?.toString() ?? 'Error initializing video';
+                 });
+            }
+        }
+      };
       _controller!.addEventsListener(_eventListener!);
+
 
     } catch (e) {
       if (_retryCount < _maxRetries && mounted) {
@@ -221,7 +246,7 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
       } else {
         if (mounted) {
           setState(() {
-            _isLoading = false;
+            _isLoading = false; // Stop loading on final error
             _isInitialized = false;
             _errorMessage = 'Failed to load video after $_maxRetries attempts: $e';
           });
@@ -279,69 +304,63 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
 
   @override
   Widget _buildPlaceholder() {
-    if (widget.thumbnailUrl != null && widget.thumbnailUrl!.isNotEmpty) {
-      return CachedNetworkImage(
-        imageUrl: widget.thumbnailUrl!,
-        fit: BoxFit.contain,
-        placeholder: (context, url) => const Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
-            strokeWidth: 2,
+    final double effectiveAspectRatio = widget.videoAspectRatioProp ?? 16 / 9;
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        AspectRatio(
+          aspectRatio: effectiveAspectRatio,
+          child: (widget.thumbnailUrl != null && widget.thumbnailUrl!.isNotEmpty)
+              ? CachedNetworkImage(
+                  imageUrl: widget.thumbnailUrl!,
+                  fit: BoxFit.cover,
+                  memCacheWidth: screenWidth.round(),
+                  placeholder: (context, url) => Container(color: Colors.black87),
+                  errorWidget: (context, url, error) => Container(color: Colors.black),
+                )
+              : Container(color: Colors.black87), // Fallback if no thumbnail
+        ),
+        if (_isLoading) // Show progress indicator if loading
+          const Center(
+            child: CircularProgressIndicator(
+              strokeWidth: 1.0,
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            ),
           ),
-        ),
-        errorWidget: (context, url, error) => Container(
-          color: Colors.black,
-          child: const Center(
-            child: Icon(Icons.error_outline, color: Colors.grey, size: 40),
-          ),
-        ),
-      );
-    } else {
-      // Default placeholder if no thumbnail URL is provided
-      return const Center(
-        child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
-          strokeWidth: 2,
-        ),
-      );
-    }
+      ],
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    // If there's an error message, display it.
     if (_errorMessage != null) {
-      print('Error: $_errorMessage');
-      return Center(
-        child: Text(
-          _errorMessage!, // Already checked for null
-          style: const TextStyle(color: Colors.red, fontSize: 16),
-          textAlign: TextAlign.center,
-        ),
+      // If there's an error, display it using the buildError structure
+      // (assuming buildError is a global helper or defined in this scope)
+      return buildError(
+          context,
+          message: _errorMessage,
+          fileName: widget.displayPath.split('/').last
       );
     }
 
-    // If still loading and not yet initialized (controller is null), show placeholder.
-    // This handles the very initial state before controller setup attempts.
-    // The BetterPlayerConfiguration.placeholder will handle loading display during controller setup.
-    if (_isLoading && _controller == null) {
+    // If controller is null (init hasn't happened or failed very early) or still loading, show placeholder.
+    // _isLoading is true initially and set to false on BetterPlayerEventType.initialized or playing.
+    if (_controller == null || (_isLoading && !_isInitialized) ) {
       return _buildPlaceholder();
     }
 
-    // If not initialized and controller is null (could be due to no source), show error.
-    // This case should ideally be caught by _errorMessage, but as a fallback.
-    if (!_isInitialized || _controller == null) {
-      return Center(
-        child: Text(
-          _errorMessage ?? 'Video player not available.', // Generic error if _errorMessage is null
-          style: const TextStyle(color: Colors.red, fontSize: 16),
-          textAlign: TextAlign.center,
-        ),
-      );
+    // If initialized but for some reason controller is null (should not happen if _isLoading is false)
+    // or if not initialized and also not loading (e.g. error before controller creation)
+    // This state indicates a problem, could show error or placeholder.
+    // The _errorMessage check above should catch most failure scenarios.
+    // If _isInitialized is false here, it means initialization event hasn't fired or failed.
+    if (!_isInitialized && !_isLoading) {
+        return _buildPlaceholder(); // Still show placeholder if not initialized and not actively loading
     }
 
-    // Once controller is available and initialized (or attempting to initialize),
-    // BetterPlayer widget itself will use its placeholder.
+    // Controller is available and likely initialized (or BetterPlayer will show its internal placeholder from config)
     return LayoutBuilder(
       builder: (context, constraints) {
         return GestureDetector(
