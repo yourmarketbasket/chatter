@@ -176,7 +176,7 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
           autoPlay: false,
           looping: false,
           aspectRatio: null, // Let parent AspectRatio control this
-          fit: BoxFit.fill, // Fill the parent AspectRatio
+          fit: BoxFit.fitWidth, // Fill the parent AspectRatio
           placeholder: _buildPlaceholder(),
           controlsConfiguration: const BetterPlayerControlsConfiguration(
             showControls: false,
@@ -282,7 +282,7 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
     if (widget.thumbnailUrl != null && widget.thumbnailUrl!.isNotEmpty) {
       return CachedNetworkImage(
         imageUrl: widget.thumbnailUrl!,
-        fit: BoxFit.contain,
+        fit: BoxFit.fitWidth,
         placeholder: (context, url) => const Center(
           child: CircularProgressIndicator(
             valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),

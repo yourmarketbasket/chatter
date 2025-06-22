@@ -232,7 +232,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
             if (widget.thumbnailUrl != null && widget.thumbnailUrl!.isNotEmpty)
               CachedNetworkImage(
                 imageUrl: widget.thumbnailUrl!,
-                fit: BoxFit.contain, // Or BoxFit.cover, depending on desired behavior
+                fit: BoxFit.fitWidth, // Or BoxFit.cover, depending on desired behavior
                 placeholder: (context, url) => const Center(
                   child: CircularProgressIndicator(
                     valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),

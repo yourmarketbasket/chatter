@@ -312,7 +312,7 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
     final imageContentWidget = optimizedUrl?.isNotEmpty == true
         ? CachedNetworkImage(
             imageUrl: optimizedUrl!,
-            fit: BoxFit.contain,
+            fit: BoxFit.fitWidth,
             memCacheWidth: 1080, // Cap memory for full-screen images
             placeholder: (context, url) => const Center(child: LinearProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent))),
             errorWidget: (context, url, error) => buildError(context, message: 'Error loading image: $error'),
@@ -321,7 +321,7 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
         : file != null
             ? Image.file(
                 file,
-                fit: BoxFit.contain,
+                fit: BoxFit.fitWidth,
                 // Width and alignment are handled by AspectRatio and InteractiveViewer
                 errorBuilder: (context, error, stackTrace) => buildError(context, message: 'Error loading image file: $error'),
               )
