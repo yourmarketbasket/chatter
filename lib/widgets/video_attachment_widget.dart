@@ -37,6 +37,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
   bool _isMuted = true;
   bool _isInitialized = false;
   String _videoUniqueId = "";
+  bool _shouldAutoplayAfterInit = false; // Added state for autoplay intent
   final DataController _dataController = Get.find<DataController>();
   final MediaVisibilityService _mediaVisibilityService = Get.find<MediaVisibilityService>();
   StreamSubscription? _isTransitioningVideoSubscription;
@@ -112,21 +113,19 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
   }
 
   void _initializeVideoPlayer({bool autoplay = false}) {
-    // If already initialized and trying to initialize again with the same settings, can return.
-    if (_isInitialized && _betterPlayerController != null) {
-        // If autoplay is requested and it's not playing, play it.
-        if (autoplay && !_betterPlayerController!.isPlaying()!) {
-             _betterPlayerController!.play();
-        }
-        return;
+    // Aggressively dispose of any existing controller first
+    if (_betterPlayerController != null) {
+      print("[VideoAttachmentWidget-$_videoUniqueId] _initializeVideoPlayer: Disposing existing controller before creating new one.");
+      _betterPlayerController!.removeEventsListener(_onPlayerEvent);
+      _betterPlayerController!.dispose();
     }
-
-    // Dispose any existing controller before creating a new one.
-    // This is important if configuration changes (e.g. autoplay flag).
-    _betterPlayerController?.removeEventsListener(_onPlayerEvent); // Remove listener from old controller
-    _betterPlayerController?.dispose();
     _betterPlayerController = null;
-    _isInitialized = false; // Reset initialization state
+    _isInitialized = false;
+    _shouldAutoplayAfterInit = autoplay; // Store the autoplay intent
+
+    // Call setState if appropriate, e.g. if UI needs to clear the old player view immediately
+    // However, this method is often called before build or during state updates where direct setState might be tricky.
+    // The subsequent setState in this method or in the caller should handle UI updates.
 
     final String? attachmentUrl = widget.attachment['url'] as String?;
     if (attachmentUrl == null) {
@@ -142,7 +141,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
 
     _betterPlayerController = BetterPlayerController(
       BetterPlayerConfiguration(
-        autoPlay: autoplay,
+        autoPlay: false, // Always false here
         looping: widget.onVideoCompletedInGrid == null,
         fit: BoxFit.cover,
         controlsConfiguration: BetterPlayerControlsConfiguration(
@@ -174,12 +173,12 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
         if (mounted) {
           setState(() => _isInitialized = true);
           _betterPlayerController!.setVolume(_isMuted ? 0.0 : 1.0);
-           // If autoplay was requested during init and player is now ready
-          if (_betterPlayerController!.betterPlayerConfiguration.autoPlay &&
-              !(_betterPlayerController!.isPlaying() ?? true) ) { // Check if not already playing
+          if (_shouldAutoplayAfterInit && !(_betterPlayerController!.isPlaying() ?? true)) {
             _betterPlayerController!.play();
+            // Reset flag if it's a one-time intent, or manage as needed
+            // _shouldAutoplayAfterInit = false;
           } else if (_betterPlayerController!.isPlaying() == true) {
-             // If already playing (e.g. due to internal autoplay after init)
+            // Handles cases where player might start due to other reasons or was already playing
             _dataController.mediaDidStartPlaying(_videoUniqueId, 'video', _betterPlayerController!);
           }
         }
@@ -209,17 +208,16 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
   @override
   void dispose() {
     _mediaVisibilityService.unregisterItem(_videoUniqueId);
-    // _isTransitioningVideoSubscription?.cancel(); // Removed
     _currentlyPlayingMediaSubscription?.dispose();
 
     if (_betterPlayerController != null) {
-      if (_betterPlayerController!.isPlaying() == true) {
-          _dataController.mediaDidStopPlaying(_videoUniqueId, 'video');
-      }
+      print("[VideoAttachmentWidget-$_videoUniqueId] Widget dispose: Disposing BetterPlayerController.");
+      // It's good practice to remove listeners before disposing
       _betterPlayerController!.removeEventsListener(_onPlayerEvent);
       _betterPlayerController!.dispose();
-      print("[VideoAttachmentWidget-$_videoUniqueId] Disposed BetterPlayerController.");
+      _betterPlayerController = null; // Ensure it's nulled out
     }
+    _isInitialized = false; // Ensure state reflects no player
     _pulseAnimationController.dispose();
     super.dispose();
   }
@@ -250,19 +248,22 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
           context: context,
         );
 
-        // Refined disposal logic:
-        // If it becomes completely invisible AND it's not transitioning AND a controller exists
-        if (visibleFraction == 0 && _betterPlayerController != null) {
-            print("[VideoAttachmentWidget-$_videoUniqueId] Became completely invisible. Disposing player.");
-            // Pause should have been called by MediaVisibilityService.
-            // If it was playing, the pause event would have updated DataController.
-            // We just need to dispose the controller here.
+        // Aggressive disposal when completely invisible
+        if (visibleFraction == 0) {
+          if (_betterPlayerController != null) {
+            print("[VideoAttachmentWidget-$_videoUniqueId] Became completely invisible. Aggressively disposing player.");
+            _betterPlayerController!.pause(); // Ensure paused
             _betterPlayerController!.removeEventsListener(_onPlayerEvent);
             _betterPlayerController!.dispose();
             _betterPlayerController = null;
-            if(mounted) {
-              setState(() => _isInitialized = false);
-            }
+          }
+          if (_isInitialized && mounted) { // Only call setState if it was initialized
+            setState(() {
+              _isInitialized = false;
+            });
+          } else {
+            _isInitialized = false; // Ensure it's false even if not mounted or not previously init
+          }
         }
       },
       child: GestureDetector(
