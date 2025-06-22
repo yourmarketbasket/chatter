@@ -14,7 +14,8 @@ class VideoPlayerWidget extends StatefulWidget {
   final File? file;
   final String displayPath;
   final String? thumbnailUrl;
-  final bool isFeedContext; // Added to identify if this player is in the home feed
+  final bool isFeedContext;
+  final double? videoAspectRatioProp; // Added to receive aspect ratio from parent
 
   const VideoPlayerWidget({
     Key? key,
@@ -22,7 +23,8 @@ class VideoPlayerWidget extends StatefulWidget {
     this.file,
     required this.displayPath,
     this.thumbnailUrl,
-    this.isFeedContext = false, // Default to false
+    this.isFeedContext = false,
+    this.videoAspectRatioProp, // Added
   }) : super(key: key);
 
   @override
@@ -223,48 +225,52 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Center(
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            // Display thumbnail if available
-            if (widget.thumbnailUrl != null && widget.thumbnailUrl!.isNotEmpty)
-              CachedNetworkImage(
-                imageUrl: widget.thumbnailUrl!,
-                fit: BoxFit.fitWidth, // Or BoxFit.cover, depending on desired behavior
-                placeholder: (context, url) => const Center(
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
-                    strokeWidth: 2,
-                  ),
-                ),
-                errorWidget: (context, url, error) => Container(
-                  color: Colors.black,
-                  child: const Center(
-                    child: Icon(Icons.error_outline, color: Colors.grey, size: 40),
-                  ),
-                ),
-              )
-            else
-              Container(color: Colors.black), // Fallback if no thumbnail URL
+    final double effectiveAspectRatio = widget.videoAspectRatioProp ?? _controller?.value.aspectRatio ?? 16 / 9;
+    final screenWidth = MediaQuery.of(context).size.width;
 
-            // Always show a progress indicator on top if still loading,
-            // or remove if thumbnail itself has an indicator.
-            // For this setup, CachedNetworkImage's placeholder handles it.
-            // If no thumbnail, then a direct progress indicator is good.
-            if (widget.thumbnailUrl == null || widget.thumbnailUrl!.isEmpty)
-              const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
-                backgroundColor: Colors.transparent, // Make background transparent
-                strokeWidth: 2,
+    if (_isLoading || !_isInitialized && _errorMessage == null) { // Show placeholder if loading OR not initialized (and no error)
+      return Stack(
+        alignment: Alignment.center,
+        children: [
+          if (widget.thumbnailUrl != null && widget.thumbnailUrl!.isNotEmpty)
+            AspectRatio(
+              aspectRatio: effectiveAspectRatio,
+              child: CachedNetworkImage(
+                imageUrl: widget.thumbnailUrl!,
+                fit: BoxFit.cover,
+                memCacheWidth: screenWidth.round(),
+                placeholder: (context, url) => Container(color: Colors.black87),
+                errorWidget: (context, url, error) => Container(color: Colors.black),
               ),
-          ],
+            )
+          else // Fallback if no thumbnail
+            AspectRatio(
+              aspectRatio: effectiveAspectRatio,
+              child: Container(color: Colors.black87),
+            ),
+          const Center(
+            child: CircularProgressIndicator(
+              strokeWidth: 1.0,
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (_errorMessage != null) { // Handle error state separately
+      return Center(
+        child: Text(
+          _errorMessage!,
+          style: const TextStyle(color: Colors.red, fontSize: 16),
+          textAlign: TextAlign.center,
         ),
       );
     }
 
-    if (!_isInitialized || _controller == null || _errorMessage != null) {
+    // This case should ideally not be reached if _errorMessage handles all init failures.
+    // But as a safeguard:
+    if (_controller == null || !_controller!.value.isInitialized) {
       print('Error: $_errorMessage');
       return Center(
         child: Text(

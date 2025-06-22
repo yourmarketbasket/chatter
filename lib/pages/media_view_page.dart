@@ -312,7 +312,7 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
     final imageContentWidget = optimizedUrl?.isNotEmpty == true
         ? CachedNetworkImage(
             imageUrl: optimizedUrl!,
-            fit: BoxFit.fitWidth,
+            fit: BoxFit.contain,
             memCacheWidth: 1080, // Cap memory for full-screen images
             placeholder: (context, url) => const Center(child: LinearProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent))),
             errorWidget: (context, url, error) => buildError(context, message: 'Error loading image: $error'),
@@ -321,7 +321,7 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
         : file != null
             ? Image.file(
                 file,
-                fit: BoxFit.fitWidth,
+                fit: BoxFit.contain,
                 // Width and alignment are handled by AspectRatio and InteractiveViewer
                 errorBuilder: (context, error, stackTrace) => buildError(context, message: 'Error loading image file: $error'),
               )
@@ -336,12 +336,9 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
 
     return GestureDetector(
       onDoubleTapDown: (details) => _handleDoubleTap(details.localPosition),
-      child: originalAspectRatio != null
-          ? AspectRatio(
-              aspectRatio: originalAspectRatio,
-              child: interactiveImage,
-            )
-          : interactiveImage, // Fallback if no aspect ratio determined
+      // The InteractiveViewer will now be the direct child of GestureDetector (and thus Center from PageView's itemBuilder).
+      // It will use the screen space. The child (CachedNetworkImage with BoxFit.contain) will fit itself initially.
+      child: interactiveImage,
     );
   }
 
@@ -353,8 +350,8 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
     final double currentScale = currentMatrix.getMaxScaleOnAxis();
 
     Matrix4 targetMatrix;
-    if (currentScale <= 1.01) {
-      const double targetScale = 2.0;
+    if (currentScale <= 1.01) { // If at initial fitted scale (or very close to it)
+      const double targetScale = 2.5; // Zoom in to 2.5x
       final Offset centeredTapPosition = Offset(
         tapPosition.dx * (targetScale - 1),
         tapPosition.dy * (targetScale - 1),
@@ -580,25 +577,23 @@ class _VideoPlayerContainerState extends State<VideoPlayerContainer> {
 
     Widget playerWidget;
     if (widget.preferBetterPlayer) {
-      // The actual BetterPlayerWidget is defined in its own file.
-      // We assume it will correctly use BoxFit.fill or similar if its parent AspectRatio defines the size.
       playerWidget = BetterPlayerWidget(
         url: widget.url,
         file: widget.file,
         displayPath: widget.displayPath,
         thumbnailUrl: widget.thumbnailUrl,
         isFeedContext: false,
+        // Pass aspect ratio for thumbnail and loading indicator handling
+        videoAspectRatioProp: videoAspectRatio,
       );
     } else {
-      // VideoPlayerWidget needs to be adjusted to accept an aspectRatio hint or fill its parent.
       playerWidget = VideoPlayerWidget(
         url: widget.url,
         file: widget.file,
         displayPath: widget.displayPath,
         thumbnailUrl: widget.thumbnailUrl,
         isFeedContext: false,
-        // We might need to pass videoAspectRatio to VideoPlayerWidget if it's to enforce it,
-        // or ensure its internal AspectRatio is removed/modified if this parent one controls it.
+        videoAspectRatioProp: videoAspectRatio, // Pass aspect ratio
       );
     }
     // Ensure the player is centered and respects the calculated aspect ratio
@@ -613,6 +608,221 @@ class _VideoPlayerContainerState extends State<VideoPlayerContainer> {
 
 // Removed InternalBetterPlayerWidget and _InternalBetterPlayerWidgetState
 // as BetterPlayerWidget from lib/widgets/better_player_widget.dart is now used.
+
+//This widget is actually still used by VideoPlayerContainer if preferBetterPlayer is true.
+//It should be InternalBetterPlayerWidget as previously named if we are keeping it separate.
+//For now, assuming this is the one to modify for placeholder.
+//If plan implies modifying the one in lib/widgets/, this needs to be done there.
+//Based on current plan step "InternalBetterPlayerWidget (in media_view_page.dart)"
+
+class InternalBetterPlayerWidget extends StatefulWidget {
+  final String? url;
+  final File? file;
+  final String displayPath;
+  final String? thumbnailUrl;
+  final String? aspectRatioString; // This was from before, might be redundant if videoAspectRatioProp is used
+  final double? numericAspectRatio; // This was from before, might be redundant
+  final double? videoAspectRatioProp; // New: To be passed from VideoPlayerContainer
+
+  const InternalBetterPlayerWidget({
+    Key? key,
+    this.url,
+    this.file,
+    required this.displayPath,
+    this.thumbnailUrl,
+    this.aspectRatioString,
+    this.numericAspectRatio,
+    this.videoAspectRatioProp, // New
+  }) : super(key: key);
+
+  @override
+  _InternalBetterPlayerWidgetState createState() => _InternalBetterPlayerWidgetState();
+}
+
+class _InternalBetterPlayerWidgetState extends State<InternalBetterPlayerWidget> {
+  BetterPlayerController? _betterPlayerController;
+  bool _isLoading = true; // Will represent if the main video is loading
+  bool _isInitialized = false; // Tracks if BetterPlayerController is initialized
+  String? _errorMessage;
+  // _videoAspectRatio is now determined by videoAspectRatioProp or defaults.
+  // double? _videoAspectRatio; // This local state might be less important now
+
+  @override
+  void initState() {
+    super.initState();
+    // _videoAspectRatio = widget.videoAspectRatioProp ?? widget.numericAspectRatio ?? (double.tryParse(widget.aspectRatioString ?? '') ?? 16/9);
+    _initializePlayer();
+  }
+
+  Future<void> _initializePlayer() async {
+    // No longer setting _isLoading = true here, as placeholder handles initial view.
+    // _isLoading will be true while BetterPlayer is actually fetching/buffering.
+    // setState(() { _isLoading = true; _errorMessage = null; });
+    setState(() { _errorMessage = null; _isInitialized = false; });
+
+
+    try {
+      // Determine aspect ratio to use for the player configuration itself
+      // This might be used by BetterPlayer if it needs an explicit aspect ratio hint,
+      // but ideally, BoxFit.cover within a sized parent AspectRatio handles it.
+      double playerConfigAspectRatio = widget.videoAspectRatioProp ?? 16/9;
+      // if (widget.numericAspectRatio != null && widget.numericAspectRatio! > 0 && widget.numericAspectRatio!.isFinite) {
+      //   playerConfigAspectRatio = widget.numericAspectRatio!;
+      // } else if (widget.aspectRatioString != null && widget.aspectRatioString!.isNotEmpty) {
+      //   final parsedAspectRatioFromString = double.tryParse(widget.aspectRatioString!);
+      //   if (parsedAspectRatioFromString != null && parsedAspectRatioFromString.isFinite && parsedAspectRatioFromString > 0) {
+      //     playerConfigAspectRatio = parsedAspectRatioFromString;
+      //   }
+      // }
+
+
+      final configuration = BetterPlayerConfiguration(
+        autoPlay: true, // Autoplay once ready
+        looping: false,
+        fit: BoxFit.cover, // Cover the area defined by parent AspectRatio
+        aspectRatio: playerConfigAspectRatio, // Provide aspect ratio hint to player
+        placeholder: _buildThumbnailWithLoadingIndicator(),
+        errorBuilder: (context, errorMessage) {
+          // Ensure UI updates on error
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if(mounted) {
+              setState(() {
+                _isLoading = false;
+                _isInitialized = false;
+                _errorMessage = errorMessage ?? 'Error playing video';
+              });
+            }
+          });
+          return buildError( // buildError is a global helper in this file
+            context,
+            message: errorMessage ?? 'Error playing video',
+            fileName: widget.displayPath.split('/').last,
+          );
+        },
+        controlsConfiguration: const BetterPlayerControlsConfiguration(
+            showControlsOnInitialize: true, // Show controls immediately
+            showControls: true, // Enable controls
+        ),
+        cacheConfiguration: const BetterPlayerCacheConfiguration(
+          useCache: false,
+        ),
+      );
+
+      BetterPlayerDataSource dataSource;
+      if (widget.url != null && widget.url!.isNotEmpty) {
+        dataSource = BetterPlayerDataSource(
+          BetterPlayerDataSourceType.network,
+          widget.url!,
+        );
+      } else if (widget.file != null) {
+        dataSource = BetterPlayerDataSource(
+          BetterPlayerDataSourceType.file,
+          widget.file!.path,
+        );
+      } else {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'No video source available';
+        });
+        return;
+      }
+
+      _betterPlayerController = BetterPlayerController(
+        configuration,
+        betterPlayerDataSource: dataSource,
+      );
+
+      _betterPlayerController!.addEventsListener((event) {
+        if (!mounted) return;
+        if (event.betterPlayerEventType == BetterPlayerEventType.initialized) {
+          setState(() {
+            _isInitialized = true;
+            _isLoading = false; // Video is initialized, so not "loading" in the placeholder sense
+          });
+        } else if (event.betterPlayerEventType == BetterPlayerEventType.bufferingStart || event.betterPlayerEventType == BetterPlayerEventType.play) {
+          // Consider buffering as loading if not yet initialized fully
+           if (!_isInitialized) { // Or a more specific flag for "buffering placeholder"
+            setState(() { _isLoading = true; });
+           }
+        } else if (event.betterPlayerEventType == BetterPlayerEventType.bufferingEnd || event.betterPlayerEventType == BetterPlayerEventType.playing) {
+           setState(() { _isLoading = false; });
+        } else if (event.betterPlayerEventType == BetterPlayerEventType.exception) {
+           setState(() {
+            _isLoading = false;
+            _isInitialized = false;
+            _errorMessage = event.parameters?['message'] as String? ?? 'Player error';
+          });
+        }
+      });
+
+    } catch (e) {
+      debugPrint('Error initializing video player: $e');
+      setState(() {
+        _isLoading = false;
+        _isInitialized = false;
+        _errorMessage = 'Failed to initialize video player: $e';
+      });
+    }
+  }
+
+  Widget _buildThumbnailWithLoadingIndicator() {
+    final double effectiveAspectRatio = widget.videoAspectRatioProp ?? 16 / 9;
+    // Approximate screen width for memCacheWidth, or pass it if available
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        if (widget.thumbnailUrl != null && widget.thumbnailUrl!.isNotEmpty)
+          AspectRatio(
+            aspectRatio: effectiveAspectRatio,
+            child: CachedNetworkImage(
+              imageUrl: widget.thumbnailUrl!,
+              fit: BoxFit.cover,
+              memCacheWidth: screenWidth.round(), // Cache at screen width
+              errorWidget: (context, url, error) => Container(color: Colors.black), // Fallback for thumbnail error
+              placeholder: (context, url) => Container(color: Colors.black), // Basic placeholder
+            ),
+          ),
+        // Show loading indicator if _isLoading is true (meaning player is trying to load/buffer)
+        // and not yet fully initialized and playing.
+        // This condition might need refinement based on BetterPlayer events.
+        // Typically, _isLoading would be true before 'initialized' or during 'bufferingStart'.
+        if (_isLoading || !_isInitialized) // Show indicator if loading OR not yet initialized
+           Center(child: CircularProgressIndicator(strokeWidth: 1.0, valueColor: AlwaysStoppedAnimation<Color>(Colors.white))),
+      ],
+    );
+  }
+
+  @override
+  void dispose() {
+    _betterPlayerController?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_errorMessage != null) {
+      return buildError( // buildError is a global helper
+        context,
+        message: _errorMessage,
+        fileName: widget.displayPath.split('/').last,
+      );
+    }
+
+    // If controller is null (e.g. no source or init failed before controller creation), show placeholder or error
+    if (_betterPlayerController == null) {
+        // This shows the thumbnail and potentially a loading indicator if _isLoading is true
+        return _buildThumbnailWithLoadingIndicator();
+    }
+
+    // Once controller is created, BetterPlayer handles its own placeholder via config, then transitions to video
+    return BetterPlayer(controller: _betterPlayerController!);
+    // The parent VideoPlayerContainer provides the main AspectRatio wrapper.
+    // InternalBetterPlayerWidget's build method should just return the BetterPlayer.
+  }
+}
+
 
 class AudioPlayerWidget extends StatefulWidget {
   final String? url;
