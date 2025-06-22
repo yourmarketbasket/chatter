@@ -601,12 +601,6 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
               viewsCount: post['views'] as int? ?? 0,
               likesCount: post['likes'] as int? ?? 0,
               repostsCount: post['reposts'] as int? ?? 0,
-              transitionVideoId: (attachmentType == "video" && dataController.isTransitioningVideo.value && dataController.activeFeedPlayerVideoId.value == attachmentMap['url'])
-                  ? dataController.activeFeedPlayerVideoId.value
-                  : null,
-              transitionControllerType: (attachmentType == "video" && dataController.isTransitioningVideo.value && dataController.activeFeedPlayerVideoId.value == attachmentMap['url'])
-                  ? (dataController.activeFeedPlayerController.value is BetterPlayerController ? 'better_player' : 'video_player')
-                  : null,
             ),
           ),
         );

@@ -52,12 +52,6 @@ class DataController extends GetxController {
   final Rxn<String> currentlyPlayingMediaType = Rxn<String>(); // 'video' or 'audio'
   final Rxn<Object> activeMediaController = Rxn<Object>(); // Can be VideoPlayerController, BetterPlayerController, or AudioPlayer
 
-  // For seamless video transition (specific to video)
-  final Rxn<Object> activeFeedPlayerController = Rxn<Object>(); // Can be VideoPlayerController or BetterPlayerController
-  final Rxn<String> activeFeedPlayerVideoId = Rxn<String>();
-  final Rxn<Duration> activeFeedPlayerPosition = Rxn<Duration>();
-  final RxBool isTransitioningVideo = false.obs; // True if a video is being transitioned to MediaViewPage
-
   @override
   void onInit() {
     super.onInit();
@@ -702,15 +696,6 @@ class DataController extends GetxController {
       currentlyPlayingMediaType.value = mediaType;
       activeMediaController.value = controller;
       print("[DataController] Media $mediaId (type: $mediaType) started playing. Setting global lock.");
-
-      // If the new media is a video and it's in the feed, update video-specific transition logic
-      if (mediaType == 'video') {
-        // This assumes that 'controller' for video is the actual player controller (VideoPlayerController/BetterPlayerController)
-        // And that videoId for video transition purposes is the same as mediaId.
-        activeFeedPlayerController.value = controller;
-        activeFeedPlayerVideoId.value = mediaId;
-        // activeFeedPlayerPosition will be updated by the video player widget itself.
-      }
     }
   }
 
@@ -720,16 +705,6 @@ class DataController extends GetxController {
       currentlyPlayingMediaType.value = null;
       activeMediaController.value = null;
       print("[DataController] Media $mediaId (type: $mediaType) stopped playing. Releasing global lock.");
-
-      // If the stopped media was a video relevant to transition logic, clear those fields too
-      if (mediaType == 'video' && activeFeedPlayerVideoId.value == mediaId) {
-          // Only clear if not currently in a transition state to MediaViewPage for this specific video
-          if (!isTransitioningVideo.value || activeFeedPlayerVideoId.value != mediaId) {
-            activeFeedPlayerController.value = null;
-            activeFeedPlayerVideoId.value = null;
-            activeFeedPlayerPosition.value = null;
-          }
-      }
     }
   }
 
