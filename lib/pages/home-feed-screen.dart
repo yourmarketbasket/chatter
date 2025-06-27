@@ -287,61 +287,75 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            CircleAvatar(
-              radius: isReply ? 16 : 20,
-              backgroundColor: Colors.tealAccent.withOpacity(0.2),
-              backgroundImage: userAvatar != null && userAvatar.isNotEmpty ? NetworkImage(userAvatar) : null,
-              child: userAvatar == null || userAvatar.isEmpty
-                  ? Text(avatarInitial, style: GoogleFonts.poppins(color: Colors.tealAccent, fontWeight: FontWeight.w600, fontSize: isReply ? 14 : 16))
-                  : null,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Flexible(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Text(username, style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: isReply ? 14 : 16, color: Colors.white), overflow: TextOverflow.ellipsis),
-                            const SizedBox(width: 4.0),
-                            Icon(Icons.verified, color: Colors.amber, size: isReply ? 13 : 15),
-                            const SizedBox(width: 4.0),
-                            Text(' · @$username', style: GoogleFonts.poppins(fontSize: isReply ? 10 : 12, color: Colors.white70), overflow: TextOverflow.ellipsis),
-                          ],
-                        ),
-                      ),
-                      Text(DateFormat('h:mm a · MMM d').format(timestamp), style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 12)),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(content, style: GoogleFonts.roboto(fontSize: isReply ? 13 : 14, color: const Color.fromARGB(255, 255, 255, 255), height: 1.5)),
-                  if (attachments.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    _buildAttachmentGrid(attachments, post, postId), // Pass postId
-                  ],
-                  const SizedBox(height: 12),
-                  // Action buttons (Likes, Replies, Reposts, Views)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildActionButton(FeatherIcons.heart, '$likes', () => setState(() => post['likes'] = (post['likes'] as int? ?? 0) + 1)),
-                      _buildActionButton(FeatherIcons.messageCircle, '$replyCount', () => _navigateToReplyPage(post)),
-                      _buildActionButton(FeatherIcons.repeat, '$reposts', () => _navigateToRepostPage(post)),
-                      _buildActionButton(FeatherIcons.eye, '$views', () {}),
-                    ],
-                  ),
-                ],
+        GestureDetector(
+          onTap: () => _navigateToReplyPage(post),
+          behavior: HitTestBehavior.opaque,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: isReply ? 16 : 20,
+                backgroundColor: Colors.tealAccent.withOpacity(0.2),
+                backgroundImage: userAvatar != null && userAvatar.isNotEmpty ? NetworkImage(userAvatar) : null,
+                child: userAvatar == null || userAvatar.isEmpty
+                    ? Text(avatarInitial, style: GoogleFonts.poppins(color: Colors.tealAccent, fontWeight: FontWeight.w600, fontSize: isReply ? 14 : 16))
+                    : null,
               ),
-            ),
-          ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // User info Row (username, timestamp)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Flexible(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Text(username, style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: isReply ? 14 : 16, color: Colors.white), overflow: TextOverflow.ellipsis),
+                              const SizedBox(width: 4.0),
+                              Icon(Icons.verified, color: Colors.amber, size: isReply ? 13 : 15),
+                              const SizedBox(width: 4.0),
+                              Text(' · @$username', style: GoogleFonts.poppins(fontSize: isReply ? 10 : 12, color: Colors.white70), overflow: TextOverflow.ellipsis),
+                            ],
+                          ),
+                        ),
+                        Text(DateFormat('h:mm a · MMM d').format(timestamp), style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 12)),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    // Text for post content
+                    if (content.isNotEmpty)
+                      Text(content, style: GoogleFonts.roboto(fontSize: isReply ? 13 : 14, color: const Color.fromARGB(255, 255, 255, 255), height: 1.5)),
+                    // Spacer if content is empty but attachments exist, to maintain some tappable area
+                    if (content.isEmpty && attachments.isNotEmpty)
+                       const SizedBox(height: 6),
+
+                    // Attachment Grid - Taps on individual attachments are handled by _buildAttachmentWidget
+                    if (attachments.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      // Need to ensure _buildAttachmentGrid does not absorb taps meant for the parent ReplyPage navigation
+                      // if the tap is on grid padding. Individual items *should* capture their own taps.
+                      _buildAttachmentGrid(attachments, post, postId),
+                    ],
+                    const SizedBox(height: 12),
+                    // Action buttons - These have their own tap handlers and should take precedence.
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildActionButton(FeatherIcons.heart, '$likes', () => setState(() => post['likes'] = (post['likes'] as int? ?? 0) + 1)),
+                        _buildActionButton(FeatherIcons.messageCircle, '$replyCount', () => _navigateToReplyPage(post)), // This is fine, specific button
+                        _buildActionButton(FeatherIcons.repeat, '$reposts', () => _navigateToRepostPage(post)),
+                        _buildActionButton(FeatherIcons.eye, '$views', () {}),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
