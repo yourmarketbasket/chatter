@@ -203,60 +203,40 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       ),
     );
 
-    if (newReply != null && newReply is Map<String, dynamic>) {
-      Map<String, dynamic> replyData = {
-        'username': newReply['username'] ?? 'YourName',
-        'content': newReply['content']?.trim() ?? '',
-        'useravatar': newReply['useravatar'] ?? '',
-        'attachments': (newReply['attachments'] as List<Map<String, dynamic>>?)?.map((att) {
-              return {
-                'filename': att['filename'] ?? (att['file'] as File?)?.path.split('/').last ?? 'unknown',
-                'url': att['url'],
-                'size': att['size'] ?? ((att['file'] as File?)?.lengthSync() ?? 0),
-                'type': att['type'],
-                'thumbnailUrl': att['thumbnailUrl'],
-                'aspectRatio': att['aspectRatio'],
-                'width': att['width'],
-                'height': att['height'],
-                'orientation': att['orientation'],
-                'duration': att['duration'],
-              };
-            }).toList() ?? [],
-      };
-
+    // ReplyPage now returns `true` if a reply was successfully posted.
+    if (newReply == true) {
       final postId = post['_id'] as String?;
-      if (postId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: Original post ID is missing.', style: GoogleFonts.roboto(color: Colors.white)), backgroundColor: Colors.red[700]),
-        );
-        return;
-      }
-
-      final result = await dataController.replyToPost(
-        postId: postId,
-        content: replyData['content'] as String,
-        attachments: replyData['attachments'] as List<Map<String, dynamic>>,
-      );
-
-      if (result['success'] == true) {
+      if (postId != null) {
         final postIndex = dataController.posts.indexWhere((p) => p['_id'] == postId);
         if (postIndex != -1) {
-          final postMap = dataController.posts[postIndex];
-          postMap['replyCount'] = (postMap['replyCount'] ?? 0) + 1;
-          dataController.posts[postIndex] = postMap; // This might not trigger Obx update if not careful
+          // Create a new map to ensure reactivity if postMap is not directly modifiable
+          // or if modification doesn't trigger Obx update.
+          Map<String, dynamic> updatedPost = Map<String, dynamic>.from(dataController.posts[postIndex]);
+
+          // Increment reply count. Ensure 'replyCount' exists or initialize.
+          // The field name in the post object from the backend might be 'replies' (a list) or 'replyCount'.
+          // _buildPostContent uses `(post['replies'] as List<dynamic>?)?.length ?? post['replyCount'] as int? ?? 0;`
+          // So, we should ideally update whatever field is authoritative or both if necessary.
+          // For simplicity, let's assume 'replyCount' is a field we can directly increment.
+          // If not, this logic might need to be more robust based on actual post object structure.
+          int currentReplyCount = updatedPost['replyCount'] as int? ??
+                                  (updatedPost['replies'] as List<dynamic>?)?.length ??
+                                  0;
+          updatedPost['replyCount'] = currentReplyCount + 1;
+
+          dataController.posts[postIndex] = updatedPost;
           dataController.posts.refresh(); // Force refresh Obx
+
+          // Optional: Show a generic success message or rely on ReplyPage's snackbar
+          // ScaffoldMessenger.of(context).showSnackBar(
+          //   SnackBar(content: Text('Reply count updated.', style: GoogleFonts.roboto(color: Colors.white)), backgroundColor: Colors.blue[700]),
+          // );
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Reply added!', style: GoogleFonts.roboto(color: Colors.white)), backgroundColor: Colors.teal[700]),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to add reply: ${result['message'] ?? 'Unknown error'}', style: GoogleFonts.roboto(color: Colors.white)), backgroundColor: Colors.red[700]),
-        );
       }
     }
+    // No need to call dataController.replyToPost() here anymore,
+    // as ReplyPage is responsible for its own submission.
   }
-
 
   void _handleVideoCompletionInGrid(String completedVideoId, String postId, List<Map<String, dynamic>> gridVideos) {
     if (!_postVideoIds.containsKey(postId) || !_postVideoQueueIndex.containsKey(postId)) {
