@@ -214,7 +214,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
         print('[NewPostScreen] Audio Recorded: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
         final int fileSize = await file.length();
         final sizeInMB = fileSize / (1024 * 1024);
-        if (sizeInMB <= 10) {
+        if (sizeInMB <= 20) {
           // Attempt to get duration
           int? durationMs;
           final tempAudioPlayer = AudioPlayer();
@@ -245,7 +245,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
         } else {
           _showPermissionDialog(
             'File Size Error',
-            'Audio file exceeds 10MB limit.',
+            'Audio file exceeds 20MB limit.',
           );
         }
       }
@@ -361,7 +361,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
           print('[NewPostScreen] Image Picked: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
           final int fileSize = await file.length();
           final sizeInMB = fileSize / (1024 * 1024);
-          if (sizeInMB <= 10) {
+          if (sizeInMB <= 20) {
             // Prepare attachment map
             final attachment = {
               'file': file,
@@ -383,7 +383,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
           } else {
             _showPermissionDialog(
               'File Size Error',
-              'Image file exceeds 10MB limit.',
+              'Image file exceeds 20MB limit.',
             );
           }
         }
@@ -434,7 +434,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
           print('[NewPostScreen] Video Picked: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
           final int fileSize = await file.length();
           final sizeInMB = fileSize / (1024 * 1024);
-          if (sizeInMB <= 10) {
+          if (sizeInMB <= 20) {
             // Prepare attachment map
             final attachment = {
               'file': file,
@@ -456,7 +456,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
           } else {
             _showPermissionDialog(
               'File Size Error',
-              'Video file exceeds 10MB limit.',
+              'Video file exceeds 20MB limit.',
             );
           }
         }
@@ -483,7 +483,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
           print('[NewPostScreen] PDF Picked: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
           final int fileSize = await file.length();
           final sizeInMB = fileSize / (1024 * 1024);
-          if (sizeInMB <= 10) {
+          if (sizeInMB <= 20) {
             print('[NewPostScreen] Adding to _selectedAttachments: type=pdf, path=${file.path}');
             setState(() {
               _selectedAttachments.add({
@@ -496,7 +496,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
           } else {
             _showPermissionDialog(
               'File Size Error',
-              'PDF file exceeds 10MB limit.',
+              'PDF file exceeds 20MB limit.',
             );
           }
         }
@@ -521,7 +521,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
           print('[NewPostScreen] Audio Picked: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
           final int fileSize = await file.length();
           final sizeInMB = fileSize / (1024 * 1024);
-          if (sizeInMB <= 10) {
+          if (sizeInMB <= 20) {
             print('[NewPostScreen] Adding to _selectedAttachments: type=audio, path=${file.path}');
             setState(() {
               _selectedAttachments.add({
@@ -534,7 +534,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
           } else {
             _showPermissionDialog(
               'File Size Error',
-              'Audio file exceeds 10MB limit.',
+              'Audio file exceeds 20MB limit.',
             );
           }
         }
