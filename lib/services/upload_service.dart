@@ -155,11 +155,11 @@ class UploadService {
                   tempThumbnailFile.path,
                   filename: path.basename(tempThumbnailFile.path),
                 ),
-                'upload_preset': 'chatterpiks', // Your Cloudinary upload preset
+                'upload_preset': 'testpreset1', // Your Cloudinary upload preset
                 'resource_type': 'image', // Thumbnails are images
               });
               final thumbResponse = await _dio.post(
-                'https://api.cloudinary.com/v1_1/djg6xjdrq/image/upload', // Replace YOUR_CLOUD_NAME
+                'https://api.cloudinary.com/v1_1/dxhz5k4zz/image/upload', // Replace YOUR_CLOUD_NAME
                 data: thumbnailFormData,
                  options: dio.Options(
                     validateStatus: (status) => status != null && status >= 200 && status < 500,
@@ -183,13 +183,13 @@ class UploadService {
             fileToUpload.path,
             filename: path.basename(originalFilePath), // Use original filename
           ),
-          'upload_preset': 'chatterpiks',
+          'upload_preset': 'testpreset1',
           'resource_type': resourceType,
         });
 
         double uploadProgress = 0.0;
         final response = await _dio.post(
-          'https://api.cloudinary.com/v1_1/djg6xjdrq/$resourceType/upload', // Replace YOUR_CLOUD_NAME
+          'https://api.cloudinary.com/v1_1/dxhz5k4zz/$resourceType/upload', // Replace YOUR_CLOUD_NAME
           data: formData,
           options: dio.Options(
             validateStatus: (status) => status != null && status >= 200 && status < 500,
