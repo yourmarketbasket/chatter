@@ -196,6 +196,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   }
 
   Future<void> _navigateToReplyPage(Map<String, dynamic> post) async {
+    // print(post);
     final newReply = await Navigator.push(
       context,
       MaterialPageRoute(
