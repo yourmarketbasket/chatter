@@ -5,6 +5,7 @@ import 'package:video_compress/video_compress.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
+import 'compression_service.dart'; // Import the new compression service
 
 class UploadService {
   final dio.Dio _dio = dio.Dio(dio.BaseOptions(
@@ -14,6 +15,7 @@ class UploadService {
     receiveTimeout: const Duration(seconds: 60),
     sendTimeout: const Duration(seconds: 60),
   ));
+  final CompressionService _compressionService = CompressionService(); // Instantiate CompressionService
 
   // Method signature changed to accept List<Map<String, dynamic>>
   Future<List<Map<String, dynamic>>> uploadFilesToCloudinary(List<Map<String, dynamic>> attachmentsData) async {
@@ -60,16 +62,35 @@ class UploadService {
       final String? orientation = attachmentMap['orientation'] as String?;
       final int? duration = attachmentMap['duration'] as int?; // For videos
       final String? aspectRatio = attachmentMap['aspectRatio'] as String?; // Extract aspectRatio
-      final String attachmentType = attachmentMap['type'] as String? ?? 'unknown';
+      final String attachmentType = attachmentMap['type'] as String? ?? 'unknown'; // e.g., 'image', 'video', 'audio', 'document'
 
 
-      File fileToUpload = originalFile; // By default, upload the original file
+      File fileToUpload = originalFile; // Initialize with original file
       int originalFileSize = await originalFile.length();
       String? uploadedThumbnailUrl;
       File? tempThumbnailFile; // To keep track of thumbnail file for deletion
 
       try {
-        if (!await originalFile.exists()) {
+        // --- Call CompressionService ---
+        if (kDebugMode) {
+          print('[UploadService] Attempting compression for ${originalFile.path} of type $attachmentType');
+        }
+        File compressedFile = await _compressionService.compressFile(originalFile, attachmentType);
+        if (compressedFile.path != originalFile.path) {
+          if (kDebugMode) {
+            print('[UploadService] Compression successful. Original size: $originalFileSize, Compressed size: ${await compressedFile.length()}');
+          }
+          fileToUpload = compressedFile;
+        } else {
+          if (kDebugMode) {
+            print('[UploadService] Compression did not reduce size or was not applied. Using original file.');
+          }
+          fileToUpload = originalFile; // Ensure it's set back if no compression occurred or was worse
+        }
+        // --- End CompressionService call ---
+
+
+        if (!await fileToUpload.exists()) { // Check existence of the file we intend to upload
           print('[UploadService uploadFilesToCloudinary] File does not exist: $originalFilePath');
           results.add({
             'success': false,
@@ -108,33 +129,15 @@ class UploadService {
         print('[UploadService uploadFilesToCloudinary] Processing file: path=$originalFilePath, size=$originalFileSize bytes, type: $attachmentType, width: $width, height: $height, orientation: $orientation, duration: $duration, aspectRatio: $aspectRatio');
 
         final fileExtension = path.extension(originalFilePath).toLowerCase().replaceFirst('.', '');
-        final resourceType = extensionToResourceType[fileExtension] ?? 'auto';
-        print('[UploadService uploadFilesToCloudinary] File: $originalFilePath, extension: $fileExtension, resource_type: $resourceType');
+        final resourceType = extensionToResourceType[fileExtension] ?? 'auto'; // Cloudinary resource type
+        print('[UploadService uploadFilesToCloudinary] File: $originalFilePath, extension: $fileExtension, attachmentType: $attachmentType, cloudinary_resource_type: $resourceType');
 
-        if (videoExtensionsForCompression.contains(fileExtension)) {
-          // Compress Video
-          MediaInfo? mediaInfo;
-          try {
-            mediaInfo = await VideoCompress.compressVideo(
-              originalFilePath,
-              quality: VideoQuality.MediumQuality,
-              deleteOrigin: false, // Keep original for fallback and thumbnail generation
-              includeAudio: true,
-            );
-            if (mediaInfo?.file != null) {
-              fileToUpload = mediaInfo!.file!;
-              print('Video compressed: original_size=${originalFileSize}B, new_size=${fileToUpload.lengthSync()}B');
-            } else {
-              print('[UploadService uploadFilesToCloudinary] Video compression failed, using original: $originalFilePath');
-            }
-          } catch (e) {
-            print('[UploadService uploadFilesToCloudinary] Error compressing video $originalFilePath: $e. Using original.');
-          }
-
-          // Generate Thumbnail
+        // Thumbnail generation for videos. This should happen AFTER our CompressionService has run.
+        // The fileToUpload variable now holds the (potentially) compressed file.
+        if (attachmentType == 'video') { // Check against the type determined by app logic
           try {
             final String? thumbnailPath = await VideoThumbnail.thumbnailFile(
-              video: fileToUpload.path, // Use compressed video path if available, else original
+              video: fileToUpload.path, // Use the file determined by CompressionService
               thumbnailPath: (await getTemporaryDirectory()).path,
               imageFormat: ImageFormat.PNG,
               maxHeight: 300,
@@ -241,7 +244,9 @@ class UploadService {
           });
         }
       } catch (e, stackTrace) {
-        print('[UploadService uploadFilesToCloudinary] Exception for $originalFilePath: $e\n$stackTrace');
+        if (kDebugMode) {
+          print('[UploadService uploadFilesToCloudinary] Exception for $originalFilePath: $e\n$stackTrace');
+        }
         results.add({
           'success': false,
           'message': 'Upload failed for $originalFilePath: ${e.toString()}',
@@ -258,18 +263,23 @@ class UploadService {
           'aspectRatio': aspectRatio, // Include aspectRatio in exception result
         });
       } finally {
-        // Cleanup: Delete compressed file if it's different from original and not null
-        if (fileToUpload.path != originalFilePath && await fileToUpload.exists()) {
-            // This check is a bit problematic because VideoCompress library might manage its own cache.
-            // If mediaInfo.deleteOrigin = true was used, this wouldn't be needed.
-            // For now, let's assume VideoCompress cleans its own temp files or stores them in a cache.
-            // If we created fileToUpload from mediaInfo.file, and deleteOrigin was false,
-            // then mediaInfo.file points to a temporary location.
-            // The VideoCompress documentation should be consulted for its temporary file management.
-            // For safety, if we are sure `fileToUpload` is a temporary compressed file we created, we'd delete it.
-            // await fileToUpload.delete();
-            // print('[UploadService uploadFilesToCloudinary] Deleted temporary compressed file: ${fileToUpload.path}');
+        // Cleanup: Delete the file that was uploaded if it's a temporary compressed file.
+        // The CompressionService creates files in a temporary directory.
+        bool isTempCompressedFile = fileToUpload.path != originalFile.path && fileToUpload.path.contains((await getTemporaryDirectory()).path);
+
+        if (isTempCompressedFile && await fileToUpload.exists()) {
+          try {
+            await fileToUpload.delete();
+            if (kDebugMode) {
+              print('[UploadService] Deleted temporary compressed file from CompressionService: ${fileToUpload.path}');
+            }
+          } catch (e) {
+            if (kDebugMode) {
+              print('[UploadService] Error deleting temporary compressed file ${fileToUpload.path}: $e');
+            }
+          }
         }
+
         // Cleanup: Delete temporary thumbnail file
         if (tempThumbnailFile != null && await tempThumbnailFile.exists()) {
           try {
@@ -278,13 +288,16 @@ class UploadService {
               print('[UploadService uploadFilesToCloudinary] Deleted temporary thumbnail file: ${tempThumbnailFile.path}');
             }
           } catch (e) {
-            print('[UploadService uploadFilesToCloudinary] Error deleting temporary thumbnail file ${tempThumbnailFile.path}: $e');
+            if (kDebugMode) {
+              print('[UploadService uploadFilesToCloudinary] Error deleting temporary thumbnail file ${tempThumbnailFile.path}: $e');
+            }
           }
         }
       }
     }
-
-    print('[UploadService uploadFilesToCloudinary] Upload completed. Results: ${results.length} files processed.');
+    if (kDebugMode) {
+      print('[UploadService uploadFilesToCloudinary] Upload completed. Results: ${results.length} files processed.');
+    }
     return results;
   }
 
