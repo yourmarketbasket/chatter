@@ -4,8 +4,7 @@ import 'package:video_compress/video_compress.dart';
 import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart'; // For kDebugMode
-import 'package:flutter_sound_lite/flutter_sound.dart';
-import 'package:flutter_sound_lite/public/flutter_sound_recorder.dart';
+// Removed flutter_sound_lite imports as it was redundant with the existing 'record' package
 
 
 class CompressionService {
@@ -220,88 +219,50 @@ class CompressionService {
   }
 
   Future<File> compressAudio(File audioFile) async {
-    // flutter_sound is more of a recorder/player, direct compression of an existing file to AAC
-    // might require using its underlying capabilities or an external ffmpeg plugin if available.
-    // This example assumes a hypothetical scenario where it can transcode.
-    // A more realistic approach might involve a package specifically for audio conversion/compression
-    // or using platform channels if no direct Dart package exists.
+    // Placeholder for audio compression.
+    // The 'record' package is available for capturing audio.
+    // It might save to a compressed format directly (e.g., AAC, check its capabilities).
+    // If 'record' outputs a raw format (like PCM/WAV), that raw file would then
+    // need to be passed to another utility/package for compression to a format like M4A/AAC/Opus.
+    // For example, a package like `flutter_ffmpeg` could be used here if WAV files are produced.
 
     if (kDebugMode) {
       print('Attempting audio compression for: ${audioFile.path}');
+      print("Audio compression placeholder: Actual implementation depends on chosen recording format and/or compression library (e.g., using output from 'record' package).");
     }
 
+    // This is a highly simplified placeholder.
+    // Actual implementation would involve a real audio processing library.
     return _handleCompressionLogic(audioFile, () async {
-      // Attempt 1: Compress to AAC with a decent bitrate (e.g., 96k)
+      // Attempt 1: Simulate an attempt (e.g. target medium quality AAC)
       final tempDir = await getTemporaryDirectory();
+      // Assuming output is m4a for AAC
       final targetPath = '${tempDir.path}/${DateTime.now().millisecondsSinceEpoch}_compressed.m4a';
 
-      FlutterSoundRecorder recorder = FlutterSoundRecorder();
-      // NOTE: flutter_sound_lite typically records, not transcodes existing files directly in a simple API.
-      // The `startRecorder` method is for recording. To transcode an existing file,
-      // one would usually need to use FFmpeg or a similar native library, potentially via
-      // a plugin like `flutter_ffmpeg`.
-      // This is a simplified/hypothetical usage for demonstration.
-      // In a real scenario, if flutter_sound_lite cannot do this, another package or native code is needed.
-      try {
-        // This is not how flutter_sound typically works for transcoding.
-        // This is a placeholder for what a compression call might look like.
-        // await recorder.startRecorder(
-        //   toFile: targetPath,
-        //   codec: Codec.aacADTS, // Or Codec.aacMP4
-        //   // How to specify input file? This is the tricky part with flutter_sound for this use case.
-        //   // It might involve reading the file and feeding samples, or using a specific transcode function if it exists.
-        // );
-        // Simulating a successful compression call that produces a file.
-        // In reality, this would be an actual transcoding process.
-        // For now, we'll just copy the file to simulate a "compressed" output for testing the flow.
-        // THIS IS A PLACEHOLDER - ACTUAL COMPRESSION LOGIC REQUIRED
-        if (kDebugMode) {
-          print("flutter_sound_lite does not directly support transcoding existing files in this manner. This is a placeholder.");
-          print("To implement actual audio compression, a package like flutter_ffmpeg or a custom native solution would be needed.");
-        }
-        // To make the _handleCompressionLogic testable, let's copy the file for now if it's small,
-        // or return null to simulate failure for larger files to test the fallback.
-        final length = await audioFile.length();
-        if (length < 100000) { // Simulate successful compression for small files
-            File(targetPath).writeAsBytesSync(await audioFile.readAsBytes());
-            return File(targetPath);
-        } else {
-            return null; // Simulate failure for larger files or if no actual compression happened
-        }
-      } catch (e) {
-        if (kDebugMode) {
-          print('Error during audio compression attempt: $e');
-        }
-        return null;
-      } finally {
-        if (recorder.isRecording) {
-          await recorder.stopRecorder();
-        }
+      // Simulate compression: for testing, copy if small, else fail
+      // Replace this with actual call to an audio compression function
+      final length = await audioFile.length();
+      if (length < 100000 && length > 0) { // Avoid empty file issues
+        File(targetPath).writeAsBytesSync(await audioFile.readAsBytes());
+        if (kDebugMode) print('Audio placeholder: Simulated compression attempt 1 for ${audioFile.path}');
+        return File(targetPath);
       }
+      if (kDebugMode) print('Audio placeholder: Simulated compression attempt 1 FAILED for ${audioFile.path}');
+      return null;
     }, () async {
-      // Attempt 2: Compress to AAC with a lower bitrate (e.g., 64k) - if first attempt was too large
+      // Attempt 2: Simulate another attempt (e.g. target lower quality AAC)
       final tempDir = await getTemporaryDirectory();
       final targetPath = '${tempDir.path}/${DateTime.now().millisecondsSinceEpoch}_compressed_low.m4a';
-      FlutterSoundRecorder recorder = FlutterSoundRecorder();
-      try {
-        // Placeholder for second attempt - similar to above
-        if (kDebugMode) {
-          print("flutter_sound_lite placeholder for second audio compression attempt.");
-        }
-        // Simulate a successful compression for testing flow
+
+      // Simulate compression: for testing, copy if small, else fail
+      final length = await audioFile.length();
+      if (length < 150000 && length > 0) { // Different threshold for "success"
          File(targetPath).writeAsBytesSync(await audioFile.readAsBytes());
+        if (kDebugMode) print('Audio placeholder: Simulated compression attempt 2 for ${audioFile.path}');
         return File(targetPath);
-        // return null; // Or simulate failure/no better compression
-      } catch (e) {
-        if (kDebugMode) {
-          print('Error during second audio compression attempt: $e');
-        }
-        return null;
-      } finally {
-        if (recorder.isRecording) {
-          await recorder.stopRecorder();
-        }
       }
+      if (kDebugMode) print('Audio placeholder: Simulated compression attempt 2 FAILED for ${audioFile.path}');
+      return null;
     });
   }
 
