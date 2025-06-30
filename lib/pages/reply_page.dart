@@ -487,21 +487,40 @@ class _ReplyPageState extends State<ReplyPage> {
         attachments: uploadedReplyAttachments, // Pass as List<Map<String, dynamic>>
       );
 
-      if (result['success'] == true) {
-        await _fetchPostReplies();
-        _replyController.clear();
+      if (result['success'] == true && result['reply'] != null) {
+        final newReply = result['reply'] as Map<String, dynamic>;
         if (mounted) {
           setState(() {
+            // Add the new reply to the top of the list
+            _replies.insert(0, newReply);
+            _replyController.clear();
             _replyAttachments.clear();
           });
         }
         _showSnackBar('Success', result['message'] ?? 'Reply posted!', Colors.teal[700]!);
 
+        // Give a slight delay for the user to see the snackbar/UI update
+        await Future.delayed(const Duration(milliseconds: 700));
+        if (mounted) {
+          // Return true to indicate success to the previous screen
+          Navigator.pop(context, true);
+        }
+      } else if (result['success'] == true && result['reply'] == null) {
+        // Fallback: Success but no reply object returned, fetch all replies
+        _showSnackBar('Success', result['message'] ?? 'Reply posted! Refreshing...', Colors.teal[700]!);
+        await _fetchPostReplies(); // Refresh replies
+         _replyController.clear();
+        if (mounted) {
+          setState(() {
+            _replyAttachments.clear();
+          });
+        }
         await Future.delayed(const Duration(milliseconds: 500));
         if (mounted) {
-          Navigator.pop(context);
+          Navigator.pop(context, true); // Still indicate success
         }
-      } else {
+      }
+      else {
         _showSnackBar('Error', result['message'] ?? 'Failed to post reply.', Colors.red[700]!);
       }
     } catch (e) {

@@ -196,6 +196,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   }
 
   Future<void> _navigateToReplyPage(Map<String, dynamic> post) async {
+    // print(post);
     final newReply = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -203,60 +204,40 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       ),
     );
 
-    if (newReply != null && newReply is Map<String, dynamic>) {
-      Map<String, dynamic> replyData = {
-        'username': newReply['username'] ?? 'YourName',
-        'content': newReply['content']?.trim() ?? '',
-        'useravatar': newReply['useravatar'] ?? '',
-        'attachments': (newReply['attachments'] as List<Map<String, dynamic>>?)?.map((att) {
-              return {
-                'filename': att['filename'] ?? (att['file'] as File?)?.path.split('/').last ?? 'unknown',
-                'url': att['url'],
-                'size': att['size'] ?? ((att['file'] as File?)?.lengthSync() ?? 0),
-                'type': att['type'],
-                'thumbnailUrl': att['thumbnailUrl'],
-                'aspectRatio': att['aspectRatio'],
-                'width': att['width'],
-                'height': att['height'],
-                'orientation': att['orientation'],
-                'duration': att['duration'],
-              };
-            }).toList() ?? [],
-      };
-
+    // ReplyPage now returns `true` if a reply was successfully posted.
+    if (newReply == true) {
       final postId = post['_id'] as String?;
-      if (postId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: Original post ID is missing.', style: GoogleFonts.roboto(color: Colors.white)), backgroundColor: Colors.red[700]),
-        );
-        return;
-      }
-
-      final result = await dataController.replyToPost(
-        postId: postId,
-        content: replyData['content'] as String,
-        attachments: replyData['attachments'] as List<Map<String, dynamic>>,
-      );
-
-      if (result['success'] == true) {
+      if (postId != null) {
         final postIndex = dataController.posts.indexWhere((p) => p['_id'] == postId);
         if (postIndex != -1) {
-          final postMap = dataController.posts[postIndex];
-          postMap['replyCount'] = (postMap['replyCount'] ?? 0) + 1;
-          dataController.posts[postIndex] = postMap; // This might not trigger Obx update if not careful
+          // Create a new map to ensure reactivity if postMap is not directly modifiable
+          // or if modification doesn't trigger Obx update.
+          Map<String, dynamic> updatedPost = Map<String, dynamic>.from(dataController.posts[postIndex]);
+
+          // Increment reply count. Ensure 'replyCount' exists or initialize.
+          // The field name in the post object from the backend might be 'replies' (a list) or 'replyCount'.
+          // _buildPostContent uses `(post['replies'] as List<dynamic>?)?.length ?? post['replyCount'] as int? ?? 0;`
+          // So, we should ideally update whatever field is authoritative or both if necessary.
+          // For simplicity, let's assume 'replyCount' is a field we can directly increment.
+          // If not, this logic might need to be more robust based on actual post object structure.
+          int currentReplyCount = updatedPost['replyCount'] as int? ??
+                                  (updatedPost['replies'] as List<dynamic>?)?.length ??
+                                  0;
+          updatedPost['replyCount'] = currentReplyCount + 1;
+
+          dataController.posts[postIndex] = updatedPost;
           dataController.posts.refresh(); // Force refresh Obx
+
+          // Optional: Show a generic success message or rely on ReplyPage's snackbar
+          // ScaffoldMessenger.of(context).showSnackBar(
+          //   SnackBar(content: Text('Reply count updated.', style: GoogleFonts.roboto(color: Colors.white)), backgroundColor: Colors.blue[700]),
+          // );
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Reply added!', style: GoogleFonts.roboto(color: Colors.white)), backgroundColor: Colors.teal[700]),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to add reply: ${result['message'] ?? 'Unknown error'}', style: GoogleFonts.roboto(color: Colors.white)), backgroundColor: Colors.red[700]),
-        );
       }
     }
+    // No need to call dataController.replyToPost() here anymore,
+    // as ReplyPage is responsible for its own submission.
   }
-
 
   void _handleVideoCompletionInGrid(String completedVideoId, String postId, List<Map<String, dynamic>> gridVideos) {
     if (!_postVideoIds.containsKey(postId) || !_postVideoQueueIndex.containsKey(postId)) {
@@ -307,67 +288,75 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            CircleAvatar(
-              radius: isReply ? 16 : 20,
-              backgroundColor: Colors.tealAccent.withOpacity(0.2),
-              backgroundImage: userAvatar != null && userAvatar.isNotEmpty
-                  ? CachedNetworkImageProvider(
-                      userAvatar,
-                      maxWidth: 120, // Approx 2x of 20 radius * 2 for diameter, plus some buffer
-                      maxHeight: 120,
-                    )
-                  : null,
-              child: userAvatar == null || userAvatar.isEmpty
-                  ? Text(avatarInitial, style: GoogleFonts.poppins(color: Colors.tealAccent, fontWeight: FontWeight.w600, fontSize: isReply ? 14 : 16))
-                  : null,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Flexible(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Text(username, style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: isReply ? 14 : 16, color: Colors.white), overflow: TextOverflow.ellipsis),
-                            const SizedBox(width: 4.0),
-                            Icon(Icons.verified, color: Colors.amber, size: isReply ? 13 : 15),
-                            const SizedBox(width: 4.0),
-                            Text(' · @$username', style: GoogleFonts.poppins(fontSize: isReply ? 10 : 12, color: Colors.white70), overflow: TextOverflow.ellipsis),
-                          ],
-                        ),
-                      ),
-                      Text(DateFormat('h:mm a · MMM d').format(timestamp), style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 12)),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(content, style: GoogleFonts.roboto(fontSize: isReply ? 13 : 14, color: const Color.fromARGB(255, 255, 255, 255), height: 1.5)),
-                  if (attachments.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    _buildAttachmentGrid(attachments, post, postId), // Pass postId
-                  ],
-                  const SizedBox(height: 12),
-                  // Action buttons (Likes, Replies, Reposts, Views)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildActionButton(FeatherIcons.heart, '$likes', () => setState(() => post['likes'] = (post['likes'] as int? ?? 0) + 1)),
-                      _buildActionButton(FeatherIcons.messageCircle, '$replyCount', () => _navigateToReplyPage(post)),
-                      _buildActionButton(FeatherIcons.repeat, '$reposts', () => _navigateToRepostPage(post)),
-                      _buildActionButton(FeatherIcons.eye, '$views', () {}),
-                    ],
-                  ),
-                ],
+        GestureDetector(
+          onTap: () => _navigateToReplyPage(post),
+          behavior: HitTestBehavior.opaque,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: isReply ? 16 : 20,
+                backgroundColor: Colors.tealAccent.withOpacity(0.2),
+                backgroundImage: userAvatar != null && userAvatar.isNotEmpty ? NetworkImage(userAvatar) : null,
+                child: userAvatar == null || userAvatar.isEmpty
+                    ? Text(avatarInitial, style: GoogleFonts.poppins(color: Colors.tealAccent, fontWeight: FontWeight.w600, fontSize: isReply ? 14 : 16))
+                    : null,
               ),
-            ),
-          ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // User info Row (username, timestamp)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Flexible(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Text(username, style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: isReply ? 14 : 16, color: Colors.white), overflow: TextOverflow.ellipsis),
+                              const SizedBox(width: 4.0),
+                              Icon(Icons.verified, color: Colors.amber, size: isReply ? 13 : 15),
+                              const SizedBox(width: 4.0),
+                              Text(' · @$username', style: GoogleFonts.poppins(fontSize: isReply ? 10 : 12, color: Colors.white70), overflow: TextOverflow.ellipsis),
+                            ],
+                          ),
+                        ),
+                        Text(DateFormat('h:mm a · MMM d').format(timestamp), style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 12)),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    // Text for post content
+                    if (content.isNotEmpty)
+                      Text(content, style: GoogleFonts.roboto(fontSize: isReply ? 13 : 14, color: const Color.fromARGB(255, 255, 255, 255), height: 1.5)),
+                    // Spacer if content is empty but attachments exist, to maintain some tappable area
+                    if (content.isEmpty && attachments.isNotEmpty)
+                       const SizedBox(height: 6),
+
+                    // Attachment Grid - Taps on individual attachments are handled by _buildAttachmentWidget
+                    if (attachments.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      // Need to ensure _buildAttachmentGrid does not absorb taps meant for the parent ReplyPage navigation
+                      // if the tap is on grid padding. Individual items *should* capture their own taps.
+                      _buildAttachmentGrid(attachments, post, postId),
+                    ],
+                    const SizedBox(height: 12),
+                    // Action buttons - These have their own tap handlers and should take precedence.
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildActionButton(FeatherIcons.heart, '$likes', () => setState(() => post['likes'] = (post['likes'] as int? ?? 0) + 1)),
+                        _buildActionButton(FeatherIcons.messageCircle, '$replyCount', () => _navigateToReplyPage(post)), // This is fine, specific button
+                        _buildActionButton(FeatherIcons.repeat, '$reposts', () => _navigateToRepostPage(post)),
+                        _buildActionButton(FeatherIcons.eye, '$views', () {}),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );

@@ -190,12 +190,60 @@ class DataController extends GetxController {
       );
 
       if ((response.statusCode == 200 || response.statusCode == 201) && response.data['success'] == true) {
-        // Assuming the backend returns the created reply object under the key 'reply'
-        return {
-          'success': true,
-          'message': response.data['message'] ?? 'Reply posted successfully!',
-          'reply': response.data['reply'] // This could be the full reply object
-        };
+        final rawReplyData = response.data['reply'];
+        if (rawReplyData != null && rawReplyData is Map<String, dynamic>) {
+          // Perform mapping similar to fetchReplies to ensure consistent object structure
+          List<Map<String, dynamic>> mappedAttachments = [];
+          if (rawReplyData['mediaAttachments'] != null && rawReplyData['mediaAttachments'] is List) {
+            for (var attData in (rawReplyData['mediaAttachments'] as List<dynamic>)) {
+              if (attData is Map<String, dynamic>) {
+                mappedAttachments.add({
+                  'type': attData['type']?.toString() ?? 'unknown',
+                  'url': attData['url']?.toString() ?? '',
+                  'filename': attData['fileName']?.toString() ?? attData['filename']?.toString() ?? '', // Allow both fileName and filename
+                  'size': (attData['fileSize'] is num ? attData['fileSize'] : int.tryParse(attData['fileSize']?.toString() ?? '0'))?.toInt() ??
+                          (attData['size'] is num ? attData['size'] : int.tryParse(attData['size']?.toString() ?? '0'))?.toInt() ?? 0, // Allow both fileSize and size
+                });
+              }
+            }
+          }
+
+          String repUsername = rawReplyData['authorDetails']?['username']?.toString() ??
+                               rawReplyData['username']?.toString() ?? // Fallback to direct username
+                               'Unknown User';
+          String repAvatarInitial = repUsername.isNotEmpty ? repUsername[0].toUpperCase() : '?';
+          if (rawReplyData['authorDetails']?['avatarInitial'] != null) {
+            repAvatarInitial = rawReplyData['authorDetails']['avatarInitial'].toString();
+          } else if (rawReplyData['avatarInitial'] != null) {
+            repAvatarInitial = rawReplyData['avatarInitial'].toString();
+          }
+
+          final mappedReply = {
+            'id': rawReplyData['_id']?.toString() ?? rawReplyData['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+            'username': repUsername,
+            'content': rawReplyData['textContent']?.toString() ?? rawReplyData['content']?.toString() ?? '',
+            'timestamp': (DateTime.tryParse(rawReplyData['createdAt']?.toString() ?? rawReplyData['timestamp']?.toString() ?? '') ?? DateTime.now()).toIso8601String(),
+            'likes': (rawReplyData['likeCount'] is num ? rawReplyData['likeCount'] : int.tryParse(rawReplyData['likeCount']?.toString() ?? '0'))?.toInt() ?? 0,
+            'reposts': (rawReplyData['repostCount'] is num ? rawReplyData['repostCount'] : int.tryParse(rawReplyData['repostCount']?.toString() ?? '0'))?.toInt() ?? 0,
+            'views': (rawReplyData['viewCount'] is num ? rawReplyData['viewCount'] : int.tryParse(rawReplyData['viewCount']?.toString() ?? '0'))?.toInt() ?? 0,
+            'attachments': mappedAttachments,
+            'avatarInitial': repAvatarInitial,
+            'useravatar': rawReplyData['authorDetails']?['avatar']?.toString() ?? rawReplyData['useravatar']?.toString(),
+            'replies': const [], // Replies to a reply are not typically included here
+          };
+          return {
+            'success': true,
+            'message': response.data['message'] ?? 'Reply posted successfully!',
+            'reply': mappedReply // Return the mapped reply
+          };
+        } else {
+          // Success but no reply data, or reply data is not in expected format
+          return {
+            'success': true,
+            'message': response.data['message'] ?? 'Reply posted successfully (no detailed reply data returned)!',
+            'reply': null
+          };
+        }
       } else {
         return {
           'success': false,
