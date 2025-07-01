@@ -383,16 +383,20 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                               const SizedBox(width: 4.0),
                               Icon(Icons.verified, color: Colors.amber, size: isReply ? 13 : 15),
                               const SizedBox(width: 4.0),
-                              // Updated timestamp display
+                              // Display @username · relativeTime
                               Text(
-                                '· @$username · ${timeago.format(timestamp, locale: 'en_short')} · ${DateFormat('MMM d, yyyy').format(timestamp)}',
+                                '· @$username · ${timeago.format(timestamp, locale: 'en_short')}',
                                 style: GoogleFonts.poppins(fontSize: isReply ? 10 : 12, color: Colors.white70),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ],
                           ),
                         ),
-                        // The separate timestamp text is now removed as it's combined above
+                        // Display absoluteDate on the far right
+                        Text(
+                          DateFormat('MMM d, yyyy').format(timestamp),
+                          style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 12)
+                        ),
                       ],
                     ),
                     const SizedBox(height: 6),
