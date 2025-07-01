@@ -28,6 +28,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:chatter/widgets/video_attachment_widget.dart';
 import 'package:chatter/widgets/audio_attachment_widget.dart';
 import 'package:flutter_expandable_fab/flutter_expandable_fab.dart';
+import 'package:timeago/timeago.dart' as timeago;
 
 class HomeFeedScreen extends StatefulWidget {
   const HomeFeedScreen({Key? key}) : super(key: key);
@@ -386,7 +387,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                             ],
                           ),
                         ),
-                        Text(DateFormat('h:mm a · MMM d').format(timestamp), style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 12)),
+                        Text(timeago.format(timestamp, locale: 'en_short'), style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 12)),
                       ],
                     ),
                     const SizedBox(height: 6),
