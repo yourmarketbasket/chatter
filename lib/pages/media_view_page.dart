@@ -4,7 +4,7 @@ import 'package:chatter/pages/home-feed-screen.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:path_provider/path_provider.dart' as pp;
 import 'package:downloads_path_provider_28/downloads_path_provider_28.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -416,7 +416,7 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
     // Get temporary directory for initial download
     Directory temporaryDir;
     try {
-      temporaryDir = await getApplicationTemporaryDirectory();
+      temporaryDir = await pp.getApplicationTemporaryDirectory();
     } catch (e) {
       debugPrint("Error getting temporary directory: $e");
       ScaffoldMessenger.of(context).showSnackBar(
@@ -475,7 +475,7 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
           // Attempt to save to a less ideal, but accessible app-specific public-like directory as a fallback for the MOVE.
           // This is not the same as the temporary directory.
           // Alternatively, leave it in temp and notify user. For now, let's try a fallback.
-          publicDownloadsDir = await getApplicationDocumentsDirectory(); // Fallback to app's documents
+          publicDownloadsDir = await pp.getApplicationDocumentsDirectory(); // Fallback to app's documents
           finalSavePath = "${publicDownloadsDir.path}/$fileName";
           downloadsPathMessage = "Could not access public Downloads. Saved to app folder: ";
           // Note: If DownloadsPathProvider fails, direct copy to a truly public folder is unlikely to succeed without more complex platform-specific code (MediaStore).
