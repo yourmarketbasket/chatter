@@ -205,35 +205,21 @@ class UploadService {
           'resource_type': resourceType,
         });
 
-        double uploadProgress = 0.0;
-        final response = await _dio.post(
-          'https://api.cloudinary.com/v1_1/djg6xjdrq/$resourceType/upload', // Replace YOUR_CLOUD_NAME
-          data: formData,
-          options: dio.Options(
-            validateStatus: (status) => status != null && status >= 200 && status < 500,
-          ),
-          onSendProgress: (sent, total) {
-            if (total > 0) {
-              uploadProgress = (sent / total * 100).clamp(0.0, 100.0);
-              // Optional: more detailed progress logging if needed
-            }
-          },
-        );
+        // This local 'uploadProgress' variable is not used for the callback, so it can be removed.
+        // double uploadProgress = 0.0;
 
         final int finalFileSize = await fileToUpload.length(); // Size of the file that was actually uploaded
-        int currentFileSentBytesForProgress = 0; // For this specific file's progress reporting
 
-        final response = await _dio.post(
-          'https://api.cloudinary.com/v1_1/djg6xjdrq/$resourceType/upload', // Replace YOUR_CLOUD_NAME
+        // Corrected: This is the main file upload call.
+        final dio.Response response = await _dio.post( // Explicitly type response
+          'https://api.cloudinary.com/v1_1/djg6xjdrq/$resourceType/upload',
           data: formData,
           options: dio.Options(
             validateStatus: (status) => status != null && status >= 200 && status < 500,
           ),
           onSendProgress: (sent, total) {
             if (total > 0) {
-              currentFileSentBytesForProgress = sent;
-              onProgress(cumulativeSentBytes + currentFileSentBytesForProgress, grandTotalBytes);
-              // uploadProgress = (sent / total * 100).clamp(0.0, 100.0); // This is per-file progress
+              onProgress(cumulativeSentBytes + sent, grandTotalBytes);
             }
           },
         );
