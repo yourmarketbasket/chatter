@@ -215,7 +215,7 @@ class UploadService {
 
         // Corrected: This is the main file upload call.
         final dio.Response response = await _dio.post( // Explicitly type response
-          'https://api.cloudinary.com/v1_1/djg6xjdrq/$resourceType/upload',
+          'https://api.cloudinary.com/v1_1/dxhz5k4zz/$resourceType/upload',
           data: formData,
           options: dio.Options(
             validateStatus: (status) => status != null && status >= 200 && status < 500,
