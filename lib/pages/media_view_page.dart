@@ -415,7 +415,7 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
 
     Directory temporaryDir;
     try {
-      temporaryDir = await pp.getApplicationTemporaryDirectory();
+      temporaryDir = await pp.getTemporaryDirectory();
     } catch (e) {
       debugPrint("Error getting temporary directory: $e");
       ScaffoldMessenger.of(context).showSnackBar(
@@ -504,17 +504,17 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
           if (extension == 'jpg' || extension == 'jpeg') return MimeType.jpeg;
           if (extension == 'png') return MimeType.png;
           if (extension == 'pdf') return MimeType.pdf;
-          if (extension == 'mp4') return MimeType.mp4;
+          if (extension == 'mp4') return MimeType.mp4Video;
           if (extension == 'mp3') return MimeType.mp3;
-          if (extension == 'doc' || extension == 'docx') return MimeType.word;
-          if (extension == 'xls' || extension == 'xlsx') return MimeType.sheet;
-          if (extension == 'ppt' || extension == 'pptx') return MimeType.powerpoint;
+          if (extension == 'doc' || extension == 'docx') return MimeType.microsoftWord;
+          if (extension == 'xls' || extension == 'xlsx') return MimeType.microsoftExcel;
+          if (extension == 'ppt' || extension == 'pptx') return MimeType.microsoftPresentation;
           if (extension == 'txt') return MimeType.text;
           return MimeType.other; // Fallback
         }
 
         String? savedPath = await FileSaver.instance.saveAs(
-          fileName: finalFileNameWithExt, // Filename for the save dialog
+          name: finalFileNameWithExt, // Filename for the save dialog
           filePath: tempSavePath,    // Path of the temporary file
           ext: fileExtension,        // File extension
           mimeType: getMimeType(fileExtension),
