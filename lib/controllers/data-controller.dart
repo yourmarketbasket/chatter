@@ -52,6 +52,12 @@ class DataController extends GetxController {
   final Rxn<String> currentlyPlayingMediaType = Rxn<String>(); // 'video' or 'audio'
   final Rxn<Object> activeMediaController = Rxn<Object>(); // Can be VideoPlayerController, BetterPlayerController, or AudioPlayer
 
+  // Progress tracking for post creation
+  final RxDouble uploadProgress = 0.0.obs;
+  // Constants for progress allocation
+  static const double _uploadPhaseProportion = 0.8; // 80% for file uploads
+  static const double _savePhaseProportion = 0.2; // 20% for saving post to DB
+
   @override
   void onInit() {
     super.onInit();
@@ -100,12 +106,20 @@ class DataController extends GetxController {
 
   // Create post
   Future<Map<String, dynamic>> createPost(Map<String, dynamic> data) async {
-    
+    // Update progress to indicate starting the save phase
+    // This assumes uploads (if any) have completed and contributed to _uploadPhaseProportion
+    uploadProgress.value = _uploadPhaseProportion;
+
     try {
       var token = user.value['token'];
       if (token == null) {
+        uploadProgress.value = 0.0; // Reset progress on auth error
         throw Exception('User token not found');
       }
+
+      // Simulate a bit of progress for the API call itself, maybe 10% of the save phase
+      uploadProgress.value = _uploadPhaseProportion + (_savePhaseProportion * 0.1);
+
       var response = await _dio.post(
         'api/posts/create-post',
         data: data,
@@ -115,22 +129,28 @@ class DataController extends GetxController {
           },
         ),
       );
+
+      // Simulate remaining progress for the save phase after API call returns
+      uploadProgress.value = _uploadPhaseProportion + (_savePhaseProportion * 0.8);
+
+
       if (response.statusCode == 200 && response.data['success'] == true && response.data['post'] != null) {
-        // Assuming the backend returns the created post object under the key 'post'
+        uploadProgress.value = 1.0; // Mark as complete
         return {'success': true, 'message': 'Post created successfully', 'post': response.data['post']};
       } else if (response.statusCode == 200 && response.data['success'] == true && response.data['post'] == null) {
-        // Backend indicated success but didn't return the post, this is a fallback
         print('[DataController] createPost success, but no post data returned from backend.');
+        uploadProgress.value = 1.0; // Mark as complete
         return {'success': true, 'message': 'Post created successfully (no post data returned)'};
-      }
-      else {
+      } else {
+        uploadProgress.value = 0.0; // Reset progress on failure
         return {
           'success': false,
           'message': response.data['message'] ?? 'Post creation failed',
-          'post': null // Ensure 'post' key is present even on failure for consistent access
+          'post': null
         };
       }
     } catch (e) {
+      uploadProgress.value = 0.0; // Reset progress on error
       return {'success': false, 'message': e.toString()};
     }
   }
@@ -471,8 +491,42 @@ class DataController extends GetxController {
 
   // Method to be called from UI (e.g. home-feed-screen.dart)
   Future<List<Map<String, dynamic>>> uploadFiles(List<Map<String, dynamic>> attachmentsData) async {
-    // Delegate the call to the UploadService
-    return await _uploadService.uploadFilesToCloudinary(attachmentsData);
+    // Reset progress for the upload phase specifically
+    // uploadProgress.value = 0.0; // This might be too early if createPost also resets.
+                               // HomeFeedScreen should reset before starting the whole process.
+
+    // Define the progress callback for UploadService
+    void onUploadProgress(int sentBytes, int totalBytes) {
+      if (totalBytes > 0) {
+        double overallUploadPhaseProgress = sentBytes / totalBytes;
+        // Scale this progress to fit within the _uploadPhaseProportion
+        uploadProgress.value = overallUploadPhaseProgress * _uploadPhaseProportion;
+      }
+    }
+
+    // Delegate the call to the UploadService, passing the callback
+    List<Map<String, dynamic>> uploadResults = await _uploadService.uploadFilesToCloudinary(
+      attachmentsData,
+      onUploadProgress, // Pass the callback here
+    );
+
+    // After all files are uploaded (or attempted), if successful,
+    // the uploadProgress should reflect the full _uploadPhaseProportion.
+    // If there were failures, it might not reach this.
+    // Consider if all uploads must succeed to reach _uploadPhaseProportion.
+    bool allSuccess = uploadResults.every((result) => result['success'] == true);
+    if (allSuccess && attachmentsData.isNotEmpty) {
+       // Ensure progress reflects completion of upload phase if all successful
+      uploadProgress.value = _uploadPhaseProportion;
+    } else if (attachmentsData.isEmpty) {
+      // If no attachments, upload phase is skipped, progress should be at _uploadPhaseProportion
+      // to allow createPost to take over from there.
+      uploadProgress.value = _uploadPhaseProportion;
+    }
+    // If some uploads failed, uploadProgress will be less than _uploadPhaseProportion.
+    // The UI/snackbar logic in HomeFeedScreen will need to handle this (e.g., show error).
+
+    return uploadResults;
   }
 
   // Add these placeholder methods inside DataController class

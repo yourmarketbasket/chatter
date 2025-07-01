@@ -110,12 +110,72 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   }
 
   Future<void> _addPost(String content, List<Map<String, dynamic>> attachments) async {
-    List<Map<String, dynamic>> uploadedAttachments = [];
+    // Reset progress at the very beginning of the process
+    dataController.uploadProgress.value = 0.0;
+
+    // Show persistent snackbar
+    Get.showSnackbar(
+      GetSnackBar(
+        titleText: Obx(() {
+          String title = "Creating Post...";
+          if (dataController.uploadProgress.value >= 1.0) {
+            title = "Success!";
+          } else if (dataController.uploadProgress.value < 0) { // Using negative to indicate error
+            title = "Error";
+          }
+          return Text(title, style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold));
+        }),
+        messageText: Obx(() {
+          double progress = dataController.uploadProgress.value;
+          String message = "";
+          if (progress < 0) { // Error state
+             message = "Failed to create post. Please try again.";
+          } else if (progress == 0) {
+            message = "Preparing...";
+          } else if (progress < 0.8) { // Assuming 0.0 to <0.8 is upload phase
+            // Calculate percentage of the upload phase itself
+            double uploadPhaseProgress = progress / 0.8;
+            message = "Uploading attachments: ${(uploadPhaseProgress * 100).toStringAsFixed(0)}%";
+          } else if (progress < 1.0) { // Assuming 0.8 to <1.0 is save phase
+            message = "Saving post...";
+          } else {
+            message = "Your chatter is live!";
+          }
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(message, style: GoogleFonts.roboto(color: Colors.white70)),
+              if (progress >= 0 && progress < 1.0) ...[
+                const SizedBox(height: 8),
+                LinearProgressIndicator(
+                  value: progress,
+                  backgroundColor: Colors.grey[700],
+                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.tealAccent),
+                ),
+              ]
+            ],
+          );
+        }),
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.black.withOpacity(0.85),
+        borderColor: Colors.tealAccent,
+        borderWidth: 1,
+        borderRadius: 8,
+        margin: const EdgeInsets.all(10),
+        isDismissible: false, // User cannot dismiss it manually initially
+        duration: null, // Stays indefinitely until programmatically closed or progress completes
+        showProgressIndicator: false, // We use our own LinearProgressIndicator
+      ),
+    );
+
+    List<Map<String, dynamic>> uploadedAttachmentsInfo = [];
+    bool anyUploadFailed = false;
+
     if (attachments.isNotEmpty) {
       List<Map<String, dynamic>> uploadResults = await dataController.uploadFiles(attachments);
       for (var result in uploadResults) {
         if (result['success'] == true) {
-          uploadedAttachments.add({
+          uploadedAttachmentsInfo.add({
             'type': result['type'],
             'filename': result['filename'],
             'size': result['size'],
@@ -130,28 +190,37 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                            : (16/9).toStringAsFixed(2),
           });
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Failed to upload ${result['filename'] ?? 'attachment'}: ${result['message']}',
-                style: GoogleFonts.roboto(color: Colors.white),
-              ),
-              backgroundColor: Colors.red[700],
-            ),
-          );
+          anyUploadFailed = true;
+          // Individual file upload failure message (optional, as main snackbar will show general error)
+          print('Failed to upload ${result['filename'] ?? 'attachment'}: ${result['message']}');
         }
       }
     }
 
-    if (content.trim().isEmpty && uploadedAttachments.isEmpty) {
+    if (anyUploadFailed) {
+      dataController.uploadProgress.value = -1; // Indicate error
+      await Future.delayed(const Duration(seconds: 3)); // Keep error snackbar for a bit
+      if (Get.isSnackbarOpen) Get.back(); // Dismiss snackbar
       return;
     }
+
+    // If no content AND no attachments (e.g., user cleared everything after picking)
+    // Or if attachments were picked but all failed to upload, and no content.
+    if (content.trim().isEmpty && uploadedAttachmentsInfo.isEmpty) {
+       dataController.uploadProgress.value = -1; // Indicate error (e.g. "Nothing to post")
+       // It's possible Get.back() might be called too soon if createPost is not awaited or if it's very fast.
+       // Add a small delay or ensure the snackbar is managed correctly based on final progress.
+       await Future.delayed(const Duration(seconds: 3));
+       if(Get.isSnackbarOpen) Get.back(); // Dismiss snackbar
+       return;
+    }
+
 
     Map<String, dynamic> postData = {
       'username': dataController.user.value['user']['name'] ?? 'YourName',
       'content': content.trim(),
-      'useravatar': dataController.user.value['avatar'] ?? '',
-      'attachments': uploadedAttachments.map((att) => {
+      'useravatar': dataController.user.value['user']?['avatar'] ?? '', // Ensure correct path to avatar
+      'attachments': uploadedAttachmentsInfo.map((att) => { // Use uploadedAttachmentsInfo
             'filename': att['filename'],
             'url': att['url'],
             'size': att['size'],
@@ -170,28 +239,20 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     if (result['success'] == true) {
       if (result['post'] != null) {
         dataController.addNewPost(result['post'] as Map<String, dynamic>);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Fantastic! Your chatter is live!', style: GoogleFonts.roboto(color: Colors.white)),
-            backgroundColor: Colors.teal[700],
-          ),
-        );
       } else {
-        dataController.fetchFeeds(); // Fallback if post object isn't returned
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Chatter posted! Refreshing feed.', style: GoogleFonts.roboto(color: Colors.white)),
-            backgroundColor: Colors.orange[700],
-          ),
-        );
+        // If post data isn't returned, refresh feeds as a fallback
+        await dataController.fetchFeeds();
       }
+      // Progress should be 1.0 from createPost on success. Snackbar will update.
+      await Future.delayed(const Duration(seconds: 2)); // Keep success message for a bit
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result['message'] ?? 'Could not create post.', style: GoogleFonts.roboto(color: Colors.white)),
-          backgroundColor: Colors.red[700],
-        ),
-      );
+      // Create post failed
+      dataController.uploadProgress.value = -1; // Indicate error
+      await Future.delayed(const Duration(seconds: 3)); // Keep error snackbar for a bit
+    }
+
+    if (Get.isSnackbarOpen) {
+      Get.back(); // Dismiss snackbar
     }
   }
 
