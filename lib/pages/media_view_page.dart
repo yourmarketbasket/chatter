@@ -5,8 +5,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:path_provider/path_provider.dart' as pp;
-import 'package:downloads_path_provider_28/downloads_path_provider_28.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:file_saver/file_saver.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:feather_icons/feather_icons.dart';
 import 'package:pdfrx/pdfrx.dart';
@@ -413,7 +413,6 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
       return;
     }
 
-    // Get temporary directory for initial download
     Directory temporaryDir;
     try {
       temporaryDir = await pp.getApplicationTemporaryDirectory();
@@ -425,20 +424,37 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
       return;
     }
 
-    String fileName = attachment['filename']?.toString() ?? url.split('/').last;
-    if (fileName.isEmpty || !fileName.contains('.')) {
+    String originalFileName = attachment['filename']?.toString() ?? url.split('/').last;
+    String fileExtension = '';
+    String fileNameWithoutExtension = originalFileName;
+
+    if (originalFileName.contains('.')) {
+      fileExtension = originalFileName.substring(originalFileName.lastIndexOf('.') + 1);
+      fileNameWithoutExtension = originalFileName.substring(0, originalFileName.lastIndexOf('.'));
+    } else {
+      // Fallback for files without extension in their name from URL
       final String type = attachment['type']?.toString().toLowerCase() ?? 'unknown';
-      String extension = switch (type) {
-        'image' => '.jpg',
-        'video' => '.mp4',
-        'audio' => '.mp3',
-        'pdf' => '.pdf',
-        _ => '.dat',
+      fileExtension = switch (type) {
+        'image' => 'jpg', // Default extensions
+        'video' => 'mp4',
+        'audio' => 'mp3',
+        'pdf' => 'pdf',
+        _ => 'dat',
       };
-      fileName = "downloaded_file_${DateTime.now().millisecondsSinceEpoch}$extension";
     }
 
-    final String tempSavePath = "${temporaryDir.path}/$fileName";
+    // Ensure filename doesn't have extension for file_saver's 'name' param, if ext is provided separately
+    // However, file_saver's `name` parameter should be the full filename including extension.
+    // The `ext` parameter is more of a fallback or for when bytes are provided without a name.
+    // Let's ensure originalFileName is used for `name` if it has an extension, otherwise construct it.
+
+    String finalFileNameWithExt = originalFileName;
+    if (!originalFileName.contains('.')) {
+        finalFileNameWithExt = "${fileNameWithoutExtension}.${fileExtension}";
+    }
+
+
+    final String tempSavePath = "${temporaryDir.path}/$finalFileNameWithExt";
 
     setState(() {
       _isDownloading = true;
@@ -446,9 +462,10 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
     });
 
     try {
+      // Step 1: Download the file to a temporary directory
       await _dio.download(
         url,
-        tempSavePath, // Download to temporary path first
+        tempSavePath,
         onReceiveProgress: (received, total) {
           if (total != -1) {
             setState(() {
@@ -457,63 +474,91 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
           }
         },
       );
-
-      // File successfully downloaded to tempSavePath.
-      // Now, move it to the public downloads folder.
       debugPrint("File downloaded to temporary path: $tempSavePath");
 
-      Directory? publicDownloadsDir;
-      String finalSavePath;
-      String downloadsPathMessage = "File saved to: ";
+      // Make progress indeterminate for the file saving phase
+      setState(() {
+        _downloadProgress = 0.0;
+      });
 
-      try {
-        publicDownloadsDir = await DownloadsPathProvider.downloadsDirectory;
-        if (publicDownloadsDir == null) {
-          if (Platform.isAndroid || Platform.isIOS) {
-            debugPrint("DownloadsPathProvider.downloadsDirectory returned null. Cannot move file to public downloads.");
-          }
-          // Attempt to save to a less ideal, but accessible app-specific public-like directory as a fallback for the MOVE.
-          // This is not the same as the temporary directory.
-          // Alternatively, leave it in temp and notify user. For now, let's try a fallback.
-          publicDownloadsDir = await pp.getApplicationDocumentsDirectory(); // Fallback to app's documents
-          finalSavePath = "${publicDownloadsDir.path}/$fileName";
-          downloadsPathMessage = "Could not access public Downloads. Saved to app folder: ";
-          // Note: If DownloadsPathProvider fails, direct copy to a truly public folder is unlikely to succeed without more complex platform-specific code (MediaStore).
-          // This fallback primarily handles cases where DownloadsPathProvider might not be implemented for the platform.
-        } else {
-           finalSavePath = "${publicDownloadsDir.path}/$fileName";
-           downloadsPathMessage = "File saved to Downloads folder: ";
-        }
-
-        // Ensure the final directory exists (especially for the fallback case)
-        if (!await Directory(publicDownloadsDir.path).exists()) {
-            await Directory(publicDownloadsDir.path).create(recursive: true);
-        }
-
-        // Copy the file
-        final tempFile = File(tempSavePath);
-        await tempFile.copy(finalSavePath);
-        debugPrint("File copied from $tempSavePath to $finalSavePath");
-
-        // Delete the temporary file
-        await tempFile.delete();
-        debugPrint("Temporary file $tempSavePath deleted.");
-
+      // Step 2: Save the file from the temporary path to the final destination
+      if (Platform.isIOS) {
+        String savedPath = await FileSaver.instance.saveFile(
+          name: finalFileNameWithExt, // Full filename with extension
+          filePath: tempSavePath,
+          // `ext` is not strictly needed if `name` has it, but providing it doesn't hurt
+          // if `file_saver` uses it as a hint or for MIME type.
+          // Let's ensure `fileExtension` is just the extension part.
+          ext: fileExtension,
+          // mimeType: MimeType.other, // Or determine more accurately if possible/needed
+        );
+        debugPrint("iOS: File saved to Application Documents. Path: $savedPath");
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$downloadsPathMessage$finalSavePath', style: GoogleFonts.roboto())),
+          SnackBar(content: Text('File saved to app documents: $finalFileNameWithExt', style: GoogleFonts.roboto())),
+        );
+      } else if (Platform.isAndroid) {
+        // Use FileSaver.saveAs for Android to let the user pick the location,
+        // hopefully allowing them to choose the public Downloads folder.
+        MimeType getMimeType(String extension) {
+          extension = extension.toLowerCase();
+          if (extension == 'jpg' || extension == 'jpeg') return MimeType.jpeg;
+          if (extension == 'png') return MimeType.png;
+          if (extension == 'pdf') return MimeType.pdf;
+          if (extension == 'mp4') return MimeType.mp4;
+          if (extension == 'mp3') return MimeType.mp3;
+          if (extension == 'doc' || extension == 'docx') return MimeType.word;
+          if (extension == 'xls' || extension == 'xlsx') return MimeType.sheet;
+          if (extension == 'ppt' || extension == 'pptx') return MimeType.powerpoint;
+          if (extension == 'txt') return MimeType.text;
+          return MimeType.other; // Fallback
+        }
+
+        String? savedPath = await FileSaver.instance.saveAs(
+          fileName: finalFileNameWithExt, // Filename for the save dialog
+          filePath: tempSavePath,    // Path of the temporary file
+          ext: fileExtension,        // File extension
+          mimeType: getMimeType(fileExtension),
         );
 
-      } catch (e) {
-        debugPrint("Error moving file to downloads folder: $e");
-        // If moving fails, the file remains in tempSavePath.
-        // Notify the user that it was saved to a temporary/app-specific location.
+        if (savedPath != null) {
+          debugPrint("Android: File saved via saveAs. Path/Details: $savedPath");
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('File saved: $finalFileNameWithExt', style: GoogleFonts.roboto())),
+          );
+        } else {
+          // saveAs was cancelled by the user or failed
+          debugPrint("Android: saveAs was cancelled or failed.");
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('File saving cancelled.', style: GoogleFonts.roboto())),
+          );
+        }
+      } else {
+        // Fallback for other platforms (Desktop, Web) - file_saver handles them.
+        // On Desktop, it saves to Downloads. On Web, it triggers a browser download.
+        String savedPath = await FileSaver.instance.saveFile(
+          name: finalFileNameWithExt,
+          filePath: tempSavePath,
+          ext: fileExtension,
+        );
+        debugPrint("Other Platform: File saved. Path/Details: $savedPath");
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Saved to app temporary area: $tempSavePath. Could not move to Downloads. Error: $e', style: GoogleFonts.roboto())),
+          SnackBar(content: Text('File saved: $finalFileNameWithExt', style: GoogleFonts.roboto())),
         );
       }
 
+      // Delete the temporary file after successful saving by FileSaver
+      try {
+        final tempFile = File(tempSavePath);
+        if (await tempFile.exists()) {
+          await tempFile.delete();
+          debugPrint("Temporary file $tempSavePath deleted.");
+        }
+      } catch (e) {
+        debugPrint("Error deleting temporary file $tempSavePath: $e");
+      }
+
     } catch (e) {
-      debugPrint("Download error: $e");
+      debugPrint("Error during download or saving process: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Download failed: $e', style: GoogleFonts.roboto())),
       );
