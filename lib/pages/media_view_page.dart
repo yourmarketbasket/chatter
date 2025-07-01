@@ -523,7 +523,8 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
         if (savedPath != null) {
           debugPrint("Android: File saved via saveAs. Path/Details: $savedPath");
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('File saved: $finalFileNameWithExt', style: GoogleFonts.roboto())),
+            SnackBar(content: Text('File saved', style: GoogleFonts.roboto())),
+            
           );
         } else {
           // saveAs was cancelled by the user or failed
