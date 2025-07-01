@@ -27,6 +27,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 // import 'package:device_info_plus/device_info_plus.dart'; // Not used
 import 'package:chatter/widgets/video_attachment_widget.dart';
 import 'package:chatter/widgets/audio_attachment_widget.dart';
+import 'package:chatter/widgets/realtime_timeago_text.dart'; // Import the new widget
 import 'package:flutter_expandable_fab/flutter_expandable_fab.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
@@ -383,11 +384,15 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                               const SizedBox(width: 4.0),
                               Icon(Icons.verified, color: Colors.amber, size: isReply ? 13 : 15),
                               const SizedBox(width: 4.0),
-                              // Display @username · relativeTime
+                              // Display @username · relativeTime using new widget
                               Text(
-                                '· @$username · ${timeago.format(timestamp, locale: 'en_short')}',
+                                '· @$username · ', // Text before the real-time part
                                 style: GoogleFonts.poppins(fontSize: isReply ? 10 : 12, color: Colors.white70),
-                                overflow: TextOverflow.ellipsis,
+                                // overflow: TextOverflow.ellipsis, // Apply to Row or outer Flexible if needed
+                              ),
+                              RealtimeTimeagoText(
+                                timestamp: timestamp,
+                                style: GoogleFonts.poppins(fontSize: isReply ? 10 : 12, color: Colors.white70),
                               ),
                             ],
                           ),
