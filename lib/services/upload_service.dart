@@ -226,6 +226,7 @@ class UploadService {
             }
           },
         );
+        // testing comment
 
         // After this file is uploaded (successfully or not), add its total size to cumulativeSentBytes
         // This ensures the next file's progress is calculated correctly relative to the grand total.
