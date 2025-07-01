@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:downloads_path_provider_28/downloads_path_provider_28.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:feather_icons/feather_icons.dart';
@@ -412,36 +413,16 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
       return;
     }
 
-    Directory? targetDirectory;
-    String downloadsPathMessage = "Downloaded to ";
-
-    if (Platform.isAndroid) {
-      try {
-        Directory? externalDir = await getExternalStorageDirectory();
-        if (externalDir != null) {
-          String publicDownloadsPath = '${externalDir.path}/Download';
-          targetDirectory = Directory(publicDownloadsPath);
-          if (!await targetDirectory.exists()) {
-            await targetDirectory.create(recursive: true);
-          }
-          downloadsPathMessage = "Downloaded to Downloads folder. Path: ";
-        }
-      } catch (e) {
-        debugPrint("Error accessing external storage: $e");
-      }
-    }
-
-    if (targetDirectory == null) {
-      try {
-        targetDirectory = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
-        downloadsPathMessage = Platform.isIOS ? "Downloaded to app files. Path: " : "Downloaded to app-specific folder. Path: ";
-      } catch (e) {
-        debugPrint("Error getting downloads directory: $e");
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not get downloads directory.', style: GoogleFonts.roboto())),
-        );
-        return;
-      }
+    // Get temporary directory for initial download
+    Directory temporaryDir;
+    try {
+      temporaryDir = await getApplicationTemporaryDirectory();
+    } catch (e) {
+      debugPrint("Error getting temporary directory: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not get temporary directory for download.', style: GoogleFonts.roboto())),
+      );
+      return;
     }
 
     String fileName = attachment['filename']?.toString() ?? url.split('/').last;
@@ -457,7 +438,7 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
       fileName = "downloaded_file_${DateTime.now().millisecondsSinceEpoch}$extension";
     }
 
-    final String savePath = "${targetDirectory.path}/$fileName";
+    final String tempSavePath = "${temporaryDir.path}/$fileName";
 
     setState(() {
       _isDownloading = true;
@@ -467,7 +448,7 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
     try {
       await _dio.download(
         url,
-        savePath,
+        tempSavePath, // Download to temporary path first
         onReceiveProgress: (received, total) {
           if (total != -1) {
             setState(() {
@@ -476,9 +457,61 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
           }
         },
       );
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$downloadsPathMessage$savePath', style: GoogleFonts.roboto())),
-      );
+
+      // File successfully downloaded to tempSavePath.
+      // Now, move it to the public downloads folder.
+      debugPrint("File downloaded to temporary path: $tempSavePath");
+
+      Directory? publicDownloadsDir;
+      String finalSavePath;
+      String downloadsPathMessage = "File saved to: ";
+
+      try {
+        publicDownloadsDir = await DownloadsPathProvider.downloadsDirectory;
+        if (publicDownloadsDir == null) {
+          if (Platform.isAndroid || Platform.isIOS) {
+            debugPrint("DownloadsPathProvider.downloadsDirectory returned null. Cannot move file to public downloads.");
+          }
+          // Attempt to save to a less ideal, but accessible app-specific public-like directory as a fallback for the MOVE.
+          // This is not the same as the temporary directory.
+          // Alternatively, leave it in temp and notify user. For now, let's try a fallback.
+          publicDownloadsDir = await getApplicationDocumentsDirectory(); // Fallback to app's documents
+          finalSavePath = "${publicDownloadsDir.path}/$fileName";
+          downloadsPathMessage = "Could not access public Downloads. Saved to app folder: ";
+          // Note: If DownloadsPathProvider fails, direct copy to a truly public folder is unlikely to succeed without more complex platform-specific code (MediaStore).
+          // This fallback primarily handles cases where DownloadsPathProvider might not be implemented for the platform.
+        } else {
+           finalSavePath = "${publicDownloadsDir.path}/$fileName";
+           downloadsPathMessage = "File saved to Downloads folder: ";
+        }
+
+        // Ensure the final directory exists (especially for the fallback case)
+        if (!await Directory(publicDownloadsDir.path).exists()) {
+            await Directory(publicDownloadsDir.path).create(recursive: true);
+        }
+
+        // Copy the file
+        final tempFile = File(tempSavePath);
+        await tempFile.copy(finalSavePath);
+        debugPrint("File copied from $tempSavePath to $finalSavePath");
+
+        // Delete the temporary file
+        await tempFile.delete();
+        debugPrint("Temporary file $tempSavePath deleted.");
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$downloadsPathMessage$finalSavePath', style: GoogleFonts.roboto())),
+        );
+
+      } catch (e) {
+        debugPrint("Error moving file to downloads folder: $e");
+        // If moving fails, the file remains in tempSavePath.
+        // Notify the user that it was saved to a temporary/app-specific location.
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Saved to app temporary area: $tempSavePath. Could not move to Downloads. Error: $e', style: GoogleFonts.roboto())),
+        );
+      }
+
     } catch (e) {
       debugPrint("Download error: $e");
       ScaffoldMessenger.of(context).showSnackBar(
