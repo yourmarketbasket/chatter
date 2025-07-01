@@ -193,7 +193,7 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
                     ),
                   )
                 : IconButton(
-                    icon: const Icon(FeatherIcons.download, color: Colors.white),
+                    icon: const Icon(FeatherIcons.downloadCloud, color: Colors.white, size: 15,),
                     onPressed: () => _downloadAttachment(widget.attachments[_currentPageIndex]),
                   ),
           IconButton(

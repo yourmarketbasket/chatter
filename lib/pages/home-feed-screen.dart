@@ -330,7 +330,9 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     final String content = post['content'] as String? ?? '';
     final String? userAvatar = post['useravatar'] as String?;
     final String avatarInitial = (username.isNotEmpty ? username[0].toUpperCase() : '?');
-    final DateTime timestamp = post['createdAt'] is String ? DateTime.parse(post['createdAt'] as String) : DateTime.now();
+    final DateTime timestamp = post['createdAt'] is String 
+    ? DateTime.parse(post['createdAt'] as String).toUtc() 
+    : DateTime.now().toUtc();
     int likes = post['likes'] as int? ?? 0;
     int reposts = post['reposts'] as int? ?? 0;
     int views = post['views'] as int? ?? 0;
@@ -658,7 +660,9 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
               message: post['content'] as String? ?? '',
               userName: post['username'] as String? ?? 'Unknown User',
               userAvatarUrl: post['useravatar'] as String?,
-              timestamp: post['createdAt'] is String ? DateTime.parse(post['createdAt'] as String) : DateTime.now(),
+              timestamp: post['createdAt'] is String 
+                ? DateTime.parse(post['createdAt'] as String).toUtc() 
+                : DateTime.now().toUtc(),
               viewsCount: post['views'] as int? ?? 0,
               likesCount: post['likes'] as int? ?? 0,
               repostsCount: post['reposts'] as int? ?? 0,
