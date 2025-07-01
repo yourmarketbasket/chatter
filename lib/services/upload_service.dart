@@ -15,18 +15,39 @@ class UploadService {
     sendTimeout: const Duration(seconds: 60),
   ));
 
-  // Method signature changed to accept List<Map<String, dynamic>>
-  Future<List<Map<String, dynamic>>> uploadFilesToCloudinary(List<Map<String, dynamic>> attachmentsData) async {
+  Future<List<Map<String, dynamic>>> uploadFilesToCloudinary(
+    List<Map<String, dynamic>> attachmentsData,
+    Function(int sentBytes, int totalBytes) onProgress,
+  ) async {
     print('[UploadService uploadFilesToCloudinary] Received ${attachmentsData.length} attachments for upload.');
 
-    // Validate input
     if (attachmentsData.isEmpty) {
-      return [{'success': false, 'message': 'No attachments provided', 'progress': 0.0}];
+      // If there are no attachments, report completion of this phase immediately.
+      onProgress(0, 0); // Indicates no data to send, effectively 100% of "nothing"
+      return []; // Return empty list as no files were processed.
     }
 
     List<Map<String, dynamic>> results = [];
+    int grandTotalBytes = 0;
+    int cumulativeSentBytes = 0;
 
-    // Define supported file extensions and their resource types
+    // Calculate grandTotalBytes first
+    for (var attachmentMap in attachmentsData) {
+      final File file = attachmentMap['file'] as File;
+      if (await file.exists()) {
+        grandTotalBytes += await file.length();
+      }
+    }
+
+    // If grandTotalBytes is 0 (e.g., all files are empty or don't exist),
+    // report progress as complete for the upload phase.
+    if (grandTotalBytes == 0 && attachmentsData.isNotEmpty) {
+        onProgress(0,0); // Or onProgress(1,1) to signify completion of an empty task.
+                         // DataController handles 0 totalBytes by not dividing.
+        // Still proceed to return failure messages for each non-existent/empty file.
+    }
+
+
     const Map<String, String> extensionToResourceType = {
       'jpg': 'image',
       'jpeg': 'image',
@@ -200,62 +221,88 @@ class UploadService {
         );
 
         final int finalFileSize = await fileToUpload.length(); // Size of the file that was actually uploaded
+        int currentFileSentBytesForProgress = 0; // For this specific file's progress reporting
+
+        final response = await _dio.post(
+          'https://api.cloudinary.com/v1_1/djg6xjdrq/$resourceType/upload', // Replace YOUR_CLOUD_NAME
+          data: formData,
+          options: dio.Options(
+            validateStatus: (status) => status != null && status >= 200 && status < 500,
+          ),
+          onSendProgress: (sent, total) {
+            if (total > 0) {
+              currentFileSentBytesForProgress = sent;
+              onProgress(cumulativeSentBytes + currentFileSentBytesForProgress, grandTotalBytes);
+              // uploadProgress = (sent / total * 100).clamp(0.0, 100.0); // This is per-file progress
+            }
+          },
+        );
+
+        // After this file is uploaded (successfully or not), add its total size to cumulativeSentBytes
+        // This ensures the next file's progress is calculated correctly relative to the grand total.
+        // If the upload failed mid-way, currentFileSentBytesForProgress will be less than finalFileSize.
+        // For simplicity in cumulative tracking, we add finalFileSize if successful,
+        // or the last known sent amount if failed.
+        // However, it's more robust to add finalFileSize to cumulativeSentBytes *after* a successful upload,
+        // and rely on the onSendProgress callback to have reported the final sent bytes for a failed one.
 
         if (response.statusCode == 200 && response.data != null) {
+          cumulativeSentBytes += finalFileSize; // Add successfully uploaded file's size
+          onProgress(cumulativeSentBytes, grandTotalBytes); // Ensure final progress for this file is reported
+
           results.add({
             'success': true,
             'url': response.data['secure_url'] as String? ?? '',
             'thumbnailUrl': uploadedThumbnailUrl,
             'size': response.data['bytes'] as int? ?? finalFileSize,
-            // Use attachmentType from input map as the primary type, fallback to Cloudinary's format or extension
             'type': attachmentType,
             'filename': response.data['original_filename'] as String? ?? path.basename(originalFilePath),
             'filePath': originalFilePath,
-            'progress': 100.0,
+            // 'progress': 100.0, // No longer individual progress here
             'resource_type': response.data['resource_type'] as String? ?? resourceType,
-            // Add pre-calculated metadata
             'width': width,
             'height': height,
             'orientation': orientation,
             'duration': duration,
-            'aspectRatio': aspectRatio, // Include aspectRatio in success result
+            'aspectRatio': aspectRatio,
           });
-          print('[UploadService uploadFilesToCloudinary] Successfully uploaded: $originalFilePath, URL: ${response.data['secure_url']}, Thumbnail: $uploadedThumbnailUrl, Width: $width, Height: $height, Orientation: $orientation, Duration: $duration, AspectRatio: $aspectRatio');
+          print('[UploadService uploadFilesToCloudinary] Successfully uploaded: $originalFilePath, URL: ${response.data['secure_url']}, Thumbnail: $uploadedThumbnailUrl');
         } else {
+          // Don't add to cumulativeSentBytes if it failed, as onSendProgress would have reported the last state.
+          // If onSendProgress didn't fire (e.g. network error before sending), cumulativeSentBytes remains unchanged for this file.
           final errorMessage = response.data?['error']?['message'] ?? 'Upload failed with status: ${response.statusCode}';
           print('[UploadService uploadFilesToCloudinary] Upload failed for $originalFilePath: $errorMessage');
           results.add({
             'success': false,
             'message': errorMessage,
             'filePath': originalFilePath,
-            'progress': uploadProgress,
+            // 'progress': uploadProgress, // No longer individual progress
             'thumbnailUrl': uploadedThumbnailUrl,
-             // Add pre-calculated metadata even on failure
             'type': attachmentType,
             'filename': path.basename(originalFilePath),
             'width': width,
             'height': height,
             'orientation': orientation,
             'duration': duration,
-            'aspectRatio': aspectRatio, // Include aspectRatio in failure result
+            'aspectRatio': aspectRatio,
           });
         }
       } catch (e, stackTrace) {
+        // Similar to failure, don't add to cumulativeSentBytes for exceptions.
         print('[UploadService uploadFilesToCloudinary] Exception for $originalFilePath: $e\n$stackTrace');
         results.add({
           'success': false,
           'message': 'Upload failed for $originalFilePath: ${e.toString()}',
           'filePath': originalFilePath,
-          'progress': 0.0,
+          // 'progress': 0.0, // No longer individual progress
           'thumbnailUrl': uploadedThumbnailUrl,
-           // Add pre-calculated metadata even on exception
           'type': attachmentType,
           'filename': path.basename(originalFilePath),
           'width': width,
           'height': height,
           'orientation': orientation,
           'duration': duration,
-          'aspectRatio': aspectRatio, // Include aspectRatio in exception result
+          'aspectRatio': aspectRatio,
         });
       } finally {
         // Cleanup: Delete compressed file if it's different from original and not null
