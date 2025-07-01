@@ -383,11 +383,16 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                               const SizedBox(width: 4.0),
                               Icon(Icons.verified, color: Colors.amber, size: isReply ? 13 : 15),
                               const SizedBox(width: 4.0),
-                              Text(' · @$username', style: GoogleFonts.poppins(fontSize: isReply ? 10 : 12, color: Colors.white70), overflow: TextOverflow.ellipsis),
+                              // Updated timestamp display
+                              Text(
+                                '· @$username · ${timeago.format(timestamp, locale: 'en_short')} · ${DateFormat('MMM d, yyyy').format(timestamp)}',
+                                style: GoogleFonts.poppins(fontSize: isReply ? 10 : 12, color: Colors.white70),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ],
                           ),
                         ),
-                        Text(timeago.format(timestamp, locale: 'en_short'), style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 12)),
+                        // The separate timestamp text is now removed as it's combined above
                       ],
                     ),
                     const SizedBox(height: 6),
