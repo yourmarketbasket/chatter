@@ -96,9 +96,11 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     );
 
     if (confirmed == true) {
-      setState(() {
-        post['reposts'] = (post['reposts'] ?? 0) + 1;
-      });
+      // setState(() {
+      //   // TODO: Implement proper optimistic UI update for repost count.
+      //   // The line below is incorrect as post['reposts'] is a List, not an int.
+      //   // post['reposts'] = (post['reposts'] ?? 0) + 1;
+      // });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -342,7 +344,8 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     final String currentUserId = dataController.user.value['user']?['_id'] ?? '';
     final bool isLikedByCurrentUser = likesList.any((like) => (like is Map ? like['_id'] == currentUserId : like == currentUserId));
 
-    int reposts = post['reposts'] as int? ?? 0;
+    List<dynamic> repostsList = post['reposts'] as List<dynamic>? ?? [];
+    int repostsCount = repostsList.length;
 
     int views;
     if (post.containsKey('viewsCount') && post['viewsCount'] is int) {
@@ -448,7 +451,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                             isLiked: isLikedByCurrentUser
                           ),
                           _buildActionButton(FeatherIcons.messageCircle, '$replyCount', () => _navigateToReplyPage(post)), // This is fine, specific button
-                          _buildActionButton(FeatherIcons.repeat, '$reposts', () => _navigateToRepostPage(post)),
+                          _buildActionButton(FeatherIcons.repeat, '$repostsCount', () => _navigateToRepostPage(post)),
                           _buildActionButton(FeatherIcons.eye, '$views', () {}), // Assuming views are handled elsewhere or not interactive
                         ],
                       ),
@@ -791,7 +794,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                 return 0; // Default if neither field is valid
               }(),
               likesCount: (post['likes'] as List<dynamic>? ?? []).length, // Corrected likesCount
-              repostsCount: post['reposts'] as int? ?? 0,
+              repostsCount: (post['reposts'] as List<dynamic>? ?? []).length,
             ),
           ),
         );
