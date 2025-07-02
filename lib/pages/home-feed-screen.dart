@@ -326,7 +326,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   }
 
 
-  Future<Widget> _buildPostContent(Map<String, dynamic> post, {required bool isReply}) async {
+  Widget _buildPostContent(Map<String, dynamic> post, {required bool isReply}) {
     final String postId = post['_id'] as String? ?? post.hashCode.toString(); // Ensure postId is unique
     final String username = post['username'] as String? ?? 'Unknown User';
     final String content = post['content'] as String? ?? '';
