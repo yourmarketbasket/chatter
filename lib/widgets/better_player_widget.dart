@@ -178,8 +178,8 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
         BetterPlayerConfiguration(
           autoPlay: false, // Should be false for feed, true for MediaViewPage (handled by caller)
           looping: false,
-          aspectRatio: null,
-          fit: BoxFit.cover, // Ensure it covers the area
+          aspectRatio: widget.videoAspectRatioProp ?? 16 / 9,
+          fit: BoxFit.fitWidth, // Ensure it covers the area
           placeholder: _buildPlaceholder(), // Use the new placeholder
           controlsConfiguration: const BetterPlayerControlsConfiguration(
             showControls: false, // Custom controls are built on top usually
