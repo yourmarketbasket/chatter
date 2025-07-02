@@ -81,18 +81,42 @@ class SocketService {
 
     // Listen for postViewed event
     _socket!.on('postViewed', (data) {
-      print('postViewed event received: $data');
+      print('postViewed event received by SocketService: $data');
       if (data is Map<String, dynamic>) {
         final String? postId = data['postId'] as String?;
-        final int? viewsCount = data['views'] as int?; // Or however the count is sent
+        // final int? viewsCount = data['views'] as int?; // We no longer use viewsCount directly from here.
 
-        if (postId != null && viewsCount != null) {
-          _dataController.updatePostViews(postId, viewsCount);
+        if (postId != null) {
+          print('[SocketService] postViewed event for $postId. Triggering fetchSinglePost.');
+          // Trigger fetching the full post to get the most up-to-date view count and other data.
+          _dataController.fetchSinglePost(postId);
         } else {
-          print('Received postViewed event with missing postId or viewsCount: $data');
+          print('[SocketService] Received postViewed event with missing postId: $data');
         }
       } else {
-        print('Received postViewed event with unexpected data type: ${data.runtimeType}');
+        print('[SocketService] Received postViewed event with unexpected data type: ${data.runtimeType}');
+      }
+    });
+
+    // Listen for postLiked event
+    _socket!.on('postLiked', (data) {
+      print('postLiked event received: $data');
+      if (data is Map<String, dynamic>) {
+        // Assuming 'data' is the full updated post object
+        _dataController.updatePostFromSocket(data);
+      } else {
+        print('Received postLiked event with unexpected data type: ${data.runtimeType}. Expected Map<String, dynamic>.');
+      }
+    });
+
+    // Listen for postUnliked event
+    _socket!.on('postUnliked', (data) {
+      print('postUnliked event received: $data');
+      if (data is Map<String, dynamic>) {
+        // Assuming 'data' is the full updated post object
+        _dataController.updatePostFromSocket(data);
+      } else {
+        print('Received postUnliked event with unexpected data type: ${data.runtimeType}. Expected Map<String, dynamic>.');
       }
     });
   }

@@ -437,6 +437,57 @@ class DataController extends GetxController {
     }
   }
 
+  // Method to fetch a single post by its ID and update it in the local list
+  Future<void> fetchSinglePost(String postId) async {
+    if (postId.isEmpty) {
+      print('[DataController] fetchSinglePost: postId is empty. Cannot fetch.');
+      return;
+    }
+    // Optional: Add a loading state for this specific post if needed for UI
+    // isLoadingPost[postId] = true; (would require managing a map of loading states)
+    print('[DataController] Fetching single post: $postId');
+
+    try {
+      var token = user.value['token'];
+      if (token == null) {
+        print('[DataController] fetchSinglePost: User token not found. Cannot fetch post $postId.');
+        throw Exception('User token not found');
+      }
+
+      // Assuming an endpoint like /api/posts/get-post/:postId
+      // Adjust the endpoint as per your backend API structure.
+      var response = await _dio.get(
+        'api/posts/get-post/$postId',
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true && response.data['post'] != null) {
+        Map<String, dynamic> fetchedPostData = Map<String, dynamic>.from(response.data['post']);
+        // Use the existing updatePostFromSocket logic to process and replace the post
+        // This ensures consistent handling of post data and derived counts.
+        updatePostFromSocket(fetchedPostData);
+        print('[DataController] Successfully fetched and updated post $postId.');
+      } else {
+        print('[DataController] Failed to fetch post $postId. Status: ${response.statusCode}, Message: ${response.data['message']}');
+        throw Exception('Failed to fetch post $postId: ${response.data['message'] ?? "Unknown server error"}');
+      }
+    } catch (e) {
+      print('[DataController] Error fetching single post $postId: $e');
+      // Optional: Set an error state for this specific post if needed for UI
+      // postErrors[postId] = e.toString();
+      // Rethrow if the caller needs to handle it, or handle silently here.
+      // For now, just logging.
+    } finally {
+      // Optional: Clear loading state for this specific post
+      // isLoadingPost[postId] = false;
+    }
+  }
+
+
   // fetch all feeds for timeline
   Future<void> fetchFeeds() async {
     try {
@@ -980,70 +1031,46 @@ class DataController extends GetxController {
     }
   }
 
-  // Method to update post views reactively from socket event
-  void updatePostViews(String postId, int viewsCount) {
+  // Method to update a post in the local list with data from a socket event (e.g. like, unlike, view)
+  void updatePostFromSocket(Map<String, dynamic> updatedPostData) {
+    final String? postId = updatedPostData['_id'] as String?;
+    if (postId == null) {
+      print('[DataController] updatePostFromSocket: Received post data without an ID. Cannot update. Data: $updatedPostData');
+      return;
+    }
+
     try {
       int postIndex = posts.indexWhere((p) => p['_id'] == postId);
       if (postIndex != -1) {
-        // Create a new map with the updated views count
-        var updatedPost = Map<String, dynamic>.from(posts[postIndex]);
+        // Ensure count fields are derived correctly from the updated post data's arrays
+        // before replacing the local post.
+        Map<String, dynamic> processedPostData = Map<String, dynamic>.from(updatedPostData);
+        processedPostData['likesCount'] = (processedPostData['likes'] as List?)?.length ?? 0;
+        processedPostData['repostsCount'] = (processedPostData['reposts'] as List?)?.length ?? 0;
+        processedPostData['viewsCount'] = (processedPostData['views'] as List?)?.length ?? 0;
+        // If the backend also sends counts directly (e.g. viewsCount from a view event),
+        // we can prioritize that if needed, but deriving from the array length is safer if the array is the source of truth.
+        // For 'postViewed' specifically, if it only sends 'viewsCount' and not the full 'views' array,
+        // then `fetchSinglePost` (next step) will be more robust.
+        // For now, this method assumes the socket event provides the full updated post, including arrays.
 
-        // Assuming the backend sends the total views count.
-        // The 'views' field in the local post map might be a list of user IDs or just a count.
-        // For simplicity and based on the Mongoose schema, 'views' is an array of user IDs.
-        // The `viewsCount` from the socket event directly reflects `post.views.length` on the backend.
-        // We can store this count directly if the UI only needs the number.
-        // Or, if the local 'views' field is expected to be a list, this logic might differ.
-        // Let's assume for now we want to store the count in a field like 'viewsCount'
-        // or update the length of a 'views' list if that's how it's structured locally.
-
-        // If your local post map has a 'viewsCount' field:
-        updatedPost['viewsCount'] = viewsCount; // If you add a specific field for the count
-
-        // Or, if your local post map has a 'views' field that is a list (as per schema)
-        // and you want to reflect the count there, you might need to adjust.
-        // However, the socket is sending 'viewsCount', so using/adding a field for it is direct.
-        // Let's ensure the post map has a 'views' field that can store this count,
-        // or a new dedicated field. If 'views' is an array of user IDs, updating it
-        // with just a count would change its meaning.
-        //
-        // The original schema has `views: [ObjectId]`.
-        // The socket event sends `viewsCount`.
-        // For the UI to update the *number* of views, we need a field that holds this number.
-        // If the `ChatterPost` model (or the map structure in `posts`) has a field like `viewsCount`
-        // or if the number of views is derived from `post['views'].length`, we update accordingly.
-
-        // Let's assume the post map directly stores the list of viewers in `post['views']`
-        // and the UI is (or will be) responsible for displaying `post['views'].length`.
-        // The socket event provides `viewsCount`. If the local `views` array isn't being updated
-        // with actual viewer IDs through the socket (which it isn't, per current plan),
-        // then storing `viewsCount` in a dedicated field is cleaner.
-
-        // If the post objects in `posts` are expected to have a `views` field that is a List,
-        // and a separate `viewsCount` field for display:
-        if (updatedPost.containsKey('views') && updatedPost['views'] is List) {
-             // We don't have the actual list of viewer IDs from this event, only the count.
-             // So, we can't directly update the 'views' list to match the count without dummy data.
-             // It's better to have a dedicated 'viewsCount' field or ensure the UI uses .length.
-        }
-        // Add or update a 'viewsCount' field. Many UI models have a separate field for counts.
-        // If the original post map from `fetchFeeds` doesn't include `viewsCount` explicitly,
-        // this adds it. If it does, this updates it.
-        updatedPost['viewsCount'] = viewsCount; // This is the most straightforward.
-
-
-        // To ensure reactivity, replace the old post map with the updated one.
-        posts[postIndex] = updatedPost;
-        // posts.refresh(); // Call refresh if the list itself or its items are replaced.
-                           // Replacing an item by index should trigger GetX reactivity.
-        print('[DataController] Updated views for post $postId to $viewsCount');
+        posts[postIndex] = processedPostData;
+        // posts.refresh(); // Usually not needed for item replacement
+        print('[DataController] Post $postId updated from socket event.');
       } else {
-        print('[DataController] updatePostViews: Post with ID $postId not found in local list.');
+        print('[DataController] updatePostFromSocket: Post with ID $postId not found in local list. It might be a new post not yet added or an issue with ID matching.');
+        // Optionally, if it's a new post (e.g. from another user), we might want to add it here
+        // addNewPost(updatedPostData); // Consider if this is appropriate or if new posts are handled by a different event
       }
     } catch (e) {
-      print('[DataController] Error updating post views for $postId: $e');
+      print('[DataController] Error updating post $postId from socket: $e. Data: $updatedPostData');
     }
   }
+
+
+  // The old updatePostViews method is now removed.
+  // View updates are handled by the postViewed socket event triggering fetchSinglePost,
+  // which then calls updatePostFromSocket with the full, authoritative post data.
 
 
   // Existing video transition methods - might need review if they conflict or overlap
