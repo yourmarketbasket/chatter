@@ -335,7 +335,13 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     final DateTime timestamp = post['createdAt'] is String 
     ? DateTime.parse(post['createdAt'] as String).toUtc() 
     : DateTime.now().toUtc();
-    final likes = post['likes'].length as int? ?? 0;
+
+    // Likes processing
+    final List<dynamic> likesList = post['likes'] as List<dynamic>? ?? [];
+    final int likesCount = likesList.length;
+    final String currentUserId = dataController.user.value['user']?['_id']?.toString() ?? '';
+    final bool isLikedByCurrentUser = currentUserId.isNotEmpty && likesList.map((like) => like.toString()).contains(currentUserId);
+
     int reposts = post['reposts'] as int? ?? 0;
     int views = post['views'] as int? ?? 0;
     List<Map<String, dynamic>> attachments = (post['attachments'] as List<dynamic>?)?.map((e) => e as Map<String, dynamic>).toList() ?? [];
@@ -426,10 +432,73 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _buildActionButton(FeatherIcons.heart, '$likes', await dataController.likePost(postId)),
-                          _buildActionButton(FeatherIcons.messageCircle, '$replyCount', () => _navigateToReplyPage(post)), // This is fine, specific button
+                          // Updated Like Button
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: Icon(
+                                  isLikedByCurrentUser ? Icons.favorite : Icons.favorite_border, // Filled vs. empty heart
+                                  color: isLikedByCurrentUser ? Colors.pinkAccent : Colors.white, // Pink if liked
+                                  size: 15,
+                                ),
+                                onPressed: () async {
+                                  if (currentUserId.isEmpty) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Please log in to like posts.', style: GoogleFonts.roboto(color: Colors.white)), backgroundColor: Colors.red[700]),
+                                    );
+                                    return;
+                                  }
+
+                                  final postIndex = dataController.posts.indexWhere((p) => p['_id'] == postId);
+                                  if (postIndex == -1) return;
+
+                                  Map<String, dynamic> currentPostData = Map<String, dynamic>.from(dataController.posts[postIndex]);
+                                  List<dynamic> currentLikes = List<dynamic>.from(currentPostData['likes'] ?? []);
+
+                                  if (isLikedByCurrentUser) {
+                                    // Unlike action
+                                    var result = await dataController.unlikePost(postId);
+                                    if (result['success'] == true) {
+                                      currentLikes.removeWhere((userId) => userId.toString() == currentUserId);
+                                      currentPostData['likes'] = currentLikes;
+                                      // Update the specific post in the controller's list
+                                      dataController.posts[postIndex] = currentPostData;
+                                      // No need to call posts.refresh() if individual item update triggers Obx,
+                                      // but if not, then it would be needed.
+                                      // Forcing a local rebuild of this specific post item might be better.
+                                      // However, modifying the item in the RxList should trigger Obx.
+                                      // Let's ensure this item update is reactive.
+                                      // If the entire post list is rebuilt, it will pick up the change.
+                                      // For now, relying on Obx reacting to list item change.
+                                      setState(() {}); // Trigger rebuild of the parent widget to reflect change
+                                    } else {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('Failed to unlike post: ${result['message']}', style: GoogleFonts.roboto(color: Colors.white)), backgroundColor: Colors.red[700]),
+                                      );
+                                    }
+                                  } else {
+                                    // Like action
+                                    var result = await dataController.likePost(postId);
+                                    if (result['success'] == true) {
+                                      currentLikes.add(currentUserId);
+                                      currentPostData['likes'] = currentLikes;
+                                      dataController.posts[postIndex] = currentPostData;
+                                      setState(() {}); // Trigger rebuild
+                                    } else {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('Failed to like post: ${result['message']}', style: GoogleFonts.roboto(color: Colors.white)), backgroundColor: Colors.red[700]),
+                                      );
+                                    }
+                                  }
+                                },
+                              ),
+                              Text('$likesCount', style: GoogleFonts.roboto(color: Colors.white, fontSize: 14)), // Use likesCount
+                            ],
+                          ),
+                          _buildActionButton(FeatherIcons.messageCircle, '$replyCount', () => _navigateToReplyPage(post)),
                           _buildActionButton(FeatherIcons.repeat, '$reposts', () => _navigateToRepostPage(post)),
-                          _buildActionButton(FeatherIcons.eye, '$views', () {}),
+                          _buildActionButton(FeatherIcons.eye, '$views', () {}), // Assuming views are handled elsewhere or not interactive
                         ],
                       ),
                     ),
@@ -725,7 +794,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                 ? DateTime.parse(post['createdAt'] as String).toUtc() 
                 : DateTime.now().toUtc(),
               viewsCount: post['views'] as int? ?? 0,
-              likesCount: post['likes'].length,
+              likesCount: (post['likes'] as List<dynamic>? ?? []).length, // Corrected likesCount
               repostsCount: post['reposts'] as int? ?? 0,
             ),
           ),

@@ -62,7 +62,7 @@ class Post {
   final String username;
   final String userId;
   final String? content;
-  final num likes;
+  final List<String> likes; // Changed from num to List<String>
   final num reposts;
   final num views;
   final List<Attachment> attachments;
@@ -79,7 +79,7 @@ class Post {
     required this.username,
     required this.userId,
     this.content,
-    this.likes = 0,
+    this.likes = const [], // Initialize with an empty list
     this.reposts = 0,
     this.views = 0,
     this.attachments = const [],
@@ -112,7 +112,8 @@ class Post {
       username: json['username'] as String,
       userId: json['userId'] as String,
       content: json['content'] as String?,
-      likes: json['likes'] as num? ?? 0,
+      // Updated to parse a list of strings for likes
+      likes: json['likes'] != null ? List<String>.from(json['likes'] as List) : [],
       reposts: json['reposts'] as num? ?? 0,
       views: json['views'] as num? ?? 0,
       attachments: attachmentsList,
