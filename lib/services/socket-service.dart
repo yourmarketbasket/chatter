@@ -78,6 +78,23 @@ class SocketService {
         // }
       }
     });
+
+    // Listen for postViewed event
+    _socket!.on('postViewed', (data) {
+      print('postViewed event received: $data');
+      if (data is Map<String, dynamic>) {
+        final String? postId = data['postId'] as String?;
+        final int? viewsCount = data['views'] as int?; // Or however the count is sent
+
+        if (postId != null && viewsCount != null) {
+          _dataController.updatePostViews(postId, viewsCount);
+        } else {
+          print('Received postViewed event with missing postId or viewsCount: $data');
+        }
+      } else {
+        print('Received postViewed event with unexpected data type: ${data.runtimeType}');
+      }
+    });
   }
 
   void connect() {

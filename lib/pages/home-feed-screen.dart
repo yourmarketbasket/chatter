@@ -161,9 +161,11 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     );
 
     if (confirmed == true) {
-      setState(() {
-        post['reposts'] = (post['reposts'] ?? 0) + 1;
-      });
+      // setState(() {
+      //   // TODO: Implement proper optimistic UI update for repost count.
+      //   // The line below is incorrect as post['reposts'] is a List, not an int.
+      //   // post['reposts'] = (post['reposts'] ?? 0) + 1;
+      // });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -407,8 +409,18 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     final String currentUserId = dataController.user.value['user']?['_id'] ?? '';
     final bool isLikedByCurrentUser = likesList.any((like) => (like is Map ? like['_id'] == currentUserId : like == currentUserId));
 
-    int reposts = post['reposts'] as int? ?? 0;
-    int views = post['views'] as int? ?? 0;
+    List<dynamic> repostsList = post['reposts'] as List<dynamic>? ?? [];
+    int repostsCount = repostsList.length;
+
+    int views;
+    if (post.containsKey('viewsCount') && post['viewsCount'] is int) {
+      views = post['viewsCount'] as int;
+    } else if (post.containsKey('views') && post['views'] is List) {
+      views = (post['views'] as List<dynamic>).length;
+    } else {
+      views = 0; // Default if neither field is valid
+    }
+
     List<Map<String, dynamic>> attachments = (post['attachments'] as List<dynamic>?)?.map((e) => e as Map<String, dynamic>).toList() ?? [];
     int replyCount = (post['replies'] as List<dynamic>?)?.length ?? post['replyCount'] as int? ?? 0;
 
@@ -504,7 +516,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                             isLiked: isLikedByCurrentUser
                           ),
                           _buildActionButton(FeatherIcons.messageCircle, '$replyCount', () => _navigateToReplyPage(post)), // This is fine, specific button
-                          _buildActionButton(FeatherIcons.repeat, '$reposts', () => _navigateToRepostPage(post)),
+                          _buildActionButton(FeatherIcons.repeat, '$repostsCount', () => _navigateToRepostPage(post)),
                           _buildActionButton(FeatherIcons.eye, '$views', () {}), // Assuming views are handled elsewhere or not interactive
                         ],
                       ),
@@ -589,8 +601,14 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
 
     if (attachmentsArg.length == 1) {
       final attachment = attachmentsArg[0];
-      // For single attachments in the feed, always use a 4:3 aspect ratio.
-      const double aspectRatioToUse = 4.0 / 3.0;
+      final String attachmentType = attachment['type'] as String? ?? 'unknown';
+      double aspectRatioToUse;
+
+      if (attachmentType == 'video') {
+        aspectRatioToUse = 4 / 3;
+      } else {
+        aspectRatioToUse = 4 / 3;
+      }
 
       return AspectRatio(
         aspectRatio: aspectRatioToUse, // Enforce 4:3 aspect ratio
@@ -813,22 +831,41 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       contentWidget = Container(color: Colors.grey[900], child: const Icon(FeatherIcons.fileText, color: Colors.grey, size: 40));
     }
 
-    // The GestureDetector for tap handling is now part of the individual attachment widgets where needed (like PdfThumbnailWidget's onTap)
-    // or remains here if the contentWidget itself isn't handling taps.
-    // For PDF, the tap is handled by PdfThumbnailWidget or its fallback.
-    // For other types, the existing GestureDetector is still relevant.
-
-    if (attachmentType == "pdf") {
-       return ClipRRect( // PDF contentWidget (PdfThumbnailWidget) already handles tap
-        borderRadius: borderRadius,
-        child: contentWidget,
-      );
-    }
-
-    // Existing GestureDetector for non-PDF types
     return GestureDetector(
       onTap: () {
-        _navigateToMediaViewPage(context, correctlyTypedPostAttachments, attachmentMap, post, idx);
+        // Determine initial index for MediaViewPage
+        int currentIdxInAllAttachments = correctlyTypedPostAttachments.indexWhere((att) =>
+            (att['url'] != null && att['url'] == attachmentMap['url']) ||
+            (att['_id'] != null && att['_id'] == attachmentMap['_id']) ||
+            (att.hashCode == attachmentMap.hashCode) // Fallback, less reliable
+        );
+        if (currentIdxInAllAttachments == -1) currentIdxInAllAttachments = idx; // Use provided idx if not found by content
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MediaViewPage(
+              attachments: correctlyTypedPostAttachments, // Pass all attachments of the post
+              initialIndex: currentIdxInAllAttachments, // Index within all attachments of the post
+              message: post['content'] as String? ?? '',
+              userName: post['username'] as String? ?? 'Unknown User',
+              userAvatarUrl: post['useravatar'] as String?,
+              timestamp: post['createdAt'] is String
+                ? DateTime.parse(post['createdAt'] as String).toUtc()
+                : DateTime.now().toUtc(),
+              viewsCount: () {
+                if (post.containsKey('viewsCount') && post['viewsCount'] is int) {
+                  return post['viewsCount'] as int;
+                } else if (post.containsKey('views') && post['views'] is List) {
+                  return (post['views'] as List<dynamic>).length;
+                }
+                return 0; // Default if neither field is valid
+              }(),
+              likesCount: (post['likes'] as List<dynamic>? ?? []).length, // Corrected likesCount
+              repostsCount: (post['reposts'] as List<dynamic>? ?? []).length,
+            ),
+          ),
+        );
       },
       child: ClipRRect(
         borderRadius: borderRadius,

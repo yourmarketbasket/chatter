@@ -155,6 +155,34 @@ class DataController extends GetxController {
     }
   }
 
+  // view post - THIS IS THE ORIGINAL METHOD PROVIDED BY THE USER
+  Future<Map<String, dynamic>> viewPost(String postId) async {
+    try {
+      String? token = user.value['token'];
+      var response = await _dio.post(
+        'api/posts/view-post', // Endpoint from the user's original method
+        data: {'postId': postId, 'userId': user.value['user']['_id']},
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          }
+        )
+      );
+      // print(response.data);
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        // No local state update for views here; that will be handled by socket event.
+        print('[DataController] Post view for $postId recorded successfully via original method.');
+        return {'success': true, 'message': 'Post viewed successfully'};
+      } else {
+        print('[DataController] Failed to record post view for $postId via original method: ${response.data['message'] ?? 'Unknown error'}');
+        return {'success': false, 'message': response.data['message'] ?? 'Post view failed'};
+      }
+    } catch (e) {
+      print('[DataController] Error recording post view for $postId via original method: $e');
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
   // like post
   Future<Map<String, dynamic>> likePost(String postId) async {
     try {
@@ -241,28 +269,28 @@ class DataController extends GetxController {
     }
   }
   // view post
-  Future<Map<String, dynamic>> viewPost(String postId) async {
-    try {
-      String? token = user.value['token'];
-      var response = await _dio.post(
-        'api/posts/view-post',
-        data: {'postId': postId, 'userId': user.value['user']['_id']},
-        options: dio.Options(
-          headers: {
-            'Authorization': 'Bearer $token',
-          }
-        )
-      );
-      // print(response.data);
-      if (response.statusCode == 200 && response.data['success'] == true) {
-        return {'success': true, 'message': 'Post viewed successfully'};
-      } else {
-        return {'success': false, 'message': response.data['message'] ?? 'Post view failed'};
-      }
-    } catch (e) {
-      return {'success': false, 'message': e.toString()};
-    }
-  }
+  // Future<Map<String, dynamic>> viewPost(String postId) async {
+  //   try {
+  //     String? token = user.value['token'];
+  //     var response = await _dio.post(
+  //       'api/posts/view-post',
+  //       data: {'postId': postId, 'userId': user.value['user']['_id']},
+  //       options: dio.Options(
+  //         headers: {
+  //           'Authorization': 'Bearer $token',
+  //         }
+  //       )
+  //     );
+  //     // print(response.data);
+  //     if (response.statusCode == 200 && response.data['success'] == true) {
+  //       return {'success': true, 'message': 'Post viewed successfully'};
+  //     } else {
+  //       return {'success': false, 'message': response.data['message'] ?? 'Post view failed'};
+  //     }
+  //   } catch (e) {
+  //     return {'success': false, 'message': e.toString()};
+  //   }
+  // }
 
   // Method to reply to a post
   Future<Map<String, dynamic>> replyToPost({
@@ -918,6 +946,72 @@ class DataController extends GetxController {
       print("[DataController] Media $mediaId (type: $mediaType) stopped playing. Releasing global lock.");
     }
   }
+
+  // Method to update post views reactively from socket event
+  void updatePostViews(String postId, int viewsCount) {
+    try {
+      int postIndex = posts.indexWhere((p) => p['_id'] == postId);
+      if (postIndex != -1) {
+        // Create a new map with the updated views count
+        var updatedPost = Map<String, dynamic>.from(posts[postIndex]);
+
+        // Assuming the backend sends the total views count.
+        // The 'views' field in the local post map might be a list of user IDs or just a count.
+        // For simplicity and based on the Mongoose schema, 'views' is an array of user IDs.
+        // The `viewsCount` from the socket event directly reflects `post.views.length` on the backend.
+        // We can store this count directly if the UI only needs the number.
+        // Or, if the local 'views' field is expected to be a list, this logic might differ.
+        // Let's assume for now we want to store the count in a field like 'viewsCount'
+        // or update the length of a 'views' list if that's how it's structured locally.
+
+        // If your local post map has a 'viewsCount' field:
+        updatedPost['viewsCount'] = viewsCount; // If you add a specific field for the count
+
+        // Or, if your local post map has a 'views' field that is a list (as per schema)
+        // and you want to reflect the count there, you might need to adjust.
+        // However, the socket is sending 'viewsCount', so using/adding a field for it is direct.
+        // Let's ensure the post map has a 'views' field that can store this count,
+        // or a new dedicated field. If 'views' is an array of user IDs, updating it
+        // with just a count would change its meaning.
+        //
+        // The original schema has `views: [ObjectId]`.
+        // The socket event sends `viewsCount`.
+        // For the UI to update the *number* of views, we need a field that holds this number.
+        // If the `ChatterPost` model (or the map structure in `posts`) has a field like `viewsCount`
+        // or if the number of views is derived from `post['views'].length`, we update accordingly.
+
+        // Let's assume the post map directly stores the list of viewers in `post['views']`
+        // and the UI is (or will be) responsible for displaying `post['views'].length`.
+        // The socket event provides `viewsCount`. If the local `views` array isn't being updated
+        // with actual viewer IDs through the socket (which it isn't, per current plan),
+        // then storing `viewsCount` in a dedicated field is cleaner.
+
+        // If the post objects in `posts` are expected to have a `views` field that is a List,
+        // and a separate `viewsCount` field for display:
+        if (updatedPost.containsKey('views') && updatedPost['views'] is List) {
+             // We don't have the actual list of viewer IDs from this event, only the count.
+             // So, we can't directly update the 'views' list to match the count without dummy data.
+             // It's better to have a dedicated 'viewsCount' field or ensure the UI uses .length.
+        }
+        // Add or update a 'viewsCount' field. Many UI models have a separate field for counts.
+        // If the original post map from `fetchFeeds` doesn't include `viewsCount` explicitly,
+        // this adds it. If it does, this updates it.
+        updatedPost['viewsCount'] = viewsCount; // This is the most straightforward.
+
+
+        // To ensure reactivity, replace the old post map with the updated one.
+        posts[postIndex] = updatedPost;
+        // posts.refresh(); // Call refresh if the list itself or its items are replaced.
+                           // Replacing an item by index should trigger GetX reactivity.
+        print('[DataController] Updated views for post $postId to $viewsCount');
+      } else {
+        print('[DataController] updatePostViews: Post with ID $postId not found in local list.');
+      }
+    } catch (e) {
+      print('[DataController] Error updating post views for $postId: $e');
+    }
+  }
+
 
   // Existing video transition methods - might need review if they conflict or overlap
   // For now, videoDidStartPlaying and videoDidStopPlaying are effectively replaced by the generic media methods.

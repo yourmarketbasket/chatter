@@ -41,6 +41,14 @@ class _ReplyPageState extends State<ReplyPage> {
     super.initState();
     _dataController = Get.find<DataController>();
     _fetchPostReplies(); // Fetch replies when the page loads
+
+    // Call viewPost when the reply page is opened
+    if (widget.post['_id'] != null) {
+      _dataController.viewPost(widget.post['_id'] as String);
+    } else {
+      print("Error: Post ID is null in ReplyPage. Cannot record view.");
+      // Optionally, show a user-facing error or log more formally
+    }
   }
 
   // Method to fetch replies
