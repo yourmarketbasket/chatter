@@ -158,6 +158,7 @@ class DataController extends GetxController {
   // like post
   Future<Map<String, dynamic>> likePost(String postId) async {
     try {
+      String? token = user.value['token'];
       final String currentUserId = user.value['user']['_id'];
       if (currentUserId == null) {
         return {'success': false, 'message': 'User not logged in'};
@@ -165,6 +166,11 @@ class DataController extends GetxController {
 
       var response = await _dio.post(
         'api/posts/like-post',
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer ${user.value['token']}',
+          }
+        ),
         data: {'postId': postId, 'userId': currentUserId},
       );
       if (response.statusCode == 200 && response.data['success'] == true) {
@@ -196,6 +202,7 @@ class DataController extends GetxController {
   // unlike post
   Future<Map<String, dynamic>> unlikePost(String postId) async {
     try {
+      String? token = user.value['token'];
       final String currentUserId = user.value['user']['_id'];
       if (currentUserId == null) {
         return {'success': false, 'message': 'User not logged in'};
@@ -203,6 +210,11 @@ class DataController extends GetxController {
 
       var response = await _dio.post(
         'api/posts/unlike-post',
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          }
+        ),
         data: {'postId': postId, 'userId': currentUserId},
       );
       if (response.statusCode == 200 && response.data['success'] == true) {
