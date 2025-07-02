@@ -240,6 +240,29 @@ class DataController extends GetxController {
       return {'success': false, 'message': e.toString()};
     }
   }
+  // view post
+  Future<Map<String, dynamic>> viewPost(String postId) async {
+    try {
+      String? token = user.value['token'];
+      var response = await _dio.post(
+        'api/posts/view-post',
+        data: {'postId': postId, 'userId': user.value['user']['_id']},
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          }
+        )
+      );
+      // print(response.data);
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return {'success': true, 'message': 'Post viewed successfully'};
+      } else {
+        return {'success': false, 'message': response.data['message'] ?? 'Post view failed'};
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
 
   // Method to reply to a post
   Future<Map<String, dynamic>> replyToPost({

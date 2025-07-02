@@ -996,7 +996,7 @@ class _PdfThumbnailWidgetState extends State<PdfThumbnailWidget> {
           margin: 0,
           maxScale: 1.0, // For a thumbnail, don't allow scaling within itself
           minScale: 1.0,
-          viewerOverlayBuilder: (context, pageSize, viewRect, document, pageNumber) => [], // Corrected signature
+          // viewerOverlayBuilder: (context, pageSize, viewRect, document, pageNumber) => [], // Removed due to signature mismatch
           loadingBannerBuilder: (context, bytesLoaded, totalBytes) {
             // Show a simple loading indicator if it takes time
             return Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent.withOpacity(0.5)), strokeWidth: 2,));
