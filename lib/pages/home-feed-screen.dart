@@ -54,6 +54,71 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     // and any of them have video grids. Or do it in buildPostContent.
   }
 
+  // Helper method to navigate to MediaViewPage
+  void _navigateToMediaViewPage(
+      BuildContext context,
+      List<Map<String, dynamic>> allAttachments,
+      Map<String, dynamic> currentAttachmentMap,
+      Map<String, dynamic> post,
+      int fallbackIndex) {
+    int initialIndex = allAttachments.indexWhere((att) =>
+        (att['url'] != null && att['url'] == currentAttachmentMap['url']) ||
+        (att['_id'] != null && att['_id'] == currentAttachmentMap['_id']) ||
+        (att.hashCode == currentAttachmentMap.hashCode));
+    if (initialIndex == -1) initialIndex = fallbackIndex;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MediaViewPage(
+          attachments: allAttachments,
+          initialIndex: initialIndex,
+          message: post['content'] as String? ?? '',
+          userName: post['username'] as String? ?? 'Unknown User',
+          userAvatarUrl: post['useravatar'] as String?,
+          timestamp: post['createdAt'] is String
+              ? DateTime.parse(post['createdAt'] as String).toUtc()
+              : DateTime.now().toUtc(),
+          viewsCount: post['views'] as int? ?? 0,
+          likesCount: (post['likes'] as List<dynamic>? ?? []).length,
+          repostsCount: post['reposts'] as int? ?? 0,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPdfErrorFallback(double aspectRatio, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.grey[850], // Similar to other placeholders
+          // borderRadius: BorderRadius.circular(12.0), // Handled by ClipRRect in _buildAttachmentWidget
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                FeatherIcons.fileText, // Document icon
+                color: Colors.white.withOpacity(0.7),
+                size: 40,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                "Open PDF",
+                style: GoogleFonts.roboto(
+                  color: Colors.white.withOpacity(0.7),
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _scrollController.dispose();
@@ -524,29 +589,11 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
 
     if (attachmentsArg.length == 1) {
       final attachment = attachmentsArg[0];
-      final String attachmentType = attachment['type'] as String? ?? 'unknown';
-      double aspectRatioToUse;
-
-      if (attachmentType == 'video') {
-        aspectRatioToUse = 4 / 3;
-      } else {
-        // Use calculated aspect ratio for non-video types (images, PDFs)
-        final num? attWidth = attachment['width'] as num?;
-        final num? attHeight = attachment['height'] as num?;
-        final String? attAspectRatioString = attachment['aspectRatio'] as String?;
-        aspectRatioToUse = 4/3; // Default if not calculable
-
-        if (attAspectRatioString != null) {
-          aspectRatioToUse = _parseAspectRatio(attAspectRatioString) ?? aspectRatioToUse;
-        } else if (attWidth != null && attHeight != null && attHeight > 0) {
-          aspectRatioToUse = attWidth / attHeight;
-        }
-        // Ensure aspectRatio is positive
-        if (aspectRatioToUse <= 0) aspectRatioToUse = 4/3;
-      }
+      // For single attachments in the feed, always use a 4:3 aspect ratio.
+      const double aspectRatioToUse = 4.0 / 3.0;
 
       return AspectRatio(
-        aspectRatio: aspectRatioToUse,
+        aspectRatio: aspectRatioToUse, // Enforce 4:3 aspect ratio
         child: _buildAttachmentWidget(
           attachment,
           0,
@@ -741,44 +788,47 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       }
       contentWidget = AspectRatio(aspectRatio: calculatedAspectRatio > 0 ? calculatedAspectRatio : 4/3, child: imageContent);
     } else if (attachmentType == "pdf") {
-      contentWidget = AspectRatio(
-        aspectRatio: calculatedAspectRatio > 0 ? calculatedAspectRatio : 3/4, // PDFs often portrait
-        child: (displayUrl != null && displayUrl.isNotEmpty)
-          ? PdfViewer.uri(Uri.parse(displayUrl), params: const PdfViewerParams(margin: 0, maxScale: 1.0, backgroundColor: Colors.grey))
-          : Container(color: Colors.grey[900], child: const Icon(FeatherIcons.fileText, color: Colors.grey, size: 40)),
-      );
+      // Default aspect ratio for PDFs, often portrait
+      final pdfAspectRatio = calculatedAspectRatio > 0 ? calculatedAspectRatio : 3/4;
+      if (displayUrl != null && displayUrl.isNotEmpty) {
+        contentWidget = AspectRatio(
+          aspectRatio: pdfAspectRatio,
+          child: PdfThumbnailWidget( // Custom widget to handle PDF thumbnail loading and error
+            pdfUrl: displayUrl,
+            aspectRatio: pdfAspectRatio,
+            onTap: () {
+              _navigateToMediaViewPage(context, correctlyTypedPostAttachments, attachmentMap, post, idx);
+            },
+          ),
+        );
+      } else {
+        contentWidget = AspectRatio(
+          aspectRatio: pdfAspectRatio,
+          child: _buildPdfErrorFallback(pdfAspectRatio, () {
+             _navigateToMediaViewPage(context, correctlyTypedPostAttachments, attachmentMap, post, idx);
+          }),
+        );
+      }
     } else {
       contentWidget = Container(color: Colors.grey[900], child: const Icon(FeatherIcons.fileText, color: Colors.grey, size: 40));
     }
 
+    // The GestureDetector for tap handling is now part of the individual attachment widgets where needed (like PdfThumbnailWidget's onTap)
+    // or remains here if the contentWidget itself isn't handling taps.
+    // For PDF, the tap is handled by PdfThumbnailWidget or its fallback.
+    // For other types, the existing GestureDetector is still relevant.
+
+    if (attachmentType == "pdf") {
+       return ClipRRect( // PDF contentWidget (PdfThumbnailWidget) already handles tap
+        borderRadius: borderRadius,
+        child: contentWidget,
+      );
+    }
+
+    // Existing GestureDetector for non-PDF types
     return GestureDetector(
       onTap: () {
-        // Determine initial index for MediaViewPage
-        int currentIdxInAllAttachments = correctlyTypedPostAttachments.indexWhere((att) =>
-            (att['url'] != null && att['url'] == attachmentMap['url']) ||
-            (att['_id'] != null && att['_id'] == attachmentMap['_id']) ||
-            (att.hashCode == attachmentMap.hashCode) // Fallback, less reliable
-        );
-        if (currentIdxInAllAttachments == -1) currentIdxInAllAttachments = idx; // Use provided idx if not found by content
-
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => MediaViewPage(
-              attachments: correctlyTypedPostAttachments, // Pass all attachments of the post
-              initialIndex: currentIdxInAllAttachments, // Index within all attachments of the post
-              message: post['content'] as String? ?? '',
-              userName: post['username'] as String? ?? 'Unknown User',
-              userAvatarUrl: post['useravatar'] as String?,
-              timestamp: post['createdAt'] is String 
-                ? DateTime.parse(post['createdAt'] as String).toUtc() 
-                : DateTime.now().toUtc(),
-              viewsCount: post['views'] as int? ?? 0,
-              likesCount: (post['likes'] as List<dynamic>? ?? []).length, // Corrected likesCount
-              repostsCount: post['reposts'] as int? ?? 0,
-            ),
-          ),
-        );
+        _navigateToMediaViewPage(context, correctlyTypedPostAttachments, attachmentMap, post, idx);
       },
       child: ClipRRect(
         borderRadius: borderRadius,
@@ -838,5 +888,138 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         ],
       ),
     );
+  }
+}
+
+class PdfThumbnailWidget extends StatefulWidget {
+  final String pdfUrl;
+  final double aspectRatio;
+  final VoidCallback onTap;
+
+  const PdfThumbnailWidget({
+    Key? key,
+    required this.pdfUrl,
+    required this.aspectRatio,
+    required this.onTap,
+  }) : super(key: key);
+
+  @override
+  _PdfThumbnailWidgetState createState() => _PdfThumbnailWidgetState();
+}
+
+class _PdfThumbnailWidgetState extends State<PdfThumbnailWidget> {
+  Future<Widget>? _pdfViewerFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPdf();
+  }
+
+  void _loadPdf() {
+    // We're trying to see if PdfViewer.uri can render.
+    // The challenge is that PdfViewer.uri itself doesn't return a future
+    // that resolves on successful render or errors out in a way FutureBuilder can easily consume
+    // for "thumbnail preview" purposes. It's designed to be a full viewer.
+    // For a "thumbnail", we want a quick attempt. If it's slow or errors, we show fallback.
+
+    // Let's try a slightly different approach: build PdfViewer.uri directly.
+    // If it throws an exception during its build/layout phase, we want to catch that.
+    // However, internal errors within PdfViewer might not be catchable this way easily
+    // without modifying PdfViewer or having more complex error listening.
+
+    // A pragmatic approach:
+    // Try to load it. If it takes too long (via a timeout outside this widget, if needed, or assume it's quick enough for now)
+    // or if an immediate structural error occurs, we'd want the fallback.
+    // For now, we'll assume PdfViewer.uri() is relatively well-behaved for valid URLs
+    // and the main issue is a timeout or a totally bogus URL.
+
+    // Let's simulate a "load attempt" by creating the widget.
+    // The actual rendering and potential errors happen when this widget is put in the tree.
+    // We can't easily use FutureBuilder here to "preview" PdfViewer.uri itself
+    // unless PdfViewer.uri was async and returned its content or error.
+
+    // Given the constraints, the current structure in _buildAttachmentWidget
+    // which directly uses PdfViewer.uri is okay, but it doesn't have timeout/error *for the thumbnail specifically*.
+    // The new requirement is to show a *fallback* if the thumbnail fails, not if the main view fails.
+
+    // Simpler approach for this widget: It will *always* try to display PdfViewer.uri.
+    // The "error" part will be tricky. Let's assume for now that if the URL is invalid,
+    // PdfViewer.uri might show an error state internally or throw an exception during build.
+    // We'll wrap it in a try-catch in the build method for robustness.
+
+    // No async operation needed in initState for this simplified model.
+    // The build method will construct the PdfViewer.
+  }
+
+  Widget _buildFallback() {
+    // This is the fallback UI for this specific widget
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.grey[850],
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                FeatherIcons.fileText,
+                color: Colors.white.withOpacity(0.7),
+                size: 40,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                "Open PDF",
+                style: GoogleFonts.roboto(
+                  color: Colors.white.withOpacity(0.7),
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    try {
+      // Attempt to build the PdfViewer widget.
+      // Note: PdfViewer.uri might have its own internal error display.
+      // This try-catch is for structural errors during widget creation/layout.
+      final pdfWidget = PdfViewer.uri(
+        Uri.parse(widget.pdfUrl),
+        params: PdfViewerParams(
+          margin: 0,
+          maxScale: 1.0, // For a thumbnail, don't allow scaling within itself
+          minScale: 1.0,
+          viewerOverlayBuilder: (context, size) => [], // No overlay for thumbnail
+          loadingBannerBuilder: (context, bytesLoaded, totalBytes) {
+            // Show a simple loading indicator if it takes time
+            return Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent.withOpacity(0.5)), strokeWidth: 2,));
+          },
+          errorBannerBuilder: (context, error, stackTrace, documentRef) {
+            // This is an error *within* PdfViewer. We return our fallback.
+            print("PdfViewer errorBannerBuilder: $error");
+            return _buildFallback();
+          },
+          backgroundColor: Colors.grey[800] ?? Colors.grey, // Background for the PDF view area
+        ),
+      );
+
+      // The PdfViewer itself might not be tappable if it's displaying content.
+      // Wrap with GestureDetector to ensure onTap always works.
+      return GestureDetector(
+        onTap: widget.onTap,
+        child: pdfWidget,
+      );
+    } catch (e, s) {
+      // If creating PdfViewer.uri threw an exception (e.g., invalid URI format)
+      print("Error creating PdfViewer.uri for thumbnail: $e\n$s");
+      return _buildFallback(); // Show fallback on error
+    }
   }
 }

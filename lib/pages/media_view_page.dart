@@ -29,7 +29,7 @@ class MediaViewPage extends StatefulWidget {
   final String? userAvatarUrl;
   final DateTime timestamp;
   final int viewsCount;
-  final likesCount;
+  final int likesCount; // Explicitly int
   final int repostsCount;
 
   const MediaViewPage({
