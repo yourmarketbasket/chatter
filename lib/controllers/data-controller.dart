@@ -16,20 +16,6 @@ class DataController extends GetxController {
     aOptions: AndroidOptions(
       encryptedSharedPreferences: true,
     ),
-  );
-
-  // Set to keep track of post IDs for which view registration is in progress
-  final Set<String> _pendingViewRegistrations = <String>{};
-
-  // URL
-  final String baseUrl = 'https://chatter-api.fly.dev/';
-  final dio.Dio _dio = dio.Dio(dio.BaseOptions(
-    baseUrl: 'https://chatter-api.fly.dev/',
-    connectTimeout: const Duration(seconds: 30),
-    receiveTimeout: const Duration(seconds: 30),
-    sendTimeout: const Duration(seconds: 30),
-  ));
-  final user = {}.obs;
     iOptions: IOSOptions(
       accessibility: KeychainAccessibility.first_unlock,
     ),
