@@ -542,19 +542,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       if (attachmentType == 'video') {
         aspectRatioToUse = 4 / 3;
       } else {
-        // Use calculated aspect ratio for non-video types (images, PDFs)
-        final num? attWidth = attachment['width'] as num?;
-        final num? attHeight = attachment['height'] as num?;
-        final String? attAspectRatioString = attachment['aspectRatio'] as String?;
-        aspectRatioToUse = 4/3; // Default if not calculable
-
-        if (attAspectRatioString != null) {
-          aspectRatioToUse = _parseAspectRatio(attAspectRatioString) ?? aspectRatioToUse;
-        } else if (attWidth != null && attHeight != null && attHeight > 0) {
-          aspectRatioToUse = attWidth / attHeight;
-        }
-        // Ensure aspectRatio is positive
-        if (aspectRatioToUse <= 0) aspectRatioToUse = 4/3;
+        aspectRatioToUse = 4 / 3;
       }
 
       return AspectRatio(

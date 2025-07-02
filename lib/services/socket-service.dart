@@ -84,7 +84,7 @@ class SocketService {
       print('postViewed event received: $data');
       if (data is Map<String, dynamic>) {
         final String? postId = data['postId'] as String?;
-        final int? viewsCount = data['viewsCount'] as int?; // Or however the count is sent
+        final int? viewsCount = data['views'] as int?; // Or however the count is sent
 
         if (postId != null && viewsCount != null) {
           _dataController.updatePostViews(postId, viewsCount);
