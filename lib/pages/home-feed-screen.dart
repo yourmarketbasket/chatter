@@ -326,21 +326,21 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   }
 
 
-  Future<Widget> _buildPostContent(Map<String, dynamic> post, {required bool isReply}) async {
+  Widget _buildPostContent(Map<String, dynamic> post, {required bool isReply}) {
     final String postId = post['_id'] as String? ?? post.hashCode.toString(); // Ensure postId is unique
     final String username = post['username'] as String? ?? 'Unknown User';
     final String content = post['content'] as String? ?? '';
     final String? userAvatar = post['useravatar'] as String?;
     final String avatarInitial = (username.isNotEmpty ? username[0].toUpperCase() : '?');
-    final DateTime timestamp = post['createdAt'] is String 
-    ? DateTime.parse(post['createdAt'] as String).toUtc() 
+    final DateTime timestamp = post['createdAt'] is String
+    ? DateTime.parse(post['createdAt'] as String).toUtc()
     : DateTime.now().toUtc();
 
     // Likes processing
     final List<dynamic> likesList = post['likes'] as List<dynamic>? ?? [];
     final int likesCount = likesList.length;
-    final String currentUserId = dataController.user.value['user']?['_id']?.toString() ?? '';
-    final bool isLikedByCurrentUser = currentUserId.isNotEmpty && likesList.map((like) => like.toString()).contains(currentUserId);
+    final String currentUserId = dataController.user.value['user']?['_id'] ?? '';
+    final bool isLikedByCurrentUser = likesList.any((like) => (like is Map ? like['_id'] == currentUserId : like == currentUserId));
 
     int reposts = post['reposts'] as int? ?? 0;
     int views = post['views'] as int? ?? 0;
@@ -432,71 +432,13 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          // Updated Like Button
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: Icon(
-                                  isLikedByCurrentUser ? Icons.favorite : Icons.favorite_border, // Filled vs. empty heart
-                                  color: isLikedByCurrentUser ? Colors.pinkAccent : Colors.white, // Pink if liked
-                                  size: 15,
-                                ),
-                                onPressed: () async {
-                                  if (currentUserId.isEmpty) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Please log in to like posts.', style: GoogleFonts.roboto(color: Colors.white)), backgroundColor: Colors.red[700]),
-                                    );
-                                    return;
-                                  }
-
-                                  final postIndex = dataController.posts.indexWhere((p) => p['_id'] == postId);
-                                  if (postIndex == -1) return;
-
-                                  Map<String, dynamic> currentPostData = Map<String, dynamic>.from(dataController.posts[postIndex]);
-                                  List<dynamic> currentLikes = List<dynamic>.from(currentPostData['likes'] ?? []);
-
-                                  if (isLikedByCurrentUser) {
-                                    // Unlike action
-                                    var result = await dataController.unlikePost(postId);
-                                    if (result['success'] == true) {
-                                      currentLikes.removeWhere((userId) => userId.toString() == currentUserId);
-                                      currentPostData['likes'] = currentLikes;
-                                      // Update the specific post in the controller's list
-                                      dataController.posts[postIndex] = currentPostData;
-                                      // No need to call posts.refresh() if individual item update triggers Obx,
-                                      // but if not, then it would be needed.
-                                      // Forcing a local rebuild of this specific post item might be better.
-                                      // However, modifying the item in the RxList should trigger Obx.
-                                      // Let's ensure this item update is reactive.
-                                      // If the entire post list is rebuilt, it will pick up the change.
-                                      // For now, relying on Obx reacting to list item change.
-                                      setState(() {}); // Trigger rebuild of the parent widget to reflect change
-                                    } else {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('Failed to unlike post: ${result['message']}', style: GoogleFonts.roboto(color: Colors.white)), backgroundColor: Colors.red[700]),
-                                      );
-                                    }
-                                  } else {
-                                    // Like action
-                                    var result = await dataController.likePost(postId);
-                                    if (result['success'] == true) {
-                                      currentLikes.add(currentUserId);
-                                      currentPostData['likes'] = currentLikes;
-                                      dataController.posts[postIndex] = currentPostData;
-                                      setState(() {}); // Trigger rebuild
-                                    } else {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('Failed to like post: ${result['message']}', style: GoogleFonts.roboto(color: Colors.white)), backgroundColor: Colors.red[700]),
-                                      );
-                                    }
-                                  }
-                                },
-                              ),
-                              Text('$likesCount', style: GoogleFonts.roboto(color: Colors.white, fontSize: 14)), // Use likesCount
-                            ],
+                          _buildActionButton(
+                            isLikedByCurrentUser ? Icons.favorite : FeatherIcons.heart,
+                            '$likesCount',
+                            () => _toggleLikeStatus(postId, isLikedByCurrentUser),
+                            isLiked: isLikedByCurrentUser
                           ),
-                          _buildActionButton(FeatherIcons.messageCircle, '$replyCount', () => _navigateToReplyPage(post)),
+                          _buildActionButton(FeatherIcons.messageCircle, '$replyCount', () => _navigateToReplyPage(post)), // This is fine, specific button
                           _buildActionButton(FeatherIcons.repeat, '$reposts', () => _navigateToRepostPage(post)),
                           _buildActionButton(FeatherIcons.eye, '$views', () {}), // Assuming views are handled elsewhere or not interactive
                         ],
@@ -512,13 +454,29 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     );
   }
 
+  void _toggleLikeStatus(String postId, bool isCurrentlyLiked) async {
+    if (isCurrentlyLiked) {
+      await dataController.unlikePost(postId);
+    } else {
+      await dataController.likePost(postId);
+    }
+    // The Obx in the main build method will rebuild the list,
+    // and _buildPostContent will be called again with updated post data.
+  }
 
-  Widget _buildActionButton(IconData icon, String text, VoidCallback onPressed) {
+  Widget _buildActionButton(IconData icon, String text, VoidCallback onPressed, {bool isLiked = false}) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.start,
       children: [
-        IconButton(icon: Icon(icon, color: const Color.fromARGB(255, 255, 255, 255), size: 15), onPressed: onPressed),
+        IconButton(
+          icon: Icon(
+            icon,
+            color: isLiked ? Colors.redAccent : const Color.fromARGB(255, 255, 255, 255),
+            size: 15
+          ),
+          onPressed: onPressed
+        ),
         Text(text, style: GoogleFonts.roboto(color: const Color.fromARGB(255, 255, 255, 255), fontSize: 14)),
       ],
     );
@@ -837,6 +795,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         title: Text('Chatter', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 24, letterSpacing: 1.5, color: Colors.white)),
         backgroundColor: const Color(0xFF000000),
         elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white), // Set AppDrawer icon color to white
       ),
       drawer: const AppDrawer(),
       body: Obx(() {
@@ -859,36 +818,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
             final postMap = dataController.posts[index] as Map<String, dynamic>;
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 5),
-              child: FutureBuilder<Widget>(
-                future: _buildPostContent(postMap, isReply: false),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    // Display a loading indicator while waiting for the post content
-                    return Container(
-                      height: 100, // Example height, adjust as needed
-                      alignment: Alignment.center,
-                      child: const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent)),
-                    );
-                  } else if (snapshot.hasError) {
-                    // Display an error message if the future fails
-                    print("Error building post content: ${snapshot.error}");
-                    return Container(
-                      height: 100, // Example height
-                      alignment: Alignment.center,
-                      child: Text(
-                        'Error loading post.',
-                        style: GoogleFonts.roboto(color: Colors.redAccent, fontSize: 14),
-                      ),
-                    );
-                  } else if (snapshot.hasData) {
-                    // Display the post content when the future completes successfully
-                    return snapshot.data!;
-                  } else {
-                    // Fallback for other states, though typically covered by above
-                    return const SizedBox.shrink();
-                  }
-                },
-              ),
+              child: _buildPostContent(postMap, isReply: false),
             );
           },
         );
