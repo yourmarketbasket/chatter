@@ -155,6 +155,39 @@ class DataController extends GetxController {
     }
   }
 
+  // like post
+  Future<Map<String, dynamic>> likePost(String postId) async {
+    try {
+      var response = await _dio.post(
+        'api/posts/like-post',
+        data: {'postId': postId, 'userId': user.value['user']['_id']},
+      );
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return {'success': true, 'message': 'Post liked successfully'};
+      } else {
+        return {'success': false, 'message': response.data['message'] ?? 'Post like failed'};
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+  // unlike post
+  Future<Map<String, dynamic>> unlikePost(String postId) async {
+    try {
+      var response = await _dio.post(
+        'api/posts/unlike-post',
+        data: {'postId': postId, 'userId': user.value['user']['_id']},
+      );
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return {'success': true, 'message': 'Post unliked successfully'};
+      } else {
+        return {'success': false, 'message': response.data['message'] ?? 'Post unlike failed'};
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
   // Method to reply to a post
   Future<Map<String, dynamic>> replyToPost({
     required String postId,

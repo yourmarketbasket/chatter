@@ -326,7 +326,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   }
 
 
-  Widget _buildPostContent(Map<String, dynamic> post, {required bool isReply}) {
+  Future<Widget> _buildPostContent(Map<String, dynamic> post, {required bool isReply}) async {
     final String postId = post['_id'] as String? ?? post.hashCode.toString(); // Ensure postId is unique
     final String username = post['username'] as String? ?? 'Unknown User';
     final String content = post['content'] as String? ?? '';
@@ -335,7 +335,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     final DateTime timestamp = post['createdAt'] is String 
     ? DateTime.parse(post['createdAt'] as String).toUtc() 
     : DateTime.now().toUtc();
-    int likes = post['likes'] as int? ?? 0;
+    final likes = post['likes'].length as int? ?? 0;
     int reposts = post['reposts'] as int? ?? 0;
     int views = post['views'] as int? ?? 0;
     List<Map<String, dynamic>> attachments = (post['attachments'] as List<dynamic>?)?.map((e) => e as Map<String, dynamic>).toList() ?? [];
@@ -419,16 +419,19 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                       // if the tap is on grid padding. Individual items *should* capture their own taps.
                       _buildAttachmentGrid(attachments, post, postId),
                     ],
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                     // Action buttons - These have their own tap handlers and should take precedence.
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _buildActionButton(FeatherIcons.heart, '$likes', () => setState(() => post['likes'] = (post['likes'] as int? ?? 0) + 1)),
-                        _buildActionButton(FeatherIcons.messageCircle, '$replyCount', () => _navigateToReplyPage(post)), // This is fine, specific button
-                        _buildActionButton(FeatherIcons.repeat, '$reposts', () => _navigateToRepostPage(post)),
-                        _buildActionButton(FeatherIcons.eye, '$views', () {}),
-                      ],
+                    Container(
+                      margin: EdgeInsets.symmetric(horizontal: 12, vertical:  0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _buildActionButton(FeatherIcons.heart, '$likes', await dataController.likePost(postId)),
+                          _buildActionButton(FeatherIcons.messageCircle, '$replyCount', () => _navigateToReplyPage(post)), // This is fine, specific button
+                          _buildActionButton(FeatherIcons.repeat, '$reposts', () => _navigateToRepostPage(post)),
+                          _buildActionButton(FeatherIcons.eye, '$views', () {}),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -440,13 +443,48 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     );
   }
 
+
   Widget _buildActionButton(IconData icon, String text, VoidCallback onPressed) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.start,
       children: [
-        IconButton(icon: Icon(icon, color: Colors.grey, size: 20), onPressed: onPressed),
-        Text(text, style: GoogleFonts.roboto(color: Colors.grey[400], fontSize: 14)),
+        IconButton(icon: Icon(icon, color: const Color.fromARGB(255, 255, 255, 255), size: 15), onPressed: onPressed),
+        Text(text, style: GoogleFonts.roboto(color: const Color.fromARGB(255, 255, 255, 255), fontSize: 14)),
       ],
     );
+  }
+
+  double? _parseAspectRatio(dynamic aspectRatio) {
+    if (aspectRatio == null) return null;
+
+    try {
+      if (aspectRatio is double) {
+        return aspectRatio; // If it's already a double, return it
+      } else if (aspectRatio is String) {
+        // Handle formats like "16:9" or "1.777"
+        if (aspectRatio.contains(':')) {
+          // Format is "width:height"
+          final parts = aspectRatio.split(':');
+          if (parts.length == 2) {
+            final width = double.tryParse(parts[0].trim());
+            final height = double.tryParse(parts[1].trim());
+            if (width != null && height != null && height != 0) {
+              return width / height;
+            }
+          }
+        } else {
+          // Format is a decimal string like "1.777"
+          final value = double.tryParse(aspectRatio);
+          if (value != null) {
+            return value;
+          }
+        }
+      }
+    } catch (e) {
+      print('Error parsing aspect ratio: $e');
+    }
+    return null; // Return null if parsing fails
   }
 
 
@@ -459,8 +497,16 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
 
     if (attachmentsArg.length == 1) {
       return AspectRatio(
-        aspectRatio: 16 / 9, // Default for single items, or use attachment's aspect ratio
-        child: _buildAttachmentWidget(attachmentsArg[0], 0, post, BorderRadius.circular(12.0), fit: BoxFit.cover, postId: postId, isVideoGrid: false),
+        aspectRatio:  4 / 3, // Default to 16/9 if parsing fails
+        child: _buildAttachmentWidget(
+          attachmentsArg[0],
+          0,
+          post,
+          BorderRadius.circular(12.0),
+          fit: BoxFit.cover,
+          postId: postId,
+          isVideoGrid: false,
+        ),
       );
     } else if (attachmentsArg.length == 2) {
       return ClipRRect(
@@ -679,7 +725,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                 ? DateTime.parse(post['createdAt'] as String).toUtc() 
                 : DateTime.now().toUtc(),
               viewsCount: post['views'] as int? ?? 0,
-              likesCount: post['likes'] as int? ?? 0,
+              likesCount: post['likes'].length,
               repostsCount: post['reposts'] as int? ?? 0,
             ),
           ),

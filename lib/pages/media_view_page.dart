@@ -315,7 +315,7 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
             imageUrl: optimizedUrl!,
             fit: BoxFit.contain,
             memCacheWidth: 1080, // Cap memory for full-screen images
-            placeholder: (context, url) => const Center(child: LinearProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent))),
+            placeholder: (context, url) =>  Center(child: CircularProgressIndicator(strokeWidth: 1.0, valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent))),
             errorWidget: (context, url, error) => buildError(context, message: 'Error loading image: $error'),
             cacheKey: url,
           )
