@@ -565,10 +565,32 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     if (attachmentsArg.isEmpty) return const SizedBox.shrink();
 
     if (attachmentsArg.length == 1) {
+      final attachment = attachmentsArg[0];
+      final String attachmentType = attachment['type'] as String? ?? 'unknown';
+      double aspectRatioToUse;
+
+      if (attachmentType == 'video') {
+        aspectRatioToUse = 4 / 3;
+      } else {
+        // Use calculated aspect ratio for non-video types (images, PDFs)
+        final num? attWidth = attachment['width'] as num?;
+        final num? attHeight = attachment['height'] as num?;
+        final String? attAspectRatioString = attachment['aspectRatio'] as String?;
+        aspectRatioToUse = 16/9; // Default if not calculable
+
+        if (attAspectRatioString != null) {
+          aspectRatioToUse = _parseAspectRatio(attAspectRatioString) ?? aspectRatioToUse;
+        } else if (attWidth != null && attHeight != null && attHeight > 0) {
+          aspectRatioToUse = attWidth / attHeight;
+        }
+        // Ensure aspectRatio is positive
+        if (aspectRatioToUse <= 0) aspectRatioToUse = 16/9;
+      }
+
       return AspectRatio(
-        aspectRatio:  4 / 3, // Default to 16/9 if parsing fails
+        aspectRatio: aspectRatioToUse,
         child: _buildAttachmentWidget(
-          attachmentsArg[0],
+          attachment,
           0,
           post,
           BorderRadius.circular(12.0),
@@ -837,7 +859,36 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
             final postMap = dataController.posts[index] as Map<String, dynamic>;
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 5),
-              child: _buildPostContent(postMap, isReply: false),
+              child: FutureBuilder<Widget>(
+                future: _buildPostContent(postMap, isReply: false),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    // Display a loading indicator while waiting for the post content
+                    return Container(
+                      height: 100, // Example height, adjust as needed
+                      alignment: Alignment.center,
+                      child: const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent)),
+                    );
+                  } else if (snapshot.hasError) {
+                    // Display an error message if the future fails
+                    print("Error building post content: ${snapshot.error}");
+                    return Container(
+                      height: 100, // Example height
+                      alignment: Alignment.center,
+                      child: Text(
+                        'Error loading post.',
+                        style: GoogleFonts.roboto(color: Colors.redAccent, fontSize: 14),
+                      ),
+                    );
+                  } else if (snapshot.hasData) {
+                    // Display the post content when the future completes successfully
+                    return snapshot.data!;
+                  } else {
+                    // Fallback for other states, though typically covered by above
+                    return const SizedBox.shrink();
+                  }
+                },
+              ),
             );
           },
         );
