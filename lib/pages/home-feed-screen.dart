@@ -576,7 +576,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         final num? attWidth = attachment['width'] as num?;
         final num? attHeight = attachment['height'] as num?;
         final String? attAspectRatioString = attachment['aspectRatio'] as String?;
-        aspectRatioToUse = 16/9; // Default if not calculable
+        aspectRatioToUse = 4/3; // Default if not calculable
 
         if (attAspectRatioString != null) {
           aspectRatioToUse = _parseAspectRatio(attAspectRatioString) ?? aspectRatioToUse;
@@ -584,7 +584,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           aspectRatioToUse = attWidth / attHeight;
         }
         // Ensure aspectRatio is positive
-        if (aspectRatioToUse <= 0) aspectRatioToUse = 16/9;
+        if (aspectRatioToUse <= 0) aspectRatioToUse = 4/3;
       }
 
       return AspectRatio(

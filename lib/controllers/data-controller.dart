@@ -158,10 +158,17 @@ class DataController extends GetxController {
   // like post
   Future<Map<String, dynamic>> likePost(String postId) async {
     try {
+      String? token = user.value['token'];
       var response = await _dio.post(
         'api/posts/like-post',
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          }
+        ),
         data: {'postId': postId, 'userId': user.value['user']['_id']},
       );
+      print(response.data);
       if (response.statusCode == 200 && response.data['success'] == true) {
         return {'success': true, 'message': 'Post liked successfully'};
       } else {
@@ -174,10 +181,17 @@ class DataController extends GetxController {
   // unlike post
   Future<Map<String, dynamic>> unlikePost(String postId) async {
     try {
+      String? token = user.value['token'];
       var response = await _dio.post(
         'api/posts/unlike-post',
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          }
+        ),
         data: {'postId': postId, 'userId': user.value['user']['_id']},
       );
+      print(response.data);
       if (response.statusCode == 200 && response.data['success'] == true) {
         return {'success': true, 'message': 'Post unliked successfully'};
       } else {
