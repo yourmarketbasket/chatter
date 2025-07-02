@@ -168,7 +168,7 @@ class DataController extends GetxController {
         ),
         data: {'postId': postId, 'userId': user.value['user']['_id']},
       );
-      print(response.data);
+      // print(response.data);
       if (response.statusCode == 200 && response.data['success'] == true) {
         return {'success': true, 'message': 'Post liked successfully'};
       } else {
@@ -191,7 +191,7 @@ class DataController extends GetxController {
         ),
         data: {'postId': postId, 'userId': user.value['user']['_id']},
       );
-      print(response.data);
+      // print(response.data);
       if (response.statusCode == 200 && response.data['success'] == true) {
         return {'success': true, 'message': 'Post unliked successfully'};
       } else {
