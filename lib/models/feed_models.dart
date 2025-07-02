@@ -62,9 +62,9 @@ class Post {
   final String username;
   final String userId;
   final String? content;
-  final List<String> likes; // Changed from num to List<String>
-  final num reposts;
-  final num views;
+  final List<String> likes;
+  final List<String> reposts; // Changed from num to List<String>
+  final List<String> views;   // Changed from num to List<String>
   final List<Attachment> attachments;
   final String? useravatar;
   final List<String> replies; // Assuming list of Post IDs for replies
@@ -79,9 +79,9 @@ class Post {
     required this.username,
     required this.userId,
     this.content,
-    this.likes = const [], // Initialize with an empty list
-    this.reposts = 0,
-    this.views = 0,
+    this.likes = const [],
+    this.reposts = const [], // Initialize with an empty list
+    this.views = const [],   // Initialize with an empty list
     this.attachments = const [],
     this.useravatar,
     this.replies = const [],
@@ -112,10 +112,9 @@ class Post {
       username: json['username'] as String,
       userId: json['userId'] as String,
       content: json['content'] as String?,
-      // Updated to parse a list of strings for likes
-      likes: json['likes'] != null ? List<String>.from(json['likes'] as List) : [],
-      reposts: json['reposts'] as num? ?? 0,
-      views: json['views'] as num? ?? 0,
+      likes: json['likes'] != null ? List<String>.from(json['likes'].map((x) => x.toString())) : [],
+      reposts: json['reposts'] != null ? List<String>.from(json['reposts'].map((x) => x.toString())) : [],
+      views: json['views'] != null ? List<String>.from(json['views'].map((x) => x.toString())) : [],
       attachments: attachmentsList,
       useravatar: json['useravatar'] as String?,
       replies: repliesList,

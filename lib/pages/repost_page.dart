@@ -141,9 +141,9 @@ class _RepostPageState extends State<RepostPage> {
                                     userName: username,
                                     userAvatarUrl: userAvatar,
                                     timestamp: timestamp,
-                                    viewsCount: views,
-                                    likesCount: likes,
-                                    repostsCount: repostsCount,
+                                    viewsCount: widget.post['viewsCount'] as int? ?? (widget.post['views'] as List?)?.length ?? 0,
+                                    likesCount: widget.post['likesCount'] as int? ?? (widget.post['likes'] as List?)?.length ?? 0,
+                                    repostsCount: widget.post['repostsCount'] as int? ?? (widget.post['reposts'] as List?)?.length ?? 0,
                                   ),
                                 ),
                               );

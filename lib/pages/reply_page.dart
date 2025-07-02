@@ -279,9 +279,10 @@ class _ReplyPageState extends State<ReplyPage> {
                                   userName: username,
                                   userAvatarUrl: userAvatar,
                                   timestamp: timestamp,
-                                  viewsCount: post['views'] as int? ?? 0, // Example, ensure these keys exist
-                                  likesCount: post['likes'] as int? ?? 0,
-                                  repostsCount: post['reposts'] as int? ?? 0,
+                                  // Counts should refer to the original post (widget.post)
+                                  viewsCount: widget.post['viewsCount'] as int? ?? (widget.post['views'] as List?)?.length ?? 0,
+                                  likesCount: widget.post['likesCount'] as int? ?? (widget.post['likes'] as List?)?.length ?? 0,
+                                  repostsCount: widget.post['repostsCount'] as int? ?? (widget.post['reposts'] as List?)?.length ?? 0,
                                 ),
                               ),
                             );

@@ -16,10 +16,27 @@ class DataController extends GetxController {
     aOptions: AndroidOptions(
       encryptedSharedPreferences: true,
     ),
+  );
+
+  // Set to keep track of post IDs for which view registration is in progress
+  final Set<String> _pendingViewRegistrations = <String>{};
+
+  // URL
+  final String baseUrl = 'https://chatter-api.fly.dev/';
+  final dio.Dio _dio = dio.Dio(dio.BaseOptions(
+    baseUrl: 'https://chatter-api.fly.dev/',
+    connectTimeout: const Duration(seconds: 30),
+    receiveTimeout: const Duration(seconds: 30),
+    sendTimeout: const Duration(seconds: 30),
+  ));
+  final user = {}.obs;
     iOptions: IOSOptions(
       accessibility: KeychainAccessibility.first_unlock,
     ),
   );
+
+  // Set to keep track of post IDs for which view registration is in progress
+  final Set<String> _pendingViewRegistrations = <String>{};
 
   // URL
   final String baseUrl = 'https://chatter-api.fly.dev/';
@@ -157,29 +174,44 @@ class DataController extends GetxController {
 
   // view post - THIS IS THE ORIGINAL METHOD PROVIDED BY THE USER
   Future<Map<String, dynamic>> viewPost(String postId) async {
+    if (_pendingViewRegistrations.contains(postId)) {
+      print('[DataController] View registration for post $postId is already in progress. Skipping.');
+      return {'success': false, 'message': 'View registration already in progress.'};
+    }
+
     try {
+      _pendingViewRegistrations.add(postId);
       String? token = user.value['token'];
+      // Ensure user and user ID exist
+      if (user.value['user'] == null || user.value['user']['_id'] == null) {
+        print('[DataController] User data or user ID is null. Cannot record view for post $postId.');
+        return {'success': false, 'message': 'User data not found.'};
+      }
+      String userId = user.value['user']['_id'];
+
       var response = await _dio.post(
         'api/posts/view-post', // Endpoint from the user's original method
-        data: {'postId': postId, 'userId': user.value['user']['_id']},
+        data: {'postId': postId, 'userId': userId},
         options: dio.Options(
           headers: {
             'Authorization': 'Bearer $token',
           }
         )
       );
-      // print(response.data);
+
       if (response.statusCode == 200 && response.data['success'] == true) {
         // No local state update for views here; that will be handled by socket event.
-        print('[DataController] Post view for $postId recorded successfully via original method.');
+        print('[DataController] Post view for $postId recorded successfully.');
         return {'success': true, 'message': 'Post viewed successfully'};
       } else {
-        print('[DataController] Failed to record post view for $postId via original method: ${response.data['message'] ?? 'Unknown error'}');
+        print('[DataController] Failed to record post view for $postId: ${response.data['message'] ?? 'Unknown error'}');
         return {'success': false, 'message': response.data['message'] ?? 'Post view failed'};
       }
     } catch (e) {
-      print('[DataController] Error recording post view for $postId via original method: $e');
+      print('[DataController] Error recording post view for $postId: $e');
       return {'success': false, 'message': e.toString()};
+    } finally {
+      _pendingViewRegistrations.remove(postId);
     }
   }
 
@@ -216,8 +248,9 @@ class DataController extends GetxController {
             likesList.add(currentUserId);
           }
           postToUpdate['likes'] = likesList;
+          postToUpdate['likesCount'] = likesList.length; // Update likesCount
           posts[postIndex] = postToUpdate;
-          posts.refresh();
+          // posts.refresh(); // Usually not needed for item replacement if RxList is used correctly
         }
         return {'success': true, 'message': 'Post liked successfully'};
       } else {
@@ -257,8 +290,9 @@ class DataController extends GetxController {
           // Remove user's ID from likes list
           likesList.removeWhere((like) => (like is Map ? like['_id'] == currentUserId : like == currentUserId));
           postToUpdate['likes'] = likesList;
+          postToUpdate['likesCount'] = likesList.length; // Update likesCount
           posts[postIndex] = postToUpdate;
-          posts.refresh();
+          // posts.refresh(); // Usually not needed for item replacement
         }
         return {'success': true, 'message': 'Post unliked successfully'};
       } else {
@@ -433,12 +467,18 @@ class DataController extends GetxController {
         ),
       );
       if (response.statusCode == 200 && response.data['success'] == true) {
-        posts.assignAll(List<Map<String, dynamic>>.from(response.data['posts']));
+        List<Map<String, dynamic>> fetchedPosts = List<Map<String, dynamic>>.from(response.data['posts']);
+        // Ensure count fields are present
+        for (var post in fetchedPosts) {
+          post['likesCount'] = (post['likes'] as List?)?.length ?? 0;
+          post['repostsCount'] = (post['reposts'] as List?)?.length ?? 0;
+          post['viewsCount'] = (post['views'] as List?)?.length ?? 0;
+        }
+        posts.assignAll(fetchedPosts);
       } else {
         throw Exception('Failed to fetch feeds');
       }
     } catch (e) {
-
       print('Error fetching feeds: $e');
       posts.clear();
       rethrow; // Rethrow the exception to be handled by the caller
@@ -517,18 +557,23 @@ class DataController extends GetxController {
 
   // Add a new post to the beginning of the list, preventing duplicates
   void addNewPost(Map<String, dynamic> newPost) {
+    // Ensure count fields are present for the new post
+    newPost['likesCount'] = (newPost['likes'] as List?)?.length ?? 0;
+    newPost['repostsCount'] = (newPost['reposts'] as List?)?.length ?? 0;
+    // For views, a new post typically starts with 0 or a very small number.
+    // If the backend sends a 'views' array, use its length. Otherwise, default to 0.
+    // The `updatePostViews` method will update `viewsCount` based on socket events.
+    newPost['viewsCount'] = (newPost['views'] as List?)?.length ?? newPost['viewsCount'] ?? 0;
+
+
     final String? newPostId = newPost['_id'] as String?;
 
     if (newPostId == null) {
-      // If no ID, can't reliably check for duplicates based on ID.
-      // Depending on policy, either add it, log an error, or use another unique property if available.
-      // For now, let's log and add it to maintain previous behavior for posts without _id.
       print("Warning: Adding a new post without an '_id'. Cannot check for duplicates by ID. Post data: $newPost");
       posts.insert(0, newPost);
       return;
     }
 
-    // Check if a post with this ID already exists
     final bool alreadyExists = posts.any((existingPost) {
       final String? existingPostId = existingPost['_id'] as String?;
       return existingPostId != null && existingPostId == newPostId;
@@ -538,17 +583,19 @@ class DataController extends GetxController {
       posts.insert(0, newPost);
       print("New post with ID $newPostId added to the list.");
     } else {
-      // Post already exists. Optionally, update if newPost is "fresher" or different.
-      // For now, just preventing duplicates by not adding again.
-      print("Post with ID $newPostId already exists in the list. Skipping add.");
-
-      // Optional: If you want to replace the existing post with the new one (e.g., if socket data is more canonical)
-      // final int existingPostIndex = posts.indexWhere((p) => (p['_id'] as String?) == newPostId);
-      // if (existingPostIndex != -1) {
-      //   print("Replacing existing post with ID $newPostId with new data.");
-      //   posts[existingPostIndex] = newPost;
-      //   posts.refresh(); // Notify listeners if replacing an item. insert usually notifies.
-      // }
+      print("Post with ID $newPostId already exists in the list. Attempting to update if different.");
+      // Optional: If you want to replace the existing post with the new one
+      final int existingPostIndex = posts.indexWhere((p) => (p['_id'] as String?) == newPostId);
+      if (existingPostIndex != -1) {
+         // Simple check: if string representations are different. Could be more sophisticated.
+        if (posts[existingPostIndex].toString() != newPost.toString()) {
+          print("Updating existing post with ID $newPostId with new data from socket/event.");
+          posts[existingPostIndex] = newPost;
+          // posts.refresh(); // GetX usually handles list item replacement reactively.
+        } else {
+          print("Post with ID $newPostId received but data is identical to local. Skipping update.");
+        }
+      }
     }
   }
 

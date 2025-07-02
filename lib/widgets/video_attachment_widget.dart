@@ -350,9 +350,9 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
                 timestamp: widget.post['timestamp'] is String
                     ? (DateTime.tryParse(widget.post['timestamp'] as String) ?? DateTime.now())
                     : (widget.post['timestamp'] is DateTime ? widget.post['timestamp'] : DateTime.now()),
-                viewsCount: widget.post['views'] as int? ?? 0,
-                likesCount: (widget.post['likes'] as List<dynamic>? ?? []).length, // Correctly pass the length
-                repostsCount: widget.post['reposts'] as int? ?? 0,
+                viewsCount: widget.post['viewsCount'] as int? ?? (widget.post['views'] as List?)?.length ?? 0,
+                likesCount: widget.post['likesCount'] as int? ?? (widget.post['likes'] as List?)?.length ?? 0,
+                repostsCount: widget.post['repostsCount'] as int? ?? (widget.post['reposts'] as List?)?.length ?? 0,
               ),
             ),
           );

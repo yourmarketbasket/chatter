@@ -79,9 +79,9 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           timestamp: post['createdAt'] is String
               ? DateTime.parse(post['createdAt'] as String).toUtc()
               : DateTime.now().toUtc(),
-          viewsCount: post['views'] as int? ?? 0,
-          likesCount: (post['likes'] as List<dynamic>? ?? []).length,
-          repostsCount: post['reposts'] as int? ?? 0,
+          viewsCount: post['viewsCount'] as int? ?? (post['views'] as List?)?.length ?? 0,
+          likesCount: post['likesCount'] as int? ?? (post['likes'] as List?)?.length ?? 0,
+          repostsCount: post['repostsCount'] as int? ?? (post['reposts'] as List?)?.length ?? 0,
         ),
       ),
     );
@@ -853,16 +853,9 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
               timestamp: post['createdAt'] is String
                 ? DateTime.parse(post['createdAt'] as String).toUtc()
                 : DateTime.now().toUtc(),
-              viewsCount: () {
-                if (post.containsKey('viewsCount') && post['viewsCount'] is int) {
-                  return post['viewsCount'] as int;
-                } else if (post.containsKey('views') && post['views'] is List) {
-                  return (post['views'] as List<dynamic>).length;
-                }
-                return 0; // Default if neither field is valid
-              }(),
-              likesCount: (post['likes'] as List<dynamic>? ?? []).length, // Corrected likesCount
-              repostsCount: (post['reposts'] as List<dynamic>? ?? []).length,
+              viewsCount: post['viewsCount'] as int? ?? (post['views'] as List?)?.length ?? 0,
+              likesCount: post['likesCount'] as int? ?? (post['likes'] as List?)?.length ?? 0,
+              repostsCount: post['repostsCount'] as int? ?? (post['reposts'] as List?)?.length ?? 0,
             ),
           ),
         );
