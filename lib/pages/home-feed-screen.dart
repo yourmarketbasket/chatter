@@ -332,10 +332,16 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     final String content = post['content'] as String? ?? '';
     final String? userAvatar = post['useravatar'] as String?;
     final String avatarInitial = (username.isNotEmpty ? username[0].toUpperCase() : '?');
-    final DateTime timestamp = post['createdAt'] is String 
-    ? DateTime.parse(post['createdAt'] as String).toUtc() 
+    final DateTime timestamp = post['createdAt'] is String
+    ? DateTime.parse(post['createdAt'] as String).toUtc()
     : DateTime.now().toUtc();
-    final likes = post['likes'].length as int? ?? 0;
+
+    // Likes processing
+    final List<dynamic> likesList = post['likes'] as List<dynamic>? ?? [];
+    final int likesCount = likesList.length;
+    final String currentUserId = dataController.user.value['user']?['_id'] ?? '';
+    final bool isLikedByCurrentUser = likesList.any((like) => (like is Map ? like['_id'] == currentUserId : like == currentUserId));
+
     int reposts = post['reposts'] as int? ?? 0;
     int views = post['views'] as int? ?? 0;
     List<Map<String, dynamic>> attachments = (post['attachments'] as List<dynamic>?)?.map((e) => e as Map<String, dynamic>).toList() ?? [];
@@ -426,7 +432,12 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _buildActionButton(FeatherIcons.heart, '$likes', await dataController.likePost(postId)),
+                          _buildActionButton(
+                            isLikedByCurrentUser ? Icons.favorite : FeatherIcons.heart,
+                            '$likesCount',
+                            () => _toggleLikeStatus(postId, isLikedByCurrentUser),
+                            isLiked: isLikedByCurrentUser
+                          ),
                           _buildActionButton(FeatherIcons.messageCircle, '$replyCount', () => _navigateToReplyPage(post)), // This is fine, specific button
                           _buildActionButton(FeatherIcons.repeat, '$reposts', () => _navigateToRepostPage(post)),
                           _buildActionButton(FeatherIcons.eye, '$views', () {}),
@@ -443,13 +454,29 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     );
   }
 
+  void _toggleLikeStatus(String postId, bool isCurrentlyLiked) async {
+    if (isCurrentlyLiked) {
+      await dataController.unlikePost(postId);
+    } else {
+      await dataController.likePost(postId);
+    }
+    // The Obx in the main build method will rebuild the list,
+    // and _buildPostContent will be called again with updated post data.
+  }
 
-  Widget _buildActionButton(IconData icon, String text, VoidCallback onPressed) {
+  Widget _buildActionButton(IconData icon, String text, VoidCallback onPressed, {bool isLiked = false}) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.start,
       children: [
-        IconButton(icon: Icon(icon, color: const Color.fromARGB(255, 255, 255, 255), size: 15), onPressed: onPressed),
+        IconButton(
+          icon: Icon(
+            icon,
+            color: isLiked ? Colors.redAccent : const Color.fromARGB(255, 255, 255, 255),
+            size: 15
+          ),
+          onPressed: onPressed
+        ),
         Text(text, style: GoogleFonts.roboto(color: const Color.fromARGB(255, 255, 255, 255), fontSize: 14)),
       ],
     );
@@ -746,6 +773,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         title: Text('Chatter', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 24, letterSpacing: 1.5, color: Colors.white)),
         backgroundColor: const Color(0xFF000000),
         elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white), // Set AppDrawer icon color to white
       ),
       drawer: const AppDrawer(),
       body: Obx(() {

@@ -158,11 +158,32 @@ class DataController extends GetxController {
   // like post
   Future<Map<String, dynamic>> likePost(String postId) async {
     try {
+      final String currentUserId = user.value['user']['_id'];
+      if (currentUserId == null) {
+        return {'success': false, 'message': 'User not logged in'};
+      }
+
       var response = await _dio.post(
         'api/posts/like-post',
-        data: {'postId': postId, 'userId': user.value['user']['_id']},
+        data: {'postId': postId, 'userId': currentUserId},
       );
       if (response.statusCode == 200 && response.data['success'] == true) {
+        // Update local post data
+        int postIndex = posts.indexWhere((p) => p['_id'] == postId);
+        if (postIndex != -1) {
+          var postToUpdate = Map<String, dynamic>.from(posts[postIndex]);
+          var likesList = List<dynamic>.from(postToUpdate['likes'] ?? []);
+
+          // Add user's ID to likes list if not already present
+          if (!likesList.any((like) => (like is Map ? like['_id'] == currentUserId : like == currentUserId))) {
+            // Assuming backend might store simple user IDs or objects with an _id.
+            // For simplicity, adding the ID. Adjust if backend returns full like objects.
+            likesList.add(currentUserId);
+          }
+          postToUpdate['likes'] = likesList;
+          posts[postIndex] = postToUpdate;
+          posts.refresh();
+        }
         return {'success': true, 'message': 'Post liked successfully'};
       } else {
         return {'success': false, 'message': response.data['message'] ?? 'Post like failed'};
@@ -171,14 +192,32 @@ class DataController extends GetxController {
       return {'success': false, 'message': e.toString()};
     }
   }
+
   // unlike post
   Future<Map<String, dynamic>> unlikePost(String postId) async {
     try {
+      final String currentUserId = user.value['user']['_id'];
+      if (currentUserId == null) {
+        return {'success': false, 'message': 'User not logged in'};
+      }
+
       var response = await _dio.post(
         'api/posts/unlike-post',
-        data: {'postId': postId, 'userId': user.value['user']['_id']},
+        data: {'postId': postId, 'userId': currentUserId},
       );
       if (response.statusCode == 200 && response.data['success'] == true) {
+        // Update local post data
+        int postIndex = posts.indexWhere((p) => p['_id'] == postId);
+        if (postIndex != -1) {
+          var postToUpdate = Map<String, dynamic>.from(posts[postIndex]);
+          var likesList = List<dynamic>.from(postToUpdate['likes'] ?? []);
+
+          // Remove user's ID from likes list
+          likesList.removeWhere((like) => (like is Map ? like['_id'] == currentUserId : like == currentUserId));
+          postToUpdate['likes'] = likesList;
+          posts[postIndex] = postToUpdate;
+          posts.refresh();
+        }
         return {'success': true, 'message': 'Post unliked successfully'};
       } else {
         return {'success': false, 'message': response.data['message'] ?? 'Post unlike failed'};
