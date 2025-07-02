@@ -343,8 +343,16 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     final bool isLikedByCurrentUser = likesList.any((like) => (like is Map ? like['_id'] == currentUserId : like == currentUserId));
 
     int reposts = post['reposts'] as int? ?? 0;
-    // Prioritize 'viewsCount' if available (updated by socket), otherwise calculate from 'views' list length.
-    int views = post['viewsCount'] as int? ?? (post['views'] as List<dynamic>?)?.length ?? 0;
+
+    int views;
+    if (post.containsKey('viewsCount') && post['viewsCount'] is int) {
+      views = post['viewsCount'] as int;
+    } else if (post.containsKey('views') && post['views'] is List) {
+      views = (post['views'] as List<dynamic>).length;
+    } else {
+      views = 0; // Default if neither field is valid
+    }
+
     List<Map<String, dynamic>> attachments = (post['attachments'] as List<dynamic>?)?.map((e) => e as Map<String, dynamic>).toList() ?? [];
     int replyCount = (post['replies'] as List<dynamic>?)?.length ?? post['replyCount'] as int? ?? 0;
 
@@ -774,8 +782,14 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
               timestamp: post['createdAt'] is String
                 ? DateTime.parse(post['createdAt'] as String).toUtc()
                 : DateTime.now().toUtc(),
-              // Prioritize 'viewsCount', fallback to 'views' list length for MediaViewPage
-              viewsCount: post['viewsCount'] as int? ?? (post['views'] as List<dynamic>?)?.length ?? 0,
+              viewsCount: () {
+                if (post.containsKey('viewsCount') && post['viewsCount'] is int) {
+                  return post['viewsCount'] as int;
+                } else if (post.containsKey('views') && post['views'] is List) {
+                  return (post['views'] as List<dynamic>).length;
+                }
+                return 0; // Default if neither field is valid
+              }(),
               likesCount: (post['likes'] as List<dynamic>? ?? []).length, // Corrected likesCount
               repostsCount: post['reposts'] as int? ?? 0,
             ),
