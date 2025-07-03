@@ -1049,8 +1049,8 @@ class _PdfThumbnailWidgetState extends State<PdfThumbnailWidget> {
         Uri.parse(widget.pdfUrl),
         params: PdfViewerParams(
           margin: 0,
-          maxScale: 1.0, // For a thumbnail, don't allow scaling within itself
-          minScale: 1.0,
+          maxScale: 0.5, // For a thumbnail, don't allow scaling within itself
+          minScale: 0.2,
           // viewerOverlayBuilder: (context, pageSize, viewRect, document, pageNumber) => [], // Removed due to signature mismatch
           loadingBannerBuilder: (context, bytesLoaded, totalBytes) {
             // Show a simple loading indicator if it takes time

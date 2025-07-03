@@ -292,6 +292,7 @@ class AppDrawer extends StatelessWidget {
               Get.back();
               if (Get.currentRoute != '/HomeFeedScreen') {
                 Get.offAll(() => const HomeFeedScreen());
+                
               }
             },
           ),
