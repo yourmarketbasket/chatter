@@ -7,6 +7,7 @@ import 'package:chatter/services/media_visibility_service.dart'; // Import Media
 import 'package:chatter/services/notification_service.dart'; // Import NotificationService
 import 'package:chatter/controllers/data-controller.dart'; // Added import
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart'; // For kDebugMode
 import 'package:get/get.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 // import 'package:device_info_plus/device_info_plus.dart'; // No longer needed for player selection
@@ -35,15 +36,16 @@ void main() async {
   final NotificationService notificationService = Get.put(NotificationService());
   await notificationService.init();
 
-  // Show a test notification on app startup as requested
+  // Show a test notification on app startup
   // Ensure this is called after notificationService.init()
-  // and consider if it should only run for debug builds or specific conditions.
-  // For now, implementing as per "triggers when app first runs".
-  if (WidgetsBinding.instance.lifecycleState == null || WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
-    // A more robust way might be to listen to AppLifecycleState changes
-    // or call this from the initState of the first screen after a short delay,
-    // but for "app first runs" this is a direct approach.
+  // This is a direct approach for "app first runs".
+  // Consider if only for debug or after a delay for production.
+  try {
     await notificationService.showTestNotification();
+  } catch (e) {
+    if (kDebugMode) {
+      print("Error showing test notification from main.dart: $e");
+    }
   }
 
   runApp(const ChatterApp());
