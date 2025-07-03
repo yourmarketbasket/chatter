@@ -632,25 +632,8 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       final String attachmentType = attachment['type'] as String? ?? 'unknown';
       double aspectRatioToUse;
 
-      if (attachmentType == 'video') {
-        aspectRatioToUse = 4 / 3; // Enforce 4:3 for single videos in the feed
-      } else {
-        // For single non-video attachments, use their calculated or default aspect ratio
-        final num? attWidth = attachment['width'] as num?;
-        final num? attHeight = attachment['height'] as num?;
-        final String? attAspectRatioString = attachment['aspectRatio'] as String?;
-
-        if (attAspectRatioString != null) {
-            aspectRatioToUse = _parseAspectRatio(attAspectRatioString) ?? 16/9; // Default if parse fails
-        } else if (attWidth != null && attHeight != null && attHeight > 0) {
-            aspectRatioToUse = attWidth / attHeight;
-        } else if (attachmentType == 'pdf') {
-            aspectRatioToUse = 3/4; // Common PDF aspect ratio as a fallback
-        }
-        else {
-            aspectRatioToUse = 16/9; // General fallback for images or unknown
-        }
-      }
+      // For single attachments (video, image, pdf, etc.), enforce 4:3 aspect ratio in the feed.
+      aspectRatioToUse = 4 / 3;
 
       return AspectRatio(
         aspectRatio: aspectRatioToUse,

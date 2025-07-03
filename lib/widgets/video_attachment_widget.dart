@@ -157,9 +157,10 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
 
     _betterPlayerController = BetterPlayerController(
       BetterPlayerConfiguration(
+        aspectRatio: 4 / 3, // Enforce 4:3 aspect ratio for the player viewport
         autoPlay: false, // Always false here
         looping: widget.onVideoCompletedInGrid == null,
-        fit: BoxFit.cover,
+        fit: BoxFit.contain, // Use BoxFit.contain to fit video within 4:3, may letterbox/pillarbox
         controlsConfiguration: BetterPlayerControlsConfiguration(
           showControls: false,
           enablePlayPause: true, // These are for built-in controls, which are hidden

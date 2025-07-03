@@ -521,7 +521,7 @@ class DataController extends GetxController {
           postToUpdate['repostsCount'] = repostsList.length;
 
           posts[postIndex] = postToUpdate;
-          // posts.refresh(); // Usually not needed for item replacement
+          posts.refresh(); // Force UI update
 
           // If the backend sends back the updated post, we could use that directly:
           // e.g., if response.data['post'] exists and is the updated post
@@ -1107,7 +1107,7 @@ class DataController extends GetxController {
         // For now, this method assumes the socket event provides the full updated post, including arrays.
 
         posts[postIndex] = processedPostData;
-        // posts.refresh(); // Usually not needed for item replacement
+        posts.refresh(); // Force UI update
         print('[DataController] Post $postId updated from socket event.');
       } else {
         print('[DataController] updatePostFromSocket: Post with ID $postId not found in local list. It might be a new post not yet added or an issue with ID matching.');
