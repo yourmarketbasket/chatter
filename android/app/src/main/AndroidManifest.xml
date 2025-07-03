@@ -18,6 +18,8 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- Added INTERNET permission as it is commonly needed for Flutter apps -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Required for showing notifications on Android 13+ -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
     <application
         android:label="chatter"

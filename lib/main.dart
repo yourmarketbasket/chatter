@@ -4,6 +4,7 @@ import 'package:chatter/pages/login.dart';
 import 'package:chatter/pages/register.dart';
 import 'package:chatter/services/socket-service.dart';
 import 'package:chatter/services/media_visibility_service.dart'; // Import MediaVisibilityService
+import 'package:chatter/services/notification_service.dart'; // Import NotificationService
 import 'package:chatter/controllers/data-controller.dart'; // Added import
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -30,6 +31,20 @@ void main() async {
   // Register SocketService as a singleton.
   final SocketService socketService = Get.put(SocketService());
 
+  // Initialize NotificationService
+  final NotificationService notificationService = Get.put(NotificationService());
+  await notificationService.init();
+
+  // Show a test notification on app startup as requested
+  // Ensure this is called after notificationService.init()
+  // and consider if it should only run for debug builds or specific conditions.
+  // For now, implementing as per "triggers when app first runs".
+  if (WidgetsBinding.instance.lifecycleState == null || WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+    // A more robust way might be to listen to AppLifecycleState changes
+    // or call this from the initState of the first screen after a short delay,
+    // but for "app first runs" this is a direct approach.
+    await notificationService.showTestNotification();
+  }
 
   runApp(const ChatterApp());
 }
