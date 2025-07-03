@@ -2,7 +2,7 @@ import 'package:better_player_enhanced/better_player.dart';
 import 'package:chatter/controllers/data-controller.dart';
 import 'package:chatter/pages/new-posts-page.dart';
 import 'package:chatter/pages/reply_page.dart';
-import 'package:chatter/pages/repost_page.dart';
+// import 'package:chatter/pages/repost_page.dart'; // Removed
 import 'package:chatter/pages/media_view_page.dart';
 import 'package:chatter/pages/search_page.dart';
 import 'package:chatter/services/media_visibility_service.dart'; // Import MediaVisibilityService
@@ -152,7 +152,45 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     }
   }
 
-  Future<void> _navigateToRepostPage(Map<String, dynamic> post) async {
+  // Future<void> _navigateToRepostPage(Map<String, dynamic> post) async {
+  //   final String? postId = post['_id'] as String?;
+  //   if (postId == null) {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(content: Text('Error: Post ID is missing.', style: GoogleFonts.roboto(color: Colors.white)), backgroundColor: Colors.redAccent),
+  //     );
+  //     return;
+  //   }
+
+  //   final confirmed = await Navigator.push(
+  //     context,
+  //     MaterialPageRoute(
+  //       builder: (context) => RepostPage(post: post), // RepostPage just confirms intent
+  //     ),
+  //   );
+
+  //   if (confirmed == true) {
+  //     final result = await dataController.repostPost(postId); // Actual repost call
+  //     if (result['success'] == true) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(
+  //           content: Text(result['message'] ?? 'Reposted successfully!', style: GoogleFonts.roboto(color: Colors.white)),
+  //           backgroundColor: Colors.teal[700],
+  //         ),
+  //       );
+  //       // Optimistic update is now handled within dataController.repostPost
+  //       // The Obx in the build method will react to changes in dataController.posts
+  //     } else {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(
+  //           content: Text(result['message'] ?? 'Failed to repost.', style: GoogleFonts.roboto(color: Colors.white)),
+  //           backgroundColor: Colors.redAccent,
+  //         ),
+  //       );
+  //     }
+  //   }
+  // }
+
+  Future<void> _handleRepostAction(Map<String, dynamic> post) async {
     final String? postId = post['_id'] as String?;
     if (postId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -161,32 +199,25 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       return;
     }
 
-    final confirmed = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => RepostPage(post: post), // RepostPage just confirms intent
-      ),
-    );
+    // Optional: Add a confirmation dialog here if you still want a confirmation step
+    // without a full page navigation.
+    // For now, proceeding directly with the action as per the updated plan.
 
-    if (confirmed == true) {
-      final result = await dataController.repostPost(postId); // Actual repost call
-      if (result['success'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? 'Reposted successfully!', style: GoogleFonts.roboto(color: Colors.white)),
-            backgroundColor: Colors.teal[700],
-          ),
-        );
-        // Optimistic update is now handled within dataController.repostPost
-        // The Obx in the build method will react to changes in dataController.posts
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? 'Failed to repost.', style: GoogleFonts.roboto(color: Colors.white)),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
+    final result = await dataController.repostPost(postId);
+    if (result['success'] == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['message'] ?? 'Reposted successfully!', style: GoogleFonts.roboto(color: Colors.white)),
+          backgroundColor: Colors.teal[700],
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['message'] ?? 'Failed to repost.', style: GoogleFonts.roboto(color: Colors.white)),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
     }
   }
 
@@ -534,8 +565,8 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                           _buildActionButton(
                             FeatherIcons.repeat,
                             '$repostsCount',
-                            () => _navigateToRepostPage(post),
-                            isReposted: isRepostedByCurrentUser, // Pass the flag here
+                            () => _handleRepostAction(post), // Changed to direct action
+                            isReposted: isRepostedByCurrentUser,
                           ),
                           _buildActionButton(FeatherIcons.eye, '$views', () {}),
                         ],
@@ -1051,8 +1082,8 @@ class _PdfThumbnailWidgetState extends State<PdfThumbnailWidget> {
         Uri.parse(widget.pdfUrl),
         params: PdfViewerParams(
           margin: 0,
-          maxScale: 1.0, // For a thumbnail, don't allow scaling within itself
-          minScale: 1.0,
+          maxScale: 0.8, // Changed: For a thumbnail, allow slight zoom out
+          minScale: 0.5, // Changed: Allow more zoom out
           // viewerOverlayBuilder: (context, pageSize, viewRect, document, pageNumber) => [], // Removed due to signature mismatch
           loadingBannerBuilder: (context, bytesLoaded, totalBytes) {
             // Show a simple loading indicator if it takes time

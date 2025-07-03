@@ -159,7 +159,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
       BetterPlayerConfiguration(
         autoPlay: false, // Always false here
         looping: widget.onVideoCompletedInGrid == null,
-        fit: BoxFit.cover,
+        fit: BoxFit.fitWidth, // Changed from BoxFit.cover to BoxFit.fitWidth
         controlsConfiguration: BetterPlayerControlsConfiguration(
           showControls: false,
           enablePlayPause: true, // These are for built-in controls, which are hidden
