@@ -489,53 +489,52 @@ class DataController extends GetxController {
 
   // repost a post
   Future<Map<String, dynamic>> repostPost(String postId) async {
+    String? token = user.value['token'];
+    String? currentUserId = user.value['user']?['_id'];
+
+    if (token == null || currentUserId == null) {
+      return {'success': false, 'message': 'User not authenticated'};
+    }
+
     try {
-      var token = user.value['token'];
-      var userid = user.value['user']['_id'];
-      // var user = user.value['user'];
-      if (token == null) {
-        throw Exception('User token not found');
-      }
       var response = await _dio.post(
         '/api/posts/repost-post',
-        data: {'postId': postId, 'userId': userid},
+        data: {'postId': postId, 'userId': currentUserId},
         options: dio.Options(
           headers: {
             'Authorization': 'Bearer $token',
           },
         ),
       );
+
       if (response.statusCode == 200 && response.data['success'] == true) {
-        // Successful repost, now update local post data
-        final String currentUserId = user.value['user']['_id'];
+        // Optimistic UI Update
         int postIndex = posts.indexWhere((p) => p['_id'] == postId);
         if (postIndex != -1) {
           var postToUpdate = Map<String, dynamic>.from(posts[postIndex]);
+          var repostsList = List<String>.from((postToUpdate['reposts'] as List<dynamic>? ?? []).map((e) => e.toString()));
 
-          // Update reposts list and count
-          var repostsList = List<dynamic>.from(postToUpdate['reposts'] ?? []);
-          if (!repostsList.any((reposterId) => reposterId == currentUserId)) {
-            repostsList.add(currentUserId); // Add current user's ID to reposts
+          if (!repostsList.contains(currentUserId)) {
+            repostsList.add(currentUserId);
           }
           postToUpdate['reposts'] = repostsList;
           postToUpdate['repostsCount'] = repostsList.length;
-
           posts[postIndex] = postToUpdate;
-          posts.refresh(); // Force UI update
-
-          // If the backend sends back the updated post, we could use that directly:
-          // e.g., if response.data['post'] exists and is the updated post
-          // updatePostFromSocket(response.data['post']);
-          // For now, manual update is implemented above.
+          // posts.refresh(); // Usually not needed for item replacement if using Obx correctly
+          print('[DataController] Post $postId reposted optimistically by $currentUserId.');
         }
-        // Return the original backend response which might contain useful data or messages
-        return {'success': true, 'message': response.data['message'] ?? 'Post reposted successfully', 'data': response.data};
+        // The actual full post update will come via socket event 'postReposted'
+        // and be handled by updatePostFromSocket, which is fine.
+        return {'success': true, 'message': response.data['message'] ?? 'Post reposted successfully'};
       } else {
         return {'success': false, 'message': response.data['message'] ?? 'Failed to repost post'};
       }
     } catch (e) {
       print('[DataController] Error reposting post $postId: $e');
-      return {'success': false, 'message': 'An error occurred while reposting post: ${e.toString()}'};
+      if (e is dio.DioException && e.response?.data != null && e.response!.data['message'] != null) {
+        return {'success': false, 'message': 'Failed to repost: ${e.response!.data['message']}'};
+      }
+      return {'success': false, 'message': 'An error occurred while reposting: ${e.toString()}'};
     }
   }
 

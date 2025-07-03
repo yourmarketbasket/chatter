@@ -2,7 +2,7 @@ import 'package:better_player_enhanced/better_player.dart';
 import 'package:chatter/controllers/data-controller.dart';
 import 'package:chatter/pages/new-posts-page.dart';
 import 'package:chatter/pages/reply_page.dart';
-import 'package:chatter/pages/repost_page.dart';
+// import 'package:chatter/pages/repost_page.dart'; // Removed
 import 'package:chatter/pages/media_view_page.dart';
 import 'package:chatter/pages/search_page.dart';
 import 'package:chatter/services/media_visibility_service.dart'; // Import MediaVisibilityService
@@ -153,27 +153,70 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     }
   }
 
-  Future<void> _navigateToRepostPage(Map<String, dynamic> post) async {
-    final confirmed = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => RepostPage(post: post),
-      ),
-    );
+  // Future<void> _navigateToRepostPage(Map<String, dynamic> post) async {
+  //   final String? postId = post['_id'] as String?;
+  //   if (postId == null) {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(content: Text('Error: Post ID is missing.', style: GoogleFonts.roboto(color: Colors.white)), backgroundColor: Colors.redAccent),
+  //     );
+  //     return;
+  //   }
 
-    if (confirmed == true) {
-      // setState(() {
-      //   // TODO: Implement proper optimistic UI update for repost count.
-      //   // The line below is incorrect as post['reposts'] is a List, not an int.
-      //   // post['reposts'] = (post['reposts'] ?? 0) + 1;
-      // });
+  //   final confirmed = await Navigator.push(
+  //     context,
+  //     MaterialPageRoute(
+  //       builder: (context) => RepostPage(post: post), // RepostPage just confirms intent
+  //     ),
+  //   );
+
+  //   if (confirmed == true) {
+  //     final result = await dataController.repostPost(postId); // Actual repost call
+  //     if (result['success'] == true) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(
+  //           content: Text(result['message'] ?? 'Reposted successfully!', style: GoogleFonts.roboto(color: Colors.white)),
+  //           backgroundColor: Colors.teal[700],
+  //         ),
+  //       );
+  //       // Optimistic update is now handled within dataController.repostPost
+  //       // The Obx in the build method will react to changes in dataController.posts
+  //     } else {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(
+  //           content: Text(result['message'] ?? 'Failed to repost.', style: GoogleFonts.roboto(color: Colors.white)),
+  //           backgroundColor: Colors.redAccent,
+  //         ),
+  //       );
+  //     }
+  //   }
+  // }
+
+  Future<void> _handleRepostAction(Map<String, dynamic> post) async {
+    final String? postId = post['_id'] as String?;
+    if (postId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: Post ID is missing.', style: GoogleFonts.roboto(color: Colors.white)), backgroundColor: Colors.redAccent),
+      );
+      return;
+    }
+
+    // Optional: Add a confirmation dialog here if you still want a confirmation step
+    // without a full page navigation.
+    // For now, proceeding directly with the action as per the updated plan.
+
+    final result = await dataController.repostPost(postId);
+    if (result['success'] == true) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'Poa! Reposted!',
-            style: GoogleFonts.roboto(color: Colors.white),
-          ),
+          content: Text(result['message'] ?? 'Reposted successfully!', style: GoogleFonts.roboto(color: Colors.white)),
           backgroundColor: Colors.teal[700],
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['message'] ?? 'Failed to repost.', style: GoogleFonts.roboto(color: Colors.white)),
+          backgroundColor: Colors.redAccent,
         ),
       );
     }
@@ -408,10 +451,13 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     final List<dynamic> likesList = post['likes'] as List<dynamic>? ?? [];
     final int likesCount = likesList.length;
     final String currentUserId = dataController.user.value['user']?['_id'] ?? '';
-    final bool isLikedByCurrentUser = likesList.any((like) => (like is Map ? like['_id'] == currentUserId : like == currentUserId));
+    final bool isLikedByCurrentUser = likesList.any((like) => (like is Map ? like['_id'] == currentUserId : like.toString() == currentUserId));
 
-    List<dynamic> repostsList = post['reposts'] as List<dynamic>? ?? [];
-    int repostsCount = repostsList.length;
+    // Reposts processing
+    final List<dynamic> repostsDynamicList = post['reposts'] as List<dynamic>? ?? [];
+    final List<String> repostsList = repostsDynamicList.map((e) => e.toString()).toList();
+    final int repostsCount = repostsList.length;
+    final bool isRepostedByCurrentUser = repostsList.contains(currentUserId);
 
     int views;
     if (post.containsKey('viewsCount') && post['viewsCount'] is int) {
@@ -516,37 +562,14 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                             () => _toggleLikeStatus(postId, isLikedByCurrentUser),
                             isLiked: isLikedByCurrentUser
                           ),
-                          _buildActionButton(FeatherIcons.messageCircle, '$replyCount', () => _navigateToReplyPage(post)), // This is fine, specific button
+                          _buildActionButton(FeatherIcons.messageCircle, '$replyCount', () => _navigateToReplyPage(post)),
                           _buildActionButton(
                             FeatherIcons.repeat,
                             '$repostsCount',
-                            () async { // Direct repost action
-                              final String postId = post['_id'] as String? ?? '';
-                              if (postId.isNotEmpty) {
-                                final result = await dataController.repostPost(postId);
-                                if (result['success'] == true) {
-                                  // Optional: Show a quick success feedback, though UI should update reactively
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Reposted!', style: GoogleFonts.roboto(color: Colors.white)),
-                                      backgroundColor: Colors.teal[700],
-                                      duration: const Duration(seconds: 2),
-                                    ),
-                                  );
-                                } else {
-                                  // Optional: Show error feedback
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Failed to repost: ${result['message']}', style: GoogleFonts.roboto(color: Colors.white)),
-                                      backgroundColor: Colors.red[700],
-                                      duration: const Duration(seconds: 2),
-                                    ),
-                                  );
-                                }
-                              }
-                            }
+                            () => _handleRepostAction(post), // Changed to direct action
+                            isReposted: isRepostedByCurrentUser,
                           ),
-                          _buildActionButton(FeatherIcons.eye, '$views', () {}), // Assuming views are handled elsewhere or not interactive
+                          _buildActionButton(FeatherIcons.eye, '$views', () {}),
                         ],
                       ),
                     ),
@@ -570,7 +593,14 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     // and _buildPostContent will be called again with updated post data.
   }
 
-  Widget _buildActionButton(IconData icon, String text, VoidCallback onPressed, {bool isLiked = false}) {
+  Widget _buildActionButton(IconData icon, String text, VoidCallback onPressed, {bool isLiked = false, bool isReposted = false}) {
+    Color iconColor = const Color.fromARGB(255, 255, 255, 255); // Default color
+    if (isLiked) {
+      iconColor = Colors.redAccent;
+    } else if (isReposted) {
+      iconColor = Colors.tealAccent; // Color for reposted state
+    }
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.start,
@@ -578,7 +608,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         IconButton(
           icon: Icon(
             icon,
-            color: isLiked ? Colors.redAccent : const Color.fromARGB(255, 255, 255, 255),
+            color: iconColor,
             size: 15
           ),
           onPressed: onPressed
@@ -643,7 +673,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           0,
           post,
           BorderRadius.circular(12.0),
-          fit: BoxFit.cover,
+          fit: BoxFit.fitWidth,
           postId: postId,
           isVideoGrid: false,
         ),
@@ -1090,8 +1120,8 @@ class _PdfThumbnailWidgetState extends State<PdfThumbnailWidget> {
         Uri.parse(widget.pdfUrl),
         params: PdfViewerParams(
           margin: 0,
-          maxScale: 0.8, // For a thumbnail, don't allow scaling within itself
-          minScale: 0.5,
+          maxScale: 0.8, // Changed: For a thumbnail, allow slight zoom out
+          minScale: 0.5, // Changed: Allow more zoom out
           // viewerOverlayBuilder: (context, pageSize, viewRect, document, pageNumber) => [], // Removed due to signature mismatch
           loadingBannerBuilder: (context, bytesLoaded, totalBytes) {
             // Show a simple loading indicator if it takes time
