@@ -42,6 +42,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   final DataController dataController = Get.find<DataController>();
   final MediaVisibilityService mediaVisibilityService = Get.find<MediaVisibilityService>();
   final ScrollController _scrollController = ScrollController();
+  final GlobalKey<ExpandableFabState> _fabKey = GlobalKey<ExpandableFabState>(); // Declare the key
 
   // For managing video queues within posts
   final Map<String, int> _postVideoQueueIndex = {};
@@ -930,16 +931,56 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       }),
       floatingActionButtonLocation: ExpandableFab.location,
       floatingActionButton: ExpandableFab(
-        key: GlobalKey<ExpandableFabState>(), // Consider making this a member of _HomeFeedScreenState if needed elsewhere
+        key: _fabKey, // Assign the key here
         distance: 65.0,
         type: ExpandableFabType.up,
         overlayStyle: ExpandableFabOverlayStyle(color: Colors.black.withOpacity(0.5)),
         openButtonBuilder: RotateFloatingActionButtonBuilder(backgroundColor: Colors.tealAccent, foregroundColor: Colors.black, child: const Icon(FeatherIcons.menu)),
         closeButtonBuilder: RotateFloatingActionButtonBuilder(backgroundColor: Colors.tealAccent, foregroundColor: Colors.black, child: const Icon(Icons.close)),
         children: [
-          FloatingActionButton.small(heroTag: 'fab_add_post', backgroundColor: Colors.black, shape: RoundedRectangleBorder(side: const BorderSide(color: Colors.tealAccent, width: 1), borderRadius: BorderRadius.circular(10)), onPressed: _navigateToPostScreen, tooltip: 'Add Post', child: const Icon(FeatherIcons.plusCircle, color: Colors.tealAccent)),
-          FloatingActionButton.small(heroTag: 'fab_home', backgroundColor: Colors.black, shape: RoundedRectangleBorder(side: const BorderSide(color: Colors.tealAccent, width: 1), borderRadius: BorderRadius.circular(10)), onPressed: () { _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut); dataController.fetchFeeds(); }, tooltip: 'Home', child: const Icon(FeatherIcons.home, color: Colors.tealAccent)),
-          FloatingActionButton.small(heroTag: 'fab_search', backgroundColor: Colors.black, shape: RoundedRectangleBorder(side: const BorderSide(color: Colors.tealAccent, width: 1), borderRadius: BorderRadius.circular(10)), onPressed: () { Get.to(() => const SearchPage(), transition: Transition.rightToLeft); }, tooltip: 'Search', child: const Icon(FeatherIcons.search, color: Colors.tealAccent)),
+          FloatingActionButton.small(
+            heroTag: 'fab_add_post',
+            backgroundColor: Colors.black,
+            shape: RoundedRectangleBorder(side: const BorderSide(color: Colors.tealAccent, width: 1), borderRadius: BorderRadius.circular(10)),
+            onPressed: () {
+              _navigateToPostScreen();
+              final fabState = _fabKey.currentState;
+              if (fabState != null && fabState.isOpen) {
+                fabState.toggle();
+              }
+            },
+            tooltip: 'Add Post',
+            child: const Icon(FeatherIcons.plusCircle, color: Colors.tealAccent),
+          ),
+          FloatingActionButton.small(
+            heroTag: 'fab_home',
+            backgroundColor: Colors.black,
+            shape: RoundedRectangleBorder(side: const BorderSide(color: Colors.tealAccent, width: 1), borderRadius: BorderRadius.circular(10)),
+            onPressed: () {
+              _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+              dataController.fetchFeeds();
+              final fabState = _fabKey.currentState;
+              if (fabState != null && fabState.isOpen) {
+                fabState.toggle();
+              }
+            },
+            tooltip: 'Home',
+            child: const Icon(FeatherIcons.home, color: Colors.tealAccent),
+          ),
+          FloatingActionButton.small(
+            heroTag: 'fab_search',
+            backgroundColor: Colors.black,
+            shape: RoundedRectangleBorder(side: const BorderSide(color: Colors.tealAccent, width: 1), borderRadius: BorderRadius.circular(10)),
+            onPressed: () {
+              Get.to(() => const SearchPage(), transition: Transition.rightToLeft);
+              final fabState = _fabKey.currentState;
+              if (fabState != null && fabState.isOpen) {
+                fabState.toggle();
+              }
+            },
+            tooltip: 'Search',
+            child: const Icon(FeatherIcons.search, color: Colors.tealAccent),
+          ),
         ],
       ),
     );
@@ -1049,8 +1090,8 @@ class _PdfThumbnailWidgetState extends State<PdfThumbnailWidget> {
         Uri.parse(widget.pdfUrl),
         params: PdfViewerParams(
           margin: 0,
-          maxScale: 0.5, // For a thumbnail, don't allow scaling within itself
-          minScale: 0.2,
+          maxScale: 1.0, // For a thumbnail, don't allow scaling within itself
+          minScale: 1.0,
           // viewerOverlayBuilder: (context, pageSize, viewRect, document, pageNumber) => [], // Removed due to signature mismatch
           loadingBannerBuilder: (context, bytesLoaded, totalBytes) {
             // Show a simple loading indicator if it takes time
