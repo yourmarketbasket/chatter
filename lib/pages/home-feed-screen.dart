@@ -153,28 +153,40 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   }
 
   Future<void> _navigateToRepostPage(Map<String, dynamic> post) async {
+    final String? postId = post['_id'] as String?;
+    if (postId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: Post ID is missing.', style: GoogleFonts.roboto(color: Colors.white)), backgroundColor: Colors.redAccent),
+      );
+      return;
+    }
+
     final confirmed = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => RepostPage(post: post),
+        builder: (context) => RepostPage(post: post), // RepostPage just confirms intent
       ),
     );
 
     if (confirmed == true) {
-      // setState(() {
-      //   // TODO: Implement proper optimistic UI update for repost count.
-      //   // The line below is incorrect as post['reposts'] is a List, not an int.
-      //   // post['reposts'] = (post['reposts'] ?? 0) + 1;
-      // });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Poa! Reposted!',
-            style: GoogleFonts.roboto(color: Colors.white),
+      final result = await dataController.repostPost(postId); // Actual repost call
+      if (result['success'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Reposted successfully!', style: GoogleFonts.roboto(color: Colors.white)),
+            backgroundColor: Colors.teal[700],
           ),
-          backgroundColor: Colors.teal[700],
-        ),
-      );
+        );
+        // Optimistic update is now handled within dataController.repostPost
+        // The Obx in the build method will react to changes in dataController.posts
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'Failed to repost.', style: GoogleFonts.roboto(color: Colors.white)),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
     }
   }
 
@@ -407,10 +419,13 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     final List<dynamic> likesList = post['likes'] as List<dynamic>? ?? [];
     final int likesCount = likesList.length;
     final String currentUserId = dataController.user.value['user']?['_id'] ?? '';
-    final bool isLikedByCurrentUser = likesList.any((like) => (like is Map ? like['_id'] == currentUserId : like == currentUserId));
+    final bool isLikedByCurrentUser = likesList.any((like) => (like is Map ? like['_id'] == currentUserId : like.toString() == currentUserId));
 
-    List<dynamic> repostsList = post['reposts'] as List<dynamic>? ?? [];
-    int repostsCount = repostsList.length;
+    // Reposts processing
+    final List<dynamic> repostsDynamicList = post['reposts'] as List<dynamic>? ?? [];
+    final List<String> repostsList = repostsDynamicList.map((e) => e.toString()).toList();
+    final int repostsCount = repostsList.length;
+    final bool isRepostedByCurrentUser = repostsList.contains(currentUserId);
 
     int views;
     if (post.containsKey('viewsCount') && post['viewsCount'] is int) {
@@ -515,13 +530,14 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                             () => _toggleLikeStatus(postId, isLikedByCurrentUser),
                             isLiked: isLikedByCurrentUser
                           ),
-                          _buildActionButton(FeatherIcons.messageCircle, '$replyCount', () => _navigateToReplyPage(post)), // This is fine, specific button
+                          _buildActionButton(FeatherIcons.messageCircle, '$replyCount', () => _navigateToReplyPage(post)),
                           _buildActionButton(
-                            FeatherIcons.repeat, 
-                            '$repostsCount', 
-                            () => _navigateToRepostPage(post)
+                            FeatherIcons.repeat,
+                            '$repostsCount',
+                            () => _navigateToRepostPage(post),
+                            isReposted: isRepostedByCurrentUser, // Pass the flag here
                           ),
-                          _buildActionButton(FeatherIcons.eye, '$views', () {}), // Assuming views are handled elsewhere or not interactive
+                          _buildActionButton(FeatherIcons.eye, '$views', () {}),
                         ],
                       ),
                     ),
@@ -545,7 +561,14 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     // and _buildPostContent will be called again with updated post data.
   }
 
-  Widget _buildActionButton(IconData icon, String text, VoidCallback onPressed, {bool isLiked = false}) {
+  Widget _buildActionButton(IconData icon, String text, VoidCallback onPressed, {bool isLiked = false, bool isReposted = false}) {
+    Color iconColor = const Color.fromARGB(255, 255, 255, 255); // Default color
+    if (isLiked) {
+      iconColor = Colors.redAccent;
+    } else if (isReposted) {
+      iconColor = Colors.tealAccent; // Color for reposted state
+    }
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.start,
@@ -553,7 +576,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         IconButton(
           icon: Icon(
             icon,
-            color: isLiked ? Colors.redAccent : const Color.fromARGB(255, 255, 255, 255),
+            color: iconColor,
             size: 15
           ),
           onPressed: onPressed
