@@ -83,7 +83,7 @@ class SocketService {
     _socket!.on('postViewed', (data) {
       print('postViewed event received by SocketService: $data');
       if (data is Map<String, dynamic>) {
-        final String? postId = data['postId'] as String?;
+        final String? postId = data['_id'] as String?;
         // final int? viewsCount = data['views'] as int?; // We no longer use viewsCount directly from here.
 
         if (postId != null) {
@@ -100,7 +100,7 @@ class SocketService {
 
     // Listen for postLiked event
     _socket!.on('postLiked', (data) {
-      print('postLiked event received: $data');
+      // print('postLiked event received: $data');
       if (data is Map<String, dynamic>) {
         // Assuming 'data' is the full updated post object
         _dataController.updatePostFromSocket(data);
@@ -111,7 +111,7 @@ class SocketService {
 
     // Listen for postUnliked event
     _socket!.on('postUnliked', (data) {
-      print('postUnliked event received: $data');
+      // print('postUnliked event received: $data');
       if (data is Map<String, dynamic>) {
         // Assuming 'data' is the full updated post object
         _dataController.updatePostFromSocket(data);
