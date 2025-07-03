@@ -517,9 +517,33 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                           ),
                           _buildActionButton(FeatherIcons.messageCircle, '$replyCount', () => _navigateToReplyPage(post)), // This is fine, specific button
                           _buildActionButton(
-                            FeatherIcons.repeat, 
-                            '$repostsCount', 
-                            () => _navigateToRepostPage(post)
+                            FeatherIcons.repeat,
+                            '$repostsCount',
+                            () async { // Direct repost action
+                              final String postId = post['_id'] as String? ?? '';
+                              if (postId.isNotEmpty) {
+                                final result = await dataController.repostPost(postId);
+                                if (result['success'] == true) {
+                                  // Optional: Show a quick success feedback, though UI should update reactively
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Reposted!', style: GoogleFonts.roboto(color: Colors.white)),
+                                      backgroundColor: Colors.teal[700],
+                                      duration: const Duration(seconds: 2),
+                                    ),
+                                  );
+                                } else {
+                                  // Optional: Show error feedback
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Failed to repost: ${result['message']}', style: GoogleFonts.roboto(color: Colors.white)),
+                                      backgroundColor: Colors.red[700],
+                                      duration: const Duration(seconds: 2),
+                                    ),
+                                  );
+                                }
+                              }
+                            }
                           ),
                           _buildActionButton(FeatherIcons.eye, '$views', () {}), // Assuming views are handled elsewhere or not interactive
                         ],
@@ -609,13 +633,27 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       double aspectRatioToUse;
 
       if (attachmentType == 'video') {
-        aspectRatioToUse = 4 / 3;
+        aspectRatioToUse = 4 / 3; // Enforce 4:3 for single videos in the feed
       } else {
-        aspectRatioToUse = 4 / 3;
+        // For single non-video attachments, use their calculated or default aspect ratio
+        final num? attWidth = attachment['width'] as num?;
+        final num? attHeight = attachment['height'] as num?;
+        final String? attAspectRatioString = attachment['aspectRatio'] as String?;
+
+        if (attAspectRatioString != null) {
+            aspectRatioToUse = _parseAspectRatio(attAspectRatioString) ?? 16/9; // Default if parse fails
+        } else if (attWidth != null && attHeight != null && attHeight > 0) {
+            aspectRatioToUse = attWidth / attHeight;
+        } else if (attachmentType == 'pdf') {
+            aspectRatioToUse = 3/4; // Common PDF aspect ratio as a fallback
+        }
+        else {
+            aspectRatioToUse = 16/9; // General fallback for images or unknown
+        }
       }
 
       return AspectRatio(
-        aspectRatio: aspectRatioToUse, // Enforce 4:3 aspect ratio
+        aspectRatio: aspectRatioToUse,
         child: _buildAttachmentWidget(
           attachment,
           0,

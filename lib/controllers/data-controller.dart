@@ -506,14 +506,37 @@ class DataController extends GetxController {
         ),
       );
       if (response.statusCode == 200 && response.data['success'] == true) {
-        return response.data;
+        // Successful repost, now update local post data
+        final String currentUserId = user.value['user']['_id'];
+        int postIndex = posts.indexWhere((p) => p['_id'] == postId);
+        if (postIndex != -1) {
+          var postToUpdate = Map<String, dynamic>.from(posts[postIndex]);
+
+          // Update reposts list and count
+          var repostsList = List<dynamic>.from(postToUpdate['reposts'] ?? []);
+          if (!repostsList.any((reposterId) => reposterId == currentUserId)) {
+            repostsList.add(currentUserId); // Add current user's ID to reposts
+          }
+          postToUpdate['reposts'] = repostsList;
+          postToUpdate['repostsCount'] = repostsList.length;
+
+          posts[postIndex] = postToUpdate;
+          // posts.refresh(); // Usually not needed for item replacement
+
+          // If the backend sends back the updated post, we could use that directly:
+          // e.g., if response.data['post'] exists and is the updated post
+          // updatePostFromSocket(response.data['post']);
+          // For now, manual update is implemented above.
+        }
+        // Return the original backend response which might contain useful data or messages
+        return {'success': true, 'message': response.data['message'] ?? 'Post reposted successfully', 'data': response.data};
       } else {
-        throw Exception('Failed to repost post');
+        return {'success': false, 'message': response.data['message'] ?? 'Failed to repost post'};
       }
     } catch (e) {
-      throw Exception('An error occurred while reposting post: $e');
+      print('[DataController] Error reposting post $postId: $e');
+      return {'success': false, 'message': 'An error occurred while reposting post: ${e.toString()}'};
     }
-    
   }
 
 

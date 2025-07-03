@@ -405,15 +405,8 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
                 else if (!_isInitialized && _shouldRenderPlayer) // Show loading if trying to render but not ready
                   const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent))),
 
-                // Play icon overlay if not rendering player but it's supposed to be playable (managed by MediaVisibilityService)
-                if (!_shouldRenderPlayer && thumbnailUrl != null && thumbnailUrl.isNotEmpty)
-                  Center(
-                    child: Icon(
-                      FeatherIcons.playCircle,
-                      color: Colors.white.withOpacity(0.7),
-                      size: 48,
-                    ),
-                  ),
+                // Play icon overlay (FeatherIcons.playCircle) REMOVED for feed context as per requirements.
+                // The icon below (FeatherIcons.video) is part of the placeholder/error state for the thumbnail.
                 Positioned(
                   bottom: 8,
                   right: 8,
