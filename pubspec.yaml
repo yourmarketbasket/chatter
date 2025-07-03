@@ -125,4 +125,4 @@ flutter_launcher_icons:
   ios: true
   image_path: "images/512px.png"
   adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: "images/24px.png" # Using a smaller icon for foreground
+  adaptive_icon_foreground: "images/512px.png" # Using a smaller icon for foreground
