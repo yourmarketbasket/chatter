@@ -4,6 +4,7 @@ import 'package:chatter/pages/login.dart';
 import 'package:chatter/pages/register.dart';
 import 'package:chatter/services/socket-service.dart';
 import 'package:chatter/services/media_visibility_service.dart'; // Import MediaVisibilityService
+import 'package:chatter/services/notification_service.dart'; // Import NotificationService
 import 'package:chatter/controllers/data-controller.dart'; // Added import
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -29,6 +30,11 @@ void main() async {
   // Initialize SocketService. The constructor of SocketService calls connect().
   // Register SocketService as a singleton.
   final SocketService socketService = Get.put(SocketService());
+
+  // Initialize NotificationService
+  final NotificationService notificationService = NotificationService();
+  await notificationService.init();
+  await notificationService.showTestNotification(); // Show a test notification on startup
 
 
   runApp(const ChatterApp());
