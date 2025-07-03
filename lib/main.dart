@@ -7,6 +7,7 @@ import 'package:chatter/services/media_visibility_service.dart'; // Import Media
 import 'package:chatter/services/notification_service.dart'; // Import NotificationService
 import 'package:chatter/controllers/data-controller.dart'; // Added import
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart'; // For kDebugMode
 import 'package:get/get.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 // import 'package:device_info_plus/device_info_plus.dart'; // No longer needed for player selection
@@ -32,10 +33,20 @@ void main() async {
   final SocketService socketService = Get.put(SocketService());
 
   // Initialize NotificationService
-  final NotificationService notificationService = NotificationService();
+  final NotificationService notificationService = Get.put(NotificationService());
   await notificationService.init();
-  await notificationService.showTestNotification(); // Show a test notification on startup
 
+  // Show a test notification on app startup
+  // Ensure this is called after notificationService.init()
+  // This is a direct approach for "app first runs".
+  // Consider if only for debug or after a delay for production.
+  try {
+    await notificationService.showTestNotification();
+  } catch (e) {
+    if (kDebugMode) {
+      print("Error showing test notification from main.dart: $e");
+    }
+  }
 
   runApp(const ChatterApp());
 }

@@ -48,7 +48,8 @@ dependencies:
   audioplayers: ^6.4.0
   video_thumbnail: ^0.5.6
   path_provider: ^2.1.5
-  permission_handler: ^12.0.0+1
+  permission_handler: ^12.0.0+1 # For handling notification permissions
+  flutter_local_notifications: ^17.2.1 # For showing local notifications
   image_picker: ^1.1.2
   pdfrx: ^1.1.35
   device_info_plus: ^11.4.0
@@ -121,8 +122,7 @@ flutter:
   # see https://flutter.dev/to/font-from-package
 
 flutter_launcher_icons:
-  android: true
+  android: "launcher_icon"
   ios: true
   image_path: "images/512px.png"
-  adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: "images/512px.png" # Using a smaller icon for foreground
+  min_sdk_android: 23
