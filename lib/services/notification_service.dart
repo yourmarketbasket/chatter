@@ -13,11 +13,14 @@ class NotificationService {
   static const String _channelDescription = 'Default channel for Chatter app notifications';
 
   // Use the specific 16px icon name for the status bar
-  static const String _notificationIconName = '@drawable/ic_status_16px';
+  // This static const is no longer strictly needed here if only used for initialization,
+  // but can be kept if used elsewhere or for clarity.
+  // static const String _notificationIconName = '@drawable/ic_status_16px'; // Original problematic line
 
   Future<void> init() async {
+    // Correctly reference the drawable resource name without the '@drawable/' prefix.
     const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings(_notificationIconName);
+        AndroidInitializationSettings('ic_status_16px');
 
     // TODO: Add iOS initialization settings if needed in the future
     // const DarwinInitializationSettings initializationSettingsIOS = ...;
