@@ -119,6 +119,16 @@ class SocketService {
         print('Received postUnliked event with unexpected data type: ${data.runtimeType}. Expected Map<String, dynamic>.');
       }
     });
+    // postReposted event
+    _socket!.on('postReposted', (data) {
+      // print('postReposted event received: $data');
+      if (data is Map<String, dynamic>) {
+        // Assuming 'data' is the full updated post object
+        _dataController.updatePostFromSocket(data);
+      } else {
+        print('Received postReposted event with unexpected data type: ${data.runtimeType}. Expected Map<String, dynamic>.');
+      }
+    });
   }
 
   void connect() {

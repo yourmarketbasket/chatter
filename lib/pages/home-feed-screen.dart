@@ -516,7 +516,11 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                             isLiked: isLikedByCurrentUser
                           ),
                           _buildActionButton(FeatherIcons.messageCircle, '$replyCount', () => _navigateToReplyPage(post)), // This is fine, specific button
-                          _buildActionButton(FeatherIcons.repeat, '$repostsCount', () => _navigateToRepostPage(post)),
+                          _buildActionButton(
+                            FeatherIcons.repeat, 
+                            '$repostsCount', 
+                            () => _navigateToRepostPage(post)
+                          ),
                           _buildActionButton(FeatherIcons.eye, '$views', () {}), // Assuming views are handled elsewhere or not interactive
                         ],
                       ),

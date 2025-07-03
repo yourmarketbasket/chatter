@@ -487,6 +487,35 @@ class DataController extends GetxController {
     }
   }
 
+  // repost a post
+  Future<Map<String, dynamic>> repostPost(String postId) async {
+    try {
+      var token = user.value['token'];
+      var userid = user.value['user']['_id'];
+      // var user = user.value['user'];
+      if (token == null) {
+        throw Exception('User token not found');
+      }
+      var response = await _dio.post(
+        '/api/posts/repost-post',
+        data: {'postId': postId, 'userId': userid},
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return response.data;
+      } else {
+        throw Exception('Failed to repost post');
+      }
+    } catch (e) {
+      throw Exception('An error occurred while reposting post: $e');
+    }
+    
+  }
+
 
   // fetch all feeds for timeline
   Future<void> fetchFeeds() async {
