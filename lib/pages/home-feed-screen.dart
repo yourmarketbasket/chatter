@@ -675,7 +675,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           0,
           post,
           BorderRadius.circular(12.0),
-          fit: BoxFit.cover,
+          fit: BoxFit.fitWidth,
           postId: postId,
           isVideoGrid: false,
         ),
