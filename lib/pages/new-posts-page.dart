@@ -227,7 +227,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
     final int fileSize = await file.length();
     final sizeInMB = fileSize / (1024 * 1024);
 
-    if (sizeInMB <= 20) { // TODO: Consider a larger limit for videos, e.g., 50MB or 100MB
+    if (sizeInMB <= 20) { // Updated file size limit
       final attachment = {
         'file': file,
         'type': 'video',
@@ -241,19 +241,12 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
         print('[NewPostScreen] Could not get dimensions for video, will be added without them.');
       }
 
-      // Optional: Check video duration if there's a limit
-      // final int? durationSeconds = dimensions?['duration'] as int?;
-      // if (durationSeconds != null && durationSeconds > MAX_VIDEO_DURATION_SECONDS) {
-      //   _showPermissionDialog('Video Too Long', 'Video exceeds maximum duration of $MAX_VIDEO_DURATION_SECONDS seconds.');
-      //   return;
-      // }
-
       print('[NewPostScreen] Adding to _selectedAttachments: $attachment');
       _addAttachment(attachment);
     } else {
       _showPermissionDialog(
         'File Size Error',
-        'Video file "${file.path.split('/').last}" exceeds 20MB limit and was not added.', // TODO: Adjust message if limit changes
+        'Video file "${file.path.split('/').last}" exceeds 20MB limit and was not added.',
       );
     }
   }
@@ -266,7 +259,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
         print('[NewPostScreen] Audio Recorded: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
         final int fileSize = await file.length();
         final sizeInMB = fileSize / (1024 * 1024);
-        if (sizeInMB <= 20) {
+        if (sizeInMB <= 20) { // Updated file size limit
           // Attempt to get duration
           int? durationMs;
           final tempAudioPlayer = AudioPlayer();
@@ -287,7 +280,6 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
             'filename': file.path.split('/').last,
             'size': fileSize,
             if (durationSeconds != null) 'duration': durationSeconds,
-            // Audio doesn't typically have width/height/orientation/aspectRatio in this context
           };
           setState(() {
             _selectedAttachments.add(attachmentData);
@@ -404,7 +396,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
     final int fileSize = await file.length();
     final sizeInMB = fileSize / (1024 * 1024);
 
-    if (sizeInMB <= 20) {
+    if (sizeInMB <= 20) { // Updated file size limit
       final attachment = {
         'file': file,
         'type': 'image',
@@ -546,13 +538,12 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
               print('[NewPostScreen] PDF Picked: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
               final int fileSize = await file.length();
               final sizeInMB = fileSize / (1024 * 1024);
-              if (sizeInMB <= 20) {
+              if (sizeInMB <= 20) { // Updated file size limit
                 final attachmentData = {
                   'file': file,
                   'type': 'pdf',
                   'filename': file.path.split('/').last,
                   'size': fileSize,
-                  // PDFs don't have width/height/orientation/duration in the same way as images/videos
                 };
                 print('[NewPostScreen] Adding to _selectedAttachments: $attachmentData');
                 _addAttachment(attachmentData);
@@ -588,7 +579,7 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
               print('[NewPostScreen] Audio Picked: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
               final int fileSize = await file.length();
               final sizeInMB = fileSize / (1024 * 1024);
-              if (sizeInMB <= 20) {
+              if (sizeInMB <= 20) { // Updated file size limit
                 // Attempt to get duration
                 int? durationMs;
                 final tempAudioPlayer = AudioPlayer();
