@@ -94,8 +94,9 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
   void _updateAspectAndFit() {
     if (widget.enforceFeedConstraints) {
       _currentAspectRatio = 4 / 3;
-      _currentBoxFit = BoxFit.fitWidth;
+      _currentBoxFit = BoxFit.cover; // For feed: cover the 4:3 frame
     } else {
+      // Calculate native aspect ratio
       final num? videoWidth = widget.attachment['width'] as num?;
       final num? videoHeight = widget.attachment['height'] as num?;
       if (videoWidth != null && videoHeight != null && videoHeight > 0) {
@@ -109,31 +110,29 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
             final double? h = double.tryParse(parts[1]);
             if (w != null && h != null && h > 0) {
               _currentAspectRatio = w / h;
+            } else {
+              _currentAspectRatio = 16/9; // Fallback
             }
           } else {
             final double? val = double.tryParse(aspectRatioString);
             if (val != null && val > 0) {
               _currentAspectRatio = val;
+            } else {
+              _currentAspectRatio = 16/9; // Fallback
             }
           }
         } else {
-            _currentAspectRatio = 16/9; // Fallback if no specific data
+            _currentAspectRatio = 16/9; // Default fallback
         }
       }
-      if (_currentAspectRatio <= 0) _currentAspectRatio = 16/9; // Ensure positive
-      _currentBoxFit = BoxFit.contain; // Native aspect ratio usually uses contain
+      if (_currentAspectRatio <= 0) _currentAspectRatio = 16/9;
+      _currentBoxFit = BoxFit.contain; // For native: contain within its aspect ratio
     }
 
-    if (mounted && _betterPlayerController != null && _isInitialized) {
-      _betterPlayerController!.setBetterPlayerConfiguration(
-        _betterPlayerController!.betterPlayerConfiguration.copyWith(
-          aspectRatio: _currentAspectRatio,
-          fit: _currentBoxFit,
-        )
-      );
-    }
-     // Call setState to rebuild with new aspect ratio if it's used in AspectRatio widget
-    if(mounted) setState(() {});
+    // No direct update to BetterPlayerController configuration here after initialization.
+    // This method now primarily sets _currentAspectRatio and _currentBoxFit for initialization
+    // and for the outer AspectRatio widget.
+    if(mounted) setState(() {}); // Ensure UI rebuilds if aspect ratio changed for the wrapper
   }
 
 
@@ -141,13 +140,16 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
   void didUpdateWidget(covariant VideoAttachmentWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.enforceFeedConstraints != oldWidget.enforceFeedConstraints ||
-        (widget.enforceFeedConstraints == false && // Only re-check attachment data if not enforcing feed constraints
+        (widget.enforceFeedConstraints == false &&
          (widget.attachment['width'] != oldWidget.attachment['width'] ||
           widget.attachment['height'] != oldWidget.attachment['height'] ||
           widget.attachment['aspectRatio'] != oldWidget.attachment['aspectRatio'])
         )
        ) {
       _updateAspectAndFit();
+      // If player is initialized and constraints change, might need to re-initialize player.
+      // For simplicity, current setup relies on _initializeVideoPlayer to use updated values.
+      // A more robust solution for live changes might involve disposing and recreating the player.
     }
   }
 
@@ -164,6 +166,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
     print("[VideoAttachmentWidget-$_videoUniqueId] Play callback received.");
     if (!_isInitialized || _betterPlayerController == null) {
       print("[VideoAttachmentWidget-$_videoUniqueId] Player not ready, initializing to play.");
+      // _updateAspectAndFit(); // Ensure aspect/fit are correct before initializing
       _initializeVideoPlayer(autoplay: true);
     } else {
       if (mounted) {
@@ -199,6 +202,10 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
     _isInitialized = false;
     _shouldAutoplayAfterInit = autoplay;
 
+    // Ensure aspect ratio and fit are determined before creating the controller
+    _updateAspectAndFit();
+
+
     final String? attachmentUrl = widget.attachment['url'] as String?;
     if (attachmentUrl == null) {
       print("[VideoAttachmentWidget-$_videoUniqueId] Video attachment URL is null.");
@@ -211,16 +218,12 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
       '/upload/q_auto:low,w_480,c_limit/',
     );
 
-    // Ensure _updateAspectAndFit has been called to set _currentAspectRatio and _currentBoxFit
-    // This is usually done in initState and didUpdateWidget, but ensure it's fresh if called standalone.
-    // _updateAspectAndFit(); // Could call here, but might be redundant if state is managed well.
-
     _betterPlayerController = BetterPlayerController(
       BetterPlayerConfiguration(
-        aspectRatio: _currentAspectRatio, // Use the dynamically determined aspect ratio
+        aspectRatio: _currentAspectRatio, // Use state variable set by _updateAspectAndFit
         autoPlay: false,
         looping: widget.onVideoCompletedInGrid == null,
-        fit: _currentBoxFit, // Use the dynamically determined BoxFit
+        fit: _currentBoxFit, // Use state variable set by _updateAspectAndFit
         controlsConfiguration: BetterPlayerControlsConfiguration(
           showControls: false,
           enablePlayPause: true,
@@ -248,21 +251,18 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
         if (mounted) {
           setState(() => _isInitialized = true);
 
-          // If not enforcing feed constraints, try to get aspect ratio from player
           if (!widget.enforceFeedConstraints) {
             final videoPlayerAspectRatio = _betterPlayerController!.videoPlayerController?.value.aspectRatio;
             if (videoPlayerAspectRatio != null && videoPlayerAspectRatio > 0 && videoPlayerAspectRatio != _currentAspectRatio) {
               if (mounted) {
-                 setState(() { // Update state for AspectRatio widget
+                 // Only update _currentAspectRatio for the parent AspectRatio widget via setState.
+                 // Do not attempt to change the player's internal configuration here.
+                 setState(() {
                     _currentAspectRatio = videoPlayerAspectRatio;
                  });
-                _betterPlayerController!.setBetterPlayerConfiguration(
-                  _betterPlayerController!.betterPlayerConfiguration.copyWith(aspectRatio: _currentAspectRatio)
-                );
               }
             }
           }
-          // Volume and autoplay logic remains
           _betterPlayerController!.setVolume(_isMuted ? 0.0 : 1.0);
           if (_shouldAutoplayAfterInit && !(_betterPlayerController!.isPlaying() ?? true)) {
             _betterPlayerController!.play();
