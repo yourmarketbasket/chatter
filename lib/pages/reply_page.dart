@@ -315,14 +315,24 @@ class _ReplyPageState extends State<ReplyPage> {
 
  Widget _buildPostContent(Map<String, dynamic> post, {required bool isReply, int indentLevel = 0}) {
   final String username = post['username'] as String? ?? 'Unknown User';
-  final String content = post['content'] as String? ?? '';
+  // Decode content if it's in buffer format
+  String content = post['content'] as String? ?? '';
+  if (post['buffer'] != null && post['buffer']['data'] is List) {
+    try {
+      final List<int> data = List<int>.from(post['buffer']['data'] as List);
+      content = utf8.decode(data); // Assuming UTF-8 encoding
+    } catch (e) {
+      print('Error decoding buffer content: $e');
+      content = 'Error displaying content.';
+    }
+  }
+
   final String? userAvatar = post['useravatar'] as String?;
   final String avatarInitial = post['avatarInitial'] as String? ?? (username.isNotEmpty ? username[0].toUpperCase() : '?');
   final DateTime timestamp = post['createdAt'] is String
       ? (DateTime.tryParse(post['createdAt'] as String) ?? DateTime.now())
       : (post['createdAt'] is DateTime ? post['createdAt'] as DateTime : DateTime.now());
 
-  // Safely handle attachments
   List<Map<String, dynamic>> correctlyTypedAttachments = [];
   final dynamic rawAttachments = post['attachments'];
   if (rawAttachments is List && rawAttachments.isNotEmpty) {
@@ -343,7 +353,6 @@ class _ReplyPageState extends State<ReplyPage> {
     }
   }
 
-  // Safely handle stats
   final int likesCount = post['likesCount'] as int? ?? (post['likes'] is List ? (post['likes'] as List).length : 0);
   final int repostsCount = post['repostsCount'] as int? ?? (post['reposts'] is List ? (post['reposts'] as List).length : 0);
   final int viewsCount = post['viewsCount'] as int? ?? (post['views'] is List ? (post['views'] as List).length : 0);
@@ -361,6 +370,7 @@ class _ReplyPageState extends State<ReplyPage> {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // User Avatar
             CircleAvatar(
               radius: isReply ? 14 : 18,
               backgroundColor: Colors.tealAccent.withOpacity(0.2),
@@ -376,11 +386,12 @@ class _ReplyPageState extends State<ReplyPage> {
                     )
                   : null,
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Row: Username, Time/Date, Views
                   Row(
                     children: [
                       Text(
@@ -392,68 +403,54 @@ class _ReplyPageState extends State<ReplyPage> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        DateFormat('h:mm a · MMM d, yyyy').format(timestamp),
-                        style: GoogleFonts.roboto(
-                          fontSize: isReply ? 11 : 12,
-                          color: Colors.grey[400],
+                      Expanded(
+                        child: Text(
+                          '${DateFormat('h:mm a').format(timestamp)} · ${DateFormat('MMM d, yyyy').format(timestamp)} · $viewsCount views',
+                          style: GoogleFonts.roboto(
+                            fontSize: isReply ? 11 : 12,
+                            color: Colors.grey[400],
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    content,
-                    style: GoogleFonts.roboto(
-                      fontSize: isReply ? 13 : 14,
-                      color: Colors.white70,
-                      height: 1.5,
-                    ),
+                  const SizedBox(height: 6),
+                  // Column: Content and Attachments
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        content,
+                        style: GoogleFonts.roboto(
+                          fontSize: isReply ? 13 : 14,
+                          color: Colors.white70,
+                          height: 1.5,
+                        ),
+                      ),
+                      if (correctlyTypedAttachments.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        _buildReplyAttachmentGrid(
+                          correctlyTypedAttachments,
+                          post,
+                          username,
+                          userAvatar,
+                          timestamp,
+                          viewsCount,
+                          likesCount,
+                          repostsCount,
+                          content,
+                        ),
+                      ],
+                    ],
                   ),
-                  if (correctlyTypedAttachments.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    _buildReplyAttachmentGrid(
-                      correctlyTypedAttachments,
-                      post,
-                      username,
-                      userAvatar,
-                      timestamp,
-                      viewsCount,
-                      likesCount,
-                      repostsCount,
-                      content,
-                    ),
-                  ],
                   const SizedBox(height: 12),
+                  // Row: Reply, Reposts, Like, Bookmark, Share
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _buildStatButton(
-                        icon: FeatherIcons.heart,
-                        text: '$likesCount',
-                        color: Colors.pinkAccent,
-                        onPressed: () {
-                          _showSnackBar(
-                            'Like ${isReply ? "Reply" : "Post"}',
-                            'Like ${isReply ? "reply" : "post"} by @$username (not implemented yet).',
-                            Colors.pinkAccent,
-                          );
-                        },
-                      ),
-                      _buildStatButton(
-                        icon: FeatherIcons.repeat,
-                        text: '$repostsCount',
-                        color: Colors.greenAccent,
-                        onPressed: () {
-                          _showSnackBar(
-                            'Repost ${isReply ? "Reply" : "Post"}',
-                            'Repost ${isReply ? "reply" : "post"} by @$username (not implemented yet).',
-                            Colors.greenAccent,
-                          );
-                        },
-                      ),
-                      _buildStatButton(
-                        icon: FeatherIcons.messageCircle,
+                       _buildStatButton(
+                        icon: FeatherIcons.messageCircle, // Reply
                         text: '$repliesCount',
                         color: Colors.tealAccent,
                         onPressed: () {
@@ -469,26 +466,32 @@ class _ReplyPageState extends State<ReplyPage> {
                         },
                       ),
                       _buildStatButton(
-                        icon: FeatherIcons.eye,
-                        text: '$viewsCount',
-                        color: Colors.blueAccent,
+                        icon: FeatherIcons.repeat, // Repost
+                        text: '$repostsCount',
+                        color: Colors.greenAccent,
                         onPressed: () {
                           _showSnackBar(
-                            'View ${isReply ? "Reply" : "Post"}',
-                            'View ${isReply ? "reply" : "post"} by @$username (not implemented yet).',
-                            Colors.blueAccent,
+                            'Repost ${isReply ? "Reply" : "Post"}',
+                            'Repost ${isReply ? "reply" : "post"} by @$username (not implemented yet).',
+                            Colors.greenAccent,
                           );
                         },
                       ),
                       _buildStatButton(
-                        icon: FeatherIcons.share2,
-                        text: '',
-                        color: Colors.white70,
-                        onPressed: () => _sharePost(post),
+                        icon: FeatherIcons.heart, // Like
+                        text: '$likesCount',
+                        color: Colors.pinkAccent,
+                        onPressed: () {
+                          _showSnackBar(
+                            'Like ${isReply ? "Reply" : "Post"}',
+                            'Like ${isReply ? "reply" : "post"} by @$username (not implemented yet).',
+                            Colors.pinkAccent,
+                          );
+                        },
                       ),
-                      if (!isReply) ...[
+                      if (!isReply) // Bookmark only for original post, not replies
                         _buildStatButton(
-                          icon: FeatherIcons.bookmark,
+                          icon: FeatherIcons.bookmark, // Bookmark
                           text: '',
                           color: Colors.white70,
                           onPressed: () {
@@ -499,7 +502,15 @@ class _ReplyPageState extends State<ReplyPage> {
                             );
                           },
                         ),
-                      ],
+                       if (isReply) // Empty SizedBox to maintain spacing for replies if no bookmark
+                         const SizedBox(width: 24), // Adjust width as needed for alignment
+
+                      _buildStatButton(
+                        icon: FeatherIcons.share2, // Share
+                        text: '',
+                        color: Colors.white70,
+                        onPressed: () => _sharePost(post),
+                      ),
                     ],
                   ),
                 ],
@@ -511,9 +522,9 @@ class _ReplyPageState extends State<ReplyPage> {
     ),
   );
 }
-  
-  
-  Widget _buildStatButton({
+
+
+Widget _buildStatButton({
     required IconData icon,
     required String text,
     required Color color,

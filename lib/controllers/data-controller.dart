@@ -513,54 +513,68 @@ class DataController extends GetxController {
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
-        print(response.data);
+        print("[DataController] Raw replies data from API for post $postId: ${response.data}");
         final List<dynamic> repliesData = response.data['replies'];
         List<Map<String, dynamic>> replies = [];
 
         for (var replyData in repliesData) {
+          if (replyData == null || replyData is! Map<String,dynamic>) {
+            print("[DataController] Skipping invalid reply data item: $replyData");
+            continue;
+          }
+          Map<String,dynamic> currentReply = Map<String,dynamic>.from(replyData);
+
           // Safely extract and parse attachments
           List<Map<String, dynamic>> attachments = [];
-          if (replyData['mediaAttachments'] != null && replyData['mediaAttachments'] is List) {
-            for (var attData in (replyData['mediaAttachments'] as List<dynamic>)) {
+          if (currentReply['attachments'] != null && currentReply['attachments'] is List) {
+            for (var attData in (currentReply['attachments'] as List<dynamic>)) {
               if (attData is Map<String, dynamic>) {
                 attachments.add({
                   'type': attData['type']?.toString() ?? 'unknown',
                   'url': attData['url']?.toString() ?? '',
-                  'filename': attData['fileName']?.toString() ?? '', // Adjusted to fileName
-                  'size': (attData['fileSize'] is num ? attData['fileSize'] : int.tryParse(attData['fileSize']?.toString() ?? '0'))?.toInt() ?? 0, // Adjusted to fileSize
+                  'filename': attData['filename']?.toString() ?? '',
+                  'size': (attData['size'] is num ? attData['size'] : int.tryParse(attData['size']?.toString() ?? '0'))?.toInt() ?? 0,
+                  'thumbnailUrl': attData['thumbnailUrl']?.toString(), // Include thumbnail
                 });
               }
             }
           }
 
-          // Safely extract username and generate avatarInitial
-          String username = replyData['authorDetails']?['username']?.toString() ?? 'Unknown User';
+          String username = currentReply['username']?.toString() ?? 'Unknown User';
           String avatarInitial = username.isNotEmpty ? username[0].toUpperCase() : '?';
-          if (replyData['authorDetails']?['avatarInitial'] != null) {
-            avatarInitial = replyData['authorDetails']['avatarInitial'].toString();
+          if (currentReply['avatarInitial'] != null && currentReply['avatarInitial'].toString().isNotEmpty) {
+            avatarInitial = currentReply['avatarInitial'].toString();
           }
 
+          // Content: Pass buffer directly. _buildPostContent in ReplyPage will handle decoding.
+          // Also pass 'content' if available as a direct string.
+          String textContent = currentReply['content']?.toString() ?? '';
+          final bufferData = currentReply['buffer'];
+
           replies.add({
-            'id': replyData['_id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(), // Fallback id
+            '_id': currentReply['_id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
             'username': username,
-            'content': replyData['textContent']?.toString() ?? '',
-            'timestamp': (DateTime.tryParse(replyData['createdAt']?.toString() ?? '') ?? DateTime.now()).toIso8601String(),
-            'likes': (replyData['likeCount'] is num ? replyData['likeCount'] : int.tryParse(replyData['likeCount']?.toString() ?? '0'))?.toInt() ?? 0,
-            'reposts': (replyData['repostCount'] is num ? replyData['repostCount'] : int.tryParse(replyData['repostCount']?.toString() ?? '0'))?.toInt() ?? 0,
-            'views': (replyData['viewCount'] is num ? replyData['viewCount'] : int.tryParse(replyData['viewCount']?.toString() ?? '0'))?.toInt() ?? 0,
+            'content': textContent, // Direct text content
+            'buffer': bufferData,   // Buffer for potentially encoded content
+            'createdAt': currentReply['createdAt'], // Pass as is (String or DateTime)
+            'likes': List<dynamic>.from(currentReply['likes'] ?? []),
+            'reposts': List<dynamic>.from(currentReply['reposts'] ?? []),
+            'views': List<dynamic>.from(currentReply['views'] ?? []),
             'attachments': attachments,
             'avatarInitial': avatarInitial,
-            'useravatar': replyData['authorDetails']?['avatar']?.toString(), // Can be null
-            'replies': const [], // Replies to a reply are not typically fetched in this call
+            'useravatar': currentReply['useravatar']?.toString(),
+            'replies': List<dynamic>.from(currentReply['replies'] ?? const []),
+            'userId': currentReply['userId']?.toString(),
           });
         }
+        print("[DataController] Processed replies for post $postId: $replies");
         return replies;
       } else {
-        print('Error fetching replies: ${response.statusCode} - ${response.data['message']}');
-        throw Exception('Failed to fetch replies: ${response.data['message'] ?? 'Unknown error'}');
+        print('[DataController] Error fetching replies for post $postId: ${response.statusCode} - ${response.data?['message']}');
+        throw Exception('Failed to fetch replies: ${response.data?['message'] ?? 'Unknown error'}');
       }
     } catch (e) {
-      print('Exception caught in fetchReplies: $e');
+      print('[DataController] Exception caught in fetchReplies for post $postId: $e');
       throw Exception('An error occurred while fetching replies: $e');
     }
   }
