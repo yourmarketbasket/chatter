@@ -176,87 +176,7 @@ class _ReplyPageState extends State<ReplyPage> {
                   Text(content, style: GoogleFonts.roboto(fontSize: isReply ? 13 : 14, color: Colors.white70, height: 1.5)),
                   if (correctlyTypedAttachments.isNotEmpty) ...[
                     const SizedBox(height: 12),
-                    GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: correctlyTypedAttachments.length > 1 ? 2 : 1,
-                        crossAxisSpacing: 8,
-                        mainAxisSpacing: 8,
-                        childAspectRatio: (attachment) { // Calculate aspect ratio based on attachment type
-                            final String type = attachment['type'] as String? ?? 'unknown';
-                            if (type == 'video') {
-                                // Use actual video aspect ratio if available, else default
-                                final num? videoWidth = attachment['width'] as num?;
-                                final num? videoHeight = attachment['height'] as num?;
-                                if (videoWidth != null && videoHeight != null && videoHeight > 0) {
-                                    return videoWidth / videoHeight;
-                                }
-                                return 16/9; // Default for video
-                            }
-                            return 1.0; // Default for images/PDFs in grid
-                        }(correctlyTypedAttachments[0]), // Example: use first item's aspect for simplicity in grid setting
-                      ),
-                      itemCount: correctlyTypedAttachments.length,
-                      itemBuilder: (context, idx) {
-                        final attachment = correctlyTypedAttachments[idx];
-                        final String attachmentType = attachment['type'] as String? ?? 'unknown';
-                        final String? attachmentFilename = attachment['filename'] as String?;
-
-                        return GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => MediaViewPage(
-                                  attachments: correctlyTypedAttachments,
-                                  initialIndex: idx,
-                                  message: content,
-                                  userName: username,
-                                  userAvatarUrl: userAvatar,
-                                  timestamp: timestamp,
-                                  viewsCount: viewsCount,
-                                  likesCount: likesCount,
-                                  repostsCount: repostsCount,
-                                ),
-                              ),
-                            );
-                          },
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: attachmentType == "image"
-                                ? (attachment['url'] != null
-                                    ? Image.network(attachment['url'] as String, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => Container(color: Colors.grey[900], child: const Icon(FeatherIcons.image, color: Colors.grey, size: 40)))
-                                    : (attachment['file'] as File?) != null
-                                        ? Image.file(attachment['file'] as File, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => Container(color: Colors.grey[900], child: const Icon(FeatherIcons.image, color: Colors.grey, size: 40)))
-                                        : Container(color: Colors.grey[900], child: const Icon(FeatherIcons.alertTriangle, color: Colors.redAccent, size: 40)))
-                                : attachmentType == "pdf"
-                                    ? ((attachment['url'] != null || (attachment['file'] as File?) != null)
-                                        ? PdfViewer.uri(attachment['url'] != null ? Uri.parse(attachment['url'] as String) : Uri.file((attachment['file'] as File).path), params: const PdfViewerParams(maxScale: 1.0))
-                                        : Container(color: Colors.grey[900], child: const Icon(FeatherIcons.alertTriangle, color: Colors.redAccent, size: 40)))
-                                : attachmentType == "video" // Use VideoAttachmentWidget for videos
-                                    ? VideoAttachmentWidget(
-                                        key: Key('video_${attachment['url'] ?? idx}'), // Ensure unique key
-                                        attachment: attachment,
-                                        post: post, // Pass the whole post map
-                                        borderRadius: BorderRadius.circular(12), // Match styling
-                                        enforceFeedConstraints: false, // Use native aspect ratio here
-                                      )
-                                    : Container(
-                                        color: Colors.grey[900],
-                                        child: Column(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            Icon(attachmentType == "audio" ? FeatherIcons.music : FeatherIcons.film, color: Colors.tealAccent, size: 40),
-                                            const SizedBox(height: 8),
-                                            Text(attachmentFilename ?? (attachment['url'] as String? ?? 'unknown').split('/').last, style: GoogleFonts.roboto(color: Colors.white70, fontSize: 12), textAlign: TextAlign.center, overflow: TextOverflow.ellipsis),
-                                          ],
-                                        ),
-                                      ),
-                          ),
-                        );
-                      },
-                    ),
+                    _buildReplyAttachmentGrid(correctlyTypedAttachments, post, username, userAvatar, timestamp, viewsCount, likesCount, repostsCount, content),
                   ],
                   if (!isReply) ...[ // Show stats only for the main post, not for replies in this context
                     const SizedBox(height: 12),
@@ -534,21 +454,29 @@ class _ReplyPageState extends State<ReplyPage> {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  _isLoadingReplies && _fetchRepliesError == null // Show main loader only if error isn't present
-                      ? const Center(child: Padding(padding: EdgeInsets.all(16.0), child: CircularProgressIndicator(color: Colors.tealAccent)))
+                  _isLoadingReplies && _fetchRepliesError == null
+                      ? const Center(child: Padding(padding: EdgeInsets.symmetric(vertical: 20.0), child: CircularProgressIndicator(color: Colors.tealAccent)))
                       : _fetchRepliesError != null
                           ? Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(_fetchRepliesError!, style: GoogleFonts.roboto(color: Colors.redAccent, fontSize: 14)),
-                                  const SizedBox(height: 8),
-                                  ElevatedButton(onPressed: () => _fetchPostReplies(showLoadingIndicator: true), child: Text("Retry", style: GoogleFonts.roboto(color: Colors.black)), style: ElevatedButton.styleFrom(backgroundColor: Colors.tealAccent)),
-                                ],
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 20.0),
+                                child: Text(
+                                  "Couldn't load replies. Tap refresh to try again.",
+                                  style: GoogleFonts.roboto(color: Colors.redAccent, fontSize: 14),
+                                  textAlign: TextAlign.center,
+                                ),
                               ),
                             )
                           : _replies.isEmpty
-                              ? Center(child: Text("No replies yet. Be the first to reply!", style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 14)))
+                              ? Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 20.0),
+                                    child: Text(
+                                      "No replies yet.",
+                                      style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 14),
+                                    ),
+                                  ),
+                                )
                               : ListView.builder(
                                   shrinkWrap: true,
                                   physics: const NeverScrollableScrollPhysics(),
