@@ -95,6 +95,7 @@ class _ReplyPageState extends State<ReplyPage> {
         return;
       }
       final fetchedReplies = await _dataController.fetchReplies(postId);
+      print(fetchedReplies);
       if (mounted) {
         setState(() {
           _replies = fetchedReplies;
@@ -1572,7 +1573,7 @@ class _ReplyPageState extends State<ReplyPage> {
                             itemBuilder: (context, index) {
                               final reply = _replies[index];
                               bool isLast = index == _replies.length - 1;
-                              return _buildTweetStylePostItem(reply, isMainPost: false, isLastReply: isLast);
+                              return _buildTweetStylePostItem(reply, isMainPost: false);
                             },
                             separatorBuilder: (context, index) =>
                               const Divider(color: Color(0xFF2F3336), height: 1, indent: 58, endIndent: 16), // Adjusted indent
@@ -1739,6 +1740,6 @@ class _ReplyPageState extends State<ReplyPage> {
           ),
         ],
       ),
-    );
+    ));
   }
 }
