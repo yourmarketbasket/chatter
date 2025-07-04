@@ -153,8 +153,15 @@ class DataController extends GetxController {
         };
       }
     } catch (e) {
-      uploadProgress.value = 0.0; // Reset progress on error
-      return {'success': false, 'message': e.toString()};
+      uploadProgress.value = -1; // Indicate error state
+      String errorMessage = e.toString();
+      if (e is dio.DioException && e.response?.data != null && e.response!.data['message'] != null) {
+        errorMessage = 'Failed to create post: ${e.response!.data['message']}';
+      } else if (e is dio.DioException) {
+        errorMessage = 'Failed to create post: ${e.message ?? e.toString()}';
+      }
+      print('[DataController] Error creating post: $errorMessage');
+      return {'success': false, 'message': errorMessage};
     }
   }
 
@@ -645,20 +652,23 @@ class DataController extends GetxController {
 
   // Add a new post to the beginning of the list, preventing duplicates
   void addNewPost(Map<String, dynamic> newPost) {
-    // Ensure count fields are present for the new post
-    newPost['likesCount'] = (newPost['likes'] as List?)?.length ?? 0;
-    newPost['repostsCount'] = (newPost['reposts'] as List?)?.length ?? 0;
-    // For views, a new post typically starts with 0 or a very small number.
-    // If the backend sends a 'views' array, use its length. Otherwise, default to 0.
-    // The `updatePostViews` method will update `viewsCount` based on socket events.
-    newPost['viewsCount'] = (newPost['views'] as List?)?.length ?? newPost['viewsCount'] ?? 0;
+    Map<String, dynamic> processedNewPost = Map<String, dynamic>.from(newPost);
 
+    processedNewPost['likesCount'] = (processedNewPost['likes'] as List?)?.length ?? 0;
+    processedNewPost['repostsCount'] = (processedNewPost['reposts'] as List?)?.length ?? 0;
+    processedNewPost['viewsCount'] = (processedNewPost['views'] as List?)?.length ?? processedNewPost['viewsCount'] ?? 0;
 
-    final String? newPostId = newPost['_id'] as String?;
+    if (processedNewPost['replies'] is List) {
+      processedNewPost['replyCount'] = (processedNewPost['replies'] as List).length;
+    } else if (processedNewPost['replyCount'] == null) {
+      processedNewPost['replyCount'] = 0;
+    }
+
+    final String? newPostId = processedNewPost['_id'] as String?;
 
     if (newPostId == null) {
-      print("Warning: Adding a new post without an '_id'. Cannot check for duplicates by ID. Post data: $newPost");
-      posts.insert(0, newPost);
+      print("Warning: Adding a new post without an '_id'. Cannot check for duplicates by ID. Post data: $processedNewPost");
+      posts.insert(0, processedNewPost);
       return;
     }
 
@@ -668,21 +678,16 @@ class DataController extends GetxController {
     });
 
     if (!alreadyExists) {
-      posts.insert(0, newPost);
+      posts.insert(0, processedNewPost);
       print("New post with ID $newPostId added to the list.");
     } else {
-      print("Post with ID $newPostId already exists in the list. Attempting to update if different.");
-      // Optional: If you want to replace the existing post with the new one
+      print("Post with ID $newPostId already exists in the list. Attempting to update.");
       final int existingPostIndex = posts.indexWhere((p) => (p['_id'] as String?) == newPostId);
       if (existingPostIndex != -1) {
-         // Simple check: if string representations are different. Could be more sophisticated.
-        if (posts[existingPostIndex].toString() != newPost.toString()) {
-          print("Updating existing post with ID $newPostId with new data from socket/event.");
-          posts[existingPostIndex] = newPost;
-          // posts.refresh(); // GetX usually handles list item replacement reactively.
-        } else {
-          print("Post with ID $newPostId received but data is identical to local. Skipping update.");
-        }
+        // Replace with new data, as it might be an update (e.g. from socket)
+        posts[existingPostIndex] = processedNewPost;
+        posts.refresh();
+        print("Updating existing post with ID $newPostId with new data.");
       }
     }
   }
@@ -1093,31 +1098,32 @@ class DataController extends GetxController {
     try {
       int postIndex = posts.indexWhere((p) => p['_id'] == postId);
       if (postIndex != -1) {
-        // Ensure count fields are derived correctly from the updated post data's arrays
-        // before replacing the local post.
         Map<String, dynamic> processedPostData = Map<String, dynamic>.from(updatedPostData);
         processedPostData['likesCount'] = (processedPostData['likes'] as List?)?.length ?? 0;
         processedPostData['repostsCount'] = (processedPostData['reposts'] as List?)?.length ?? 0;
         processedPostData['viewsCount'] = (processedPostData['views'] as List?)?.length ?? 0;
-        // If the backend also sends counts directly (e.g. viewsCount from a view event),
-        // we can prioritize that if needed, but deriving from the array length is safer if the array is the source of truth.
-        // For 'postViewed' specifically, if it only sends 'viewsCount' and not the full 'views' array,
-        // then `fetchSinglePost` (next step) will be more robust.
-        // For now, this method assumes the socket event provides the full updated post, including arrays.
+
+        // Derive replyCount from the 'replies' array if present, otherwise use existing 'replyCount' or default to 0
+        if (processedPostData['replies'] is List) {
+          processedPostData['replyCount'] = (processedPostData['replies'] as List).length;
+        } else if (processedPostData['replyCount'] == null) {
+          processedPostData['replyCount'] = 0;
+        }
 
         posts[postIndex] = processedPostData;
-        posts.refresh(); // Force UI update
+        posts.refresh();
         print('[DataController] Post $postId updated from socket event.');
       } else {
         print('[DataController] updatePostFromSocket: Post with ID $postId not found in local list. It might be a new post not yet added or an issue with ID matching.');
-        // Optionally, if it's a new post (e.g. from another user), we might want to add it here
-        // addNewPost(updatedPostData); // Consider if this is appropriate or if new posts are handled by a different event
+        // If it's a new post from another user, it should be added via addNewPost after being processed.
+        // Consider if addNewPost should be called here or if a different socket event handles new posts.
+        // For now, if not found, it's logged. If it should be added, addNewPost would need similar processing.
+        // addNewPost(updatedPostData); // This would also need the same count processing.
       }
     } catch (e) {
       print('[DataController] Error updating post $postId from socket: $e. Data: $updatedPostData');
     }
   }
-
 
   // The old updatePostViews method is now removed.
   // View updates are handled by the postViewed socket event triggering fetchSinglePost,

@@ -807,9 +807,17 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     }
 
     // Make sure attachmentMap has a unique ID for key, fallback if URL is null
-    final String attachmentKeyId = attachmentMap['url'] as String? ??
-                                   attachmentMap['_id'] as String? ??
-                                   (attachmentMap.hashCode.toString() + idx.toString());
+    final String attachmentKeyId;
+    if (attachmentMap['_id'] != null && (attachmentMap['_id'] as String).isNotEmpty) {
+      attachmentKeyId = attachmentMap['_id'] as String;
+    } else if (attachmentMap['url'] != null && (attachmentMap['url'] as String).isNotEmpty) {
+      attachmentKeyId = attachmentMap['url'] as String;
+    } else {
+      // Fallback for items that might not have _id or url (e.g. local files in preview before upload)
+      // This is less ideal for feed items which should have stable IDs.
+      attachmentKeyId = 'tempKey_${post['_id']}_${idx}';
+      print("Warning: Attachment in post ${post['_id']} at index $idx is using a temporary key. Attachment data: $attachmentMap");
+    }
 
 
     List<Map<String, dynamic>> correctlyTypedPostAttachments = [];

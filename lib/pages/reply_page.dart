@@ -297,9 +297,19 @@ class _ReplyPageState extends State<ReplyPage> {
 
     Widget contentWidget;
 
+    final String attachmentKeySuffix;
+    if (attachmentMap['_id'] != null && (attachmentMap['_id'] as String).isNotEmpty) {
+        attachmentKeySuffix = attachmentMap['_id'] as String;
+    } else if (attachmentMap['url'] != null && (attachmentMap['url'] as String).isNotEmpty) {
+        attachmentKeySuffix = attachmentMap['url'] as String;
+    } else {
+        attachmentKeySuffix = idx.toString();
+        print("Warning: Reply attachment for post/reply ${postOrReplyData['id']} at index $idx is using an index-based key suffix. Data: $attachmentMap");
+    }
+
     if (attachmentType == "video") {
       contentWidget = VideoAttachmentWidget(
-        key: Key('video_reply_${attachmentMap['url'] ?? idx}'),
+        key: Key('video_reply_$attachmentKeySuffix'),
         attachment: attachmentMap,
         post: postOrReplyData,
         borderRadius: borderRadius,
@@ -325,7 +335,7 @@ class _ReplyPageState extends State<ReplyPage> {
       }
     } else if (attachmentType == "audio") {
       contentWidget = AudioAttachmentWidget(
-        key: Key('audio_reply_${attachmentMap['url'] ?? idx}'),
+        key: Key('audio_reply_$attachmentKeySuffix'),
         attachment: attachmentMap,
         post: postOrReplyData,
         borderRadius: borderRadius,
@@ -954,168 +964,6 @@ class _ReplyPageState extends State<ReplyPage> {
                       padding: EdgeInsets.all(12.0),
                       child: SizedBox(
                         height: 24, width: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.tealAccent),
-                      ),
-                    )
-                  : IconButton(
-                      icon: const Icon(FeatherIcons.send, color: Colors.tealAccent, size: 22),
-                      onPressed: _submitReply,
-                      tooltip: 'Post Reply',
-                    ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Text("Replies", style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white)),
-                       _isLoadingReplies && _fetchRepliesError == null // Show "Trying to refresh" only when actively loading without prior error
-                        ? Row(
-                            children: [
-                               Text("Reloading Replies...", style: GoogleFonts.poppins(fontSize: 16, color: Colors.grey[400])),
-                               const SizedBox(width: 8),
-                               const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent))),
-                            ],
-                          )
-                        : Text("Replies", style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white)),
-                      Row(
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.refresh, color: Colors.tealAccent),
-                            tooltip: "Refresh Replies",
-                            onPressed: () => _fetchPostReplies(showLoadingIndicator: true), // Explicitly show loader
-                          ),
-                          IconButton(
-                            icon: Icon(_showReplyField ? FeatherIcons.messageCircle : FeatherIcons.edit3, color: Colors.tealAccent),
-                            tooltip: _showReplyField ? "Hide Reply Field" : "Show Reply Field",
-                            onPressed: () {
-                              setState(() {
-                                _showReplyField = !_showReplyField;
-                              });
-                            },
-                          ),
-                        ],
-                      )
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  _isLoadingReplies && _fetchRepliesError == null
-                      ? const Center(child: Padding(padding: EdgeInsets.symmetric(vertical: 20.0), child: CircularProgressIndicator(color: Colors.tealAccent)))
-                      : _fetchRepliesError != null
-                          ? Center(
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 20.0),
-                                child: Text(
-                                  "Couldn't load replies. Tap refresh to try again.",
-                                  style: GoogleFonts.roboto(color: Colors.redAccent, fontSize: 14),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                            )
-                          : _replies.isEmpty
-                              ? Center(
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 20.0),
-                                    child: Text(
-                                      "No replies yet.",
-                                      style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 14),
-                                    ),
-                                  ),
-                                )
-                              : ListView.builder(
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  itemCount: _replies.length,
-                                  itemBuilder: (context, index) {
-                                    final reply = _replies[index];
-                                    return Padding(padding: const EdgeInsets.symmetric(vertical: 8.0), child: _buildPostContent(reply, isReply: true));
-                                  },
-                                ),
-                ],
-              ),
-            ),
-          ),
-          if (_showReplyField) _buildReplyInputArea(), // Conditionally display reply input
-        ],
-      ),
-    );
-  }
-
-  Widget _buildReplyInputArea() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A), // Slightly different background for input area
-        border: Border(top: BorderSide(color: Colors.grey[800]!)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (_replyAttachments.isNotEmpty) ...[
-             SizedBox(
-              height: 60, // Fixed height for attachment previews in reply area
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: _replyAttachments.map((attachment) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8.0),
-                    child: Chip(
-                      avatar: attachment['type'] == 'image' ? const Icon(FeatherIcons.image, size:16)
-                            : attachment['type'] == 'video' ? const Icon(FeatherIcons.video, size:16)
-                            : attachment['type'] == 'audio' ? const Icon(FeatherIcons.music, size:16)
-                            : const Icon(FeatherIcons.file, size:16),
-                      label: Text(
-                        (attachment['filename'] ?? (attachment['file']?.path.split('/').last ?? 'Preview')),
-                        style: GoogleFonts.roboto(color: Colors.white, fontSize: 10),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      backgroundColor: Colors.grey[700],
-                      deleteIcon: const Icon(FeatherIcons.x, size: 14, color: Colors.white70),
-                      onDeleted: () {
-                        setState(() {
-                          _replyAttachments.remove(attachment);
-                        });
-                      },
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end, // Align items to the bottom
-            children: [
-              IconButton(
-                icon: const Icon(FeatherIcons.paperclip, color: Colors.tealAccent, size: 22),
-                onPressed: _showAttachmentPicker, // Updated to single picker
-                tooltip: 'Add Media',
-              ),
-              Expanded(
-                child: TextField(
-                  controller: _replyController,
-                  style: GoogleFonts.roboto(color: Colors.white, fontSize: 15),
-                  decoration: InputDecoration(
-                    hintText: "Post your reply...",
-                    hintStyle: GoogleFonts.roboto(color: Colors.grey[500]),
-                    border: InputBorder.none, // Minimalist field
-                    contentPadding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 0),
-                  ),
-                  keyboardType: TextInputType.multiline,
-                  minLines: 1,
-                  maxLines: 5, // Allow field to grow
-                  maxLength: 280, // Keep char limit
-                  buildCounter: (BuildContext context, {int? currentLength, int? maxLength, bool? isFocused}) => null, // Hide counter if desired
-                ),
-              ),
-              _isSubmittingReply
-                  ? const Padding(
-                      padding: EdgeInsets.all(12.0), // Consistent padding with IconButton
-                      child: SizedBox(
-                        height: 24, width: 24, // Match IconButton tap target size
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.tealAccent),
                       ),
                     )
