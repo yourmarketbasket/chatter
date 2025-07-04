@@ -38,11 +38,12 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
   bool _isInitialized = false;
   String _videoUniqueId = "";
   bool _shouldAutoplayAfterInit = false;
-  bool _shouldRenderPlayer = false; // New state variable
+  bool _shouldRenderPlayer = false;
   final DataController _dataController = Get.find<DataController>();
   final MediaVisibilityService _mediaVisibilityService = Get.find<MediaVisibilityService>();
   StreamSubscription? _isTransitioningVideoSubscription;
   Worker? _currentlyPlayingMediaSubscription;
+  double _aspectRatio = 16 / 9; // Default aspect ratio
 
   @override
   void initState() {
@@ -50,14 +51,12 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
     _videoUniqueId = widget.attachment['url'] as String? ??
                      (widget.key?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString());
 
+    _updateAspectRatio();
+
     final String? thumbnailUrl = widget.attachment['thumbnailUrl'] as String?;
     if (thumbnailUrl != null && thumbnailUrl.isNotEmpty) {
       _precacheThumbnail(thumbnailUrl);
     }
-
-    // Standard initialization, don't autoplay, visibility service will decide
-    // Player is not rendered initially, only initialized when it becomes visible.
-    // _initializeVideoPlayer(autoplay: false); // Deferred to onVisibilityChanged
 
     _currentlyPlayingMediaSubscription = ever(_dataController.currentlyPlayingMediaId, (String? playingId) {
       if (!mounted || _betterPlayerController == null || !_isInitialized) return;
@@ -71,7 +70,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
           print('[VideoAttachmentWidget-$_videoUniqueId] Another video ($playingId) started in feed. Pausing this video.');
           if (mounted) {
             setState(() {
-              _shouldRenderPlayer = false; // Stop rendering if another video takes over
+              _shouldRenderPlayer = false;
             });
           }
           _betterPlayerController!.pause();
@@ -87,6 +86,53 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
       CurvedAnimation(parent: _pulseAnimationController, curve: Curves.easeInOut),
     );
     _pulseAnimationController.repeat(reverse: true);
+  }
+
+  void _updateAspectRatio() {
+    final num? videoWidth = widget.attachment['width'] as num?;
+    final num? videoHeight = widget.attachment['height'] as num?;
+    if (videoWidth != null && videoHeight != null && videoHeight > 0) {
+      _aspectRatio = videoWidth / videoHeight;
+    } else {
+      // Try to parse from 'aspectRatio' string if present
+      final String? aspectRatioString = widget.attachment['aspectRatio'] as String?;
+      if (aspectRatioString != null) {
+        final parts = aspectRatioString.split(':');
+        if (parts.length == 2) {
+          final double? w = double.tryParse(parts[0]);
+          final double? h = double.tryParse(parts[1]);
+          if (w != null && h != null && h > 0) {
+            _aspectRatio = w / h;
+          }
+        } else {
+          final double? val = double.tryParse(aspectRatioString);
+          if (val != null && val > 0) {
+            _aspectRatio = val;
+          }
+        }
+      }
+    }
+    // Ensure aspect ratio is positive, else default
+    if (_aspectRatio <= 0) _aspectRatio = 16/9;
+
+    if (mounted && _betterPlayerController != null && _isInitialized) {
+      _betterPlayerController!.setBetterPlayerConfiguration(
+        _betterPlayerController!.betterPlayerConfiguration.copyWith(
+          aspectRatio: _aspectRatio,
+        )
+      );
+    }
+  }
+
+
+  @override
+  void didUpdateWidget(covariant VideoAttachmentWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.attachment['width'] != oldWidget.attachment['width'] ||
+        widget.attachment['height'] != oldWidget.attachment['height'] ||
+        widget.attachment['aspectRatio'] != oldWidget.attachment['aspectRatio']) {
+      _updateAspectRatio();
+    }
   }
 
   void _precacheThumbnail(String thumbnailUrl) async {
@@ -116,7 +162,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
 
   void _pauseVideo() {
     print("[VideoAttachmentWidget-$_videoUniqueId] Pause callback received.");
-    if (_betterPlayerController != null && _isInitialized) { // Check _isInitialized
+    if (_betterPlayerController != null && _isInitialized) {
       _betterPlayerController!.pause();
        print("[VideoAttachmentWidget-$_videoUniqueId] Player paused.");
     }
@@ -128,7 +174,6 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
   }
 
   void _initializeVideoPlayer({bool autoplay = false}) {
-    // Aggressively dispose of any existing controller first
     if (_betterPlayerController != null) {
       print("[VideoAttachmentWidget-$_videoUniqueId] _initializeVideoPlayer: Disposing existing controller before creating new one.");
       _betterPlayerController!.removeEventsListener(_onPlayerEvent);
@@ -136,66 +181,68 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
     }
     _betterPlayerController = null;
     _isInitialized = false;
-    _shouldAutoplayAfterInit = autoplay; // Store the autoplay intent
-
-    // Call setState if appropriate, e.g. if UI needs to clear the old player view immediately
-    // However, this method is often called before build or during state updates where direct setState might be tricky.
-    // The subsequent setState in this method or in the caller should handle UI updates.
+    _shouldAutoplayAfterInit = autoplay;
 
     final String? attachmentUrl = widget.attachment['url'] as String?;
     if (attachmentUrl == null) {
       print("[VideoAttachmentWidget-$_videoUniqueId] Video attachment URL is null.");
-      if (mounted) setState(() {}); // Update UI to reflect lack of player
+      if (mounted) setState(() {});
       return;
     }
 
-    // Use lower resolution for feed previews
     final optimizedUrl = attachmentUrl.replaceAll(
       '/upload/',
-      '/upload/q_auto:low,w_480,c_limit/', // Lower quality, smaller width, limit to prevent upscaling
+      '/upload/q_auto:low,w_480,c_limit/',
     );
 
     _betterPlayerController = BetterPlayerController(
       BetterPlayerConfiguration(
-        aspectRatio: 4 / 3, // Enforce 4:3 aspect ratio for the player viewport
-        autoPlay: false, // Always false here
+        aspectRatio: _aspectRatio, // Use dynamic aspect ratio
+        autoPlay: false,
         looping: widget.onVideoCompletedInGrid == null,
-        fit: BoxFit.fitWidth, // Changed from BoxFit.cover to BoxFit.fitWidth
+        fit: BoxFit.contain, // Changed to contain to respect aspect ratio
         controlsConfiguration: BetterPlayerControlsConfiguration(
           showControls: false,
-          enablePlayPause: true, // These are for built-in controls, which are hidden
+          enablePlayPause: true,
           enableMute: true,
           muteIcon: FeatherIcons.volumeX,
           unMuteIcon: FeatherIcons.volume2,
           loadingWidget: const SizedBox.shrink(),
         ),
-        handleLifecycle: false, // We manage lifecycle explicitly
+        handleLifecycle: false,
       ),
       betterPlayerDataSource: BetterPlayerDataSource(
         BetterPlayerDataSourceType.network,
         optimizedUrl,
         videoFormat: BetterPlayerVideoFormat.other,
-        cacheConfiguration: const BetterPlayerCacheConfiguration( // Caching disabled
-          useCache: false,
-        ),
+        cacheConfiguration: const BetterPlayerCacheConfiguration(useCache: false),
       ),
     )..addEventsListener(_onPlayerEvent);
   }
 
   void _onPlayerEvent(BetterPlayerEvent event) {
-    if (!mounted || _betterPlayerController == null) return; // Added null check for _betterPlayerController
+    if (!mounted || _betterPlayerController == null) return;
 
     switch (event.betterPlayerEventType) {
       case BetterPlayerEventType.initialized:
         if (mounted) {
           setState(() => _isInitialized = true);
+           // Update aspect ratio again once initialized, as player might have more info
+          final videoAspectRatio = _betterPlayerController!.videoPlayerController?.value.aspectRatio;
+          if (videoAspectRatio != null && videoAspectRatio > 0 && videoAspectRatio != _aspectRatio) {
+            if (mounted) {
+               setState(() {
+                  _aspectRatio = videoAspectRatio;
+               });
+              _betterPlayerController!.setBetterPlayerConfiguration(
+                _betterPlayerController!.betterPlayerConfiguration.copyWith(aspectRatio: _aspectRatio)
+              );
+            }
+          }
           _betterPlayerController!.setVolume(_isMuted ? 0.0 : 1.0);
           if (_shouldAutoplayAfterInit && !(_betterPlayerController!.isPlaying() ?? true)) {
             _betterPlayerController!.play();
-            // Reset flag if it's a one-time intent, or manage as needed
-            // _shouldAutoplayAfterInit = false;
           } else if (_betterPlayerController!.isPlaying() == true) {
-            // Handles cases where player might start due to other reasons or was already playing
             _dataController.mediaDidStartPlaying(_videoUniqueId, 'video', _betterPlayerController!);
           }
         }
@@ -215,7 +262,6 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
         _dataController.mediaDidStopPlaying(_videoUniqueId, 'video');
         widget.onVideoCompletedInGrid?.call(_videoUniqueId);
         break;
-      // Progress event no longer updates DataController transition properties
       case BetterPlayerEventType.progress:
       default:
         break;
@@ -229,12 +275,11 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
 
     if (_betterPlayerController != null) {
       print("[VideoAttachmentWidget-$_videoUniqueId] Widget dispose: Disposing BetterPlayerController.");
-      // It's good practice to remove listeners before disposing
       _betterPlayerController!.removeEventsListener(_onPlayerEvent);
       _betterPlayerController!.dispose();
-      _betterPlayerController = null; // Ensure it's nulled out
+      _betterPlayerController = null;
     }
-    _isInitialized = false; // Ensure state reflects no player
+    _isInitialized = false;
     _pulseAnimationController.dispose();
     super.dispose();
   }
@@ -248,8 +293,6 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
       key: Key(visibilityDetectorKey),
       onVisibilityChanged: (visibilityInfo) {
         final visibleFraction = visibilityInfo.visibleFraction;
-
-        // Removed isCurrentlyTransitioningThisVideo check as transition logic is removed
 
         if (visibleFraction > 0 && !_isInitialized && _betterPlayerController == null) {
             print("[VideoAttachmentWidget-$_videoUniqueId] Becoming visible (fraction: $visibleFraction), ensuring player is initialized.");
@@ -265,29 +308,13 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
           context: context,
         );
 
-        // Initialize player when it becomes visible and not already initialized
-        if (visibleFraction > 0 && !_isInitialized && _betterPlayerController == null) {
-            print("[VideoAttachmentWidget-$_videoUniqueId] Becoming visible (fraction: $visibleFraction), ensuring player is initialized.");
-            _initializeVideoPlayer(autoplay: false); // _shouldRenderPlayer will be false by default
-        }
-
-        _mediaVisibilityService.itemVisibilityChanged(
-          mediaId: _videoUniqueId,
-          mediaType: 'video',
-          visibleFraction: visibleFraction,
-          playCallback: _playVideo,
-          pauseCallback: _pauseVideo,
-          context: context,
-        );
-
-        // Aggressive disposal when completely invisible
         if (visibleFraction == 0) {
-          if (mounted && _shouldRenderPlayer) { // If it was rendering, update state
+          if (mounted && _shouldRenderPlayer) {
             setState(() {
               _shouldRenderPlayer = false;
             });
           } else {
-             _shouldRenderPlayer = false; // Ensure it's false
+             _shouldRenderPlayer = false;
           }
 
           if (_betterPlayerController != null) {
@@ -297,7 +324,6 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
             _betterPlayerController!.dispose();
             _betterPlayerController = null;
           }
-          // Update _isInitialized state
           if (_isInitialized && mounted) {
             setState(() {
               _isInitialized = false;
@@ -309,7 +335,6 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
       },
       child: GestureDetector(
         onTap: () {
-          // Transition logic removed. Directly navigate.
           List<Map<String, dynamic>> correctlyTypedPostAttachments = [];
           final dynamic rawPostAttachments = widget.post['attachments'];
           if (rawPostAttachments is List) {
@@ -357,20 +382,19 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
               ),
             ),
           );
-          // Removed .then() block that handled post-transition logic
         },
         child: ClipRRect(
           borderRadius: widget.borderRadius,
           child: AspectRatio(
-            aspectRatio: 4 / 3,
+            aspectRatio: _aspectRatio, // Use dynamic aspect ratio here
             child: Stack(
               alignment: Alignment.center,
               children: [
                 Positioned.fill(
                   child: CachedNetworkImage(
                     imageUrl: thumbnailUrl ?? '',
-                    fit: BoxFit.cover,
-                    memCacheWidth: 480, // Optimize memory for thumbnail
+                    fit: BoxFit.cover, // Cover for thumbnail
+                    memCacheWidth: 480,
                     cacheManager: CustomCacheManager.instance,
                     cacheKey: thumbnailUrl ?? _videoUniqueId,
                     placeholder: (context, url) => ScaleTransition(
@@ -378,36 +402,24 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
                       child: Container(
                         color: Colors.grey[850],
                         child: Center(
-                          child: Icon(
-                            FeatherIcons.video,
-                            color: Colors.white.withOpacity(0.6),
-                            size: 36,
-                          ),
+                          child: Icon(FeatherIcons.video, color: Colors.white.withOpacity(0.6), size: 36),
                         ),
                       ),
                     ),
                     errorWidget: (context, url, error) => Container(
                       color: Colors.grey[900],
                       child: Center(
-                        child: Icon(
-                          FeatherIcons.video,
-                          color: Colors.white.withOpacity(0.6),
-                          size: 36,
-                        ),
+                        child: Icon(FeatherIcons.video, color: Colors.white.withOpacity(0.6), size: 36),
                       ),
                     ),
                   ),
                 ),
-                // Conditionally render the player only when it should be visible and active
                 if (_isInitialized && _shouldRenderPlayer && _betterPlayerController != null)
-                  Positioned.fill( // Ensure player fills the AspectRatio
+                  Positioned.fill(
                     child: BetterPlayer(controller: _betterPlayerController!),
                   )
-                else if (!_isInitialized && _shouldRenderPlayer) // Show loading if trying to render but not ready
+                else if (!_isInitialized && _shouldRenderPlayer)
                   const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent))),
-
-                // Play icon overlay (FeatherIcons.playCircle) REMOVED for feed context as per requirements.
-                // The icon below (FeatherIcons.video) is part of the placeholder/error state for the thumbnail.
                 Positioned(
                   bottom: 8,
                   right: 8,
