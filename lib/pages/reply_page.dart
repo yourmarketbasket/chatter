@@ -210,6 +210,283 @@ class _ReplyPageState extends State<ReplyPage> {
     );
   }
 
+  // Helper method to parse aspect ratio string (e.g., "16:9") to double
+  double? _parseAspectRatio(dynamic aspectRatio) {
+    if (aspectRatio == null) return null;
+    try {
+      if (aspectRatio is double) return aspectRatio;
+      if (aspectRatio is String) {
+        if (aspectRatio.contains(':')) {
+          final parts = aspectRatio.split(':');
+          if (parts.length == 2) {
+            final width = double.tryParse(parts[0].trim());
+            final height = double.tryParse(parts[1].trim());
+            if (width != null && height != null && height != 0) return width / height;
+          }
+        } else {
+          final value = double.tryParse(aspectRatio);
+          if (value != null) return value;
+        }
+      }
+    } catch (e) {
+      print('Error parsing aspect ratio: $e');
+    }
+    return null;
+  }
+
+  // Builds the individual attachment item for the grid
+  Widget _buildReplyAttachmentWidget(
+    Map<String, dynamic> attachmentMap,
+    int idx,
+    List<Map<String, dynamic>> allAttachmentsInThisPost, // All attachments of the specific post/reply being built
+    Map<String, dynamic> postOrReplyData, // The specific post or reply map this attachment belongs to
+    BorderRadius borderRadius
+  ) {
+    final String attachmentType = attachmentMap['type'] as String? ?? 'unknown';
+    final String? displayUrl = attachmentMap['url'] as String?;
+    final String? attachmentFilename = attachmentMap['filename'] as String?;
+    final File? localFile = attachmentMap['file'] as File?;
+
+    // For MediaViewPage context
+    final String messageContent = postOrReplyData['content'] as String? ?? '';
+    final String userName = postOrReplyData['username'] as String? ?? 'Unknown User';
+    final String? userAvatarUrl = postOrReplyData['useravatar'] as String?;
+    final DateTime timestamp = postOrReplyData['timestamp'] is String
+        ? (DateTime.tryParse(postOrReplyData['timestamp'] as String) ?? DateTime.now())
+        : (postOrReplyData['timestamp'] is DateTime ? postOrReplyData['timestamp'] : DateTime.now());
+
+    // Counts should refer to the original post (widget.post) when viewing its attachments,
+    // or to the specific reply's counts if viewing a reply's attachments (though replies don't typically show these counts)
+    final int viewsCount = widget.post['viewsCount'] as int? ?? (widget.post['views'] as List?)?.length ?? 0;
+    final int likesCount = widget.post['likesCount'] as int? ?? (widget.post['likes'] as List?)?.length ?? 0;
+    final int repostsCount = widget.post['repostsCount'] as int? ?? (widget.post['reposts'] as List?)?.length ?? 0;
+
+
+    Widget contentWidget;
+
+    if (attachmentType == "video") {
+      contentWidget = VideoAttachmentWidget(
+        key: Key('video_reply_${attachmentMap['url'] ?? idx}'),
+        attachment: attachmentMap,
+        post: postOrReplyData, // Pass the specific post/reply data
+        borderRadius: borderRadius, // borderRadius is for the item itself, ClipRRect handles outer.
+        enforceFeedConstraints: false, // Native aspect ratio on reply page
+      );
+    } else if (attachmentType == "image") {
+      if (displayUrl != null && displayUrl.isNotEmpty) {
+        contentWidget = Image.network(displayUrl, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => Container(color: Colors.grey[900], child: const Icon(FeatherIcons.image, color: Colors.grey, size: 40)));
+      } else if (localFile != null) {
+        contentWidget = Image.file(localFile, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => Container(color: Colors.grey[900], child: const Icon(FeatherIcons.image, color: Colors.grey, size: 40)));
+      } else {
+        contentWidget = Container(color: Colors.grey[900], child: const Icon(FeatherIcons.alertTriangle, color: Colors.redAccent, size: 40));
+      }
+    } else if (attachmentType == "pdf") {
+      final uri = displayUrl != null ? Uri.tryParse(displayUrl) : (localFile != null ? Uri.file(localFile.path) : null);
+      if (uri != null) {
+        // Using a simple placeholder for PDF in grid view on reply page for now.
+        // Can be enhanced with PdfThumbnailWidget if needed.
+        contentWidget = Container(
+          color: Colors.grey[800],
+          child: Center(child: Icon(FeatherIcons.fileText, color: Colors.white.withOpacity(0.7), size: 40)),
+        );
+      } else {
+        contentWidget = Container(color: Colors.grey[900], child: const Icon(FeatherIcons.alertTriangle, color: Colors.redAccent, size: 40));
+      }
+    } else { // Fallback for audio or other types
+      contentWidget = Container(
+        color: Colors.grey[900],
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(attachmentType == "audio" ? FeatherIcons.music : FeatherIcons.film, color: Colors.tealAccent, size: 40),
+            const SizedBox(height: 8),
+            Text(attachmentFilename ?? (displayUrl ?? 'unknown').split('/').last, style: GoogleFonts.roboto(color: Colors.white70, fontSize: 12), textAlign: TextAlign.center, overflow: TextOverflow.ellipsis),
+          ],
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: () {
+          int initialIndex = allAttachmentsInThisPost.indexWhere((att) =>
+              (att['url'] != null && att['url'] == attachmentMap['url']) ||
+              (att.hashCode == attachmentMap.hashCode) // Fallback if URL is null (e.g. local file)
+          );
+          if (initialIndex == -1) initialIndex = idx;
+
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MediaViewPage(
+              attachments: allAttachmentsInThisPost,
+              initialIndex: initialIndex,
+              message: messageContent,
+              userName: userName,
+              userAvatarUrl: userAvatarUrl,
+              timestamp: timestamp,
+              viewsCount: viewsCount,
+              likesCount: likesCount,
+              repostsCount: repostsCount,
+            ),
+          ),
+        );
+      },
+      child: ClipRRect( // Individual item clipping if needed, but outer grid ClipRRect is primary
+        borderRadius: borderRadius,
+        child: contentWidget,
+      ),
+    );
+  }
+
+
+  // Builds the attachment grid, similar to HomeFeedScreen
+  Widget _buildReplyAttachmentGrid(
+    List<Map<String, dynamic>> attachmentsArg,
+    Map<String, dynamic> postOrReplyData, // The specific post/reply this grid belongs to
+    // Pass other context if needed by _buildReplyAttachmentWidget for MediaViewPage
+    String userName,
+    String? userAvatar,
+    DateTime timestamp,
+    int viewsCount,
+    int likesCount,
+    int repostsCount,
+    String messageContent
+  ) {
+    const double itemSpacing = 4.0;
+    if (attachmentsArg.isEmpty) return const SizedBox.shrink();
+
+    // Determine the context for MediaViewPage - use the attachments from postOrReplyData
+    final List<Map<String, dynamic>> allAttachmentsForMediaView =
+        (postOrReplyData['attachments'] as List<dynamic>?)
+            ?.map((e) => e as Map<String, dynamic>)
+            .toList() ?? [];
+
+
+    Widget gridContent;
+
+    if (attachmentsArg.length == 1) {
+      final attachment = attachmentsArg[0];
+      double aspectRatioToUse = _parseAspectRatio(attachment['aspectRatio']) ?? 1.0; // Default to 1:1 for single image/pdf
+      if (attachment['type'] == 'video') {
+         aspectRatioToUse = _parseAspectRatio(attachment['aspectRatio']) ?? 16/9; // Default for video
+      }
+      if (aspectRatioToUse <=0) aspectRatioToUse = 1.0;
+
+
+      gridContent = AspectRatio(
+        aspectRatio: aspectRatioToUse,
+        child: _buildReplyAttachmentWidget(attachment, 0, allAttachmentsForMediaView, postOrReplyData, BorderRadius.circular(12.0)), // Single item gets full rounding
+      );
+    } else if (attachmentsArg.length == 2) {
+      gridContent = AspectRatio(
+        aspectRatio: 2 * (4 / 3), // Maintain a reasonable overall shape
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(child: _buildReplyAttachmentWidget(attachmentsArg[0], 0, allAttachmentsForMediaView, postOrReplyData, BorderRadius.zero)),
+            const SizedBox(width: itemSpacing),
+            Expanded(child: _buildReplyAttachmentWidget(attachmentsArg[1], 1, allAttachmentsForMediaView, postOrReplyData, BorderRadius.zero)),
+          ],
+        ),
+      );
+    } else if (attachmentsArg.length == 3) {
+       gridContent = LayoutBuilder(builder: (context, constraints) {
+        double width = constraints.maxWidth;
+        double leftItemWidth = (width * 0.66) - (itemSpacing / 2);
+        double rightColumnWidth = width * 0.33 - (itemSpacing / 2);
+        // Attempt to make overall grid squarish or 4:3 like
+        double totalHeight = width * ( (attachmentsArg[0]['type'] == 'video' || attachmentsArg[1]['type'] == 'video' || attachmentsArg[2]['type'] == 'video' ) ? (9/16) : (3/4) );
+        if (attachmentsArg.any((att) => (_parseAspectRatio(att['aspectRatio']) ?? 1.0) < 1)) { // If any portrait items
+            totalHeight = width * (4/3); // Make grid taller for portrait content
+        }
+
+
+        return SizedBox(
+            height: totalHeight, // Constrain height
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(width: leftItemWidth, child: _buildReplyAttachmentWidget(attachmentsArg[0], 0, allAttachmentsForMediaView, postOrReplyData, BorderRadius.zero)),
+                const SizedBox(width: itemSpacing),
+                SizedBox(
+                  width: rightColumnWidth,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(child: _buildReplyAttachmentWidget(attachmentsArg[1], 1, allAttachmentsForMediaView, postOrReplyData, BorderRadius.zero)),
+                      const SizedBox(height: itemSpacing),
+                      Expanded(child: _buildReplyAttachmentWidget(attachmentsArg[2], 2, allAttachmentsForMediaView, postOrReplyData, BorderRadius.zero)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+      });
+    } else if (attachmentsArg.length == 4) {
+      gridContent = AspectRatio(
+        aspectRatio: 1.0, // Square grid
+        child: GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: itemSpacing, mainAxisSpacing: itemSpacing, childAspectRatio: 1),
+          itemCount: 4,
+          itemBuilder: (context, index) => _buildReplyAttachmentWidget(attachmentsArg[index], index, allAttachmentsForMediaView, postOrReplyData, BorderRadius.zero),
+        ),
+      );
+    } else if (attachmentsArg.length == 5) {
+        gridContent = LayoutBuilder(builder: (context, constraints) {
+          double containerWidth = constraints.maxWidth;
+          double h1 = (containerWidth - itemSpacing) / 2;
+          double h2 = (containerWidth - 2 * itemSpacing) / 3;
+          double totalHeight = h1 + itemSpacing + h2;
+          return SizedBox(
+              height: totalHeight,
+              child: Column(
+                children: [
+                  SizedBox(height: h1, child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    Expanded(child: _buildReplyAttachmentWidget(attachmentsArg[0], 0, allAttachmentsForMediaView, postOrReplyData, BorderRadius.zero)), const SizedBox(width: itemSpacing),
+                    Expanded(child: _buildReplyAttachmentWidget(attachmentsArg[1], 1, allAttachmentsForMediaView, postOrReplyData, BorderRadius.zero)),
+                  ])),
+                  const SizedBox(height: itemSpacing),
+                  SizedBox(height: h2, child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    Expanded(child: _buildReplyAttachmentWidget(attachmentsArg[2], 2, allAttachmentsForMediaView, postOrReplyData, BorderRadius.zero)), const SizedBox(width: itemSpacing),
+                    Expanded(child: _buildReplyAttachmentWidget(attachmentsArg[3], 3, allAttachmentsForMediaView, postOrReplyData, BorderRadius.zero)), const SizedBox(width: itemSpacing),
+                    Expanded(child: _buildReplyAttachmentWidget(attachmentsArg[4], 4, allAttachmentsForMediaView, postOrReplyData, BorderRadius.zero)),
+                  ])),
+                ],
+              ),
+            );
+       });
+    } else { // 6 or more items
+      const int crossAxisCount = 3;
+      const double childAspectRatio = 1.0; // Square items
+      gridContent = LayoutBuilder(builder: (context, constraints) {
+        double itemWidth = (constraints.maxWidth - (crossAxisCount - 1) * itemSpacing) / crossAxisCount;
+        double itemHeight = itemWidth / childAspectRatio;
+        int numRows = (attachmentsArg.length / crossAxisCount).ceil();
+        double totalHeight = numRows * itemHeight + (numRows - 1) * itemSpacing;
+         return SizedBox(
+            height: totalHeight,
+            child: GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: crossAxisCount, crossAxisSpacing: itemSpacing, mainAxisSpacing: itemSpacing, childAspectRatio: childAspectRatio),
+              itemCount: attachmentsArg.length, // Show all items up to a reasonable limit, or cap at 6 for a 2x3 grid
+              itemBuilder: (context, index) => _buildReplyAttachmentWidget(attachmentsArg[index], index, allAttachmentsForMediaView, postOrReplyData, BorderRadius.zero),
+            ),
+          );
+      });
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12.0), // Outer rounding for the whole grid
+      child: gridContent,
+    );
+  }
+
+
   Future<void> _pickAndAddAttachment(String type) async {
     File? file;
     String dialogTitle = '';
