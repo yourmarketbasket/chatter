@@ -477,8 +477,9 @@ class _ReplyPageState extends State<ReplyPage> {
     } else if (attachmentsArg.length == 3) {
        gridContent = LayoutBuilder(builder: (context, constraints) {
         double width = constraints.maxWidth;
-        double leftItemWidth = (width * 0.66) - (itemSpacing / 2);
-        double rightColumnWidth = width * 0.33 - (itemSpacing / 2);
+        // Corrected width calculation for 3 items
+        double leftItemWidth = (width - itemSpacing) * (2/3);
+        double rightColumnWidth = (width - itemSpacing) * (1/3);
         // Attempt to make overall grid squarish or 4:3 like
         double totalHeight = width * ( (attachmentsArg[0]['type'] == 'video' || attachmentsArg[1]['type'] == 'video' || attachmentsArg[2]['type'] == 'video' ) ? (9/16) : (3/4) );
         if (attachmentsArg.any((att) => (_parseAspectRatio(att['aspectRatio']) ?? 1.0) < 1)) { // If any portrait items
