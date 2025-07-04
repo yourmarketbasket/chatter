@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io';
+import 'package:flutter/services.dart'; // Import for Clipboard
 import 'package:feather_icons/feather_icons.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart'; // Import share_plus
@@ -49,14 +50,25 @@ class _ReplyPageState extends State<ReplyPage> {
   }
 
   Future<void> _fetchPostReplies({bool showLoadingIndicator = true}) async {
-    if (mounted) {
-      setState(() {
-        if (showLoadingIndicator) _isLoadingReplies = true;
-        _fetchRepliesError = null;
-      });
-    }
+    if (!mounted) return; // Early exit if not mounted
+    setState(() {
+      if (showLoadingIndicator) _isLoadingReplies = true;
+      _fetchRepliesError = null;
+    });
+
     try {
-      final fetchedReplies = await _dataController.fetchReplies(widget.post['id'] as String);
+      final postId = widget.post['_id'] as String?;
+      if (postId == null) {
+        print("Error: Post ID is null in _fetchPostReplies. Cannot fetch replies.");
+        if (mounted) {
+          setState(() {
+            _fetchRepliesError = 'Cannot load replies: Original post ID is missing.';
+            _isLoadingReplies = false;
+          });
+        }
+        return;
+      }
+      final fetchedReplies = await _dataController.fetchReplies(postId);
       if (mounted) {
         setState(() {
           _replies = fetchedReplies;
@@ -67,7 +79,7 @@ class _ReplyPageState extends State<ReplyPage> {
       print('Error fetching replies: $e');
       if (mounted) {
         setState(() {
-          _fetchRepliesError = 'Failed to load replies. Please try again.';
+          _fetchRepliesError = 'Failed to load replies. Please try again.'; // This message will be simplified later
           if (showLoadingIndicator) _isLoadingReplies = false;
         });
       }
@@ -131,18 +143,27 @@ class _ReplyPageState extends State<ReplyPage> {
     List<Map<String, dynamic>> correctlyTypedAttachments = [];
     final dynamic rawAttachments = post['attachments'];
     if (rawAttachments is List) {
-      for (var item in rawAttachments) {
+      for (final item in rawAttachments) { // Use 'final' for loop variable
         if (item is Map<String, dynamic>) {
           correctlyTypedAttachments.add(item);
         } else if (item is Map) {
+          // Attempt to convert Map to Map<String, dynamic>
+          // This handles cases where item might be Map<dynamic, dynamic>
           try {
-            correctlyTypedAttachments.add(Map<String, dynamic>.from(item));
+            correctlyTypedAttachments.add(Map<String, dynamic>.from(item.map(
+              (key, value) => MapEntry(key.toString(), value),
+            )));
           } catch (e) {
-            print('Error converting attachment Map: $e');
+            print('Error converting attachment Map to Map<String, dynamic>: $e. Attachment: $item');
+            // Optionally, add a placeholder for unconvertible attachments or skip
           }
+        } else {
+          // Log or handle items that are not maps, if necessary
+          print('Skipping non-map attachment item: $item');
         }
       }
     }
+
 
     // Stats for original post
     final int likesCount = widget.post['likesCount'] as int? ?? (widget.post['likes'] as List?)?.length ?? 0;
@@ -220,24 +241,30 @@ class _ReplyPageState extends State<ReplyPage> {
   double? _parseAspectRatio(dynamic aspectRatio) {
     if (aspectRatio == null) return null;
     try {
-      if (aspectRatio is double) return aspectRatio;
+      if (aspectRatio is double) {
+        return (aspectRatio > 0) ? aspectRatio : 1.0; // Ensure positive
+      }
       if (aspectRatio is String) {
         if (aspectRatio.contains(':')) {
           final parts = aspectRatio.split(':');
           if (parts.length == 2) {
             final width = double.tryParse(parts[0].trim());
             final height = double.tryParse(parts[1].trim());
-            if (width != null && height != null && height != 0) return width / height;
+            if (width != null && height != null && width > 0 && height > 0) {
+              return width / height;
+            }
           }
         } else {
           final value = double.tryParse(aspectRatio);
-          if (value != null) return value;
+          if (value != null && value > 0) {
+            return value;
+          }
         }
       }
     } catch (e) {
       print('Error parsing aspect ratio: $e');
     }
-    return null;
+    return 1.0; // Default to 1:1 if parsing fails or invalid
   }
 
   // Builds the individual attachment item for the grid
@@ -251,7 +278,7 @@ class _ReplyPageState extends State<ReplyPage> {
     final String attachmentType = attachmentMap['type'] as String? ?? 'unknown';
     final String? displayUrl = attachmentMap['url'] as String?;
     final String? attachmentFilename = attachmentMap['filename'] as String?;
-    final File? localFile = attachmentMap['file'] as File?;
+    final File? localFile = attachmentMap['file'] is File ? attachmentMap['file'] as File? : null; // Ensure 'file' is File
 
     // For MediaViewPage context
     final String messageContent = postOrReplyData['content'] as String? ?? '';
@@ -368,22 +395,25 @@ class _ReplyPageState extends State<ReplyPage> {
     if (attachmentsArg.isEmpty) return const SizedBox.shrink();
 
     // Determine the context for MediaViewPage - use the attachments from postOrReplyData
-    final List<Map<String, dynamic>> allAttachmentsForMediaView =
-        (postOrReplyData['attachments'] as List<dynamic>?)
-            ?.map((e) => e as Map<String, dynamic>)
-            .toList() ?? [];
+    // Ensure robust handling of attachments list
+    final List<Map<String, dynamic>> allAttachmentsForMediaView;
+    final dynamic rawPostAttachments = postOrReplyData['attachments'];
+    if (rawPostAttachments is List) {
+      allAttachmentsForMediaView = rawPostAttachments.whereType<Map<String, dynamic>>().toList();
+    } else {
+      allAttachmentsForMediaView = [];
+    }
 
 
     Widget gridContent;
 
     if (attachmentsArg.length == 1) {
       final attachment = attachmentsArg[0];
-      double aspectRatioToUse = _parseAspectRatio(attachment['aspectRatio']) ?? 1.0; // Default to 1:1 for single image/pdf
-      if (attachment['type'] == 'video') {
-         aspectRatioToUse = _parseAspectRatio(attachment['aspectRatio']) ?? 16/9; // Default for video
+      double aspectRatioToUse = _parseAspectRatio(attachment['aspectRatio']) ??
+                                (attachment['type'] == 'video' ? 16/9 : 1.0);
+      if (aspectRatioToUse <= 0) { // Ensure it's positive, else default
+        aspectRatioToUse = (attachment['type'] == 'video' ? 16/9 : 1.0);
       }
-      if (aspectRatioToUse <=0) aspectRatioToUse = 1.0;
-
 
       gridContent = AspectRatio(
         aspectRatio: aspectRatioToUse,
@@ -525,42 +555,36 @@ class _ReplyPageState extends State<ReplyPage> {
       }
 
       if (pickedFile != null) file = File(pickedFile.path);
+      // Note: 'file' could still be null here if FilePicker for PDF/Audio didn't yield a result
+      // and pickedFile was also null (e.g. if image/video pick was cancelled).
 
       if (file != null) {
         final sizeInBytes = await file.length();
-        final sizeInMB = sizeInBytes / (1024 * 1024);
-        if (sizeInMB <= 20) { // Increased limit
-          setState(() {
-            _replyAttachments.add({'file': file, 'type': type, 'filename': file?.path.split('/').last, 'size': sizeInBytes});
-          });
-          message = '${type[0].toUpperCase()}${type.substring(1)} selected: ${file.path.split('/').last}';
-          _showSnackBar(dialogTitle, message, Colors.teal[700]!);
-        } else {
-          message = 'File must be under 20MB!';
+        final double sizeInMB = sizeInBytes / (1024 * 1024);
+
+        if (sizeInMB > 20) {
+          message = 'File "${file.path.split('/').last}" is too large (${sizeInMB.toStringAsFixed(1)}MB). Must be under 20MB.';
           _showSnackBar(dialogTitle, message, Colors.red[700]!);
+          return; // Exit if file is too large
         }
-      } else if (type == "pdf" || type == "audio") { // For FilePicker types if file is already set
-        // This path might be redundant if `file` is already set from FilePicker result.
-        // Keeping for safety, but can be simplified.
-        if (file != null) {
-             // Duplicated logic from above, ideally refactor
-            final sizeInBytes = await file.length();
-            final sizeInMB = sizeInBytes / (1024 * 1024);
-             if (sizeInMB <= 20) {
-                setState(() { _replyAttachments.add({'file': file, 'type': type, 'filename': file?.path.split('/').last, 'size': sizeInBytes}); });
-                message = '${type[0].toUpperCase()}${type.substring(1)} selected: ${file.path.split('/').last}';
-                _showSnackBar(dialogTitle, message, Colors.teal[700]!);
-            } else {
-                message = 'File must be under 20MB!';
-                _showSnackBar(dialogTitle, message, Colors.red[700]!);
-            }
-        } else {
-            message = 'No file selected.';
-            _showSnackBar(dialogTitle, message, Colors.red[700]!);
+
+        // If file is valid and within size limits
+        if (mounted) {
+          setState(() {
+            _replyAttachments.add({
+              'file': file,
+              'type': type,
+              'filename': file?.path.split('/').last,
+              'size': sizeInBytes,
+            });
+          });
         }
-      }
-      else {
-        message = 'No file selected.';
+        message = '${type[0].toUpperCase()}${type.substring(1)} selected: ${file.path.split('/').last}';
+        _showSnackBar(dialogTitle, message, Colors.teal[700]!);
+
+      } else {
+        // This 'else' block now correctly covers all cases where 'file' is null after picking attempts.
+        message = 'No file selected for $type.';
         _showSnackBar(dialogTitle, message, Colors.red[700]!);
       }
     } catch (e) {
@@ -623,7 +647,8 @@ class _ReplyPageState extends State<ReplyPage> {
       _showSnackBar('Input Error', 'Please enter text or add an attachment.', Colors.red[700]!);
       return;
     }
-    setState(() { _isSubmittingReply = true; });
+    if (mounted) setState(() { _isSubmittingReply = true; }); else return; // Exit if not mounted
+
     List<Map<String, dynamic>> uploadedReplyAttachments = [];
     try {
       if (_replyAttachments.isNotEmpty) {
@@ -650,25 +675,32 @@ class _ReplyPageState extends State<ReplyPage> {
       }
       if (_replyController.text.trim().isEmpty && uploadedReplyAttachments.isEmpty && _replyAttachments.isNotEmpty) {
         _showSnackBar('Upload Error', 'Failed to upload attachments. Reply not sent.', Colors.red[700]!);
-        setState(() { _isSubmittingReply = false; });
+        if (mounted) setState(() { _isSubmittingReply = false; });
         return;
       }
-      final result = await _dataController.replyToPost(postId: widget.post['id'] as String, content: _replyController.text.trim(), attachments: uploadedReplyAttachments);
+      final postId = widget.post['_id'] as String?;
+      if (postId == null) {
+        _showSnackBar('Error', 'Cannot post reply: Original post ID is missing.', Colors.red[700]!);
+        if (mounted) setState(() { _isSubmittingReply = false; });
+        return;
+      }
+      final result = await _dataController.replyToPost(postId: postId, content: _replyController.text.trim(), attachments: uploadedReplyAttachments);
+
+      if (!mounted) return; // Check mounted after await
+
       if (result['success'] == true && result['reply'] != null) {
         final newReply = result['reply'] as Map<String, dynamic>;
-        if (mounted) {
-          setState(() {
-            _replies.insert(0, newReply);
-            _replyController.clear();
-            _replyAttachments.clear();
-          });
-        }
+        setState(() {
+          _replies.insert(0, newReply);
+          _replyController.clear();
+          _replyAttachments.clear();
+        });
         _showSnackBar('Success', result['message'] ?? 'Reply posted!', Colors.teal[700]!);
         await Future.delayed(const Duration(milliseconds: 700));
         if (mounted) Navigator.pop(context, true);
       } else if (result['success'] == true && result['reply'] == null) {
         _showSnackBar('Success', result['message'] ?? 'Reply posted! Refreshing...', Colors.teal[700]!);
-        await _fetchPostReplies();
+        await _fetchPostReplies(); // This already has mounted checks
         _replyController.clear();
         if (mounted) setState(() { _replyAttachments.clear(); });
         await Future.delayed(const Duration(milliseconds: 500));
@@ -678,9 +710,13 @@ class _ReplyPageState extends State<ReplyPage> {
       }
     } catch (e) {
       print('Error in _submitReply: $e');
-      _showSnackBar('Error', 'An unexpected error occurred: ${e.toString()}', Colors.red[700]!);
+      if (mounted) { // Check mounted before showing snackbar from catch
+        _showSnackBar('Error', 'An unexpected error occurred: ${e.toString()}', Colors.red[700]!);
+      }
     } finally {
-      if (mounted) setState(() { _isSubmittingReply = false; });
+      if (mounted) {
+        setState(() { _isSubmittingReply = false; });
+      }
     }
   }
 
@@ -722,12 +758,14 @@ class _ReplyPageState extends State<ReplyPage> {
                 // TODO: Implement report post functionality
                 _showSnackBar('Report Post', 'Report post by @$postUsername (not implemented yet).', Colors.orange);
               } else if (result == 'copy_link') {
-                // In a real app, generate and copy a shareable link to the post
-                final String postLink = "https://chatter.example.com/post/${widget.post['_id'] ?? 'some-id'}";
-                // Clipboard.setData(ClipboardData(text: postLink)); // Requires services import
-                print('Copy link: $postLink (not implemented yet)');
-                _showSnackBar('Copy Link', 'Link copied to clipboard (not implemented yet).', Colors.blue);
-
+                final String postId = widget.post['_id'] as String? ?? "unknown_post_id";
+                // Replace with your actual app's domain and post path structure
+                final String postLink = "https://chatter.yourdomain.com/post/$postId";
+                Clipboard.setData(ClipboardData(text: postLink)).then((_) {
+                  _showSnackBar('Link Copied', 'Post link copied to clipboard!', Colors.green[700]!);
+                }).catchError((error) {
+                  _showSnackBar('Error', 'Could not copy link: $error', Colors.red[700]!);
+                });
               }
             },
             itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
