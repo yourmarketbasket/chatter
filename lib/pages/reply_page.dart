@@ -8,6 +8,7 @@ import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 import 'package:feather_icons/feather_icons.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:share_plus/share_plus.dart'; // Import share_plus
 import 'package:image_picker/image_picker.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -148,22 +149,27 @@ class _ReplyPageState extends State<ReplyPage> {
     final int repostsCount = widget.post['repostsCount'] as int? ?? (widget.post['reposts'] as List?)?.length ?? 0;
     final int viewsCount = widget.post['viewsCount'] as int? ?? (widget.post['views'] as List?)?.length ?? 0;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            CircleAvatar(
-              radius: isReply ? 16 : 20,
-              backgroundColor: Colors.tealAccent.withOpacity(0.2),
-              backgroundImage: userAvatar != null && userAvatar.isNotEmpty ? NetworkImage(userAvatar) : null,
-              child: userAvatar == null || userAvatar.isEmpty ? Text(avatarInitial, style: GoogleFonts.poppins(color: Colors.tealAccent, fontWeight: FontWeight.w600, fontSize: isReply ? 14 : 16)) : null,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    // Define a minimal horizontal padding to be applied
+    const EdgeInsets minimalHorizontalPadding = EdgeInsets.symmetric(horizontal: 4.0);
+
+    return Padding( // Added padding to the whole content block
+      padding: minimalHorizontalPadding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: isReply ? 16 : 20,
+                backgroundColor: Colors.tealAccent.withOpacity(0.2),
+                backgroundImage: userAvatar != null && userAvatar.isNotEmpty ? NetworkImage(userAvatar) : null,
+                child: userAvatar == null || userAvatar.isEmpty ? Text(avatarInitial, style: GoogleFonts.poppins(color: Colors.tealAccent, fontWeight: FontWeight.w600, fontSize: isReply ? 14 : 16)) : null,
+              ),
+              const SizedBox(width: 8), // Reduced space next to avatar
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -186,7 +192,7 @@ class _ReplyPageState extends State<ReplyPage> {
                         _buildStat(FeatherIcons.heart, '$likesCount Likes', Colors.pinkAccent),
                         _buildStat(FeatherIcons.repeat, '$repostsCount Reposts', Colors.greenAccent),
                         _buildStat(FeatherIcons.eye, '$viewsCount Views', Colors.blueAccent),
-                        IconButton(icon: const Icon(FeatherIcons.share2, color: Colors.white70, size: 18), onPressed: () { /* TODO: Implement Share */ }),
+                        IconButton(icon: const Icon(FeatherIcons.share2, color: Colors.white70, size: 18), onPressed: () => _sharePost(widget.post)),
                         IconButton(icon: const Icon(FeatherIcons.bookmark, color: Colors.white70, size: 18), onPressed: () { /* TODO: Implement Bookmark */ }),
                       ],
                     ),
@@ -268,9 +274,9 @@ class _ReplyPageState extends State<ReplyPage> {
       contentWidget = VideoAttachmentWidget(
         key: Key('video_reply_${attachmentMap['url'] ?? idx}'),
         attachment: attachmentMap,
-        post: postOrReplyData, // Pass the specific post/reply data
-        borderRadius: borderRadius, // borderRadius is for the item itself, ClipRRect handles outer.
-        enforceFeedConstraints: false, // Native aspect ratio on reply page
+        post: postOrReplyData,
+        borderRadius: borderRadius,
+        enforceFeedConstraints: false,
       );
     } else if (attachmentType == "image") {
       if (displayUrl != null && displayUrl.isNotEmpty) {
@@ -283,8 +289,6 @@ class _ReplyPageState extends State<ReplyPage> {
     } else if (attachmentType == "pdf") {
       final uri = displayUrl != null ? Uri.tryParse(displayUrl) : (localFile != null ? Uri.file(localFile.path) : null);
       if (uri != null) {
-        // Using a simple placeholder for PDF in grid view on reply page for now.
-        // Can be enhanced with PdfThumbnailWidget if needed.
         contentWidget = Container(
           color: Colors.grey[800],
           child: Center(child: Icon(FeatherIcons.fileText, color: Colors.white.withOpacity(0.7), size: 40)),
@@ -292,13 +296,20 @@ class _ReplyPageState extends State<ReplyPage> {
       } else {
         contentWidget = Container(color: Colors.grey[900], child: const Icon(FeatherIcons.alertTriangle, color: Colors.redAccent, size: 40));
       }
-    } else { // Fallback for audio or other types
+    } else if (attachmentType == "audio") {
+      contentWidget = AudioAttachmentWidget(
+        key: Key('audio_reply_${attachmentMap['url'] ?? idx}'),
+        attachment: attachmentMap,
+        post: postOrReplyData,
+        borderRadius: borderRadius,
+      );
+    } else {
       contentWidget = Container(
         color: Colors.grey[900],
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(attachmentType == "audio" ? FeatherIcons.music : FeatherIcons.film, color: Colors.tealAccent, size: 40),
+            Icon(FeatherIcons.film, color: Colors.tealAccent, size: 40), // Generic fallback icon
             const SizedBox(height: 8),
             Text(attachmentFilename ?? (displayUrl ?? 'unknown').split('/').last, style: GoogleFonts.roboto(color: Colors.white70, fontSize: 12), textAlign: TextAlign.center, overflow: TextOverflow.ellipsis),
           ],
@@ -675,29 +686,251 @@ class _ReplyPageState extends State<ReplyPage> {
 
   @override
   Widget build(BuildContext context) {
+    final String postUsername = widget.post['username'] as String? ?? 'User';
+    final DateTime parsedTimestamp = widget.post['timestamp'] is String
+        ? (DateTime.tryParse(widget.post['timestamp'] as String) ?? DateTime.now())
+        : (widget.post['timestamp'] is DateTime ? widget.post['timestamp'] : DateTime.now());
+
     return Scaffold(
       backgroundColor: const Color(0xFF000000),
       appBar: AppBar(
-        title: Text('Post', style: GoogleFonts.poppins(color: Colors.white)), // Changed title
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Post by @$postUsername', style: GoogleFonts.poppins(color: Colors.white, fontSize: 16)),
+            Text(
+              DateFormat('MMM d, yyyy · h:mm a').format(parsedTimestamp),
+              style: GoogleFonts.roboto(fontSize: 12, color: Colors.grey[400]),
+            ),
+          ],
+        ),
         backgroundColor: const Color(0xFF121212),
         iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: Colors.white),
+            onSelected: (String result) {
+              // Handle the selection
+              if (result == 'block') {
+                print('Block @$postUsername');
+                // TODO: Implement block user functionality
+                _showSnackBar('Block User', 'Block @$postUsername (not implemented yet).', Colors.orange);
+              } else if (result == 'report') {
+                print('Report post by @$postUsername');
+                // TODO: Implement report post functionality
+                _showSnackBar('Report Post', 'Report post by @$postUsername (not implemented yet).', Colors.orange);
+              } else if (result == 'copy_link') {
+                // In a real app, generate and copy a shareable link to the post
+                final String postLink = "https://chatter.example.com/post/${widget.post['_id'] ?? 'some-id'}";
+                // Clipboard.setData(ClipboardData(text: postLink)); // Requires services import
+                print('Copy link: $postLink (not implemented yet)');
+                _showSnackBar('Copy Link', 'Link copied to clipboard (not implemented yet).', Colors.blue);
+
+              }
+            },
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+              PopupMenuItem<String>(
+                value: 'block',
+                child: Text('Block @$postUsername', style: GoogleFonts.roboto()),
+              ),
+              PopupMenuItem<String>(
+                value: 'report',
+                child: Text('Report Post', style: GoogleFonts.roboto()),
+              ),
+              const PopupMenuDivider(),
+              PopupMenuItem<String>(
+                value: 'copy_link',
+                child: Text('Copy link to post', style: GoogleFonts.roboto()),
+              ),
+            ],
+            color: const Color(0xFF2C2C2C), // Dark background for the menu
+          ),
+        ],
       ),
-      body: Column( // Use Column to manage Reply Input area separately
+      body: Column(
         children: [
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
+              // Adjusted padding for the entire scrollable content
+              padding: const EdgeInsets.only(top: 16.0, bottom: 16.0, left: 8.0, right: 8.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    padding: const EdgeInsets.only(bottom: 16),
+                    // Removed specific bottom padding here, rely on overall column spacing
+                    // padding: const EdgeInsets.only(bottom: 16),
                     decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Colors.grey[800]!))),
                     child: _buildPostContent(widget.post, isReply: false),
                   ),
-                  const SizedBox(height: 20),
-                  Row(
+                  const SizedBox(height: 20), // Spacing after the main post
+                  Padding( // Added padding to the "Replies" header row
+                    padding: const EdgeInsets.symmetric(horizontal: 4.0), // Minimal horizontal padding
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                         _isLoadingReplies && _fetchRepliesError == null
+                          ? Row(
+                              children: [
+                                 Text("Reloading Replies...", style: GoogleFonts.poppins(fontSize: 16, color: Colors.grey[400])),
+                                 const SizedBox(width: 8),
+                                 const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent))),
+                              ],
+                            )
+                          : Text("Replies", style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white)),
+                        Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.refresh, color: Colors.tealAccent),
+                              tooltip: "Refresh Replies",
+                              onPressed: () => _fetchPostReplies(showLoadingIndicator: true),
+                            ),
+                            IconButton(
+                              icon: Icon(_showReplyField ? FeatherIcons.messageCircle : FeatherIcons.edit3, color: Colors.tealAccent),
+                              tooltip: _showReplyField ? "Hide Reply Field" : "Show Reply Field",
+                              onPressed: () {
+                                setState(() {
+                                  _showReplyField = !_showReplyField;
+                                });
+                              },
+                            ),
+                          ],
+                        )
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _isLoadingReplies && _fetchRepliesError == null
+                      ? const Center(child: Padding(padding: EdgeInsets.symmetric(vertical: 20.0), child: CircularProgressIndicator(color: Colors.tealAccent)))
+                      : _fetchRepliesError != null
+                          ? Center(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 20.0),
+                                child: Text(
+                                  "Couldn't load replies. Tap refresh to try again.",
+                                  style: GoogleFonts.roboto(color: Colors.redAccent, fontSize: 14),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            )
+                          : _replies.isEmpty
+                              ? Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 20.0),
+                                    child: Text(
+                                      "No replies yet.",
+                                      style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 14),
+                                    ),
+                                  ),
+                                )
+                              : ListView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  itemCount: _replies.length,
+                                  itemBuilder: (context, index) {
+                                    final reply = _replies[index];
+                                    // Each reply item will also get minimal padding from _buildPostContent
+                                    return Padding(padding: const EdgeInsets.symmetric(vertical: 8.0), child: _buildPostContent(reply, isReply: true));
+                                  },
+                                ),
+                ],
+              ),
+            ),
+          ),
+          if (_showReplyField) _buildReplyInputArea(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReplyInputArea() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1A),
+        border: Border(top: BorderSide(color: Colors.grey[800]!)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_replyAttachments.isNotEmpty) ...[
+             SizedBox(
+              height: 60,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: _replyAttachments.map((attachment) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: Chip(
+                      avatar: attachment['type'] == 'image' ? const Icon(FeatherIcons.image, size:16)
+                            : attachment['type'] == 'video' ? const Icon(FeatherIcons.video, size:16)
+                            : attachment['type'] == 'audio' ? const Icon(FeatherIcons.music, size:16)
+                            : const Icon(FeatherIcons.file, size:16),
+                      label: Text(
+                        (attachment['filename'] ?? (attachment['file']?.path.split('/').last ?? 'Preview')),
+                        style: GoogleFonts.roboto(color: Colors.white, fontSize: 10),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      backgroundColor: Colors.grey[700],
+                      deleteIcon: const Icon(FeatherIcons.x, size: 14, color: Colors.white70),
+                      onDeleted: () {
+                        setState(() {
+                          _replyAttachments.remove(attachment);
+                        });
+                      },
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              IconButton(
+                icon: const Icon(FeatherIcons.paperclip, color: Colors.tealAccent, size: 22),
+                onPressed: _showAttachmentPicker,
+                tooltip: 'Add Media',
+              ),
+              Expanded(
+                child: TextField(
+                  controller: _replyController,
+                  style: GoogleFonts.roboto(color: Colors.white, fontSize: 15),
+                  decoration: InputDecoration(
+                    hintText: "Post your reply...",
+                    hintStyle: GoogleFonts.roboto(color: Colors.grey[500]),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 0),
+                  ),
+                  keyboardType: TextInputType.multiline,
+                  minLines: 1,
+                  maxLines: 5,
+                  maxLength: 280,
+                  buildCounter: (BuildContext context, {int? currentLength, int? maxLength, bool? isFocused}) => null,
+                ),
+              ),
+              _isSubmittingReply
+                  ? const Padding(
+                      padding: EdgeInsets.all(12.0),
+                      child: SizedBox(
+                        height: 24, width: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.tealAccent),
+                      ),
+                    )
+                  : IconButton(
+                      icon: const Icon(FeatherIcons.send, color: Colors.tealAccent, size: 22),
+                      onPressed: _submitReply,
+                      tooltip: 'Post Reply',
+                    ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       // Text("Replies", style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white)),
