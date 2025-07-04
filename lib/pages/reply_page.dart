@@ -42,7 +42,7 @@ class _ReplyPageState extends State<ReplyPage> {
   bool _isLoadingReplies = true;
   String? _fetchRepliesError;
   bool _isSubmittingReply = false;
-  bool _showReplyField = true; // Default to true to show reply field initially
+  bool _showReplyField = false; // Default to false to hide reply field initially
   String? _parentReplyId;
   final FocusNode _replyFocusNode = FocusNode(); // For focusing the reply text field
 
@@ -1627,15 +1627,53 @@ class _ReplyPageState extends State<ReplyPage> {
       // Background color should match the page background or be slightly different if desired for emphasis.
       // Using Colors.transparent to blend with the page's black background.
       color: Colors.transparent,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start, // Align avatar with top of text field
-            children: [
-              CircleAvatar(
-                radius: 18, // Slightly smaller avatar for reply input
-                backgroundColor: Colors.tealAccent.withOpacity(0.2),
+      child: Padding( // Added padding around the entire input area
+        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Attachment Previews (Chips) - Placed above the input row
+            if (_replyAttachments.isNotEmpty) ...[
+              SizedBox(
+                height: 45, // Adjusted height for chips
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: _replyAttachments.map((attachment) {
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 6.0),
+                      child: Chip(
+                        avatar: Icon(
+                          attachment['type'] == 'image' ? FeatherIcons.image :
+                          attachment['type'] == 'video' ? FeatherIcons.video :
+                          attachment['type'] == 'audio' ? FeatherIcons.music : FeatherIcons.file,
+                          size: 16, color: Colors.white70
+                        ),
+                        label: Text(
+                          (attachment['filename'] ?? (attachment['file']?.path.split('/').last ?? 'Preview')),
+                          style: GoogleFonts.roboto(color: Colors.white, fontSize: 11),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        backgroundColor: Colors.grey[800],
+                        deleteIcon: const Icon(FeatherIcons.xCircle, size: 16, color: Colors.white70),
+                        onDeleted: () {
+                          setState(() { _replyAttachments.remove(attachment); });
+                        },
+                        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0), // Compact padding
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+            // Main Input Row: Avatar, TextField, Attach, Send
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center, // Align items vertically in the center
+              children: [
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: Colors.tealAccent.withOpacity(0.2),
                 backgroundImage: currentUserAvatar != null && currentUserAvatar.isNotEmpty
                     ? NetworkImage(currentUserAvatar)
                     : null,
@@ -1657,72 +1695,27 @@ class _ReplyPageState extends State<ReplyPage> {
                     hintText: hintText,
                     hintStyle: GoogleFonts.roboto(color: Colors.grey[600], fontSize: 16), // Adjusted hint color
                     border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 4.0), // Adjust for alignment
+                    contentPadding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0), // Adjusted padding
                   ),
                   keyboardType: TextInputType.multiline,
-                  minLines: 1,
-                  maxLines: 7, // Increased max lines
+                  minLines: 1, // Will start as single line
+                  maxLines: 5, // Can expand up to 5 lines
                   maxLength: 280,
-                  buildCounter: (BuildContext context,
-                          {int? currentLength,
-                          int? maxLength,
-                          bool? isFocused}) =>
-                      null, // No counter like X
+                  buildCounter: (BuildContext context, {int? currentLength, int? maxLength, bool? isFocused}) => null,
                 ),
               ),
-            ],
-          ),
-          if (_replyAttachments.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            SizedBox(
-              height: 70, // Increased height for attachment previews
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: _replyAttachments.map((attachment) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8.0),
-                    child: Chip(
-                      avatar: attachment['type'] == 'image'
-                          ? const Icon(FeatherIcons.image, size: 18, color: Colors.white70)
-                          : attachment['type'] == 'video'
-                              ? const Icon(FeatherIcons.video, size: 18, color: Colors.white70)
-                              : attachment['type'] == 'audio'
-                                  ? const Icon(FeatherIcons.music, size: 18, color: Colors.white70)
-                                  : const Icon(FeatherIcons.file, size: 18, color: Colors.white70),
-                      label: Text(
-                        (attachment['filename'] ??
-                            (attachment['file']?.path.split('/').last ??
-                                'Preview')),
-                        style: GoogleFonts.roboto(color: Colors.white, fontSize: 12),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      backgroundColor: Colors.grey[800], // Darker background for chips
-                      deleteIcon: const Icon(FeatherIcons.xCircle, // Clearer delete icon
-                          size: 18, color: Colors.white70),
-                      onDeleted: () {
-                        setState(() {
-                          _replyAttachments.remove(attachment);
-                        });
-                      },
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-          ],
-          const SizedBox(height: 8),
-          Row( // Actions: Attach & Send
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
+              const SizedBox(width: 8), // Spacing before attach icon
               IconButton(
-                icon: const Icon(FeatherIcons.paperclip,
-                    color: Colors.tealAccent, size: 22),
+                icon: const Icon(FeatherIcons.paperclip, color: Colors.tealAccent, size: 22),
                 onPressed: _showAttachmentPicker,
                 tooltip: 'Add Media',
+                padding: EdgeInsets.zero, // Reduce padding for compact row
+                constraints: const BoxConstraints(), // Reduce constraints
               ),
+              const SizedBox(width: 4), // Spacing before send button
               _isSubmittingReply
                   ? const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0), // Consistent padding
+                      padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
                       child: SizedBox(
                         height: 24,
                         width: 24,
