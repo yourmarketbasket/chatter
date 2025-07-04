@@ -14,6 +14,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:chatter/widgets/audio_attachment_widget.dart'; // Added import
 
 class ReplyPage extends StatefulWidget {
   final Map<String, dynamic> post;
@@ -84,6 +85,22 @@ class _ReplyPageState extends State<ReplyPage> {
         });
       }
     }
+
+  // Method to share a post
+  void _sharePost(Map<String, dynamic> post) {
+    final String postId = post['_id'] as String? ?? "unknown_post";
+    final String content = post['content'] as String? ?? "Check out this post!";
+    // Construct a deep link or a web URL to the post if available
+    // Example: String postUrl = "https://chatter.yourdomain.com/post/$postId";
+    // For now, just sharing the content.
+
+    String shareText = content;
+    // if (postUrl.isNotEmpty) { // Once you have post URLs
+    //   shareText += "\n\nView post: $postUrl";
+    // }
+
+    Share.share(shareText, subject: 'Check out this post from Chatter!');
+  }
   }
 
   @override
