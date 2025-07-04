@@ -1507,12 +1507,7 @@ class _ReplyPageState extends State<ReplyPage> {
                   // Let's move it into the scroll view for now.
 
                   const Divider(color: Color(0xFF2F3336), height: 1), // Divider after main post
-                  // Reply input area will be built by _buildReplyInputArea() if _showReplyField is true.
-                  // We can call it here.
-                  if (_showReplyField) _buildReplyInputArea(), // This will be styled to fit in.
-                                                               // Add a divider if it's shown.
-                  if (_showReplyField) const Divider(color: Color(0xFF2F3336), height: 1),
-
+                  // Reply input area is now removed from the scrollable view.
 
                   // Replies List
                   Padding(
@@ -1589,8 +1584,8 @@ class _ReplyPageState extends State<ReplyPage> {
               ),
             ),
           ),
-          // The call to _buildReplyInputArea() is now inside the SingleChildScrollView's Column,
-          // so the sticky bottom bar implementation is removed from here.
+          // Conditionally display the reply input area at the bottom
+          if (_showReplyField) _buildReplyInputArea(),
         ],
       ),
     );
