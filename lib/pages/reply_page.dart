@@ -1,20 +1,20 @@
 import 'package:chatter/controllers/data-controller.dart';
 import 'package:chatter/pages/media_view_page.dart';
-import 'package:chatter/widgets/video_attachment_widget.dart'; // Import VideoAttachmentWidget
+import 'package:chatter/widgets/video_attachment_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io';
-import 'package:flutter/services.dart'; // Import for Clipboard
+import 'package:flutter/services.dart';
 import 'package:feather_icons/feather_icons.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:share_plus/share_plus.dart'; // Import share_plus
+import 'package:share_plus/share_plus.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:chatter/widgets/audio_attachment_widget.dart'; // Added import
+import 'package:chatter/widgets/audio_attachment_widget.dart';
 
 class ReplyPage extends StatefulWidget {
   final Map<String, dynamic> post;
@@ -35,7 +35,7 @@ class _ReplyPageState extends State<ReplyPage> {
   bool _isLoadingReplies = true;
   String? _fetchRepliesError;
   bool _isSubmittingReply = false;
-  bool _showReplyField = true; // To toggle reply input field visibility
+  bool _showReplyField = true;
 
   @override
   void initState() {
@@ -51,7 +51,7 @@ class _ReplyPageState extends State<ReplyPage> {
   }
 
   Future<void> _fetchPostReplies({bool showLoadingIndicator = true}) async {
-    if (!mounted) return; // Early exit if not mounted
+    if (!mounted) return;
     setState(() {
       if (showLoadingIndicator) _isLoadingReplies = true;
       _fetchRepliesError = null;
@@ -80,12 +80,11 @@ class _ReplyPageState extends State<ReplyPage> {
       print('Error fetching replies: $e');
       if (mounted) {
         setState(() {
-          _fetchRepliesError = 'Failed to load replies. Please try again.'; // This message will be simplified later
+          _fetchRepliesError = 'Failed to load replies. Please try again.';
           if (showLoadingIndicator) _isLoadingReplies = false;
         });
       }
     }
-    // Removed duplicated _sharePost from here
   }
 
   @override
@@ -94,19 +93,10 @@ class _ReplyPageState extends State<ReplyPage> {
     super.dispose();
   }
 
-  // Method to share a post
   void _sharePost(Map<String, dynamic> post) {
     final String postId = post['_id'] as String? ?? "unknown_post";
     final String content = post['content'] as String? ?? "Check out this post!";
-    // Construct a deep link or a web URL to the post if available
-    // Example: String postUrl = "https://chatter.yourdomain.com/post/$postId";
-    // For now, just sharing the content.
-
     String shareText = content;
-    // if (postUrl.isNotEmpty) { // Once you have post URLs
-    //   shareText += "\n\nView post: $postUrl";
-    // }
-
     Share.share(shareText, subject: 'Check out this post from Chatter!');
   }
 
@@ -153,7 +143,7 @@ class _ReplyPageState extends State<ReplyPage> {
 
   Widget _buildPostContent(Map<String, dynamic> post, {required bool isReply}) {
     final String username = post['username'] as String? ?? 'Unknown User';
-    final String content = post['content'] as String? ?? '';
+    final String Phil = post['content'] as String? ?? '';
     final String? userAvatar = post['useravatar'] as String?;
     final String avatarInitial = post['avatarInitial'] as String? ?? (username.isNotEmpty ? username[0].toUpperCase() : '?');
     final DateTime timestamp = post['timestamp'] is String ? (DateTime.tryParse(post['timestamp'] as String) ?? DateTime.now()) : (post['timestamp'] is DateTime ? post['timestamp'] : DateTime.now());
@@ -161,89 +151,61 @@ class _ReplyPageState extends State<ReplyPage> {
     List<Map<String, dynamic>> correctlyTypedAttachments = [];
     final dynamic rawAttachments = post['attachments'];
     if (rawAttachments is List) {
-      for (final item in rawAttachments) { // Use 'final' for loop variable
+      for (final item in rawAttachments) {
         if (item is Map<String, dynamic>) {
           correctlyTypedAttachments.add(item);
         } else if (item is Map) {
-          // Attempt to convert Map to Map<String, dynamic>
-          // This handles cases where item might be Map<dynamic, dynamic>
           try {
             correctlyTypedAttachments.add(Map<String, dynamic>.from(item.map(
               (key, value) => MapEntry(key.toString(), value),
             )));
           } catch (e) {
             print('Error converting attachment Map to Map<String, dynamic>: $e. Attachment: $item');
-            // Optionally, add a placeholder for unconvertible attachments or skip
           }
         } else {
-          // Log or handle items that are not maps, if necessary
           print('Skipping non-map attachment item: $item');
         }
       }
     }
 
-
-    // Stats for original post
     final int likesCount = widget.post['likesCount'] as int? ?? (widget.post['likes'] as List?)?.length ?? 0;
     final int repostsCount = widget.post['repostsCount'] as int? ?? (widget.post['reposts'] as List?)?.length ?? 0;
     final int viewsCount = widget.post['viewsCount'] as int? ?? (widget.post['views'] as List?)?.length ?? 0;
 
-    // Define horizontal padding based on whether it's a reply or the main post
     final EdgeInsets postItemPadding = isReply
-        ? const EdgeInsets.symmetric(horizontal: 4.0) // Replies keep their original item padding
-        : const EdgeInsets.only(right: 4.0); // Main post has its left padding removed (will align with page padding), only right item padding.
+        ? const EdgeInsets.symmetric(horizontal: 4.0)
+        : const EdgeInsets.only(right: 4.0);
 
     return Padding(
-      padding: postItemPadding, // Apply conditional padding
+      padding: postItemPadding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                radius: isReply ? 16 : 20,
-                backgroundColor: Colors.tealAccent.withOpacity(0.2),
-                backgroundImage: userAvatar != null && userAvatar.isNotEmpty ? NetworkImage(userAvatar) : null,
-                child: userAvatar == null || userAvatar.isEmpty ? Text(avatarInitial, style: GoogleFonts.poppins(color: Colors.tealAccent, fontWeight: FontWeight.w600, fontSize: isReply ? 14 : 16)) : null,
-              ),
-              const SizedBox(width: 8), // Reduced space next to avatar
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('@$username', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: isReply ? 14 : 16, color: Colors.white)),
-                      Text(DateFormat('h:mm a · MMM d').format(timestamp), style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 12)),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(content, style: GoogleFonts.roboto(fontSize: isReply ? 13 : 14, color: Colors.white70, height: 1.5)),
-                  if (correctlyTypedAttachments.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    _buildReplyAttachmentGrid(correctlyTypedAttachments, post, username, userAvatar, timestamp, viewsCount, likesCount, repostsCount, content),
+              Text(Phil, style: GoogleFonts.roboto(fontSize: isReply ? 13 : 14, color: Colors.white70, height: 1.5)),
+              if (correctlyTypedAttachments.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _buildReplyAttachmentGrid(correctlyTypedAttachments, post, username, userAvatar, timestamp, viewsCount, likesCount, repostsCount, Phil),
+              ],
+              if (!isReply) ...[
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildStat(FeatherIcons.heart, '$likesCount Likes', Colors.pinkAccent),
+                    _buildStat(FeatherIcons.repeat, '$repostsCount Reposts', Colors.greenAccent),
+                    _buildStat(FeatherIcons.eye, '$viewsCount Views', Colors.blueAccent),
+                    IconButton(icon: const Icon(FeatherIcons.share2, color: Colors.white70, size: 18), onPressed: () => _sharePost(widget.post)),
+                    IconButton(icon: const Icon(FeatherIcons.bookmark, color: Colors.white70, size: 18), onPressed: () { /* TODO: Implement Bookmark */ }),
                   ],
-                  if (!isReply) ...[ // Show stats only for the main post, not for replies in this context
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _buildStat(FeatherIcons.heart, '$likesCount Likes', Colors.pinkAccent),
-                        _buildStat(FeatherIcons.repeat, '$repostsCount Reposts', Colors.greenAccent),
-                        _buildStat(FeatherIcons.eye, '$viewsCount Views', Colors.blueAccent),
-                        IconButton(icon: const Icon(FeatherIcons.share2, color: Colors.white70, size: 18), onPressed: () => _sharePost(widget.post)),
-                        IconButton(icon: const Icon(FeatherIcons.bookmark, color: Colors.white70, size: 18), onPressed: () { /* TODO: Implement Bookmark */ }),
-                      ],
-                    ),
-                  ]
-                ],
-              ),
-            ),
-          ],
-        ),
-      ],
+                ),
+              ]
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -257,12 +219,11 @@ class _ReplyPageState extends State<ReplyPage> {
     );
   }
 
-  // Helper method to parse aspect ratio string (e.g., "16:9") to double
   double? _parseAspectRatio(dynamic aspectRatio) {
     if (aspectRatio == null) return null;
     try {
       if (aspectRatio is double) {
-        return (aspectRatio > 0) ? aspectRatio : 1.0; // Ensure positive
+        return (aspectRatio > 0) ? aspectRatio : 1.0;
       }
       if (aspectRatio is String) {
         if (aspectRatio.contains(':')) {
@@ -284,23 +245,21 @@ class _ReplyPageState extends State<ReplyPage> {
     } catch (e) {
       print('Error parsing aspect ratio: $e');
     }
-    return 1.0; // Default to 1:1 if parsing fails or invalid
+    return 1.0;
   }
 
-  // Builds the individual attachment item for the grid
   Widget _buildReplyAttachmentWidget(
     Map<String, dynamic> attachmentMap,
     int idx,
-    List<Map<String, dynamic>> allAttachmentsInThisPost, // All attachments of the specific post/reply being built
-    Map<String, dynamic> postOrReplyData, // The specific post or reply map this attachment belongs to
+    List<Map<String, dynamic>> allAttachmentsInThisPost,
+    Map<String, dynamic> postOrReplyData,
     BorderRadius borderRadius
   ) {
     final String attachmentType = attachmentMap['type'] as String? ?? 'unknown';
     final String? displayUrl = attachmentMap['url'] as String?;
     final String? attachmentFilename = attachmentMap['filename'] as String?;
-    final File? localFile = attachmentMap['file'] is File ? attachmentMap['file'] as File? : null; // Ensure 'file' is File
+    final File? localFile = attachmentMap['file'] is File ? attachmentMap['file'] as File? : null;
 
-    // For MediaViewPage context
     final String messageContent = postOrReplyData['content'] as String? ?? '';
     final String userName = postOrReplyData['username'] as String? ?? 'Unknown User';
     final String? userAvatarUrl = postOrReplyData['useravatar'] as String?;
@@ -308,12 +267,9 @@ class _ReplyPageState extends State<ReplyPage> {
         ? (DateTime.tryParse(postOrReplyData['timestamp'] as String) ?? DateTime.now())
         : (postOrReplyData['timestamp'] is DateTime ? postOrReplyData['timestamp'] : DateTime.now());
 
-    // Counts should refer to the original post (widget.post) when viewing its attachments,
-    // or to the specific reply's counts if viewing a reply's attachments (though replies don't typically show these counts)
     final int viewsCount = widget.post['viewsCount'] as int? ?? (widget.post['views'] as List?)?.length ?? 0;
     final int likesCount = widget.post['likesCount'] as int? ?? (widget.post['likes'] as List?)?.length ?? 0;
     final int repostsCount = widget.post['repostsCount'] as int? ?? (widget.post['reposts'] as List?)?.length ?? 0;
-
 
     Widget contentWidget;
 
@@ -366,7 +322,7 @@ class _ReplyPageState extends State<ReplyPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(FeatherIcons.film, color: Colors.tealAccent, size: 40), // Generic fallback icon
+            Icon(FeatherIcons.film, color: Colors.tealAccent, size: 40),
             const SizedBox(height: 8),
             Text(attachmentFilename ?? (displayUrl ?? 'unknown').split('/').last, style: GoogleFonts.roboto(color: Colors.white70, fontSize: 12), textAlign: TextAlign.center, overflow: TextOverflow.ellipsis),
           ],
@@ -378,10 +334,9 @@ class _ReplyPageState extends State<ReplyPage> {
       onTap: () {
           int initialIndex = allAttachmentsInThisPost.indexWhere((att) =>
               (att['url'] != null && att['url'] == attachmentMap['url']) ||
-              (att.hashCode == attachmentMap.hashCode) // Fallback if URL is null (e.g. local file)
+              (att.hashCode == attachmentMap.hashCode)
           );
           if (initialIndex == -1) initialIndex = idx;
-
 
         Navigator.push(
           context,
@@ -400,19 +355,16 @@ class _ReplyPageState extends State<ReplyPage> {
           ),
         );
       },
-      child: ClipRRect( // Individual item clipping if needed, but outer grid ClipRRect is primary
+      child: ClipRRect(
         borderRadius: borderRadius,
         child: contentWidget,
       ),
     );
   }
 
-
-  // Builds the attachment grid, similar to HomeFeedScreen
   Widget _buildReplyAttachmentGrid(
     List<Map<String, dynamic>> attachmentsArg,
-    Map<String, dynamic> postOrReplyData, // The specific post/reply this grid belongs to
-    // Pass other context if needed by _buildReplyAttachmentWidget for MediaViewPage
+    Map<String, dynamic> postOrReplyData,
     String userName,
     String? userAvatar,
     DateTime timestamp,
@@ -424,8 +376,6 @@ class _ReplyPageState extends State<ReplyPage> {
     const double itemSpacing = 4.0;
     if (attachmentsArg.isEmpty) return const SizedBox.shrink();
 
-    // Determine the context for MediaViewPage - use the attachments from postOrReplyData
-    // Ensure robust handling of attachments list
     final List<Map<String, dynamic>> allAttachmentsForMediaView;
     final dynamic rawPostAttachments = postOrReplyData['attachments'];
     if (rawPostAttachments is List) {
@@ -434,24 +384,23 @@ class _ReplyPageState extends State<ReplyPage> {
       allAttachmentsForMediaView = [];
     }
 
-
     Widget gridContent;
 
     if (attachmentsArg.length == 1) {
       final attachment = attachmentsArg[0];
       double aspectRatioToUse = _parseAspectRatio(attachment['aspectRatio']) ??
                                 (attachment['type'] == 'video' ? 16/9 : 1.0);
-      if (aspectRatioToUse <= 0) { // Ensure it's positive, else default
+      if (aspectRatioToUse <= 0) {
         aspectRatioToUse = (attachment['type'] == 'video' ? 16/9 : 1.0);
       }
 
       gridContent = AspectRatio(
         aspectRatio: aspectRatioToUse,
-        child: _buildReplyAttachmentWidget(attachment, 0, allAttachmentsForMediaView, postOrReplyData, BorderRadius.circular(12.0)), // Single item gets full rounding
+        child: _buildReplyAttachmentWidget(attachment, 0, allAttachmentsForMediaView, postOrReplyData, BorderRadius.circular(12.0)),
       );
     } else if (attachmentsArg.length == 2) {
       gridContent = AspectRatio(
-        aspectRatio: 2 * (4 / 3), // Maintain a reasonable overall shape
+        aspectRatio: 2 * (4 / 3),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -464,18 +413,15 @@ class _ReplyPageState extends State<ReplyPage> {
     } else if (attachmentsArg.length == 3) {
        gridContent = LayoutBuilder(builder: (context, constraints) {
         double width = constraints.maxWidth;
-        // Corrected width calculation for 3 items
         double leftItemWidth = (width - itemSpacing) * (2/3);
         double rightColumnWidth = (width - itemSpacing) * (1/3);
-        // Attempt to make overall grid squarish or 4:3 like
         double totalHeight = width * ( (attachmentsArg[0]['type'] == 'video' || attachmentsArg[1]['type'] == 'video' || attachmentsArg[2]['type'] == 'video' ) ? (9/16) : (3/4) );
-        if (attachmentsArg.any((att) => (_parseAspectRatio(att['aspectRatio']) ?? 1.0) < 1)) { // If any portrait items
-            totalHeight = width * (4/3); // Make grid taller for portrait content
+        if (attachmentsArg.any((att) => (_parseAspectRatio(att['aspectRatio']) ?? 1.0) < 1)) {
+            totalHeight = width * (4/3);
         }
 
-
         return SizedBox(
-            height: totalHeight, // Constrain height
+            height: totalHeight,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -498,7 +444,7 @@ class _ReplyPageState extends State<ReplyPage> {
       });
     } else if (attachmentsArg.length == 4) {
       gridContent = AspectRatio(
-        aspectRatio: 1.0, // Square grid
+        aspectRatio: 1.0,
         child: GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -531,9 +477,9 @@ class _ReplyPageState extends State<ReplyPage> {
               ),
             );
        });
-    } else { // 6 or more items
+    } else {
       const int crossAxisCount = 3;
-      const double childAspectRatio = 1.0; // Square items
+      const double childAspectRatio = 1.0;
       gridContent = LayoutBuilder(builder: (context, constraints) {
         double itemWidth = (constraints.maxWidth - (crossAxisCount - 1) * itemSpacing) / crossAxisCount;
         double itemHeight = itemWidth / childAspectRatio;
@@ -545,7 +491,7 @@ class _ReplyPageState extends State<ReplyPage> {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: crossAxisCount, crossAxisSpacing: itemSpacing, mainAxisSpacing: itemSpacing, childAspectRatio: childAspectRatio),
-              itemCount: attachmentsArg.length, // Show all items up to a reasonable limit, or cap at 6 for a 2x3 grid
+              itemCount: attachmentsArg.length,
               itemBuilder: (context, index) => _buildReplyAttachmentWidget(attachmentsArg[index], index, allAttachmentsForMediaView, postOrReplyData, BorderRadius.zero),
             ),
           );
@@ -553,11 +499,10 @@ class _ReplyPageState extends State<ReplyPage> {
     }
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(12.0), // Outer rounding for the whole grid
+      borderRadius: BorderRadius.circular(12.0),
       child: gridContent,
     );
   }
-
 
   Future<void> _pickAndAddAttachment(String type) async {
     File? file;
@@ -586,8 +531,6 @@ class _ReplyPageState extends State<ReplyPage> {
       }
 
       if (pickedFile != null) file = File(pickedFile.path);
-      // Note: 'file' could still be null here if FilePicker for PDF/Audio didn't yield a result
-      // and pickedFile was also null (e.g. if image/video pick was cancelled).
 
       if (file != null) {
         final sizeInBytes = await file.length();
@@ -596,10 +539,9 @@ class _ReplyPageState extends State<ReplyPage> {
         if (sizeInMB > 20) {
           message = 'File "${file.path.split('/').last}" is too large (${sizeInMB.toStringAsFixed(1)}MB). Must be under 20MB.';
           _showSnackBar(dialogTitle, message, Colors.red[700]!);
-          return; // Exit if file is too large
+          return;
         }
 
-        // If file is valid and within size limits
         if (mounted) {
           setState(() {
             _replyAttachments.add({
@@ -614,7 +556,6 @@ class _ReplyPageState extends State<ReplyPage> {
         _showSnackBar(dialogTitle, message, Colors.teal[700]!);
 
       } else {
-        // This 'else' block now correctly covers all cases where 'file' is null after picking attempts.
         message = 'No file selected for $type.';
         _showSnackBar(dialogTitle, message, Colors.red[700]!);
       }
@@ -671,14 +612,13 @@ class _ReplyPageState extends State<ReplyPage> {
     );
   }
 
-
   void _submitReply() async {
     if (_isSubmittingReply) return;
     if (_replyController.text.trim().isEmpty && _replyAttachments.isEmpty) {
       _showSnackBar('Input Error', 'Please enter text or add an attachment.', Colors.red[700]!);
       return;
     }
-    if (mounted) setState(() { _isSubmittingReply = true; }); else return; // Exit if not mounted
+    if (mounted) setState(() { _isSubmittingReply = true; }); else return;
 
     List<Map<String, dynamic>> uploadedReplyAttachments = [];
     try {
@@ -717,7 +657,7 @@ class _ReplyPageState extends State<ReplyPage> {
       }
       final result = await _dataController.replyToPost(postId: postId, content: _replyController.text.trim(), attachments: uploadedReplyAttachments);
 
-      if (!mounted) return; // Check mounted after await
+      if (!mounted) return;
 
       if (result['success'] == true && result['reply'] != null) {
         final newReply = result['reply'] as Map<String, dynamic>;
@@ -731,7 +671,7 @@ class _ReplyPageState extends State<ReplyPage> {
         if (mounted) Navigator.pop(context, true);
       } else if (result['success'] == true && result['reply'] == null) {
         _showSnackBar('Success', result['message'] ?? 'Reply posted! Refreshing...', Colors.teal[700]!);
-        await _fetchPostReplies(); // This already has mounted checks
+        await _fetchPostReplies();
         _replyController.clear();
         if (mounted) setState(() { _replyAttachments.clear(); });
         await Future.delayed(const Duration(milliseconds: 500));
@@ -741,7 +681,7 @@ class _ReplyPageState extends State<ReplyPage> {
       }
     } catch (e) {
       print('Error in _submitReply: $e');
-      if (mounted) { // Check mounted before showing snackbar from catch
+      if (mounted) {
         _showSnackBar('Error', 'An unexpected error occurred: ${e.toString()}', Colors.red[700]!);
       }
     } finally {
@@ -761,15 +701,13 @@ class _ReplyPageState extends State<ReplyPage> {
     final String? appBarUserAvatar = widget.post['useravatar'] as String?;
     final String appBarAvatarInitial = widget.post['avatarInitial'] as String? ?? (postUsername.isNotEmpty ? postUsername[0].toUpperCase() : '?');
 
-
     return Scaffold(
       backgroundColor: const Color(0xFF000000),
       appBar: AppBar(
-        // New title structure for AppBar
         title: Row(
           children: [
             CircleAvatar(
-              radius: 18, // Slightly smaller for AppBar
+              radius: 18,
               backgroundColor: Colors.tealAccent.withOpacity(0.2),
               backgroundImage: appBarUserAvatar != null && appBarUserAvatar.isNotEmpty ? NetworkImage(appBarUserAvatar) : null,
               child: appBarUserAvatar == null || appBarUserAvatar.isEmpty
@@ -777,7 +715,7 @@ class _ReplyPageState extends State<ReplyPage> {
                   : null,
             ),
             const SizedBox(width: 10),
-            Expanded( // Allow text column to take available space
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -785,10 +723,10 @@ class _ReplyPageState extends State<ReplyPage> {
                   Text(
                     '@$postUsername',
                     style: GoogleFonts.poppins(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
-                    overflow: TextOverflow.ellipsis, // Handle long usernames
+                    overflow: TextOverflow.ellipsis,
                   ),
                   Text(
-                    DateFormat('h:mm a · MMM d, yyyy').format(parsedTimestamp), // Consistent detailed format
+                    DateFormat('h:mm a · MMM d, yyyy').format(parsedTimestamp),
                     style: GoogleFonts.roboto(fontSize: 12, color: Colors.grey[400]),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -804,18 +742,14 @@ class _ReplyPageState extends State<ReplyPage> {
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: Colors.white),
             onSelected: (String result) {
-              // Handle the selection
               if (result == 'block') {
                 print('Block @$postUsername');
-                // TODO: Implement block user functionality
                 _showSnackBar('Block User', 'Block @$postUsername (not implemented yet).', Colors.orange);
               } else if (result == 'report') {
                 print('Report post by @$postUsername');
-                // TODO: Implement report post functionality
                 _showSnackBar('Report Post', 'Report post by @$postUsername (not implemented yet).', Colors.orange);
               } else if (result == 'copy_link') {
                 final String postId = widget.post['_id'] as String? ?? "unknown_post_id";
-                // Replace with your actual app's domain and post path structure
                 final String postLink = "https://chatter.yourdomain.com/post/$postId";
                 Clipboard.setData(ClipboardData(text: postLink)).then((_) {
                   _showSnackBar('Link Copied', 'Post link copied to clipboard!', Colors.green[700]!);
@@ -839,7 +773,7 @@ class _ReplyPageState extends State<ReplyPage> {
                 child: Text('Copy link to post', style: GoogleFonts.roboto()),
               ),
             ],
-            color: const Color(0xFF2C2C2C), // Dark background for the menu
+            color: const Color(0xFF2C2C2C),
           ),
         ],
       ),
@@ -847,20 +781,17 @@ class _ReplyPageState extends State<ReplyPage> {
         children: [
           Expanded(
             child: SingleChildScrollView(
-              // Adjusted padding for the entire scrollable content
               padding: const EdgeInsets.only(top: 16.0, bottom: 16.0, left: 8.0, right: 8.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    // Removed specific bottom padding here, rely on overall column spacing
-                    // padding: const EdgeInsets.only(bottom: 16),
                     decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Colors.grey[800]!))),
                     child: _buildPostContent(widget.post, isReply: false),
                   ),
-                  const SizedBox(height: 20), // Spacing after the main post
-                  Padding( // Added padding to the "Replies" header row
-                    padding: const EdgeInsets.symmetric(horizontal: 4.0), // Minimal horizontal padding
+                  const SizedBox(height: 20),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4.0),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -924,7 +855,6 @@ class _ReplyPageState extends State<ReplyPage> {
                                   itemCount: _replies.length,
                                   itemBuilder: (context, index) {
                                     final reply = _replies[index];
-                                    // Each reply item will also get minimal padding from _buildPostContent
                                     return Padding(padding: const EdgeInsets.symmetric(vertical: 8.0), child: _buildPostContent(reply, isReply: true));
                                   },
                                 ),
