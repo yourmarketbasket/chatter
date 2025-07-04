@@ -109,6 +109,22 @@ class _ReplyPageState extends State<ReplyPage> {
     super.dispose();
   }
 
+  // Method to share a post
+  void _sharePost(Map<String, dynamic> post) {
+    final String postId = post['_id'] as String? ?? "unknown_post";
+    final String content = post['content'] as String? ?? "Check out this post!";
+    // Construct a deep link or a web URL to the post if available
+    // Example: String postUrl = "https://chatter.yourdomain.com/post/$postId";
+    // For now, just sharing the content.
+
+    String shareText = content;
+    // if (postUrl.isNotEmpty) { // Once you have post URLs
+    //   shareText += "\n\nView post: $postUrl";
+    // }
+
+    Share.share(shareText, subject: 'Check out this post from Chatter!');
+  }
+
   Future<int?> _getAndroidSdkVersion() async {
     if (Platform.isAndroid) {
       try {
