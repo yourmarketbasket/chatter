@@ -256,7 +256,8 @@ class _ReplyPageState extends State<ReplyPage> {
             ),
           ],
         ),
-      ],
+        ],
+      ),
     );
   }
 
