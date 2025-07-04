@@ -515,46 +515,65 @@ class DataController extends GetxController {
       if (response.statusCode == 200 && response.data['success'] == true) {
         print(response.data);
         final List<dynamic> repliesData = response.data['replies'];
-        List<Map<String, dynamic>> replies = [];
+        List<Map<String, dynamic>> processedReplies = [];
 
         for (var replyData in repliesData) {
-          // Safely extract and parse attachments
+          // Ensure replyData is a Map
+          if (replyData is! Map<String, dynamic>) {
+            print('[DataController] fetchReplies: Skipping invalid reply data item: $replyData');
+            continue;
+          }
+
+          // Extract data directly from replyData based on the new structure
+          String username = replyData['username']?.toString() ?? 'Unknown User';
+          String content = replyData['content']?.toString() ?? '';
+          String? userAvatar = replyData['useravatar']?.toString();
+          String avatarInitial = username.isNotEmpty ? username[0].toUpperCase() : '?';
+
+          // Parse attachments if they exist and match the expected structure
           List<Map<String, dynamic>> attachments = [];
-          if (replyData['mediaAttachments'] != null && replyData['mediaAttachments'] is List) {
-            for (var attData in (replyData['mediaAttachments'] as List<dynamic>)) {
+          if (replyData['attachments'] != null && replyData['attachments'] is List) {
+            for (var attData in (replyData['attachments'] as List<dynamic>)) {
               if (attData is Map<String, dynamic>) {
                 attachments.add({
                   'type': attData['type']?.toString() ?? 'unknown',
                   'url': attData['url']?.toString() ?? '',
-                  'filename': attData['fileName']?.toString() ?? '', // Adjusted to fileName
-                  'size': (attData['fileSize'] is num ? attData['fileSize'] : int.tryParse(attData['fileSize']?.toString() ?? '0'))?.toInt() ?? 0, // Adjusted to fileSize
+                  'filename': attData['filename']?.toString() ?? '', // Assuming 'filename' based on other parts of app
+                  'size': (attData['size'] is num ? attData['size'] : int.tryParse(attData['size']?.toString() ?? '0'))?.toInt() ?? 0,  // Assuming 'size'
+                  'thumbnailUrl': attData['thumbnailUrl']?.toString(), // Added based on general attachment structure
                 });
               }
             }
           }
 
-          // Safely extract username and generate avatarInitial
-          String username = replyData['authorDetails']?['username']?.toString() ?? 'Unknown User';
-          String avatarInitial = username.isNotEmpty ? username[0].toUpperCase() : '?';
-          if (replyData['authorDetails']?['avatarInitial'] != null) {
-            avatarInitial = replyData['authorDetails']['avatarInitial'].toString();
-          }
+          // Process likes, reposts, views - API provides arrays, UI expects counts
+          // The ReplyPage's _buildTweetStylePostItem already derives counts from post['likes'].length etc.
+          // So, we should pass the arrays directly, or the counts if the API guarantees them.
+          // Your API response shows 'likes: []'. _buildTweetStylePostItem handles this by doing .length.
+          // So, we should pass the raw arrays for 'likes', 'reposts', 'views'.
+          List<dynamic> likes = replyData['likes'] is List ? List<dynamic>.from(replyData['likes']) : [];
+          List<dynamic> reposts = replyData['reposts'] is List ? List<dynamic>.from(replyData['reposts']) : [];
+          List<dynamic> views = replyData['views'] is List ? List<dynamic>.from(replyData['views']) : [];
 
-          replies.add({
-            'id': replyData['_id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(), // Fallback id
+
+          processedReplies.add({
+            '_id': replyData['_id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(), // Use _id consistent with post objects
             'username': username,
-            'content': replyData['textContent']?.toString() ?? '',
-            'timestamp': (DateTime.tryParse(replyData['createdAt']?.toString() ?? '') ?? DateTime.now()).toIso8601String(),
-            'likes': (replyData['likeCount'] is num ? replyData['likeCount'] : int.tryParse(replyData['likeCount']?.toString() ?? '0'))?.toInt() ?? 0,
-            'reposts': (replyData['repostCount'] is num ? replyData['repostCount'] : int.tryParse(replyData['repostCount']?.toString() ?? '0'))?.toInt() ?? 0,
-            'views': (replyData['viewCount'] is num ? replyData['viewCount'] : int.tryParse(replyData['viewCount']?.toString() ?? '0'))?.toInt() ?? 0,
+            'content': content,
+            'createdAt': (DateTime.tryParse(replyData['createdAt']?.toString() ?? '') ?? DateTime.now()).toIso8601String(), // Renamed 'timestamp' to 'createdAt'
+            'likes': likes, // Pass the list of liker IDs/objects
+            'reposts': reposts, // Pass the list of reposter IDs/objects
+            'views': views, // Pass the list of viewer IDs/objects
+            // Counts will be derived in _buildTweetStylePostItem from the length of these lists
             'attachments': attachments,
-            'avatarInitial': avatarInitial,
-            'useravatar': replyData['authorDetails']?['avatar']?.toString(), // Can be null
-            'replies': const [], // Replies to a reply are not typically fetched in this call
+            'avatarInitial': avatarInitial, // Derived from username
+            'useravatar': userAvatar,
+            'replies': replyData['replies'] is List ? List<dynamic>.from(replyData['replies']) : [], // Pass actual replies array
+            // Add other fields from your API response if needed by _buildTweetStylePostItem
+            'userId': replyData['userId']?.toString(),
           });
         }
-        return replies;
+        return processedReplies;
       } else {
         print('Error fetching replies: ${response.statusCode} - ${response.data['message']}');
         throw Exception('Failed to fetch replies: ${response.data['message'] ?? 'Unknown error'}');
