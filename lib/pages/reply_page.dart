@@ -7,6 +7,7 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:feather_icons/feather_icons.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -370,148 +371,165 @@ class _ReplyPageState extends State<ReplyPage> {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // User Avatar
-            CircleAvatar(
-              radius: isReply ? 14 : 18,
-              backgroundColor: Colors.tealAccent.withOpacity(0.2),
-              backgroundImage: userAvatar != null && userAvatar.isNotEmpty ? NetworkImage(userAvatar) : null,
-              child: userAvatar == null || userAvatar.isEmpty
-                  ? Text(
-                      avatarInitial,
-                      style: GoogleFonts.poppins(
-                        color: Colors.tealAccent,
-                        fontWeight: FontWeight.w600,
-                        fontSize: isReply ? 12 : 14,
-                      ),
-                    )
-                  : null,
-            ),
-            const SizedBox(width: 12),
+            
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Row: Username, Time/Date, Views
-                  Row(
-                    children: [
-                      Text(
-                        '@$username',
-                        style: GoogleFonts.poppins(
-                          color: Colors.white,
-                          fontSize: isReply ? 14 : 16,
-                          fontWeight: FontWeight.w600,
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    child: Row(
+                      children: [
+                        Row(
+                          children: [
+                            // User Avatar
+                            CircleAvatar(
+                              radius: isReply ? 14 : 18,
+                              backgroundColor: Colors.tealAccent.withOpacity(0.2),
+                              backgroundImage: userAvatar != null && userAvatar.isNotEmpty ? NetworkImage(userAvatar) : null,
+                              child: userAvatar == null || userAvatar.isEmpty
+                                  ? Text(
+                                      avatarInitial,
+                                      style: GoogleFonts.poppins(
+                                        color: Colors.tealAccent,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: isReply ? 12 : 14,
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              '@$username',
+                              style: GoogleFonts.poppins(
+                                color: Colors.white,
+                                fontSize: isReply ? 14 : 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '${DateFormat('h:mm a').format(timestamp)} · ${DateFormat('MMM d, yyyy').format(timestamp)} · $viewsCount views',
-                          style: GoogleFonts.roboto(
-                            fontSize: isReply ? 11 : 12,
-                            color: Colors.grey[400],
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '${DateFormat('h:mm a').format(timestamp)} · ${DateFormat('MMM d, yyyy').format(timestamp)} · $viewsCount views',
+                            style: GoogleFonts.roboto(
+                              fontSize: isReply ? 11 : 12,
+                              color: Colors.grey[400],
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 6),
                   // Column: Content and Attachments
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        content,
-                        style: GoogleFonts.roboto(
-                          fontSize: isReply ? 13 : 14,
-                          color: Colors.white70,
-                          height: 1.5,
+                      Padding(
+                        padding: const EdgeInsets.only(left:55),
+                        child: Text(
+                          content,
+                          style: GoogleFonts.roboto(
+                            fontSize: isReply ? 13 : 14,
+                            color: const Color.fromARGB(255, 255, 255, 255),
+                            height: 1.5,
+                          ),
                         ),
                       ),
                       if (correctlyTypedAttachments.isNotEmpty) ...[
-                        const SizedBox(height: 12),
-                        _buildReplyAttachmentGrid(
-                          correctlyTypedAttachments,
-                          post,
-                          username,
-                          userAvatar,
-                          timestamp,
-                          viewsCount,
-                          likesCount,
-                          repostsCount,
-                          content,
+                        const SizedBox(height: 8),
+                        Padding(
+                          padding: const EdgeInsets.only(left:40),
+                          child: _buildReplyAttachmentGrid(
+                            correctlyTypedAttachments,
+                            post,
+                            username,
+                            userAvatar,
+                            timestamp,
+                            viewsCount,
+                            likesCount,
+                            repostsCount,
+                            content,
+                          ),
                         ),
                       ],
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   // Row: Reply, Reposts, Like, Bookmark, Share
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                       _buildStatButton(
-                        icon: FeatherIcons.messageCircle, // Reply
-                        text: '$repliesCount',
-                        color: Colors.tealAccent,
-                        onPressed: () {
-                          setState(() {
-                            _parentReplyId = post['_id'] as String?;
-                            _showReplyField = true;
-                          });
-                          _showSnackBar(
-                            'Reply',
-                            'Replying to @$username.',
-                            Colors.teal[700]!,
-                          );
-                        },
-                      ),
-                      _buildStatButton(
-                        icon: FeatherIcons.repeat, // Repost
-                        text: '$repostsCount',
-                        color: Colors.greenAccent,
-                        onPressed: () {
-                          _showSnackBar(
-                            'Repost ${isReply ? "Reply" : "Post"}',
-                            'Repost ${isReply ? "reply" : "post"} by @$username (not implemented yet).',
-                            Colors.greenAccent,
-                          );
-                        },
-                      ),
-                      _buildStatButton(
-                        icon: FeatherIcons.heart, // Like
-                        text: '$likesCount',
-                        color: Colors.pinkAccent,
-                        onPressed: () {
-                          _showSnackBar(
-                            'Like ${isReply ? "Reply" : "Post"}',
-                            'Like ${isReply ? "reply" : "post"} by @$username (not implemented yet).',
-                            Colors.pinkAccent,
-                          );
-                        },
-                      ),
-                      if (!isReply) // Bookmark only for original post, not replies
-                        _buildStatButton(
-                          icon: FeatherIcons.bookmark, // Bookmark
-                          text: '',
-                          color: Colors.white70,
+                  Padding(
+                    padding: const EdgeInsets.only(left: 40),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                         _buildStatButton(
+                          icon: FeatherIcons.messageCircle, // Reply
+                          text: '$repliesCount',
+                          color: Colors.tealAccent,
                           onPressed: () {
+                            setState(() {
+                              _parentReplyId = post['_id'] as String?;
+                              _showReplyField = true;
+                            });
                             _showSnackBar(
-                              'Bookmark Post',
-                              'Bookmark post by @$username (not implemented yet).',
+                              'Reply',
+                              'Replying to @$username.',
                               Colors.teal[700]!,
                             );
                           },
                         ),
-                       if (isReply) // Empty SizedBox to maintain spacing for replies if no bookmark
-                         const SizedBox(width: 24), // Adjust width as needed for alignment
-
-                      _buildStatButton(
-                        icon: FeatherIcons.share2, // Share
-                        text: '',
-                        color: Colors.white70,
-                        onPressed: () => _sharePost(post),
-                      ),
-                    ],
+                        _buildStatButton(
+                          icon: FeatherIcons.repeat, // Repost
+                          text: '$repostsCount',
+                          color: Colors.greenAccent,
+                          onPressed: () {
+                            _showSnackBar(
+                              'Repost ${isReply ? "Reply" : "Post"}',
+                              'Repost ${isReply ? "reply" : "post"} by @$username (not implemented yet).',
+                              Colors.greenAccent,
+                            );
+                          },
+                        ),
+                        _buildStatButton(
+                          icon: FeatherIcons.heart, // Like
+                          text: '$likesCount',
+                          color: Colors.pinkAccent,
+                          onPressed: () {
+                            _showSnackBar(
+                              'Like ${isReply ? "Reply" : "Post"}',
+                              'Like ${isReply ? "reply" : "post"} by @$username (not implemented yet).',
+                              Colors.pinkAccent,
+                            );
+                          },
+                        ),
+                        if (!isReply) // Bookmark only for original post, not replies
+                          _buildStatButton(
+                            icon: FeatherIcons.bookmark, // Bookmark
+                            text: '',
+                            color: Colors.white70,
+                            onPressed: () {
+                              _showSnackBar(
+                                'Bookmark Post',
+                                'Bookmark post by @$username (not implemented yet).',
+                                Colors.teal[700]!,
+                              );
+                            },
+                          ),
+                         if (isReply) // Empty SizedBox to maintain spacing for replies if no bookmark
+                           const SizedBox(width: 24), // Adjust width as needed for alignment
+                    
+                        _buildStatButton(
+                          icon: FeatherIcons.share2, // Share
+                          text: '',
+                          color: Colors.white70,
+                          onPressed: () => _sharePost(post),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -1236,47 +1254,8 @@ Widget _buildStatButton({
     return Scaffold(
       backgroundColor: const Color(0xFF000000),
       appBar: AppBar(
-        title: Row(
-          children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: Colors.tealAccent.withOpacity(0.2),
-              backgroundImage: appBarUserAvatar != null && appBarUserAvatar.isNotEmpty
-                  ? NetworkImage(appBarUserAvatar)
-                  : null,
-              child: appBarUserAvatar == null || appBarUserAvatar.isEmpty
-                  ? Text(appBarAvatarInitial,
-                      style: GoogleFonts.poppins(
-                          color: Colors.tealAccent,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14))
-                  : null,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '@$postUsername',
-                    style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    DateFormat('h:mm a · MMM d, yyyy').format(parsedTimestamp),
-                    style: GoogleFonts.roboto(fontSize: 12, color: Colors.grey[400]),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: const Color(0xFF121212),
+        title: Text('Post', style: GoogleFonts.poppins(color: Colors.white)),
+        backgroundColor: const Color.fromARGB(255, 0, 0, 0),
         iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
         actions: [
@@ -1299,9 +1278,12 @@ Widget _buildStatButton({
                   Container(
                     decoration: BoxDecoration(
                         border: Border(bottom: BorderSide(color: Colors.grey[800]!))),
-                    child: _buildPostContent(widget.post, isReply: false),
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 20.0),
+                      child: _buildPostContent(widget.post, isReply: false),
+                    ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 10),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4.0),
                     child: Column(
@@ -1391,7 +1373,9 @@ Widget _buildStatButton({
                                           ),
                                         ),
                                       )
-                                    : ListView.builder(
+                                    : ListView.separated(
+                                        separatorBuilder: (context, index) =>
+                                             Divider(color: Colors.grey[800]),
                                         shrinkWrap: true,
                                         physics: const NeverScrollableScrollPhysics(),
                                         itemCount: _replies.length,
@@ -1399,7 +1383,7 @@ Widget _buildStatButton({
                                           final reply = _replies[index];
                                           return Padding(
                                               padding:
-                                                  const EdgeInsets.symmetric(vertical: 8.0),
+                                                  const EdgeInsets.symmetric(vertical: 1.0),
                                               child: _buildPostContent(reply, isReply: true));
                                         },
                                       ),
