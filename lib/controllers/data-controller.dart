@@ -319,53 +319,24 @@ class DataController extends GetxController {
   //   }
   // }
 
-  // Method to reply to a post
-  Future<Map<String, dynamic>> replyToPost({
-    required String postId,
-    required String content,
-    List<Map<String, dynamic>> attachments = const [],
-  }) async {
+  //  reply to post
+  Future<Map<String, dynamic>> replyToPost(Map<String, dynamic> data) async {
     try {
-      final token = user.value['token'];
-      if (token == null) {
-        return {'success': false, 'message': 'User not authenticated. Please log in.'};
+      String? token = user.value['token'];
+      String? currentUserId = user.value['user']?['_id'];
+
+      if (token == null || currentUserId == null) {
+        return {'success': false, 'message': 'User not authenticated'};
       }
 
-      final userId = user.value['user']?['_id']?.toString();
-      if (userId == null) {
-        return {'success': false, 'message': 'User ID not found. Please log in again.'};
-      }
-
-      final String? username = user.value['user']?['name']?.toString();
-      final String? userAvatar = user.value['user']?['avatar']?.toString();
-
-      List<Map<String, dynamic>> attachmentPayload = attachments.map((att) {
-        // Ensure URL is not null, provide a default or handle error if necessary
-        // For now, assuming att['url'] will be populated by earlier upload step
-        if (att['url'] == null) {
-          print('Warning: Attachment URL is null for ${att['filename']}. This attachment might not be saved correctly.');
-        }
-        return {
-          'type': att['type'],
-          'url': att['url'] ?? '', // Or handle more gracefully if a URL is always expected
-          'filename': att['filename'],
-          'size': att['size'],
-        };
-      }).toList();
-
-      final Map<String, dynamic> requestData = {
-        'content': content,
-        'userId': userId, // Make sure backend expects 'userId' and not e.g. 'authorId'
-        'attachments': attachmentPayload,
-        // Optional: include username and avatar if backend doesn't resolve from userId
-        // These might be useful if the backend wants to denormalize this info directly into the reply document
-        'username': username ?? 'Anonymous', // Provide a default if null
-        'userAvatar': userAvatar, // Can be null
-      };
-
-      final response = await _dio.post(
-        '/api/posts/$postId/reply', // Dummy endpoint
-        data: requestData,
+      var response = await _dio.post(
+        '/api/posts/reply-to-post',
+        data: {
+          'postId': data['postId'],
+          'userId': currentUserId,
+          'content': data['content'],
+          'attachments': data['attachments'] ?? [], // Ensure attachments are included
+        },
         options: dio.Options(
           headers: {
             'Authorization': 'Bearer $token',
@@ -373,74 +344,18 @@ class DataController extends GetxController {
         ),
       );
 
-      if ((response.statusCode == 200 || response.statusCode == 201) && response.data['success'] == true) {
-        final rawReplyData = response.data['reply'];
-        if (rawReplyData != null && rawReplyData is Map<String, dynamic>) {
-          // Perform mapping similar to fetchReplies to ensure consistent object structure
-          List<Map<String, dynamic>> mappedAttachments = [];
-          if (rawReplyData['mediaAttachments'] != null && rawReplyData['mediaAttachments'] is List) {
-            for (var attData in (rawReplyData['mediaAttachments'] as List<dynamic>)) {
-              if (attData is Map<String, dynamic>) {
-                mappedAttachments.add({
-                  'type': attData['type']?.toString() ?? 'unknown',
-                  'url': attData['url']?.toString() ?? '',
-                  'filename': attData['fileName']?.toString() ?? attData['filename']?.toString() ?? '', // Allow both fileName and filename
-                  'size': (attData['fileSize'] is num ? attData['fileSize'] : int.tryParse(attData['fileSize']?.toString() ?? '0'))?.toInt() ??
-                          (attData['size'] is num ? attData['size'] : int.tryParse(attData['size']?.toString() ?? '0'))?.toInt() ?? 0, // Allow both fileSize and size
-                });
-              }
-            }
-          }
-
-          String repUsername = rawReplyData['authorDetails']?['username']?.toString() ??
-                               rawReplyData['username']?.toString() ?? // Fallback to direct username
-                               'Unknown User';
-          String repAvatarInitial = repUsername.isNotEmpty ? repUsername[0].toUpperCase() : '?';
-          if (rawReplyData['authorDetails']?['avatarInitial'] != null) {
-            repAvatarInitial = rawReplyData['authorDetails']['avatarInitial'].toString();
-          } else if (rawReplyData['avatarInitial'] != null) {
-            repAvatarInitial = rawReplyData['avatarInitial'].toString();
-          }
-
-          final mappedReply = {
-            'id': rawReplyData['_id']?.toString() ?? rawReplyData['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
-            'username': repUsername,
-            'content': rawReplyData['textContent']?.toString() ?? rawReplyData['content']?.toString() ?? '',
-            'timestamp': (DateTime.tryParse(rawReplyData['createdAt']?.toString() ?? rawReplyData['timestamp']?.toString() ?? '') ?? DateTime.now()).toIso8601String(),
-            'likes': (rawReplyData['likeCount'] is num ? rawReplyData['likeCount'] : int.tryParse(rawReplyData['likeCount']?.toString() ?? '0'))?.toInt() ?? 0,
-            'reposts': (rawReplyData['repostCount'] is num ? rawReplyData['repostCount'] : int.tryParse(rawReplyData['repostCount']?.toString() ?? '0'))?.toInt() ?? 0,
-            'views': (rawReplyData['viewCount'] is num ? rawReplyData['viewCount'] : int.tryParse(rawReplyData['viewCount']?.toString() ?? '0'))?.toInt() ?? 0,
-            'attachments': mappedAttachments,
-            'avatarInitial': repAvatarInitial,
-            'useravatar': rawReplyData['authorDetails']?['avatar']?.toString() ?? rawReplyData['useravatar']?.toString(),
-            'replies': const [], // Replies to a reply are not typically included here
-          };
-          return {
-            'success': true,
-            'message': response.data['message'] ?? 'Reply posted successfully!',
-            'reply': mappedReply // Return the mapped reply
-          };
-        } else {
-          // Success but no reply data, or reply data is not in expected format
-          return {
-            'success': true,
-            'message': response.data['message'] ?? 'Reply posted successfully (no detailed reply data returned)!',
-            'reply': null
-          };
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        // Optimistic UI Update
+        int postIndex = posts.indexWhere((p) => p['_id'] == data['postId']);
+        if (postIndex != -1) {
+          posts[postIndex]['replies'].add(response.data['reply']);
         }
+        return {'success': true, 'message': 'Reply added successfully'};
       } else {
-        return {
-          'success': false,
-          'message': response.data['message'] ?? 'Failed to post reply. Server error.'
-        };
+        return {'success': false, 'message': response.data['message'] ?? 'Post reply failed'};
       }
     } catch (e) {
-      print('Error in replyToPost: ${e.toString()}');
-      // Check if e is a DioError to potentially extract more specific error info
-      if (e is dio.DioException && e.response?.data != null && e.response!.data['message'] != null) {
-        return {'success': false, 'message': 'Failed to post reply: ${e.response!.data['message']}'};
-      }
-      return {'success': false, 'message': 'An error occurred while posting reply: ${e.toString()}'};
+      return {'success': false, 'message': e.toString()};
     }
   }
 
