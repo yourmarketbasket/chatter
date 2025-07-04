@@ -240,6 +240,7 @@ class _ReplyPageState extends State<ReplyPage> {
                                         attachment: attachment,
                                         post: post, // Pass the whole post map
                                         borderRadius: BorderRadius.circular(12), // Match styling
+                                        enforceFeedConstraints: false, // Use native aspect ratio here
                                       )
                                     : Container(
                                         color: Colors.grey[900],

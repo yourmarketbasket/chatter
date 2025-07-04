@@ -831,7 +831,8 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         attachment: attachmentMap,
         post: post,
         borderRadius: BorderRadius.zero, // Border radius handled by ClipRRect wrapper usually
-        isFeedContext: true,
+        isFeedContext: true, // This is the home feed context
+        enforceFeedConstraints: true, // Enforce 4:3 for home feed
         onVideoCompletedInGrid: isVideoGrid
             ? (completedVideoId) => _handleVideoCompletionInGrid(
                 completedVideoId,

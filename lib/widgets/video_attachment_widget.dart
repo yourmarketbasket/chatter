@@ -14,8 +14,9 @@ class VideoAttachmentWidget extends StatefulWidget {
   final Map<String, dynamic> attachment;
   final Map<String, dynamic> post;
   final BorderRadius borderRadius;
-  final bool isFeedContext;
+  final bool isFeedContext; // Remains for other feed-specific logic if any
   final Function(String videoId)? onVideoCompletedInGrid;
+  final bool enforceFeedConstraints; // New parameter
 
   const VideoAttachmentWidget({
     required Key key,
@@ -24,6 +25,7 @@ class VideoAttachmentWidget extends StatefulWidget {
     required this.borderRadius,
     this.isFeedContext = false,
     this.onVideoCompletedInGrid,
+    this.enforceFeedConstraints = false, // Default to false (native aspect ratio)
   }) : super(key: key);
 
   @override
@@ -43,7 +45,8 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
   final MediaVisibilityService _mediaVisibilityService = Get.find<MediaVisibilityService>();
   StreamSubscription? _isTransitioningVideoSubscription;
   Worker? _currentlyPlayingMediaSubscription;
-  double _aspectRatio = 16 / 9; // Default aspect ratio
+  double _currentAspectRatio = 16 / 9; // Holds the dynamically determined aspect ratio
+  BoxFit _currentBoxFit = BoxFit.contain; // Holds the dynamically determined BoxFit
 
   @override
   void initState() {
@@ -51,7 +54,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
     _videoUniqueId = widget.attachment['url'] as String? ??
                      (widget.key?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString());
 
-    _updateAspectRatio();
+    _updateAspectAndFit(); // Initial determination
 
     final String? thumbnailUrl = widget.attachment['thumbnailUrl'] as String?;
     if (thumbnailUrl != null && thumbnailUrl.isNotEmpty) {
@@ -61,7 +64,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
     _currentlyPlayingMediaSubscription = ever(_dataController.currentlyPlayingMediaId, (String? playingId) {
       if (!mounted || _betterPlayerController == null || !_isInitialized) return;
 
-      if (widget.isFeedContext) {
+      if (widget.isFeedContext) { // This specific logic might still be relevant for feed
         final bool isThisVideoPlaying = _betterPlayerController!.isPlaying() ?? false;
         if (isThisVideoPlaying &&
             playingId != null &&
@@ -88,50 +91,63 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
     _pulseAnimationController.repeat(reverse: true);
   }
 
-  void _updateAspectRatio() {
-    final num? videoWidth = widget.attachment['width'] as num?;
-    final num? videoHeight = widget.attachment['height'] as num?;
-    if (videoWidth != null && videoHeight != null && videoHeight > 0) {
-      _aspectRatio = videoWidth / videoHeight;
+  void _updateAspectAndFit() {
+    if (widget.enforceFeedConstraints) {
+      _currentAspectRatio = 4 / 3;
+      _currentBoxFit = BoxFit.fitWidth;
     } else {
-      // Try to parse from 'aspectRatio' string if present
-      final String? aspectRatioString = widget.attachment['aspectRatio'] as String?;
-      if (aspectRatioString != null) {
-        final parts = aspectRatioString.split(':');
-        if (parts.length == 2) {
-          final double? w = double.tryParse(parts[0]);
-          final double? h = double.tryParse(parts[1]);
-          if (w != null && h != null && h > 0) {
-            _aspectRatio = w / h;
+      final num? videoWidth = widget.attachment['width'] as num?;
+      final num? videoHeight = widget.attachment['height'] as num?;
+      if (videoWidth != null && videoHeight != null && videoHeight > 0) {
+        _currentAspectRatio = videoWidth / videoHeight;
+      } else {
+        final String? aspectRatioString = widget.attachment['aspectRatio'] as String?;
+        if (aspectRatioString != null) {
+          final parts = aspectRatioString.split(':');
+          if (parts.length == 2) {
+            final double? w = double.tryParse(parts[0]);
+            final double? h = double.tryParse(parts[1]);
+            if (w != null && h != null && h > 0) {
+              _currentAspectRatio = w / h;
+            }
+          } else {
+            final double? val = double.tryParse(aspectRatioString);
+            if (val != null && val > 0) {
+              _currentAspectRatio = val;
+            }
           }
         } else {
-          final double? val = double.tryParse(aspectRatioString);
-          if (val != null && val > 0) {
-            _aspectRatio = val;
-          }
+            _currentAspectRatio = 16/9; // Fallback if no specific data
         }
       }
+      if (_currentAspectRatio <= 0) _currentAspectRatio = 16/9; // Ensure positive
+      _currentBoxFit = BoxFit.contain; // Native aspect ratio usually uses contain
     }
-    // Ensure aspect ratio is positive, else default
-    if (_aspectRatio <= 0) _aspectRatio = 16/9;
 
     if (mounted && _betterPlayerController != null && _isInitialized) {
       _betterPlayerController!.setBetterPlayerConfiguration(
         _betterPlayerController!.betterPlayerConfiguration.copyWith(
-          aspectRatio: _aspectRatio,
+          aspectRatio: _currentAspectRatio,
+          fit: _currentBoxFit,
         )
       );
     }
+     // Call setState to rebuild with new aspect ratio if it's used in AspectRatio widget
+    if(mounted) setState(() {});
   }
 
 
   @override
   void didUpdateWidget(covariant VideoAttachmentWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.attachment['width'] != oldWidget.attachment['width'] ||
-        widget.attachment['height'] != oldWidget.attachment['height'] ||
-        widget.attachment['aspectRatio'] != oldWidget.attachment['aspectRatio']) {
-      _updateAspectRatio();
+    if (widget.enforceFeedConstraints != oldWidget.enforceFeedConstraints ||
+        (widget.enforceFeedConstraints == false && // Only re-check attachment data if not enforcing feed constraints
+         (widget.attachment['width'] != oldWidget.attachment['width'] ||
+          widget.attachment['height'] != oldWidget.attachment['height'] ||
+          widget.attachment['aspectRatio'] != oldWidget.attachment['aspectRatio'])
+        )
+       ) {
+      _updateAspectAndFit();
     }
   }
 
@@ -195,12 +211,16 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
       '/upload/q_auto:low,w_480,c_limit/',
     );
 
+    // Ensure _updateAspectAndFit has been called to set _currentAspectRatio and _currentBoxFit
+    // This is usually done in initState and didUpdateWidget, but ensure it's fresh if called standalone.
+    // _updateAspectAndFit(); // Could call here, but might be redundant if state is managed well.
+
     _betterPlayerController = BetterPlayerController(
       BetterPlayerConfiguration(
-        aspectRatio: _aspectRatio, // Use dynamic aspect ratio
+        aspectRatio: _currentAspectRatio, // Use the dynamically determined aspect ratio
         autoPlay: false,
         looping: widget.onVideoCompletedInGrid == null,
-        fit: BoxFit.contain, // Changed to contain to respect aspect ratio
+        fit: _currentBoxFit, // Use the dynamically determined BoxFit
         controlsConfiguration: BetterPlayerControlsConfiguration(
           showControls: false,
           enablePlayPause: true,
@@ -227,18 +247,22 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
       case BetterPlayerEventType.initialized:
         if (mounted) {
           setState(() => _isInitialized = true);
-           // Update aspect ratio again once initialized, as player might have more info
-          final videoAspectRatio = _betterPlayerController!.videoPlayerController?.value.aspectRatio;
-          if (videoAspectRatio != null && videoAspectRatio > 0 && videoAspectRatio != _aspectRatio) {
-            if (mounted) {
-               setState(() {
-                  _aspectRatio = videoAspectRatio;
-               });
-              _betterPlayerController!.setBetterPlayerConfiguration(
-                _betterPlayerController!.betterPlayerConfiguration.copyWith(aspectRatio: _aspectRatio)
-              );
+
+          // If not enforcing feed constraints, try to get aspect ratio from player
+          if (!widget.enforceFeedConstraints) {
+            final videoPlayerAspectRatio = _betterPlayerController!.videoPlayerController?.value.aspectRatio;
+            if (videoPlayerAspectRatio != null && videoPlayerAspectRatio > 0 && videoPlayerAspectRatio != _currentAspectRatio) {
+              if (mounted) {
+                 setState(() { // Update state for AspectRatio widget
+                    _currentAspectRatio = videoPlayerAspectRatio;
+                 });
+                _betterPlayerController!.setBetterPlayerConfiguration(
+                  _betterPlayerController!.betterPlayerConfiguration.copyWith(aspectRatio: _currentAspectRatio)
+                );
+              }
             }
           }
+          // Volume and autoplay logic remains
           _betterPlayerController!.setVolume(_isMuted ? 0.0 : 1.0);
           if (_shouldAutoplayAfterInit && !(_betterPlayerController!.isPlaying() ?? true)) {
             _betterPlayerController!.play();
@@ -289,6 +313,13 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
     final String? thumbnailUrl = widget.attachment['thumbnailUrl'] as String?;
     final String visibilityDetectorKey = _videoUniqueId;
 
+    // Ensure _currentAspectRatio is up-to-date for the AspectRatio widget
+    // This might be slightly redundant if _updateAspectAndFit also calls setState,
+    // but ensures the AspectRatio widget uses the latest calculated value.
+    // Consider if _updateAspectAndFit should always call setState if it changes _currentAspectRatio.
+    // For now, explicit call in build might be safer if _updateAspectAndFit is complex.
+    // However, _updateAspectAndFit already calls setState if mounted.
+
     return VisibilityDetector(
       key: Key(visibilityDetectorKey),
       onVisibilityChanged: (visibilityInfo) {
@@ -296,7 +327,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
 
         if (visibleFraction > 0 && !_isInitialized && _betterPlayerController == null) {
             print("[VideoAttachmentWidget-$_videoUniqueId] Becoming visible (fraction: $visibleFraction), ensuring player is initialized.");
-            _initializeVideoPlayer(autoplay: false);
+            _initializeVideoPlayer(autoplay: false); // Autoplay decision is managed by MediaVisibilityService
         }
 
         _mediaVisibilityService.itemVisibilityChanged(
@@ -308,11 +339,9 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
           context: context,
         );
 
-        if (visibleFraction == 0) {
+        if (visibleFraction == 0) { // Aggressive disposal
           if (mounted && _shouldRenderPlayer) {
-            setState(() {
-              _shouldRenderPlayer = false;
-            });
+            setState(() { _shouldRenderPlayer = false; });
           } else {
              _shouldRenderPlayer = false;
           }
@@ -325,16 +354,14 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
             _betterPlayerController = null;
           }
           if (_isInitialized && mounted) {
-            setState(() {
-              _isInitialized = false;
-            });
+            setState(() { _isInitialized = false; });
           } else {
             _isInitialized = false;
           }
         }
       },
       child: GestureDetector(
-        onTap: () {
+        onTap: () { // Navigation to MediaViewPage
           List<Map<String, dynamic>> correctlyTypedPostAttachments = [];
           final dynamic rawPostAttachments = widget.post['attachments'];
           if (rawPostAttachments is List) {
@@ -342,17 +369,12 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
               if (item is Map<String, dynamic>) {
                 correctlyTypedPostAttachments.add(item);
               } else if (item is Map) {
-                try {
-                  correctlyTypedPostAttachments.add(Map<String, dynamic>.from(item));
-                } catch (e) {
-                  print('[VideoAttachmentWidget-$_videoUniqueId] Error converting attachment item Map: $e');
-                }
+                try { correctlyTypedPostAttachments.add(Map<String, dynamic>.from(item)); } catch (e) { print('[VideoAttachmentWidget-$_videoUniqueId] Error converting attachment item Map: $e');}
               } else {
                 print('[VideoAttachmentWidget-$_videoUniqueId] Skipping non-map attachment item: $item');
               }
             }
           }
-
           int initialIndex = -1;
           if (widget.attachment['url'] != null) {
             initialIndex = correctlyTypedPostAttachments.indexWhere((att) => att['url'] == widget.attachment['url']);
@@ -363,7 +385,6 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
             initialIndex = correctlyTypedPostAttachments.indexOf(widget.attachment);
             if (initialIndex == -1) initialIndex = 0;
           }
-
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -386,40 +407,33 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
         child: ClipRRect(
           borderRadius: widget.borderRadius,
           child: AspectRatio(
-            aspectRatio: _aspectRatio, // Use dynamic aspect ratio here
+            aspectRatio: _currentAspectRatio, // Use the dynamically determined aspect ratio for the container
             child: Stack(
               alignment: Alignment.center,
               children: [
-                Positioned.fill(
+                Positioned.fill( // Thumbnail
                   child: CachedNetworkImage(
                     imageUrl: thumbnailUrl ?? '',
-                    fit: BoxFit.cover, // Cover for thumbnail
+                    fit: BoxFit.cover,
                     memCacheWidth: 480,
                     cacheManager: CustomCacheManager.instance,
                     cacheKey: thumbnailUrl ?? _videoUniqueId,
                     placeholder: (context, url) => ScaleTransition(
                       scale: _pulseAnimation,
-                      child: Container(
-                        color: Colors.grey[850],
-                        child: Center(
-                          child: Icon(FeatherIcons.video, color: Colors.white.withOpacity(0.6), size: 36),
-                        ),
-                      ),
+                      child: Container(color: Colors.grey[850], child: Center(child: Icon(FeatherIcons.video, color: Colors.white.withOpacity(0.6), size: 36))),
                     ),
-                    errorWidget: (context, url, error) => Container(
-                      color: Colors.grey[900],
-                      child: Center(
-                        child: Icon(FeatherIcons.video, color: Colors.white.withOpacity(0.6), size: 36),
-                      ),
-                    ),
+                    errorWidget: (context, url, error) => Container(color: Colors.grey[900], child: Center(child: Icon(FeatherIcons.video, color: Colors.white.withOpacity(0.6), size: 36))),
                   ),
                 ),
+                // Player, rendered conditionally
                 if (_isInitialized && _shouldRenderPlayer && _betterPlayerController != null)
-                  Positioned.fill(
+                  Positioned.fill( // Player should also fill the AspectRatio container
                     child: BetterPlayer(controller: _betterPlayerController!),
                   )
-                else if (!_isInitialized && _shouldRenderPlayer)
+                else if (!_isInitialized && _shouldRenderPlayer) // Loading indicator
                   const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent))),
+
+                // Mute/Unmute button
                 Positioned(
                   bottom: 8,
                   right: 8,
@@ -432,15 +446,8 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
                     },
                     child: Container(
                       padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.6),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        _isMuted ? FeatherIcons.volumeX : FeatherIcons.volume2,
-                        color: Colors.white,
-                        size: 16,
-                      ),
+                      decoration: BoxDecoration(color: Colors.black.withOpacity(0.6), shape: BoxShape.circle),
+                      child: Icon(_isMuted ? FeatherIcons.volumeX : FeatherIcons.volume2, color: Colors.white, size: 16),
                     ),
                   ),
                 ),
