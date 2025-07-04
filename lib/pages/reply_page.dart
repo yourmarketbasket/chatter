@@ -85,22 +85,7 @@ class _ReplyPageState extends State<ReplyPage> {
         });
       }
     }
-
-  // Method to share a post
-  void _sharePost(Map<String, dynamic> post) {
-    final String postId = post['_id'] as String? ?? "unknown_post";
-    final String content = post['content'] as String? ?? "Check out this post!";
-    // Construct a deep link or a web URL to the post if available
-    // Example: String postUrl = "https://chatter.yourdomain.com/post/$postId";
-    // For now, just sharing the content.
-
-    String shareText = content;
-    // if (postUrl.isNotEmpty) { // Once you have post URLs
-    //   shareText += "\n\nView post: $postUrl";
-    // }
-
-    Share.share(shareText, subject: 'Check out this post from Chatter!');
-  }
+    // Removed duplicated _sharePost from here
   }
 
   @override
@@ -203,11 +188,13 @@ class _ReplyPageState extends State<ReplyPage> {
     final int repostsCount = widget.post['repostsCount'] as int? ?? (widget.post['reposts'] as List?)?.length ?? 0;
     final int viewsCount = widget.post['viewsCount'] as int? ?? (widget.post['views'] as List?)?.length ?? 0;
 
-    // Define a minimal horizontal padding to be applied
-    const EdgeInsets minimalHorizontalPadding = EdgeInsets.symmetric(horizontal: 4.0);
+    // Define horizontal padding based on whether it's a reply or the main post
+    final EdgeInsets postItemPadding = isReply
+        ? const EdgeInsets.symmetric(horizontal: 4.0) // Replies keep their original item padding
+        : const EdgeInsets.only(right: 4.0); // Main post has its left padding removed (will align with page padding), only right item padding.
 
-    return Padding( // Added padding to the whole content block
-      padding: minimalHorizontalPadding,
+    return Padding(
+      padding: postItemPadding, // Apply conditional padding
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -256,8 +243,7 @@ class _ReplyPageState extends State<ReplyPage> {
             ),
           ],
         ),
-        ],
-      ),
+      ],
     );
   }
 
@@ -772,17 +758,42 @@ class _ReplyPageState extends State<ReplyPage> {
         ? (DateTime.tryParse(widget.post['timestamp'] as String) ?? DateTime.now())
         : (widget.post['timestamp'] is DateTime ? widget.post['timestamp'] : DateTime.now());
 
+    final String? appBarUserAvatar = widget.post['useravatar'] as String?;
+    final String appBarAvatarInitial = widget.post['avatarInitial'] as String? ?? (postUsername.isNotEmpty ? postUsername[0].toUpperCase() : '?');
+
+
     return Scaffold(
       backgroundColor: const Color(0xFF000000),
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+        // New title structure for AppBar
+        title: Row(
           children: [
-            Text('Post by @$postUsername', style: GoogleFonts.poppins(color: Colors.white, fontSize: 16)),
-            Text(
-              DateFormat('MMM d, yyyy · h:mm a').format(parsedTimestamp),
-              style: GoogleFonts.roboto(fontSize: 12, color: Colors.grey[400]),
+            CircleAvatar(
+              radius: 18, // Slightly smaller for AppBar
+              backgroundColor: Colors.tealAccent.withOpacity(0.2),
+              backgroundImage: appBarUserAvatar != null && appBarUserAvatar.isNotEmpty ? NetworkImage(appBarUserAvatar) : null,
+              child: appBarUserAvatar == null || appBarUserAvatar.isEmpty
+                  ? Text(appBarAvatarInitial, style: GoogleFonts.poppins(color: Colors.tealAccent, fontWeight: FontWeight.w600, fontSize: 14))
+                  : null,
+            ),
+            const SizedBox(width: 10),
+            Expanded( // Allow text column to take available space
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '@$postUsername',
+                    style: GoogleFonts.poppins(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+                    overflow: TextOverflow.ellipsis, // Handle long usernames
+                  ),
+                  Text(
+                    DateFormat('h:mm a · MMM d, yyyy').format(parsedTimestamp), // Consistent detailed format
+                    style: GoogleFonts.roboto(fontSize: 12, color: Colors.grey[400]),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
           ],
         ),

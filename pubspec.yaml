@@ -66,7 +66,7 @@ dependencies:
   file_saver: ^0.3.0
   timeago: ^3.7.1
   flutter_launcher_icons: ^0.14.4
-  share_plus: ^11.0.0
+  share_plus: ^9.0.0 # Added share_plus
 
 dev_dependencies:
   flutter_test:
