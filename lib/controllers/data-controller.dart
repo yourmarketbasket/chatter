@@ -513,73 +513,68 @@ class DataController extends GetxController {
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
-        print(response.data);
+        print("[DataController] Raw replies data from API for post $postId: ${response.data}");
         final List<dynamic> repliesData = response.data['replies'];
         List<Map<String, dynamic>> processedReplies = [];
 
         for (var replyData in repliesData) {
-          // Ensure replyData is a Map
-          if (replyData is! Map<String, dynamic>) {
-            print('[DataController] fetchReplies: Skipping invalid reply data item: $replyData');
+          if (replyData == null || replyData is! Map<String,dynamic>) {
+            print("[DataController] Skipping invalid reply data item: $replyData");
             continue;
           }
+          Map<String,dynamic> currentReply = Map<String,dynamic>.from(replyData);
 
-          // Extract data directly from replyData based on the new structure
-          String username = replyData['username']?.toString() ?? 'Unknown User';
-          String content = replyData['content']?.toString() ?? '';
-          String? userAvatar = replyData['useravatar']?.toString();
-          String avatarInitial = username.isNotEmpty ? username[0].toUpperCase() : '?';
-
-          // Parse attachments if they exist and match the expected structure
+          // Safely extract and parse attachments
           List<Map<String, dynamic>> attachments = [];
-          if (replyData['attachments'] != null && replyData['attachments'] is List) {
-            for (var attData in (replyData['attachments'] as List<dynamic>)) {
+          if (currentReply['attachments'] != null && currentReply['attachments'] is List) {
+            for (var attData in (currentReply['attachments'] as List<dynamic>)) {
               if (attData is Map<String, dynamic>) {
                 attachments.add({
                   'type': attData['type']?.toString() ?? 'unknown',
                   'url': attData['url']?.toString() ?? '',
-                  'filename': attData['filename']?.toString() ?? '', // Assuming 'filename' based on other parts of app
-                  'size': (attData['size'] is num ? attData['size'] : int.tryParse(attData['size']?.toString() ?? '0'))?.toInt() ?? 0,  // Assuming 'size'
-                  'thumbnailUrl': attData['thumbnailUrl']?.toString(), // Added based on general attachment structure
+                  'filename': attData['filename']?.toString() ?? '',
+                  'size': (attData['size'] is num ? attData['size'] : int.tryParse(attData['size']?.toString() ?? '0'))?.toInt() ?? 0,
+                  'thumbnailUrl': attData['thumbnailUrl']?.toString(), // Include thumbnail
                 });
               }
             }
           }
 
-          // Process likes, reposts, views - API provides arrays, UI expects counts
-          // The ReplyPage's _buildTweetStylePostItem already derives counts from post['likes'].length etc.
-          // So, we should pass the arrays directly, or the counts if the API guarantees them.
-          // Your API response shows 'likes: []'. _buildTweetStylePostItem handles this by doing .length.
-          // So, we should pass the raw arrays for 'likes', 'reposts', 'views'.
-          List<dynamic> likes = replyData['likes'] is List ? List<dynamic>.from(replyData['likes']) : [];
-          List<dynamic> reposts = replyData['reposts'] is List ? List<dynamic>.from(replyData['reposts']) : [];
-          List<dynamic> views = replyData['views'] is List ? List<dynamic>.from(replyData['views']) : [];
+          String username = currentReply['username']?.toString() ?? 'Unknown User';
+          String avatarInitial = username.isNotEmpty ? username[0].toUpperCase() : '?';
+          if (currentReply['avatarInitial'] != null && currentReply['avatarInitial'].toString().isNotEmpty) {
+            avatarInitial = currentReply['avatarInitial'].toString();
+          }
 
+          // Content: Pass buffer directly. _buildPostContent in ReplyPage will handle decoding.
+          // Also pass 'content' if available as a direct string.
+          String textContent = currentReply['content']?.toString() ?? '';
+          final bufferData = currentReply['buffer'];
 
           processedReplies.add({
-            '_id': replyData['_id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(), // Use _id consistent with post objects
+            '_id': currentReply['_id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
             'username': username,
-            'content': content,
-            'createdAt': (DateTime.tryParse(replyData['createdAt']?.toString() ?? '') ?? DateTime.now()).toIso8601String(), // Renamed 'timestamp' to 'createdAt'
-            'likes': likes, // Pass the list of liker IDs/objects
-            'reposts': reposts, // Pass the list of reposter IDs/objects
-            'views': views, // Pass the list of viewer IDs/objects
-            // Counts will be derived in _buildTweetStylePostItem from the length of these lists
+            'content': textContent, // Direct text content
+            'buffer': bufferData,   // Buffer for potentially encoded content
+            'createdAt': currentReply['createdAt'], // Pass as is (String or DateTime)
+            'likes': List<dynamic>.from(currentReply['likes'] ?? []),
+            'reposts': List<dynamic>.from(currentReply['reposts'] ?? []),
+            'views': List<dynamic>.from(currentReply['views'] ?? []),
             'attachments': attachments,
-            'avatarInitial': avatarInitial, // Derived from username
-            'useravatar': userAvatar,
-            'replies': replyData['replies'] is List ? List<dynamic>.from(replyData['replies']) : [], // Pass actual replies array
-            // Add other fields from your API response if needed by _buildTweetStylePostItem
-            'userId': replyData['userId']?.toString(),
+            'avatarInitial': avatarInitial,
+            'useravatar': currentReply['useravatar']?.toString(),
+            'replies': List<dynamic>.from(currentReply['replies'] ?? const []),
+            'userId': currentReply['userId']?.toString(),
           });
         }
+        print("[DataController] Processed replies for post $postId: $processedReplies");
         return processedReplies;
       } else {
-        print('Error fetching replies: ${response.statusCode} - ${response.data['message']}');
-        throw Exception('Failed to fetch replies: ${response.data['message'] ?? 'Unknown error'}');
+        print('[DataController] Error fetching replies for post $postId: ${response.statusCode} - ${response.data?['message']}');
+        throw Exception('Failed to fetch replies: ${response.data?['message'] ?? 'Unknown error'}');
       }
     } catch (e) {
-      print('Exception caught in fetchReplies: $e');
+      print('[DataController] Exception caught in fetchReplies for post $postId: $e');
       throw Exception('An error occurred while fetching replies: $e');
     }
   }

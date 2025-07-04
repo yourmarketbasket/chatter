@@ -497,7 +497,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                     ? Text(avatarInitial, style: GoogleFonts.poppins(color: Colors.tealAccent, fontWeight: FontWeight.w600, fontSize: isReply ? 14 : 16))
                     : null,
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -537,41 +537,40 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                     const SizedBox(height: 6),
                     // Text for post content
                     if (content.isNotEmpty)
-                      Text(content, style: GoogleFonts.roboto(fontSize: isReply ? 13 : 14, color: const Color.fromARGB(255, 255, 255, 255), height: 1.5)),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 15),
+                        child: Text(content, style: GoogleFonts.roboto(fontSize: isReply ? 13 : 14, color: const Color.fromARGB(255, 255, 255, 255), height: 1.5)),
+                      ),
                     // Spacer if content is empty but attachments exist, to maintain some tappable area
                     if (content.isEmpty && attachments.isNotEmpty)
                        const SizedBox(height: 6),
 
                     // Attachment Grid - Taps on individual attachments are handled by _buildAttachmentWidget
                     if (attachments.isNotEmpty) ...[
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 6),
                       // Need to ensure _buildAttachmentGrid does not absorb taps meant for the parent ReplyPage navigation
                       // if the tap is on grid padding. Individual items *should* capture their own taps.
                       _buildAttachmentGrid(attachments, post, postId),
                     ],
-                    const SizedBox(height: 8),
                     // Action buttons - These have their own tap handlers and should take precedence.
-                    Container(
-                      margin: EdgeInsets.symmetric(horizontal: 12, vertical:  0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _buildActionButton(
-                            isLikedByCurrentUser ? Icons.favorite : FeatherIcons.heart,
-                            '$likesCount',
-                            () => _toggleLikeStatus(postId, isLikedByCurrentUser),
-                            isLiked: isLikedByCurrentUser
-                          ),
-                          _buildActionButton(FeatherIcons.messageCircle, '$replyCount', () => _navigateToReplyPage(post)),
-                          _buildActionButton(
-                            FeatherIcons.repeat,
-                            '$repostsCount',
-                            () => _handleRepostAction(post), // Changed to direct action
-                            isReposted: isRepostedByCurrentUser,
-                          ),
-                          _buildActionButton(FeatherIcons.eye, '$views', () {}),
-                        ],
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildActionButton(
+                          isLikedByCurrentUser ? Icons.favorite : FeatherIcons.heart,
+                          '$likesCount',
+                          () => _toggleLikeStatus(postId, isLikedByCurrentUser),
+                          isLiked: isLikedByCurrentUser
+                        ),
+                        _buildActionButton(FeatherIcons.messageCircle, '$replyCount', () => _navigateToReplyPage(post)),
+                        _buildActionButton(
+                          FeatherIcons.repeat,
+                          '$repostsCount',
+                          () => _handleRepostAction(post), // Changed to direct action
+                          isReposted: isRepostedByCurrentUser,
+                        ),
+                        _buildActionButton(FeatherIcons.eye, '$views', () {}),
+                      ],
                     ),
                   ],
                 ),
@@ -961,10 +960,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           separatorBuilder: (context, index) => Divider(color: Colors.grey[850], height: 1),
           itemBuilder: (context, index) {
             final postMap = dataController.posts[index] as Map<String, dynamic>;
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 5),
-              child: _buildPostContent(postMap, isReply: false),
-            );
+            return _buildPostContent(postMap, isReply: false);
           },
         );
       }),
