@@ -35,21 +35,41 @@ class _ReplyPageState extends State<ReplyPage> {
   late DataController _dataController;
   final DeviceInfoPlugin _deviceInfo = DeviceInfoPlugin();
 
+  // State variable for the main post to allow modifications (likes, etc.)
+  late Map<String, dynamic> _mainPostData;
+
   List<Map<String, dynamic>> _replies = [];
   bool _isLoadingReplies = true;
   String? _fetchRepliesError;
   bool _isSubmittingReply = false;
-  bool _showReplyField = true;
+  bool _showReplyField = true; // Default to true to show reply field initially
   String? _parentReplyId;
+  final FocusNode _replyFocusNode = FocusNode(); // For focusing the reply text field
 
   @override
   void initState() {
     super.initState();
     _dataController = Get.find<DataController>();
+    // Initialize _mainPostData with a deep copy of widget.post
+    _mainPostData = Map<String, dynamic>.from(widget.post);
+    // Ensure nested lists like 'likes' or 'reposts' are also copied if they exist, to avoid modifying the original widget.post's lists.
+    // For simplicity, we'll assume top-level copy is enough for now, but deep copy is safer.
+    // A more robust deep copy: _mainPostData = jsonDecode(jsonEncode(widget.post));
+    // However, jsonEncode/Decode won't work if widget.post contains non-JSON serializable types (like File objects if any were there).
+    // For this app's structure, Map.from should be okay for fields like 'likes', 'reposts' if they are lists of strings/basic types.
+    // Let's ensure 'likes' and 'reposts' are new lists if they exist.
+    if (_mainPostData['likes'] != null && _mainPostData['likes'] is List) {
+      _mainPostData['likes'] = List<dynamic>.from(_mainPostData['likes'] as List);
+    }
+    if (_mainPostData['reposts'] != null && _mainPostData['reposts'] is List) {
+      _mainPostData['reposts'] = List<dynamic>.from(_mainPostData['reposts'] as List);
+    }
+
+
     _fetchPostReplies();
 
-    if (widget.post['_id'] != null) {
-      _dataController.viewPost(widget.post['_id'] as String);
+    if (_mainPostData['_id'] != null) {
+      _dataController.viewPost(_mainPostData['_id'] as String);
     } else {
       print("Error: Post ID is null in ReplyPage. Cannot record view.");
     }
@@ -511,8 +531,221 @@ class _ReplyPageState extends State<ReplyPage> {
     ),
   );
 }
-  
-  
+
+  // Refactored widget to display posts in a Twitter-like style.
+  // Can be used for the main post and for replies.
+  Widget _buildTweetStylePostItem(Map<String, dynamic> post, {required bool isMainPost}) {
+    final String username = post['username'] as String? ?? 'Unknown User';
+    final String? userAvatar = post['useravatar'] as String?;
+    final String avatarInitial = post['avatarInitial'] as String? ?? (username.isNotEmpty ? username[0].toUpperCase() : '?');
+    final String content = post['content'] as String? ?? '';
+    final DateTime timestamp = post['createdAt'] is String
+        ? (DateTime.tryParse(post['createdAt'] as String) ?? DateTime.now())
+        : (post['createdAt'] is DateTime ? post['createdAt'] as DateTime : DateTime.now());
+
+    // Determine if this reply is the last one in the list for line drawing
+    // This is a placeholder, actual check needs to be passed or determined from context
+    final bool isLastReplyInList = post['isLastReplyInList'] ?? false;
+
+
+    List<Map<String, dynamic>> attachments = [];
+    final dynamic rawAttachments = post['attachments'];
+    if (rawAttachments is List && rawAttachments.isNotEmpty) {
+      attachments = rawAttachments
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item.map((key, value) => MapEntry(key.toString(), value))))
+          .toList();
+    }
+
+    final int likesCount = post['likesCount'] as int? ?? (post['likes'] is List ? (post['likes'] as List).length : 0);
+    final int repostsCount = post['repostsCount'] as int? ?? (post['reposts'] is List ? (post['reposts'] as List).length : 0);
+    final int viewsCount = post['viewsCount'] as int? ?? (post['views'] is List ? (post['views'] as List).length : 0);
+    // final int repliesCount = post['repliesCount'] as int? ?? (post['replies'] is List ? (post['replies'] as List).length : 0);
+
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Avatar, Username, More Options icon
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: Colors.tealAccent.withOpacity(0.2),
+                backgroundImage: userAvatar != null && userAvatar.isNotEmpty ? NetworkImage(userAvatar) : null,
+                child: userAvatar == null || userAvatar.isEmpty
+                    ? Text(
+                        avatarInitial,
+                        style: GoogleFonts.poppins(
+                          color: Colors.tealAccent,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 18,
+                        ),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      username, // Display name
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      '@$username', // Handle
+                      style: GoogleFonts.roboto(
+                        color: Colors.grey[500],
+                        fontSize: 15,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // IconButton( // This was for the individual post more options, AppBar has one now
+              //   icon: Icon(FeatherIcons.moreHorizontal, color: Colors.grey[500], size: 20),
+              //   onPressed: () { /* TODO: Implement post specific actions if needed */ },
+              // ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Post Content
+          if (content.isNotEmpty)
+            Text(
+              content,
+              style: GoogleFonts.roboto(
+                fontSize: 16, // Made text slightly larger for main post
+                color: Colors.white,
+                height: 1.4,
+              ),
+            ),
+
+          // Attachments
+          if (attachments.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _buildReplyAttachmentGrid( // Re-using existing attachment grid, might need styling adjustments
+              attachments,
+              post,
+              username,
+              userAvatar,
+              timestamp,
+              viewsCount,
+              likesCount,
+              repostsCount,
+              content,
+            ),
+          ],
+          const SizedBox(height: 12),
+
+          // Timestamp
+          Text(
+            DateFormat('h:mm a · MMM d, yyyy').format(timestamp) + ' · $viewsCount Views', // Added views here
+            style: GoogleFonts.roboto(
+              fontSize: 14,
+              color: Colors.grey[500],
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Divider(color: Color(0xFF2F3336), height: 1),
+          const SizedBox(height: 8),
+
+          // Engagement Stats (e.g., Reposts, Likes)
+          Row(
+            children: [
+              if (repostsCount > 0) ...[
+                Text(
+                  '$repostsCount',
+                  style: GoogleFonts.roboto(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'Reposts',
+                  style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 14),
+                ),
+                const SizedBox(width: 16),
+              ],
+              if (likesCount > 0) ...[
+                 Text(
+                  '$likesCount',
+                  style: GoogleFonts.roboto(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'Likes',
+                  style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 14),
+                ),
+              ]
+              // Add Quotes and Bookmarks if available
+            ],
+          ),
+          if (repostsCount > 0 || likesCount > 0) ... [
+            const SizedBox(height: 8),
+            const Divider(color: Color(0xFF2F3336), height: 1),
+            const SizedBox(height: 4),
+          ],
+
+
+          // Action Buttons (Reply, Repost, Like, Share)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround, // Space them out like Twitter
+            children: [
+              _buildStatButton( // Re-using _buildStatButton, might need icon/style adjustments
+                icon: FeatherIcons.messageCircle, // Reply
+                text: '', // No text for icon-only buttons in this style
+                color: Colors.grey[500]!,
+                onPressed: () {
+                  // TODO: Implement reply action - focus input field
+                  _showSnackBar('Reply', 'Reply action triggered (main post).', Colors.teal[700]!);
+                },
+              ),
+              _buildStatButton(
+                icon: FeatherIcons.repeat, // Repost
+                text: '',
+                color: Colors.grey[500]!,
+                onPressed: () {
+                  // TODO: Implement repost action
+                   _showSnackBar('Repost', 'Repost action triggered (main post).', Colors.greenAccent);
+                },
+              ),
+              _buildStatButton(
+                icon: FeatherIcons.heart, // Like
+                text: '',
+                color: Colors.grey[500]!, // Default, change if liked
+                onPressed: () {
+                  // TODO: Implement like action
+                  _showSnackBar('Like', 'Like action triggered (main post).', Colors.pinkAccent);
+                },
+              ),
+               _buildStatButton( // X uses a bookmark icon here sometimes, or views icon
+                icon: FeatherIcons.bookmark, // Bookmark as a placeholder for "Views" or other action
+                text: '',
+                color: Colors.grey[500]!,
+                onPressed: () {
+                     _showSnackBar('Bookmark', 'Bookmark action triggered (main post).', Colors.blueAccent);
+                },
+              ),
+              _buildStatButton(
+                icon: FeatherIcons.share2, // Share
+                text: '',
+                color: Colors.grey[500]!,
+                onPressed: () => _sharePost(post),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStatButton({
     required IconData icon,
     required String text,
@@ -1170,30 +1403,27 @@ class _ReplyPageState extends State<ReplyPage> {
 
       if (result['success'] == true && result['reply'] != null) {
         final newReply = result['reply'] as Map<String, dynamic>;
+        // New reply successfully posted and data is available
+        _showSnackBar('Success', result['message'] ?? 'Reply posted!', Colors.teal[700]!);
         setState(() {
-          _replies.insert(0, newReply);
+          _replies.insert(0, newReply); // Add to the top of the list
           _replyController.clear();
           _replyAttachments.clear();
           _parentReplyId = null;
+          // No navigation, stay on the page. User sees their reply.
         });
-        _showSnackBar('Success', result['message'] ?? 'Reply posted!',
-            Colors.teal[700]!);
-        await Future.delayed(const Duration(milliseconds: 700));
-        if (mounted) Navigator.pop(context, true);
       } else if (result['success'] == true && result['reply'] == null) {
-        _showSnackBar('Success', result['message'] ?? 'Reply posted! Refreshing...',
-            Colors.teal[700]!);
-        await _fetchPostReplies();
+        // This case implies success but no immediate reply data, so we refresh.
+        _showSnackBar('Success', result['message'] ?? 'Reply posted! Refreshing replies...', Colors.teal[700]!);
         _replyController.clear();
-        if (mounted) setState(() {
+        if (mounted) setState(() { // Clear attachments and parent ID optimistically
           _replyAttachments.clear();
           _parentReplyId = null;
         });
-        await Future.delayed(const Duration(milliseconds: 500));
-        if (mounted) Navigator.pop(context, true);
+        await _fetchPostReplies(showLoadingIndicator: false); // Refresh replies list
+        // No navigation, stay on page.
       } else {
-        _showSnackBar('Error', result['message'] ?? 'Failed to post reply.',
-            Colors.red[700]!);
+        _showSnackBar('Error', result['message'] ?? 'Failed to post reply.', Colors.red[700]!);
       }
     } catch (e) {
       print('Error in _submitReply: $e');
@@ -1218,59 +1448,27 @@ class _ReplyPageState extends State<ReplyPage> {
             ? widget.post['createdAt']
             : DateTime.now());
 
-    final String? appBarUserAvatar = widget.post['useravatar'] as String?;
-    final String appBarAvatarInitial = widget.post['avatarInitial'] as String? ??
-        (postUsername.isNotEmpty ? postUsername[0].toUpperCase() : '?');
+    // final String? appBarUserAvatar = widget.post['useravatar'] as String?;
+    // final String appBarAvatarInitial = widget.post['avatarInitial'] as String? ??
+    //     (postUsername.isNotEmpty ? postUsername[0].toUpperCase() : '?');
 
     return Scaffold(
       backgroundColor: const Color(0xFF000000),
       appBar: AppBar(
-        title: Row(
-          children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: Colors.tealAccent.withOpacity(0.2),
-              backgroundImage: appBarUserAvatar != null && appBarUserAvatar.isNotEmpty
-                  ? NetworkImage(appBarUserAvatar)
-                  : null,
-              child: appBarUserAvatar == null || appBarUserAvatar.isEmpty
-                  ? Text(appBarAvatarInitial,
-                      style: GoogleFonts.poppins(
-                          color: Colors.tealAccent,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14))
-                  : null,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '@$postUsername',
-                    style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    DateFormat('h:mm a · MMM d, yyyy').format(parsedTimestamp),
-                    style: GoogleFonts.roboto(fontSize: 12, color: Colors.grey[400]),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ],
+        leading: IconButton(
+          icon: const Icon(FeatherIcons.arrowLeft, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
         ),
-        backgroundColor: const Color(0xFF121212),
-        iconTheme: const IconThemeData(color: Colors.white),
+        title: Text(
+          'Post', // X/Twitter uses "Post" as title
+          style: GoogleFonts.poppins(
+              color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
+        ),
+        backgroundColor: const Color(0xFF000000), // Twitter-like black background
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.more_vert, color: Colors.white),
+            icon: const Icon(FeatherIcons.moreVertical, color: Colors.white), // Using Feather icon for consistency
             onPressed: _showActionsBottomSheet,
             tooltip: 'More Actions',
           ),
@@ -1280,118 +1478,110 @@ class _ReplyPageState extends State<ReplyPage> {
         children: [
           Expanded(
             child: SingleChildScrollView(
-              padding:
-                  const EdgeInsets.only(top: 16.0, bottom: 16.0, left: 8.0, right: 8.0),
+              padding: const EdgeInsets.all(0), // Will be handled by items
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    decoration: BoxDecoration(
-                        border: Border(bottom: BorderSide(color: Colors.grey[800]!))),
-                    child: _buildPostContent(widget.post, isReply: false),
-                  ),
-                  const SizedBox(height: 20),
+                  // Main Post Display Area
+                  _buildTweetStylePostItem(_mainPostData, isMainPost: true),
+                  // The Divider after the main post is good.
+
+                  // Reply Input Area - Placed here, before the list of replies.
+                  // It will only be shown if _showReplyField is true, which is handled by its own build method.
+                  // No explicit if needed here, as _buildReplyInputArea handles its visibility.
+                  // The _buildReplyInputArea itself returns a Container or SizedBox.shrink.
+                  // However, to ensure it's part of the scrollable content and correctly positioned:
+                  // We ensure _buildReplyInputArea is called within the SingleChildScrollView's Column.
+                  // The visibility of the input area is controlled by the _showReplyField state variable
+                  // and the _buildReplyInputArea returns an empty SizedBox if not shown.
+                  // For clarity in structure, it's better to conditionally add it or ensure it returns SizedBox.shrink().
+                  // The current _buildReplyInputArea is outside the SingleChildScrollView, which is not ideal.
+                  // Let's move its call or a wrapper into the SingleChildScrollView.
+
+                  // The reply input should be sticky at the bottom if not part of scroll.
+                  // For X style, the reply input for the *main post* is typically part of the scrollable content, below the post.
+                  // Let's ensure _buildReplyInputArea is called *within* the SingleChildScrollView's main Column.
+                  // The if (_showReplyField) _buildReplyInputArea() is at the very bottom of the outer Column,
+                  // which makes it sticky. This is fine for a reply bar.
+                  // For X, the "Post your reply" is often more integrated.
+                  // Let's move it into the scroll view for now.
+
+                  const Divider(color: Color(0xFF2F3336), height: 1), // Divider after main post
+                  // Reply input area will be built by _buildReplyInputArea() if _showReplyField is true.
+                  // We can call it here.
+                  if (_showReplyField) _buildReplyInputArea(), // This will be styled to fit in.
+                                                               // Add a divider if it's shown.
+                  if (_showReplyField) const Divider(color: Color(0xFF2F3336), height: 1),
+
+
+                  // Replies List
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                    padding: const EdgeInsets.only(top: 0.0), // No top padding for the list itself
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            _isLoadingReplies && _fetchRepliesError == null
-                                ? Row(
-                                    children: [
-                                      Text("Reloading Replies...",
-                                          style: GoogleFonts.poppins(
-                                              fontSize: 16, color: Colors.grey[400])),
-                                      const SizedBox(width: 8),
-                                      const SizedBox(
-                                          width: 16,
-                                          height: 16,
-                                          child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              valueColor:
-                                                  AlwaysStoppedAnimation<Color>(
-                                                      Colors.tealAccent))),
-                                    ],
-                                  )
-                                : Text("Replies",
-                                    style: GoogleFonts.poppins(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.white)),
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.refresh, color: Colors.tealAccent),
-                                  tooltip: "Refresh Replies",
-                                  onPressed: () =>
-                                      _fetchPostReplies(showLoadingIndicator: true),
-                                ),
-                                IconButton(
-                                  icon: Icon(
-                                      _showReplyField
-                                          ? FeatherIcons.messageCircle
-                                          : FeatherIcons.edit3,
-                                      color: Colors.tealAccent),
-                                  tooltip: _showReplyField
-                                      ? "Hide Reply Field"
-                                      : "Show Reply Field",
-                                  onPressed: () {
-                                    setState(() {
-                                      _showReplyField = !_showReplyField;
-                                      if (!_showReplyField) _parentReplyId = null;
-                                    });
-                                  },
-                                ),
-                              ],
-                            ),
-                          ],
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text("Replies",
+                                  style: GoogleFonts.poppins(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white)),
+                              IconButton(
+                                icon: const Icon(Icons.refresh, color: Colors.tealAccent, size: 22),
+                                tooltip: "Refresh Replies",
+                                onPressed: () =>
+                                    _fetchPostReplies(showLoadingIndicator: true),
+                              ),
+                            ],
+                          ),
                         ),
-                        const SizedBox(height: 8),
-                        _isLoadingReplies && _fetchRepliesError == null
-                            ? const Center(
-                                child: Padding(
-                                    padding: EdgeInsets.symmetric(vertical: 20.0),
-                                    child: CircularProgressIndicator(
-                                        color: Colors.tealAccent)))
-                            : _fetchRepliesError != null
-                                ? Center(
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 20.0),
-                                      child: Text(
-                                        "Couldn't load replies. Tap refresh to try again.",
-                                        style: GoogleFonts.roboto(
-                                            color: Colors.redAccent, fontSize: 14),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ),
-                                  )
-                                : _replies.isEmpty
-                                    ? Center(
-                                        child: Padding(
-                                          padding:
-                                              const EdgeInsets.symmetric(vertical: 20.0),
-                                          child: Text(
-                                            "No replies yet.",
-                                            style: GoogleFonts.roboto(
-                                                color: Colors.grey[500], fontSize: 14),
-                                          ),
-                                        ),
-                                      )
-                                    : ListView.builder(
-                                        shrinkWrap: true,
-                                        physics: const NeverScrollableScrollPhysics(),
-                                        itemCount: _replies.length,
-                                        itemBuilder: (context, index) {
-                                          final reply = _replies[index];
-                                          return Padding(
-                                              padding:
-                                                  const EdgeInsets.symmetric(vertical: 8.0),
-                                              child: _buildPostContent(reply, isReply: true));
-                                        },
-                                      ),
+                        if (_isLoadingReplies && _fetchRepliesError == null)
+                          const Center(
+                              child: Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 20.0),
+                                  child: CircularProgressIndicator(
+                                      color: Colors.tealAccent)))
+                        else if (_fetchRepliesError != null)
+                          Center(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 20.0, horizontal: 16.0),
+                                child: Text(
+                                  "Couldn't load replies. Tap refresh to try again.",
+                                  style: GoogleFonts.roboto(
+                                      color: Colors.redAccent, fontSize: 14),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            )
+                        else if (_replies.isEmpty)
+                          Center(
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 20.0, horizontal: 16.0),
+                                child: Text(
+                                  "No replies yet. Be the first to reply!",
+                                  style: GoogleFonts.roboto(
+                                      color: Colors.grey[500], fontSize: 14),
+                                ),
+                              ),
+                            )
+                        else
+                          ListView.separated(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: _replies.length,
+                            itemBuilder: (context, index) {
+                              final reply = _replies[index];
+                              bool isLast = index == _replies.length - 1;
+                              return _buildTweetStylePostItem(reply, isMainPost: false, isLastReply: isLast);
+                            },
+                            separatorBuilder: (context, index) =>
+                              const Divider(color: Color(0xFF2F3336), height: 1, indent: 58, endIndent: 16), // Adjusted indent
+                          ),
                       ],
                     ),
                   ),
@@ -1399,25 +1589,98 @@ class _ReplyPageState extends State<ReplyPage> {
               ),
             ),
           ),
-          if (_showReplyField) _buildReplyInputArea(),
+          // The call to _buildReplyInputArea() is now inside the SingleChildScrollView's Column,
+          // so the sticky bottom bar implementation is removed from here.
         ],
       ),
     );
   }
 
   Widget _buildReplyInputArea() {
+    if (!_showReplyField) {
+      return const SizedBox.shrink(); // Don't show anything if not active
+    }
+
+    final currentUserData = _dataController.user.value['user'] as Map<String, dynamic>?;
+    final String? currentUserAvatar = currentUserData?['avatar'] as String?;
+    final String currentUserInitial = currentUserData?['username'] != null && (currentUserData!['username'] as String).isNotEmpty
+        ? (currentUserData['username'] as String)[0].toUpperCase()
+        : '?';
+
+    String hintText = "Post your reply...";
+    if (_parentReplyId != null) {
+      final parentReplyUser = _replies.firstWhere((r) => r['_id'] == _parentReplyId, orElse: () => {});
+      if (parentReplyUser.isNotEmpty && parentReplyUser['username'] != null) {
+        hintText = "Reply to @${parentReplyUser['username']}...";
+      } else {
+         // Fallback if parent reply user not found in _replies (e.g. replying to main post, which isn't in _replies)
+         // Or if replying to a reply that's somehow not in the loaded list.
+         // A more robust way would be to pass the parent post/reply object or username directly.
+         // For now, let's check if we are replying to the main post.
+         if (widget.post['_id'] == _parentReplyId) { // This check is flawed as _parentReplyId is for replies, not main post.
+            hintText = "Reply to @${widget.post['username']}...";
+         } else {
+           hintText = "Reply to selected message..."; // Generic fallback
+         }
+      }
+    }
+
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        border: Border(top: BorderSide(color: Colors.grey[800]!)),
-      ),
+      padding: const EdgeInsets.all(12.0), // Use symmetric padding for X-like feel
+      // No border here, it's part of the feed items with dividers around it.
+      // Background color should match the page background or be slightly different if desired for emphasis.
+      // Using Colors.transparent to blend with the page's black background.
+      color: Colors.transparent,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start, // Align avatar with top of text field
+            children: [
+              CircleAvatar(
+                radius: 18, // Slightly smaller avatar for reply input
+                backgroundColor: Colors.tealAccent.withOpacity(0.2),
+                backgroundImage: currentUserAvatar != null && currentUserAvatar.isNotEmpty
+                    ? NetworkImage(currentUserAvatar)
+                    : null,
+                child: currentUserAvatar == null || currentUserAvatar.isEmpty
+                    ? Text(currentUserInitial,
+                        style: GoogleFonts.poppins(
+                            color: Colors.tealAccent,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16))
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: _replyController,
+                  focusNode: _replyFocusNode, // Assign the FocusNode
+                  style: GoogleFonts.roboto(color: Colors.white, fontSize: 16), // Slightly larger font
+                  decoration: InputDecoration(
+                    hintText: hintText,
+                    hintStyle: GoogleFonts.roboto(color: Colors.grey[600], fontSize: 16), // Adjusted hint color
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 4.0), // Adjust for alignment
+                  ),
+                  keyboardType: TextInputType.multiline,
+                  minLines: 1,
+                  maxLines: 7, // Increased max lines
+                  maxLength: 280,
+                  buildCounter: (BuildContext context,
+                          {int? currentLength,
+                          int? maxLength,
+                          bool? isFocused}) =>
+                      null, // No counter like X
+                ),
+              ),
+            ],
+          ),
           if (_replyAttachments.isNotEmpty) ...[
+            const SizedBox(height: 10),
             SizedBox(
-              height: 60,
+              height: 70, // Increased height for attachment previews
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 children: _replyAttachments.map((attachment) {
@@ -1425,22 +1688,22 @@ class _ReplyPageState extends State<ReplyPage> {
                     padding: const EdgeInsets.only(right: 8.0),
                     child: Chip(
                       avatar: attachment['type'] == 'image'
-                          ? const Icon(FeatherIcons.image, size: 16)
+                          ? const Icon(FeatherIcons.image, size: 18, color: Colors.white70)
                           : attachment['type'] == 'video'
-                              ? const Icon(FeatherIcons.video, size: 16)
+                              ? const Icon(FeatherIcons.video, size: 18, color: Colors.white70)
                               : attachment['type'] == 'audio'
-                                  ? const Icon(FeatherIcons.music, size: 16)
-                                  : const Icon(FeatherIcons.file, size: 16),
+                                  ? const Icon(FeatherIcons.music, size: 18, color: Colors.white70)
+                                  : const Icon(FeatherIcons.file, size: 18, color: Colors.white70),
                       label: Text(
                         (attachment['filename'] ??
                             (attachment['file']?.path.split('/').last ??
                                 'Preview')),
-                        style: GoogleFonts.roboto(color: Colors.white, fontSize: 10),
+                        style: GoogleFonts.roboto(color: Colors.white, fontSize: 12),
                         overflow: TextOverflow.ellipsis,
                       ),
-                      backgroundColor: Colors.grey[700],
-                      deleteIcon: const Icon(FeatherIcons.x,
-                          size: 14, color: Colors.white70),
+                      backgroundColor: Colors.grey[800], // Darker background for chips
+                      deleteIcon: const Icon(FeatherIcons.xCircle, // Clearer delete icon
+                          size: 18, color: Colors.white70),
                       onDeleted: () {
                         setState(() {
                           _replyAttachments.remove(attachment);
@@ -1451,10 +1714,10 @@ class _ReplyPageState extends State<ReplyPage> {
                 }).toList(),
               ),
             ),
-            const SizedBox(height: 8),
           ],
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          const SizedBox(height: 8),
+          Row( // Actions: Attach & Send
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               IconButton(
                 icon: const Icon(FeatherIcons.paperclip,
@@ -1462,46 +1725,28 @@ class _ReplyPageState extends State<ReplyPage> {
                 onPressed: _showAttachmentPicker,
                 tooltip: 'Add Media',
               ),
-              Expanded(
-                child: TextField(
-                  controller: _replyController,
-                  style: GoogleFonts.roboto(color: Colors.white, fontSize: 15),
-                  decoration: InputDecoration(
-                    hintText: _parentReplyId != null
-                        ? "Reply to @${_replies.firstWhere((r) => r['_id'] == _parentReplyId, orElse: () => {'username': 'user'})['username']}..."
-                        : "Post your reply...",
-                    hintStyle: GoogleFonts.roboto(color: Colors.grey[500]),
-                    border: InputBorder.none,
-                    contentPadding:
-                        const EdgeInsets.symmetric(vertical: 10.0, horizontal: 0),
-                  ),
-                  keyboardType: TextInputType.multiline,
-                  minLines: 1,
-                  maxLines: 5,
-                  maxLength: 280,
-                  buildCounter: (BuildContext context,
-                          {int? currentLength,
-                          int? maxLength,
-                          bool? isFocused}) =>
-                      null,
-                ),
-              ),
               _isSubmittingReply
                   ? const Padding(
-                      padding: EdgeInsets.all(12.0),
+                      padding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0), // Consistent padding
                       child: SizedBox(
                         height: 24,
                         width: 24,
                         child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.tealAccent),
+                            strokeWidth: 2.5, color: Colors.tealAccent), // Slightly thicker stroke
                       ),
                     )
-                  : IconButton(
-                      icon: const Icon(FeatherIcons.send,
-                          color: Colors.tealAccent, size: 22),
+                  : TextButton( // X uses a button for "Reply" or "Post"
                       onPressed: _submitReply,
-                      tooltip: 'Post Reply',
-                    ),
+                      style: TextButton.styleFrom(
+                        backgroundColor: Colors.tealAccent,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
+                      ),
+                      child: Text(
+                        'Reply',
+                         style: GoogleFonts.poppins(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 15),
+                      ),
+                    )
             ],
           ),
         ],
