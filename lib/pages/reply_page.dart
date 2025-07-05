@@ -409,12 +409,12 @@ class _ReplyPageState extends State<ReplyPage> {
   }
 
 
-  return Padding(
-    padding: postItemPadding,
-      : const EdgeInsets.only(right: 4.0);
+  // return Padding(
+  //   padding: postItemPadding, // This was the duplicated line
+  //     : const EdgeInsets.only(right: 4.0);
 
   return Padding(
-    padding: postItemPadding,
+    padding: postItemPadding, // Corrected: This is the single, correct Padding widget call
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
