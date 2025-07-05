@@ -444,119 +444,110 @@ class _ReplyPageState extends State<ReplyPage> {
   //     : const EdgeInsets.only(right: 4.0);
 
   return Padding(
-    padding: postItemPadding, // Corrected: This is the single, correct Padding widget call
+    padding: postItemPadding,
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row( // This is the top-level Row for a post/reply item: Avatar + Main Content Column
+        // Row for Avatar and Main Content Block (User Info, Content, Attachments)
+        Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // TODO: Consider if CircleAvatar should be outside the Expanded for consistent left alignment,
-            // or if the current structure (where content and actions are indented relative to it) is preferred.
-            // For now, keeping it as part of the main content block.
+            // Avatar
+            Padding(
+              padding: EdgeInsets.only(top: 8.0, right: 12.0, left: isReply ? 0 : 8.0), // No extra left padding for replies as postItemPadding handles it
+              child: CircleAvatar(
+                radius: isReply ? 14 : 18,
+                backgroundColor: Colors.tealAccent.withOpacity(0.2),
+                backgroundImage: userAvatar != null && userAvatar.isNotEmpty ? NetworkImage(userAvatar) : null,
+                child: userAvatar == null || userAvatar.isEmpty
+                    ? Text(
+                        avatarInitial,
+                        style: GoogleFonts.poppins(
+                          color: Colors.tealAccent,
+                          fontWeight: FontWeight.w600,
+                          fontSize: isReply ? 12 : 14,
+                        ),
+                      )
+                    : null,
+              ),
+            ),
+            // Expanded for User Info, Content, Attachments - this whole block is tappable for replies
             Expanded(
-              child: Column( // Main column for the item: User/Content Details + Action Buttons
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // User Info + Tappable Content Area
-                  Row( // Row for Avatar and the rest of the content (user info, text, attachments)
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                       Padding( // Padding for the avatar
-                         padding: const EdgeInsets.only(top: 8.0, right: 12.0, left:8.0), // Adjust left padding if avatar is here
-                         child: CircleAvatar(
-                           radius: isReply ? 14 : 18,
-                           backgroundColor: Colors.tealAccent.withOpacity(0.2),
-                           backgroundImage: userAvatar != null && userAvatar.isNotEmpty ? NetworkImage(userAvatar) : null,
-                           child: userAvatar == null || userAvatar.isEmpty
-                               ? Text(
-                                   avatarInitial,
-                                   style: GoogleFonts.poppins(
-                                     color: Colors.tealAccent,
-                                     fontWeight: FontWeight.w600,
-                                     fontSize: isReply ? 12 : 14,
-                                   ),
-                                 )
-                               : null,
-                         ),
-                       ),
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: isReply ? () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => ReplyPage(
-                                  post: postData,
-                                  originalPostId: threadOriginalPostId,
-                                ),
-                              ),
-                            );
-                          } : null,
-                          child: Column( // Column for username/timestamp row, content text, and attachments
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row( // Username, timestamp, views
-                                children: [
-                                  Text(
-                                    '@$username',
-                                    style: GoogleFonts.poppins(
-                                      color: Colors.white,
-                                      fontSize: isReply ? 14 : 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      '${DateFormat('h:mm a').format(timestamp)} · ${DateFormat('MMM d, yyyy').format(timestamp)} · $viewsCount views',
-                                      style: GoogleFonts.roboto(
-                                        fontSize: isReply ? 11 : 12,
-                                        color: Colors.grey[400],
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-                              Text( // Content text
-                                content,
-                                style: GoogleFonts.roboto(
-                                  fontSize: isReply ? 13 : 14,
-                                  color: const Color.fromARGB(255, 255, 255, 255),
-                                  height: 1.5,
-                                ),
-                              ),
-                              if (correctlyTypedAttachments.isNotEmpty) ...[
-                                const SizedBox(height: 8),
-                                _buildReplyAttachmentGrid( // Attachments grid
-                                  correctlyTypedAttachments,
-                                  postData,
-                                  username,
-                                  userAvatar,
-                                  timestamp,
-                                  viewsCount,
-                                  likesCount,
-                                  repostsCount,
-                                  content,
-                                ),
-                              ],
-                            ],
+                  GestureDetector(
+                    onTap: isReply ? () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ReplyPage(
+                            post: postData,
+                            originalPostId: threadOriginalPostId,
                           ),
                         ),
-                      ),
-                    ],
+                      );
+                    } : null,
+                    child: Column( // Inner column for text content and attachments
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row( // Username, timestamp, views
+                          children: [
+                            Text(
+                              '@$username',
+                              style: GoogleFonts.poppins(
+                                color: Colors.white,
+                                fontSize: isReply ? 14 : 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '${DateFormat('h:mm a').format(timestamp)} · ${DateFormat('MMM d, yyyy').format(timestamp)} · $viewsCount views',
+                                style: GoogleFonts.roboto(
+                                  fontSize: isReply ? 11 : 12,
+                                  color: Colors.grey[400],
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text( // Content text
+                          content,
+                          style: GoogleFonts.roboto(
+                            fontSize: isReply ? 13 : 14,
+                            color: const Color.fromARGB(255, 255, 255, 255),
+                            height: 1.5,
+                          ),
+                        ),
+                        if (correctlyTypedAttachments.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          _buildReplyAttachmentGrid( // Attachments grid
+                            correctlyTypedAttachments,
+                            postData,
+                            username,
+                            userAvatar,
+                            timestamp,
+                            viewsCount,
+                            likesCount,
+                            repostsCount,
+                            content,
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 8), // Space before action buttons
-                  // Action Buttons Row
+                  // Action Buttons Row - Positioned relative to the content above it
                   Padding(
-                    // Adjust left padding to align with content (after avatar)
-                    padding: EdgeInsets.only(left: (isReply ? 14 : 18) * 2 + 12 + 8.0),
+                    padding: const EdgeInsets.only(left: 0), // No extra left padding here, alignment is handled by parent Row's avatar
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                         _buildStatButton(
+                        _buildStatButton(
                           icon: FeatherIcons.messageCircle,
                           text: '$repliesCount',
                           color: Colors.tealAccent,
@@ -581,16 +572,14 @@ class _ReplyPageState extends State<ReplyPage> {
                                 setState(() {
                                   int replyIndex = _replies.indexWhere((r) => r['_id'] == currentEntryId);
                                   if (replyIndex != -1) {
-                                    var originalReply = _replies[replyIndex];
+                                    var originalReply = Map<String,dynamic>.from(_replies[replyIndex]); // Ensure mutable
                                     var newRepostsList = List<dynamic>.from(originalReply['reposts'] ?? []);
                                     if (!newRepostsList.contains(currentUserId)) {
                                        newRepostsList.add(currentUserId);
                                     }
-                                    _replies[replyIndex] = {
-                                      ...originalReply,
-                                      'reposts': newRepostsList,
-                                      'repostsCount': newRepostsList.length
-                                    };
+                                    originalReply['reposts'] = newRepostsList;
+                                    originalReply['repostsCount'] = newRepostsList.length;
+                                    _replies[replyIndex] = originalReply;
                                   }
                                 });
                               } else {
@@ -616,14 +605,12 @@ class _ReplyPageState extends State<ReplyPage> {
                                   setState(() {
                                     int replyIndex = _replies.indexWhere((r) => r['_id'] == currentEntryId);
                                     if (replyIndex != -1) {
-                                      var originalReply = _replies[replyIndex];
+                                      var originalReply = Map<String,dynamic>.from(_replies[replyIndex]); // Ensure mutable
                                       var newLikesList = List<dynamic>.from(originalReply['likes'] ?? []);
                                       newLikesList.removeWhere((id) => (id is Map ? id['_id'] == currentUserId : id.toString() == currentUserId));
-                                      _replies[replyIndex] = {
-                                        ...originalReply,
-                                        'likes': newLikesList,
-                                        'likesCount': newLikesList.length
-                                      };
+                                      originalReply['likes'] = newLikesList;
+                                      originalReply['likesCount'] = newLikesList.length;
+                                     _replies[replyIndex] = originalReply;
                                     }
                                   });
                                 } else {
@@ -636,16 +623,14 @@ class _ReplyPageState extends State<ReplyPage> {
                                    setState(() {
                                     int replyIndex = _replies.indexWhere((r) => r['_id'] == currentEntryId);
                                     if (replyIndex != -1) {
-                                      var originalReply = _replies[replyIndex];
+                                      var originalReply = Map<String,dynamic>.from(_replies[replyIndex]); // Ensure mutable
                                       var newLikesList = List<dynamic>.from(originalReply['likes'] ?? []);
                                       if (!newLikesList.any((like) => (like is Map ? like['_id'] == currentUserId : like.toString() == currentUserId))) {
                                         newLikesList.add(currentUserId);
                                       }
-                                      _replies[replyIndex] = {
-                                        ...originalReply,
-                                        'likes': newLikesList,
-                                        'likesCount': newLikesList.length,
-                                      };
+                                      originalReply['likes'] = newLikesList;
+                                      originalReply['likesCount'] = newLikesList.length;
+                                      _replies[replyIndex] = originalReply;
                                     }
                                   });
                                 } else {
