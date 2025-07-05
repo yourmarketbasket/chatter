@@ -378,31 +378,80 @@ class _ReplyPageState extends State<ReplyPage> {
         if (mounted) setState(() { _isSubmittingReply = false; });
         return;
       }
-      final postId = widget.post['_id'] as String?;
-      if (postId == null) {
-        _showSnackBar('Error', 'Cannot post reply: Original post ID is missing.', Colors.red[700]!);
+      final currentItemPostId = widget.post['_id'] as String?; // ID of the item this page is currently focused on
+      if (currentItemPostId == null) {
+        _showSnackBar('Error', 'Cannot post reply: Current item ID is missing.', Colors.red[700]!);
         if (mounted) setState(() { _isSubmittingReply = false; });
         return;
       }
 
+      // Determine the true original post ID of the thread.
+      // If widget.originalPostId is set, this ReplyPage is for a reply, so that's the root.
+      // Otherwise, this ReplyPage is for an original post, so widget.post['_id'] is the root.
+      final String threadOriginalPostId = widget.originalPostId ?? currentItemPostId;
+
       Map<String, dynamic> result;
-      // Determine if it's a reply to the main post or a reply to another reply
-      if (_parentReplyId != null && _parentReplyId != postId) { // Replying to a reply
+      // Determine if it's a reply to the main item of this page or a reply to another reply listed on this page
+      if (_parentReplyId != null && _parentReplyId != currentItemPostId) { // Replying to a listed reply
         final replyToReplyData = {
-          'postId': postId, // This is the ID of the original root post
-          'parentReplyId': _parentReplyId, // This is the ID of the reply we are replying to
+          // This 'postId' for the backend API call must be the ultimate original post ID of the thread.
+          'postId': threadOriginalPostId,
+          'parentReplyId': _parentReplyId, // This is the ID of the reply we are directly replying to
           'content': _replyController.text.trim(),
           'attachments': uploadedReplyAttachments,
         };
         result = await _dataController.replyToReply(replyToReplyData);
-      } else { // Replying to the main post
+      } else { // Replying to the main item displayed on this ReplyPage
         final replyToPostData = {
-          'postId': postId, // ID of the main post
-          // 'parentReplyId' is not included or is null
+          // If replying to the main item of the page:
+          // - If this page is for an original post (widget.originalPostId == null), then currentItemPostId is the original post's ID.
+          // - If this page is for a reply (widget.originalPostId != null), then currentItemPostId is that reply's ID,
+          //   and threadOriginalPostId is the original post's ID.
+          // The backend's replyToPost expects 'postId' to be the ID of the item being directly replied to.
+          // If that item is itself a reply, the backend might handle nesting it under the originalPostId.
+          // Let's assume replyToPost is for replying to a root post,
+          // and replyToReply is for replying to a reply (which needs originalPostId and parentReplyId).
+
+          // If _parentReplyId is null OR _parentReplyId is the same as currentItemPostId,
+          // it means we are replying to the main item this page is about.
+          // If this main item is an original post:
+          'postId': currentItemPostId, // The ID of the item we are directly replying to on this page.
+                                      // If this item is an original post, this is fine.
+                                      // If this item is a reply (i.e., widget.originalPostId != null),
+                                      // then this call should technically be a replyToReply.
+                                      // The existing logic for setting _parentReplyId might simplify this:
+                                      // - onReplyToItem for the main post sets _parentReplyId = mainPostId
+                                      // - onReplyToItem for a listed reply sets _parentReplyId = replyId
+                                      // So, if _parentReplyId == currentItemPostId, we're replying to the main item.
+
+          // Correct logic:
+          // If _parentReplyId is set and is *not* the currentItemPostId, it's a reply to a listed reply (handled above).
+          // Otherwise, we're replying to the main item of the page (currentItemPostId).
+          // If this currentItemPostId is actually a reply (i.e., widget.originalPostId is not null),
+          // then we should use the replyToReply endpoint.
           'content': _replyController.text.trim(),
           'attachments': uploadedReplyAttachments,
         };
-        result = await _dataController.replyToPost(replyToPostData);
+
+        if (widget.originalPostId != null) { // The main item of this page is already a reply
+          // We are replying to widget.post (which is a reply). So use replyToReply.
+          // _parentReplyId would be currentItemPostId in this case if "reply" on main post was hit.
+          final actualParentReplyId = _parentReplyId ?? currentItemPostId;
+          result = await _dataController.replyToReply({
+            'postId': threadOriginalPostId, // Ultimate root post
+            'parentReplyId': actualParentReplyId, // The reply we are replying to
+            'content': _replyController.text.trim(),
+            'attachments': uploadedReplyAttachments,
+          });
+        } else { // The main item of this page is an original post.
+          // We are replying to widget.post (which is an original post). So use replyToPost.
+          // _parentReplyId would be currentItemPostId here.
+          result = await _dataController.replyToPost({
+            'postId': currentItemPostId, // The original post we are replying to
+            'content': _replyController.text.trim(),
+            'attachments': uploadedReplyAttachments,
+          });
+        }
       }
 
       if (!mounted) return;

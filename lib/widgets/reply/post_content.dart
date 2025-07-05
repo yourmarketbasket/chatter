@@ -257,6 +257,16 @@ class _PostContentState extends State<PostContent> {
                               // widget.showSnackBar('Reply', 'Replying to @$username...', Colors.teal[700]!);
                             },
                           ),
+                          StatButton( // Views button
+                            icon: FeatherIcons.eye,
+                            text: '$viewsCount',
+                            color: Colors.white70, // Or another distinct color
+                            onPressed: () {
+                              // Typically, views are just for display, no action on tap.
+                              // If an action is needed (e.g., show list of viewers), implement here.
+                              print("Views button tapped for post/reply $currentEntryId - $viewsCount views");
+                            },
+                          ),
                           StatButton(
                             icon: FeatherIcons.repeat,
                             text: '$repostsCount',
