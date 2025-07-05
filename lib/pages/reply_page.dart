@@ -360,9 +360,15 @@ class _ReplyPageState extends State<ReplyPage> {
   // If it's showing a top-level post, widget.originalPostId will be null.
   // `postId` should refer to the ID of the item being currently processed by _buildPostContent (postData['_id'])
   // `threadOriginalPostId` is the ID of the ultimate root post of the entire thread.
-  final String threadOriginalPostId = widget.originalPostId ?? widget.post['_id'] as String;
   final String currentEntryId = postData['_id'] as String; // ID of the current post or reply item being built
   final String username = postData['username'] as String? ?? 'Unknown User';
+  // Determine the ultimate root post ID for API calls, regardless of current nesting level
+  final String rootPostId = widget.originalPostId ?? (isReply ? (postData['originalPostId'] ?? widget.post['_id']) : widget.post['_id']) as String;
+  // ^ If widget.originalPostId is set, use it. Else, if it's a reply, try to get its originalPostId,
+  //   fallback to the current page's main post ID. If not a reply, it's the current page's main post ID.
+  // This logic for `rootPostId` might need refinement based on exactly how `originalPostId` is stored/passed for replies.
+  // For now, simplifying to what was used for actions:
+  final String threadOriginalPostId = widget.originalPostId ?? widget.post['_id'] as String;
 
   // Decode content if it's in buffer format
   String content = postData['content'] as String? ?? '';
@@ -442,255 +448,250 @@ class _ReplyPageState extends State<ReplyPage> {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
+        Row( // This is the top-level Row for a post/reply item: Avatar + Main Content Column
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            
+            // TODO: Consider if CircleAvatar should be outside the Expanded for consistent left alignment,
+            // or if the current structure (where content and actions are indented relative to it) is preferred.
+            // For now, keeping it as part of the main content block.
             Expanded(
-              child: GestureDetector( // Make the content area tappable for replies
-                onTap: isReply ? () {
-                  // Navigate to a new ReplyPage for this reply
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => ReplyPage(
-                        post: postData, // The tapped reply becomes the "main post" for the new page
-                        originalPostId: threadOriginalPostId, // Pass down the original root post ID
-                      ),
-                    ),
-                  );
-                } : null, // Only enable tap for replies
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Row: Username, Time/Date, Views
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: Row(
-                        children: [
-                          Row(
-                            children: [
-                              // User Avatar
-                              CircleAvatar(
-                                radius: isReply ? 14 : 18,
-                                backgroundColor: Colors.tealAccent.withOpacity(0.2),
-                                backgroundImage: userAvatar != null && userAvatar.isNotEmpty ? NetworkImage(userAvatar) : null,
-                                child: userAvatar == null || userAvatar.isEmpty
-                                    ? Text(
-                                        avatarInitial,
-                                        style: GoogleFonts.poppins(
-                                          color: Colors.tealAccent,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: isReply ? 12 : 14,
-                                        ),
-                                      )
-                                    : null,
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                '@$username',
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white,
-                                  fontSize: isReply ? 14 : 16,
-                                  fontWeight: FontWeight.w600,
+              child: Column( // Main column for the item: User/Content Details + Action Buttons
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // User Info + Tappable Content Area
+                  Row( // Row for Avatar and the rest of the content (user info, text, attachments)
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                       Padding( // Padding for the avatar
+                         padding: const EdgeInsets.only(top: 8.0, right: 12.0, left:8.0), // Adjust left padding if avatar is here
+                         child: CircleAvatar(
+                           radius: isReply ? 14 : 18,
+                           backgroundColor: Colors.tealAccent.withOpacity(0.2),
+                           backgroundImage: userAvatar != null && userAvatar.isNotEmpty ? NetworkImage(userAvatar) : null,
+                           child: userAvatar == null || userAvatar.isEmpty
+                               ? Text(
+                                   avatarInitial,
+                                   style: GoogleFonts.poppins(
+                                     color: Colors.tealAccent,
+                                     fontWeight: FontWeight.w600,
+                                     fontSize: isReply ? 12 : 14,
+                                   ),
+                                 )
+                               : null,
+                         ),
+                       ),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: isReply ? () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ReplyPage(
+                                  post: postData,
+                                  originalPostId: threadOriginalPostId,
                                 ),
                               ),
+                            );
+                          } : null,
+                          child: Column( // Column for username/timestamp row, content text, and attachments
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row( // Username, timestamp, views
+                                children: [
+                                  Text(
+                                    '@$username',
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.white,
+                                      fontSize: isReply ? 14 : 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      '${DateFormat('h:mm a').format(timestamp)} · ${DateFormat('MMM d, yyyy').format(timestamp)} · $viewsCount views',
+                                      style: GoogleFonts.roboto(
+                                        fontSize: isReply ? 11 : 12,
+                                        color: Colors.grey[400],
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Text( // Content text
+                                content,
+                                style: GoogleFonts.roboto(
+                                  fontSize: isReply ? 13 : 14,
+                                  color: const Color.fromARGB(255, 255, 255, 255),
+                                  height: 1.5,
+                                ),
+                              ),
+                              if (correctlyTypedAttachments.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                _buildReplyAttachmentGrid( // Attachments grid
+                                  correctlyTypedAttachments,
+                                  postData,
+                                  username,
+                                  userAvatar,
+                                  timestamp,
+                                  viewsCount,
+                                  likesCount,
+                                  repostsCount,
+                                  content,
+                                ),
+                              ],
                             ],
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              '${DateFormat('h:mm a').format(timestamp)} · ${DateFormat('MMM d, yyyy').format(timestamp)} · $viewsCount views',
-                              style: GoogleFonts.roboto(
-                                fontSize: isReply ? 11 : 12,
-                                color: Colors.grey[400],
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    // Column: Content and Attachments
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.only(left:55),
-                          child: Text(
-                            content,
-                            style: GoogleFonts.roboto(
-                              fontSize: isReply ? 13 : 14,
-                              color: const Color.fromARGB(255, 255, 255, 255),
-                              height: 1.5,
-                            ),
-                          ),
                         ),
-                        if (correctlyTypedAttachments.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          Padding(
-                            padding: const EdgeInsets.only(left:40),
-                            child: _buildReplyAttachmentGrid(
-                              correctlyTypedAttachments,
-                              postData, // Pass postData here
-                              username,
-                              userAvatar,
-                              timestamp,
-                              viewsCount,
-                              likesCount,
-                              repostsCount,
-                              content,
-                            ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8), // Space before action buttons
+                  // Action Buttons Row
+                  Padding(
+                    // Adjust left padding to align with content (after avatar)
+                    padding: EdgeInsets.only(left: (isReply ? 14 : 18) * 2 + 12 + 8.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                         _buildStatButton(
+                          icon: FeatherIcons.messageCircle,
+                          text: '$repliesCount',
+                          color: Colors.tealAccent,
+                          onPressed: () {
+                            setState(() {
+                              _parentReplyId = currentEntryId;
+                              _showReplyField = true;
+                              FocusScope.of(context).requestFocus(_replyFocusNode);
+                            });
+                            _showSnackBar('Reply', 'Replying to @$username...', Colors.teal[700]!);
+                          },
+                        ),
+                        _buildStatButton(
+                          icon: FeatherIcons.repeat,
+                          text: '$repostsCount',
+                          color: Colors.greenAccent,
+                          onPressed: () async {
+                            if (isReply) {
+                              final result = await _dataController.repostReply(threadOriginalPostId, currentEntryId);
+                              if (result['success'] == true) {
+                                _showSnackBar('Success', result['message'] ?? 'Reply reposted!', Colors.green[700]!);
+                                setState(() {
+                                  int replyIndex = _replies.indexWhere((r) => r['_id'] == currentEntryId);
+                                  if (replyIndex != -1) {
+                                    var originalReply = _replies[replyIndex];
+                                    var newRepostsList = List<dynamic>.from(originalReply['reposts'] ?? []);
+                                    if (!newRepostsList.contains(currentUserId)) {
+                                       newRepostsList.add(currentUserId);
+                                    }
+                                    _replies[replyIndex] = {
+                                      ...originalReply,
+                                      'reposts': newRepostsList,
+                                      'repostsCount': newRepostsList.length
+                                    };
+                                  }
+                                });
+                              } else {
+                                _showSnackBar('Error', result['message'] ?? 'Failed to repost reply.', Colors.red[700]!);
+                              }
+                            } else {
+                               _showSnackBar(
+                                'Repost Post',
+                                'Repost post by @$username (original functionality).', Colors.orange);
+                            }
+                          },
+                        ),
+                        _buildStatButton(
+                          icon: isLikedByCurrentUser ? Icons.favorite : FeatherIcons.heart,
+                          text: '$likesCount',
+                          color: isLikedByCurrentUser ? Colors.pinkAccent : Colors.pinkAccent.withOpacity(0.7),
+                          onPressed: () async {
+                            if (isReply) {
+                              if (isLikedByCurrentUser) {
+                                final result = await _dataController.unlikeReply(threadOriginalPostId, currentEntryId);
+                                if (result['success'] == true) {
+                                  _showSnackBar('Success', result['message'] ?? 'Reply unliked!', Colors.grey[700]!);
+                                  setState(() {
+                                    int replyIndex = _replies.indexWhere((r) => r['_id'] == currentEntryId);
+                                    if (replyIndex != -1) {
+                                      var originalReply = _replies[replyIndex];
+                                      var newLikesList = List<dynamic>.from(originalReply['likes'] ?? []);
+                                      newLikesList.removeWhere((id) => (id is Map ? id['_id'] == currentUserId : id.toString() == currentUserId));
+                                      _replies[replyIndex] = {
+                                        ...originalReply,
+                                        'likes': newLikesList,
+                                        'likesCount': newLikesList.length
+                                      };
+                                    }
+                                  });
+                                } else {
+                                  _showSnackBar('Error', result['message'] ?? 'Failed to unlike reply.', Colors.red[700]!);
+                                }
+                              } else {
+                                final result = await _dataController.likeReply(threadOriginalPostId, currentEntryId);
+                                if (result['success'] == true) {
+                                  _showSnackBar('Success', result['message'] ?? 'Reply liked!', Colors.pink[700]!);
+                                   setState(() {
+                                    int replyIndex = _replies.indexWhere((r) => r['_id'] == currentEntryId);
+                                    if (replyIndex != -1) {
+                                      var originalReply = _replies[replyIndex];
+                                      var newLikesList = List<dynamic>.from(originalReply['likes'] ?? []);
+                                      if (!newLikesList.any((like) => (like is Map ? like['_id'] == currentUserId : like.toString() == currentUserId))) {
+                                        newLikesList.add(currentUserId);
+                                      }
+                                      _replies[replyIndex] = {
+                                        ...originalReply,
+                                        'likes': newLikesList,
+                                        'likesCount': newLikesList.length,
+                                      };
+                                    }
+                                  });
+                                } else {
+                                  _showSnackBar('Error', result['message'] ?? 'Failed to like reply.', Colors.red[700]!);
+                                }
+                              }
+                            } else {
+                               _showSnackBar(
+                                'Like Post',
+                                'Like post by @$username (original functionality).', Colors.orange);
+                            }
+                          },
+                        ),
+                        if (!isReply)
+                          _buildStatButton(
+                            icon: FeatherIcons.bookmark,
+                            text: '',
+                            color: Colors.white70,
+                            onPressed: () {
+                              _showSnackBar(
+                                'Bookmark Post',
+                                'Bookmark post by @$username (not implemented yet).',
+                                Colors.teal[700]!,
+                              );
+                            },
                           ),
-                        ],
+                         if (isReply)
+                           const SizedBox(width: 24),
+                        _buildStatButton(
+                          icon: FeatherIcons.share2,
+                          text: '',
+                          color: Colors.white70,
+                          onPressed: () => _sharePost(postData),
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    // Row: Reply, Reposts, Like, Bookmark, Share (Action buttons should be outside GestureDetector if they have their own taps)
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ],
         ),
-        // Action buttons are moved outside the GestureDetector for clarity and to ensure their individual tap targets work.
-        Padding(
-          padding: const EdgeInsets.only(left: 40, top: 0), // Adjust top padding if needed after moving
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // Reply Button
-              _buildStatButton(
-                icon: FeatherIcons.messageCircle,
-                text: '$repliesCount',
-                color: Colors.tealAccent,
-                onPressed: () {
-                  setState(() {
-                    _parentReplyId = currentEntryId;
-                    _showReplyField = true;
-                    FocusScope.of(context).requestFocus(_replyFocusNode);
-                  });
-                  _showSnackBar('Reply', 'Replying to @$username...', Colors.teal[700]!);
-                },
-              ),
-              // Repost Button
-              _buildStatButton(
-                icon: FeatherIcons.repeat,
-                text: '$repostsCount',
-                color: Colors.greenAccent,
-                onPressed: () async {
-                  if (isReply) {
-                    final result = await _dataController.repostReply(threadOriginalPostId, currentEntryId);
-                    if (result['success'] == true) {
-                      _showSnackBar('Success', result['message'] ?? 'Reply reposted!', Colors.green[700]!);
-                      setState(() {
-                        int replyIndex = _replies.indexWhere((r) => r['_id'] == currentEntryId);
-                        if (replyIndex != -1) {
-                          var originalReply = _replies[replyIndex];
-                          var newRepostsList = List<dynamic>.from(originalReply['reposts'] ?? []);
-                          if (!newRepostsList.contains(currentUserId)) {
-                             newRepostsList.add(currentUserId);
-                          }
-                          _replies[replyIndex] = {
-                            ...originalReply,
-                            'reposts': newRepostsList,
-                            'repostsCount': newRepostsList.length
-                          };
-                        }
-                      });
-                    } else {
-                      _showSnackBar('Error', result['message'] ?? 'Failed to repost reply.', Colors.red[700]!);
-                    }
-                  } else {
-                     _showSnackBar(
-                      'Repost Post',
-                      'Repost post by @$username (original functionality).', Colors.orange);
-                  }
-                },
-              ),
-              // Like Button
-              _buildStatButton(
-                icon: isLikedByCurrentUser ? Icons.favorite : FeatherIcons.heart,
-                text: '$likesCount',
-                color: isLikedByCurrentUser ? Colors.pinkAccent : Colors.pinkAccent.withOpacity(0.7),
-                onPressed: () async {
-                  if (isReply) {
-                    if (isLikedByCurrentUser) {
-                      final result = await _dataController.unlikeReply(threadOriginalPostId, currentEntryId);
-                      if (result['success'] == true) {
-                        _showSnackBar('Success', result['message'] ?? 'Reply unliked!', Colors.grey[700]!);
-                        setState(() {
-                          int replyIndex = _replies.indexWhere((r) => r['_id'] == currentEntryId);
-                          if (replyIndex != -1) {
-                            var originalReply = _replies[replyIndex];
-                            var newLikesList = List<dynamic>.from(originalReply['likes'] ?? []);
-                            newLikesList.removeWhere((id) => (id is Map ? id['_id'] == currentUserId : id.toString() == currentUserId));
-                            _replies[replyIndex] = {
-                              ...originalReply,
-                              'likes': newLikesList,
-                              'likesCount': newLikesList.length
-                            };
-                          }
-                        });
-                      } else {
-                        _showSnackBar('Error', result['message'] ?? 'Failed to unlike reply.', Colors.red[700]!);
-                      }
-                    } else {
-                      final result = await _dataController.likeReply(threadOriginalPostId, currentEntryId);
-                      if (result['success'] == true) {
-                        _showSnackBar('Success', result['message'] ?? 'Reply liked!', Colors.pink[700]!);
-                         setState(() {
-                          int replyIndex = _replies.indexWhere((r) => r['_id'] == currentEntryId);
-                          if (replyIndex != -1) {
-                            var originalReply = _replies[replyIndex];
-                            var newLikesList = List<dynamic>.from(originalReply['likes'] ?? []);
-                            if (!newLikesList.any((like) => (like is Map ? like['_id'] == currentUserId : like.toString() == currentUserId))) {
-                              newLikesList.add(currentUserId);
-                            }
-                            _replies[replyIndex] = {
-                              ...originalReply,
-                              'likes': newLikesList,
-                              'likesCount': newLikesList.length,
-                            };
-                          }
-                        });
-                      } else {
-                        _showSnackBar('Error', result['message'] ?? 'Failed to like reply.', Colors.red[700]!);
-                      }
-                    }
-                  } else {
-                     _showSnackBar(
-                      'Like Post',
-                      'Like post by @$username (original functionality).', Colors.orange);
-                  }
-                },
-              ),
-              if (!isReply)
-                _buildStatButton(
-                  icon: FeatherIcons.bookmark,
-                  text: '',
-                  color: Colors.white70,
-                  onPressed: () {
-                    _showSnackBar(
-                      'Bookmark Post',
-                      'Bookmark post by @$username (not implemented yet).',
-                      Colors.teal[700]!,
-                    );
-                  },
-                ),
-               if (isReply)
-                 const SizedBox(width: 24),
-
-              _buildStatButton(
-                icon: FeatherIcons.share2,
-                text: '',
-                color: Colors.white70,
-                onPressed: () => _sharePost(postData),
-              ),
-            ],
-          ),
-        ),
+      ],
+    ),
+  );
+}
       ],
     ),
   );
