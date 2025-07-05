@@ -5,157 +5,128 @@ import 'package:chatter/widgets/video_attachment_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:feather_icons/feather_icons.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:pdfrx/pdfrx.dart'; // Ensure this import is correct based on your project
+import 'package:pdfrx/pdfrx.dart';
 
 class ReplyAttachmentDisplayWidget extends StatelessWidget {
   final Map<String, dynamic> attachmentMap;
-  final int currentIndex; // Renamed from idx to avoid conflict if used in a loop
+  final int currentIndex;
   final List<Map<String, dynamic>> allAttachmentsInThisPost;
   final Map<String, dynamic> postOrReplyData;
   final BorderRadius borderRadius;
 
   const ReplyAttachmentDisplayWidget({
-    Key? key,
+    super.key,
     required this.attachmentMap,
     required this.currentIndex,
     required this.allAttachmentsInThisPost,
     required this.postOrReplyData,
     required this.borderRadius,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
-    final String attachmentType = attachmentMap['type'] as String? ?? 'unknown';
-    final String? displayUrl = attachmentMap['url'] as String?;
-    // final String? thumbnailUrl = attachmentMap['thumbnailUrl'] as String?; // Not used in original code block
-    final String? attachmentFilename = attachmentMap['filename'] as String?;
-    final File? localFile =
-        attachmentMap['file'] is File ? attachmentMap['file'] as File? : null;
+    // Safe type access with defaults
+    final String attachmentType = attachmentMap['type']?.toString() ?? 'unknown';
+    final String? displayUrl = attachmentMap['url']?.toString();
+    final String? attachmentFilename = attachmentMap['filename']?.toString();
+    final File? localFile = attachmentMap['file'] is File ? attachmentMap['file'] as File : null;
 
-    final String messageContent = postOrReplyData['content'] as String? ?? '';
-    final String userName = postOrReplyData['username'] as String? ?? 'Unknown User';
-    final String? userAvatarUrl = postOrReplyData['useravatar'] as String?;
+    // Post or reply metadata
+    final String messageContent = postOrReplyData['content']?.toString() ?? '';
+    final String userName = postOrReplyData['username']?.toString() ?? 'Unknown User';
+    final String? userAvatarUrl = postOrReplyData['useravatar']?.toString();
     final DateTime timestamp = postOrReplyData['createdAt'] is String
-        ? (DateTime.tryParse(postOrReplyData['createdAt'] as String) ?? DateTime.now())
-        : (postOrReplyData['createdAt'] is DateTime
-            ? postOrReplyData['createdAt'] as DateTime // Ensure correct casting
-            : DateTime.now());
+        ? DateTime.tryParse(postOrReplyData['createdAt'] as String) ?? DateTime.now()
+        : postOrReplyData['createdAt'] is DateTime
+            ? postOrReplyData['createdAt'] as DateTime
+            : DateTime.now();
 
-    final int viewsCount =
-        postOrReplyData['viewsCount'] as int? ?? (postOrReplyData['views'] as List?)?.length ?? 0;
-    final int likesCount =
-        postOrReplyData['likesCount'] as int? ?? (postOrReplyData['likes'] as List?)?.length ?? 0;
-    final int repostsCount =
-        postOrReplyData['repostsCount'] as int? ?? (postOrReplyData['reposts'] as List?)?.length ?? 0;
+    final int viewsCount = postOrReplyData['viewsCount'] is int
+        ? postOrReplyData['viewsCount'] as int
+        : (postOrReplyData['views'] as List?)?.length ?? 0;
+    final int likesCount = postOrReplyData['likesCount'] is int
+        ? postOrReplyData['likesCount'] as int
+        : (postOrReplyData['likes'] as List?)?.length ?? 0;
+    final int repostsCount = postOrReplyData['repostsCount'] is int
+        ? postOrReplyData['repostsCount'] as int
+        : (postOrReplyData['reposts'] as List?)?.length ?? 0;
+
+    // Generate unique key for attachment
+    final String attachmentKeySuffix = attachmentMap['_id']?.toString().isNotEmpty == true
+        ? attachmentMap['_id'] as String
+        : attachmentMap['url']?.toString().isNotEmpty == true
+            ? attachmentMap['url'] as String
+            : 'index_$currentIndex';
 
     Widget contentWidget;
 
-    final String attachmentKeySuffix;
-    if (attachmentMap['_id'] != null && (attachmentMap['_id'] as String).isNotEmpty) {
-      attachmentKeySuffix = attachmentMap['_id'] as String;
-    } else if (attachmentMap['url'] != null && (attachmentMap['url'] as String).isNotEmpty) {
-      attachmentKeySuffix = attachmentMap['url'] as String;
-    } else {
-      attachmentKeySuffix = currentIndex.toString();
-      print(
-          "Warning: Reply attachment for post/reply ${postOrReplyData['_id']} at index $currentIndex is using an index-based key suffix. Data: $attachmentMap");
-    }
+    switch (attachmentType) {
+      case 'video':
+        contentWidget = VideoAttachmentWidget(
+          key: Key('video_reply_att_$attachmentKeySuffix'),
+          attachment: attachmentMap,
+          post: postOrReplyData,
+          borderRadius: borderRadius,
+          enforceFeedConstraints: false,
+        );
+        break;
 
-    if (attachmentType == "video") {
-      // Assuming VideoAttachmentWidget is already in lib/widgets/
-      contentWidget = VideoAttachmentWidget(
-        key: Key('video_reply_att_$attachmentKeySuffix'),
-        attachment: attachmentMap,
-        post: postOrReplyData,
-        borderRadius: borderRadius,
-        enforceFeedConstraints: false, // As per original usage
-      );
-    } else if (attachmentType == "image") {
-      if (displayUrl != null && displayUrl.isNotEmpty) {
-        contentWidget = Image.network(
-          displayUrl,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => Container(
-              color: Colors.grey[900],
-              child: const Icon(FeatherIcons.image, color: Colors.grey, size: 40)),
+      case 'image':
+        contentWidget = displayUrl?.isNotEmpty == true
+            ? Image.network(
+                displayUrl!,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => _buildErrorPlaceholder(),
+              )
+            : localFile != null
+                ? Image.file(
+                    localFile,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => _buildErrorPlaceholder(),
+                  )
+                : _buildErrorPlaceholder();
+        break;
+
+      case 'pdf':
+        final uri = displayUrl != null
+            ? Uri.tryParse(displayUrl)
+            : localFile != null
+                ? Uri.file(localFile.path)
+                : null;
+        contentWidget = uri != null
+            ? PdfThumbnailWidget(
+                pdfUri: uri,
+                aspectRatio: 4 / 3,
+              )
+            : _buildErrorPlaceholder();
+        break;
+
+      case 'audio':
+        contentWidget = AudioAttachmentWidget(
+          key: Key('audio_reply_att_$attachmentKeySuffix'),
+          attachment: attachmentMap,
+          post: postOrReplyData,
+          borderRadius: borderRadius,
         );
-      } else if (localFile != null) {
-        contentWidget = Image.file(
-          localFile,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => Container(
-              color: Colors.grey[900],
-              child: const Icon(FeatherIcons.image, color: Colors.grey, size: 40)),
-        );
-      } else {
-        contentWidget = Container(
-            color: Colors.grey[900],
-            child: const Icon(FeatherIcons.alertTriangle, color: Colors.redAccent, size: 40));
-      }
-    } else if (attachmentType == "pdf") {
-      final uri = displayUrl != null
-          ? Uri.tryParse(displayUrl)
-          : (localFile != null ? Uri.file(localFile.path) : null);
-      if (uri != null) {
-        // Using the local PdfThumbnailWidget (helper widget defined below in this file)
-        contentWidget = PdfThumbnailWidget(
-          pdfUrl: uri.toString(),
-          // The onTap for MediaViewPage navigation is handled by the parent GestureDetector
-          // that wraps this contentWidget. So, PdfThumbnailWidget's onTap is not used here for that.
-          // If PdfThumbnailWidget itself had interactive elements, its own onTap would handle those.
-          // For simple display and then navigating on tap, the current structure is fine.
-          // No specific onTap needed here for PdfThumbnailWidget as the outer GestureDetector handles it.
-          onTap: () {
-            // This onTap is required by PdfThumbnailWidget's constructor.
-            // Since the parent GestureDetector handles navigation, this can be an empty function
-            // or log something if needed for debugging direct interaction with the PDF thumbnail itself.
-            // print("PdfThumbnailWidget (inner) tapped - display only, navigation by parent");
-          },
-        );
-      } else {
-        contentWidget = Container(
-            color: Colors.grey[900],
-            child: const Icon(FeatherIcons.alertTriangle, color: Colors.redAccent, size: 40));
-      }
-    } else if (attachmentType == "audio") {
-      // Assuming AudioAttachmentWidget is already in lib/widgets/
-      contentWidget = AudioAttachmentWidget(
-        key: Key('audio_reply_att_$attachmentKeySuffix'),
-        attachment: attachmentMap,
-        post: postOrReplyData,
-        borderRadius: borderRadius,
-      );
-    } else {
-      contentWidget = Container(
-        color: Colors.grey[900],
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(FeatherIcons.film, color: Colors.tealAccent, size: 40), // Default icon
-            const SizedBox(height: 8),
-            Text(
-                attachmentFilename ?? (displayUrl ?? 'unknown').split('/').last,
-                style: GoogleFonts.roboto(color: Colors.white70, fontSize: 12),
-                textAlign: TextAlign.center,
-                overflow: TextOverflow.ellipsis),
-          ],
-        ),
-      );
+        break;
+
+      default:
+        contentWidget = _buildDefaultPlaceholder(attachmentFilename, displayUrl);
+        break;
     }
 
     return GestureDetector(
       onTap: () {
-        int initialIndex = allAttachmentsInThisPost.indexWhere((att) =>
-            (att['url'] != null && att['url'] == attachmentMap['url']) ||
-            (att.hashCode == attachmentMap.hashCode)); // Fallback to hashcode might be unreliable if objects change
-        if (initialIndex == -1) initialIndex = currentIndex;
-
+        final initialIndex = allAttachmentsInThisPost.indexWhere((att) =>
+            att['url']?.toString() == attachmentMap['url']?.toString() ||
+            (att['_id']?.toString() == attachmentMap['_id']?.toString() &&
+                att['_id'] != null));
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => MediaViewPage(
               attachments: allAttachmentsInThisPost,
-              initialIndex: initialIndex,
+              initialIndex: initialIndex != -1 ? initialIndex : currentIndex,
               message: messageContent,
               userName: userName,
               userAvatarUrl: userAvatarUrl,
@@ -173,69 +144,50 @@ class ReplyAttachmentDisplayWidget extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildErrorPlaceholder() {
+    return Container(
+      color: Colors.grey[900],
+      child: const Icon(FeatherIcons.alertTriangle, color: Colors.redAccent, size: 40),
+    );
+  }
+
+  Widget _buildDefaultPlaceholder(String? filename, String? url) {
+    return Container(
+      color: Colors.grey[900],
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(FeatherIcons.film, color: Colors.tealAccent, size: 40),
+          const SizedBox(height: 8),
+          Text(
+            filename ?? (url?.split('/').last) ?? 'unknown',
+            style: GoogleFonts.roboto(color: Colors.white70, fontSize: 12),
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-// Helper widget for PdfThumbnail if custom onTap is needed directly on it.
-// For this refactor, the GestureDetector above handles the tap.
 class PdfThumbnailWidget extends StatelessWidget {
-  final String pdfUrl;
+  final Uri pdfUri;
   final double aspectRatio;
-  final VoidCallback onTap;
 
   const PdfThumbnailWidget({
-    Key? key,
-    required this.pdfUrl,
+    super.key,
+    required this.pdfUri,
     this.aspectRatio = 4 / 3,
-    required this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
-    final uri = Uri.tryParse(pdfUrl);
-    if (uri == null) {
-      return Container(
-          color: Colors.grey[900],
-          child: const Icon(FeatherIcons.alertTriangle, color: Colors.redAccent, size: 40));
-    }
-    return GestureDetector(
-      onTap: onTap, // This onTap is for the parent GestureDetector in ReplyAttachmentDisplayWidget
-      child: AspectRatio(
-        aspectRatio: aspectRatio,
-        child: PdfView.uri( // Using PdfView.uri as per pdfrx for displaying PDF content
-          uri.toString(), // PdfView.uri expects a String URL
-          params: PdfViewParams(
-            pageNumber: 1, // Show the first page
-            // Prevent interaction for thumbnail view
-            enableInteraction: false,
-            // Fit width or whole page, depending on desired thumbnail appearance
-            // Using fitWidth often gives a good thumbnail preview.
-            layoutPages: (viewSize, pages) => [pages.first.copyWith(
-                // Calculate scale to fit the page width within the AspectRatio
-                // This is a simplified approach; true fitWidth might need page dimensions.
-                // For a robust thumbnail, one might need to render the page to an image.
-                // pdfrx's PdfPageImage is usually for that, but if it's undefined, PdfView is the alternative.
-                // Let's try to make it fit by using a common scale or by using page size if available.
-                // For now, we'll rely on the AspectRatio to clip it.
-                // A high initialResolution can make it look better when scaled down.
-                size: Size(viewSize.width, (pages.first.aspectRatio > 0 ? viewSize.width / pages.first.aspectRatio : viewSize.width))
-              ).box,
-            ],
-            backgroundColor: Colors.grey[800], // Background for the PDF view area
-            errorBuilder: (context, error, stackTrace, documentRef) => Container(
-               color: Colors.grey[900],
-               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(FeatherIcons.fileText, color: Colors.redAccent, size: 30),
-                  const SizedBox(height: 4),
-                  Text("PDF Error", style: GoogleFonts.roboto(fontSize: 10, color: Colors.white70))
-                ],
-            )
-          ),
-          // PdfPageImage.uri might not have a direct loadingBuilder like PdfView.
-          // It renders an image directly. We can wrap it in a FutureBuilder if loading indication is critical.
-          // For simplicity, let's assume it renders reasonably fast or shows error.
-        ),
+    return AspectRatio(
+      aspectRatio: aspectRatio,
+      child: PdfViewer.uri(
+        pdfUri,
       ),
     );
   }

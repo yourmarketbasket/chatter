@@ -6,6 +6,7 @@ import 'package:chatter/pages/media_view_page.dart'; // Used for navigation
 import 'package:chatter/widgets/reply/reply_input_area.dart';
 import 'package:chatter/widgets/reply/post_content.dart';
 import 'package:chatter/widgets/reply/actions_bottom_sheet.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart'; // Keep for potential direct use or if PostContent usage implies a general need.
@@ -15,6 +16,7 @@ import 'dart:io'; // Used by File operations, _downloadFile
 import 'package:flutter/services.dart'; // Used by Clipboard
 import 'package:feather_icons/feather_icons.dart'; // Used for icons in AppBar and reply area toggle
 import 'package:google_fonts/google_fonts.dart'; // Used for text styles
+import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart'; // Used by _sharePost
 // import 'package:image_picker/image_picker.dart'; // Now handled by ReplyInputArea
 // import 'package:pdfrx/pdfrx.dart'; // Moved to ReplyAttachmentDisplayWidget

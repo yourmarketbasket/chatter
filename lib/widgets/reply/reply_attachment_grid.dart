@@ -100,7 +100,7 @@ class ReplyAttachmentGrid extends StatelessWidget {
         // it relied on Expanded within a Row.
         // Let's make it flexible by not wrapping in AspectRatio or using a common one like 2:1 or 8:3.
         // For now, we mimic the structure that would be responsive.
-        // aspectRatio: 2 * (4 / 3), // This might be too restrictive
+        aspectRatio: 2 * (4 / 3), // This might be too restrictive
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
