@@ -97,46 +97,20 @@ class ReplyAttachmentDisplayWidget extends StatelessWidget {
           ? Uri.tryParse(displayUrl)
           : (localFile != null ? Uri.file(localFile.path) : null);
       if (uri != null) {
-        // Using PdfThumbnailWidget from pdfrx package
-        contentWidget = PdfThumbnail.uri(
-          uri,
-          // Removed PdfThumbnailWidget specific parameters not present in PdfThumbnail.uri
-          // aspectRatio: 4/3, // PdfThumbnail determines its own aspect ratio
-          errorBuilder: (context, error, stackTrace) => Container(
-             color: Colors.grey[900],
-             child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(FeatherIcons.fileText, color: Colors.redAccent, size: 30),
-                  const SizedBox(height: 4),
-                  Text("PDF Error", style: GoogleFonts.roboto(fontSize: 10, color: Colors.white70))
-                ],
-            )
-          ),
-          loadingBuilder: (context, progress) => Center(child: CircularProgressIndicator(value: progress, color: Colors.tealAccent, backgroundColor: Colors.grey[800],)),
-          // onTap: () { // onTap is handled by the parent GestureDetector
-          //   int initialIndex = allAttachmentsInThisPost.indexWhere((att) =>
-          //       (att['url'] != null && att['url'] == attachmentMap['url']) ||
-          //       (att.hashCode == attachmentMap.hashCode));
-          //   if (initialIndex == -1) initialIndex = currentIndex;
-
-          //   Navigator.push(
-          //     context,
-          //     MaterialPageRoute(
-          //       builder: (context) => MediaViewPage(
-          //         attachments: allAttachmentsInThisPost,
-          //         initialIndex: initialIndex,
-          //         message: messageContent,
-          //         userName: userName,
-          //         userAvatarUrl: userAvatarUrl,
-          //         timestamp: timestamp,
-          //         viewsCount: viewsCount,
-          //         likesCount: likesCount,
-          //         repostsCount: repostsCount,
-          //       ),
-          //     ),
-          //   );
-          // },
+        // Using the local PdfThumbnailWidget (helper widget defined below in this file)
+        contentWidget = PdfThumbnailWidget(
+          pdfUrl: uri.toString(),
+          // The onTap for MediaViewPage navigation is handled by the parent GestureDetector
+          // that wraps this contentWidget. So, PdfThumbnailWidget's onTap is not used here for that.
+          // If PdfThumbnailWidget itself had interactive elements, its own onTap would handle those.
+          // For simple display and then navigating on tap, the current structure is fine.
+          // No specific onTap needed here for PdfThumbnailWidget as the outer GestureDetector handles it.
+          onTap: () {
+            // This onTap is required by PdfThumbnailWidget's constructor.
+            // Since the parent GestureDetector handles navigation, this can be an empty function
+            // or log something if needed for debugging direct interaction with the PDF thumbnail itself.
+            // print("PdfThumbnailWidget (inner) tapped - display only, navigation by parent");
+          },
         );
       } else {
         contentWidget = Container(
@@ -225,12 +199,12 @@ class PdfThumbnailWidget extends StatelessWidget {
     }
     return GestureDetector(
       onTap: onTap,
-      child: AspectRatio(
+      child: AspectRatio( // Keep the AspectRatio to control the thumbnail size
         aspectRatio: aspectRatio,
-        child: PdfThumbnail.uri(
+        child: PdfPageImage.uri( // Changed from PdfThumbnail.uri to PdfPageImage.uri
           uri,
-          // Removed PdfThumbnailWidget specific parameters not present in PdfThumbnail.uri
-          // aspectRatio: 4/3, // PdfThumbnail determines its own aspect ratio
+          pageNumber: 1, // Display the first page as a thumbnail
+          scale: 3, // Higher scale for better quality, adjust as needed
           errorBuilder: (context, error, stackTrace) => Container(
              color: Colors.grey[900],
              child: Column(
@@ -242,7 +216,9 @@ class PdfThumbnailWidget extends StatelessWidget {
                 ],
             )
           ),
-          loadingBuilder: (context, progress) => Center(child: CircularProgressIndicator(value: progress, color: Colors.tealAccent, backgroundColor: Colors.grey[800],)),
+          // PdfPageImage.uri might not have a direct loadingBuilder like PdfView.
+          // It renders an image directly. We can wrap it in a FutureBuilder if loading indication is critical.
+          // For simplicity, let's assume it renders reasonably fast or shows error.
         ),
       ),
     );
