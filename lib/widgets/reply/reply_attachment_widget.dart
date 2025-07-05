@@ -198,16 +198,32 @@ class PdfThumbnailWidget extends StatelessWidget {
           child: const Icon(FeatherIcons.alertTriangle, color: Colors.redAccent, size: 40));
     }
     return GestureDetector(
-      onTap: onTap,
-      child: AspectRatio( // Keep the AspectRatio to control the thumbnail size
+      onTap: onTap, // This onTap is for the parent GestureDetector in ReplyAttachmentDisplayWidget
+      child: AspectRatio(
         aspectRatio: aspectRatio,
-        child: PdfPageImage.uri( // Changed from PdfThumbnail.uri to PdfPageImage.uri
-          uri,
-          pageNumber: 1, // Display the first page as a thumbnail
-          scale: 3, // Higher scale for better quality, adjust as needed
-          errorBuilder: (context, error, stackTrace) => Container(
-             color: Colors.grey[900],
-             child: Column(
+        child: PdfView.uri( // Using PdfView.uri as per pdfrx for displaying PDF content
+          uri.toString(), // PdfView.uri expects a String URL
+          params: PdfViewParams(
+            pageNumber: 1, // Show the first page
+            // Prevent interaction for thumbnail view
+            enableInteraction: false,
+            // Fit width or whole page, depending on desired thumbnail appearance
+            // Using fitWidth often gives a good thumbnail preview.
+            layoutPages: (viewSize, pages) => [pages.first.copyWith(
+                // Calculate scale to fit the page width within the AspectRatio
+                // This is a simplified approach; true fitWidth might need page dimensions.
+                // For a robust thumbnail, one might need to render the page to an image.
+                // pdfrx's PdfPageImage is usually for that, but if it's undefined, PdfView is the alternative.
+                // Let's try to make it fit by using a common scale or by using page size if available.
+                // For now, we'll rely on the AspectRatio to clip it.
+                // A high initialResolution can make it look better when scaled down.
+                size: Size(viewSize.width, (pages.first.aspectRatio > 0 ? viewSize.width / pages.first.aspectRatio : viewSize.width))
+              ).box,
+            ],
+            backgroundColor: Colors.grey[800], // Background for the PDF view area
+            errorBuilder: (context, error, stackTrace, documentRef) => Container(
+               color: Colors.grey[900],
+               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Icon(FeatherIcons.fileText, color: Colors.redAccent, size: 30),
