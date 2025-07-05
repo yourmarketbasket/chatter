@@ -1295,4 +1295,106 @@ class DataController extends GetxController {
     }
   }
 
+  // Fetch replies for a specific reply (children of a reply)
+  Future<List<Map<String, dynamic>>> fetchRepliesForReply(String originalPostId, String parentReplyId) async {
+    try {
+      final token = user.value['token'];
+      if (token == null) {
+        throw Exception('User token not found. Please log in.');
+      }
+
+      // As per user prompt: route - posts/fetch-replies-for-reply(post) - data (postId, replyId)
+      // Assuming "post" in "posts/fetch-replies-for-reply(post)" implies a POST request.
+      final response = await _dio.post( // Changed to POST
+        'api/posts/fetch-replies-for-reply',
+        data: {
+          'postId': originalPostId, // ID of the original top-level post
+          'replyId': parentReplyId,  // ID of the reply whose children are being fetched
+        },
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        print("[DataController] Raw replies data from API for parent reply $parentReplyId: ${response.data}");
+        final List<dynamic> repliesData = response.data['replies'] ?? []; // Default to empty list if null
+        List<Map<String, dynamic>> processedReplies = [];
+
+        for (var replyData in repliesData) {
+          if (replyData == null || replyData is! Map<String,dynamic>) {
+            print("[DataController] Skipping invalid reply data item for parent reply $parentReplyId: $replyData");
+            continue;
+          }
+          Map<String,dynamic> currentReply = Map<String,dynamic>.from(replyData);
+
+          // Re-use the processing logic from fetchReplies, perhaps by extracting it to a helper
+          // For now, duplicating the processing logic:
+          List<Map<String, dynamic>> attachments = [];
+          if (currentReply['attachments'] != null && currentReply['attachments'] is List) {
+            for (var attData in (currentReply['attachments'] as List<dynamic>)) {
+              if (attData is Map<String, dynamic>) {
+                attachments.add({
+                  'type': attData['type']?.toString() ?? 'unknown',
+                  'url': attData['url']?.toString() ?? '',
+                  'filename': attData['filename']?.toString() ?? '',
+                  'size': (attData['size'] is num ? attData['size'] : int.tryParse(attData['size']?.toString() ?? '0'))?.toInt() ?? 0,
+                  'thumbnailUrl': attData['thumbnailUrl']?.toString(),
+                });
+              }
+            }
+          }
+
+          String username = currentReply['username']?.toString() ?? 'Unknown User';
+          String avatarInitial = username.isNotEmpty ? username[0].toUpperCase() : '?';
+          if (currentReply['avatarInitial'] != null && currentReply['avatarInitial'].toString().isNotEmpty) {
+            avatarInitial = currentReply['avatarInitial'].toString();
+          }
+          String textContent = currentReply['content']?.toString() ?? '';
+          final bufferData = currentReply['buffer'];
+
+          // Add count derivations
+          currentReply['likesCount'] = (currentReply['likes'] as List?)?.length ?? 0;
+          currentReply['repostsCount'] = (currentReply['reposts'] as List?)?.length ?? 0;
+          currentReply['viewsCount'] = (currentReply['views'] as List?)?.length ?? 0;
+          currentReply['repliesCount'] = (currentReply['replies'] as List?)?.length ?? 0;
+
+
+          processedReplies.add({
+            '_id': currentReply['_id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+            'username': username,
+            'content': textContent,
+            'buffer': bufferData,
+            'createdAt': currentReply['createdAt'],
+            'likes': List<dynamic>.from(currentReply['likes'] ?? []),
+            'reposts': List<dynamic>.from(currentReply['reposts'] ?? []),
+            'views': List<dynamic>.from(currentReply['views'] ?? []),
+            'attachments': attachments,
+            'avatarInitial': avatarInitial,
+            'useravatar': currentReply['useravatar']?.toString(),
+            'replies': List<dynamic>.from(currentReply['replies'] ?? const []), // For further nesting if API supports
+            'userId': currentReply['userId']?.toString(),
+            'likesCount': currentReply['likesCount'], // Pass derived counts
+            'repostsCount': currentReply['repostsCount'],
+            'viewsCount': currentReply['viewsCount'],
+            'repliesCount': currentReply['repliesCount'],
+            // Crucially, add originalPostId and parentReplyId if the backend doesn't nest them directly
+            // This might be useful for the UI if it needs this context.
+            // 'originalPostId': originalPostId, // The ultimate root post
+            // 'parentReplyId': parentReplyId, // The direct parent of these fetched replies
+          });
+        }
+        print("[DataController] Processed replies for parent reply $parentReplyId: $processedReplies");
+        return processedReplies;
+      } else {
+        print('[DataController] Error fetching replies for parent reply $parentReplyId: ${response.statusCode} - ${response.data?['message']}');
+        throw Exception('Failed to fetch replies for reply: ${response.data?['message'] ?? 'Unknown error'}');
+      }
+    } catch (e) {
+      print('[DataController] Exception caught in fetchRepliesForReply (parent reply $parentReplyId): $e');
+      throw Exception('An error occurred while fetching replies for reply: $e');
+    }
+  }
 }

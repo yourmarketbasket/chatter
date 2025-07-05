@@ -23,8 +23,9 @@ import 'package:path/path.dart' as path;
 
 class ReplyPage extends StatefulWidget {
   final Map<String, dynamic> post;
+  final String? originalPostId; // ID of the ultimate root post of the thread
 
-  const ReplyPage({Key? key, required this.post}) : super(key: key);
+  const ReplyPage({Key? key, required this.post, this.originalPostId}) : super(key: key);
 
   @override
   _ReplyPageState createState() => _ReplyPageState();
@@ -69,14 +70,21 @@ class _ReplyPageState extends State<ReplyPage> {
 
     _fetchPostReplies();
 
-    if (_mainPostData['_id'] != null) {
-      _dataController.viewPost(_mainPostData['_id'] as String);
+    // View the main item of this page (could be a post or a reply acting as a post)
+    final String currentPostId = _mainPostData['_id'] as String? ?? "";
+    if (currentPostId.isNotEmpty) {
+      if (widget.originalPostId == null) { // This is a top-level post
+        _dataController.viewPost(currentPostId);
+      } else { // This is a reply being viewed as a main post, so call viewReply
+             // We need the originalPostId of the thread, and currentPostId is the replyId
+        _dataController.viewReply(widget.originalPostId!, currentPostId);
+      }
     } else {
       print("Error: Post ID is null in ReplyPage. Cannot record view.");
     }
   }
 
-  Future<void> _fetchPostReplies({bool showLoadingIndicator = true}) async {
+ Future<void> _fetchPostReplies({bool showLoadingIndicator = true}) async {
     if (!mounted) return;
     setState(() {
       if (showLoadingIndicator) _isLoadingReplies = true;
@@ -84,19 +92,31 @@ class _ReplyPageState extends State<ReplyPage> {
     });
 
     try {
-      final postId = widget.post['_id'] as String?;
-      if (postId == null) {
-        print("Error: Post ID is null in _fetchPostReplies. Cannot fetch replies.");
+      final String currentPostItemId = widget.post['_id'] as String? ?? "";
+      if (currentPostItemId.isEmpty) {
+        print("Error: Current post item ID is null/empty in _fetchPostReplies. Cannot fetch replies.");
         if (mounted) {
           setState(() {
-            _fetchRepliesError = 'Cannot load replies: Original post ID is missing.';
+            _fetchRepliesError = 'Cannot load replies: Current item ID is missing.';
             _isLoadingReplies = false;
           });
         }
         return;
       }
-      final fetchedReplies = await _dataController.fetchReplies(postId);
-      print(fetchedReplies);
+
+      List<Map<String, dynamic>> fetchedReplies;
+      if (widget.originalPostId == null) {
+        // This ReplyPage instance is for a top-level post. Fetch its direct replies.
+        print("[ReplyPage] Fetching replies for top-level post: $currentPostItemId");
+        fetchedReplies = await _dataController.fetchReplies(currentPostItemId);
+      } else {
+        // This ReplyPage instance is for a reply (widget.post is a reply).
+        // Fetch replies for this reply using originalPostId and currentPostItemId (which is the parentReplyId).
+        print("[ReplyPage] Fetching replies for reply: $currentPostItemId (original post: ${widget.originalPostId})");
+        fetchedReplies = await _dataController.fetchRepliesForReply(widget.originalPostId!, currentPostItemId);
+      }
+
+      // print(fetchedReplies); // Already printed inside DataController methods
       if (mounted) {
         setState(() {
           _replies = fetchedReplies;
@@ -104,7 +124,7 @@ class _ReplyPageState extends State<ReplyPage> {
         });
       }
     } catch (e) {
-      print('Error fetching replies: $e');
+      print('Error fetching replies in ReplyPage: $e');
       if (mounted) {
         setState(() {
           _fetchRepliesError = 'Failed to load replies. Please try again.';
@@ -336,8 +356,12 @@ class _ReplyPageState extends State<ReplyPage> {
   }
 
  Widget _buildPostContent(Map<String, dynamic> postData, {required bool isReply, int indentLevel = 0}) { // Renamed post to postData
-  final String postId = widget.post['_id'] as String; // ID of the main post
-  final String currentEntryId = postData['_id'] as String; // ID of the current post or reply
+  // If this ReplyPage is showing a reply as its main item, widget.originalPostId will be non-null.
+  // If it's showing a top-level post, widget.originalPostId will be null.
+  // `postId` should refer to the ID of the item being currently processed by _buildPostContent (postData['_id'])
+  // `threadOriginalPostId` is the ID of the ultimate root post of the entire thread.
+  final String threadOriginalPostId = widget.originalPostId ?? widget.post['_id'] as String;
+  final String currentEntryId = postData['_id'] as String; // ID of the current post or reply item being built
   final String username = postData['username'] as String? ?? 'Unknown User';
 
   // Decode content if it's in buffer format
@@ -401,12 +425,12 @@ class _ReplyPageState extends State<ReplyPage> {
   // Call viewReply if this is a reply and it's being built
   // This is a simplistic way to track views. A more robust way would be VisibilityDetector.
   if (isReply) {
-    // Avoid calling viewReply for the main post itself via this logic path
-    // Ensure currentEntryId is not the same as the main post ID (widget.post['_id'])
-    if (currentEntryId != postId) {
-      _dataController.viewReply(postId, currentEntryId);
-    }
+    // When building a reply item, view it.
+    // threadOriginalPostId is the ID of the root post.
+    // currentEntryId is the ID of the reply being viewed.
+    _dataController.viewReply(threadOriginalPostId, currentEntryId);
   }
+  // Note: The viewing of the main post/item for the page is handled in initState.
 
 
   // return Padding(
@@ -423,94 +447,254 @@ class _ReplyPageState extends State<ReplyPage> {
           children: [
             
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Row: Username, Time/Date, Views
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                    child: Row(
-                      children: [
-                        Row(
-                          children: [
-                            // User Avatar
-                            CircleAvatar(
-                              radius: isReply ? 14 : 18,
-                              backgroundColor: Colors.tealAccent.withOpacity(0.2),
-                              backgroundImage: userAvatar != null && userAvatar.isNotEmpty ? NetworkImage(userAvatar) : null,
-                              child: userAvatar == null || userAvatar.isEmpty
-                                  ? Text(
-                                      avatarInitial,
-                                      style: GoogleFonts.poppins(
-                                        color: Colors.tealAccent,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: isReply ? 12 : 14,
-                                      ),
-                                    )
-                                  : null,
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              '@$username',
-                              style: GoogleFonts.poppins(
-                                color: Colors.white,
-                                fontSize: isReply ? 14 : 16,
-                                fontWeight: FontWeight.w600,
+              child: GestureDetector( // Make the content area tappable for replies
+                onTap: isReply ? () {
+                  // Navigate to a new ReplyPage for this reply
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ReplyPage(
+                        post: postData, // The tapped reply becomes the "main post" for the new page
+                        originalPostId: threadOriginalPostId, // Pass down the original root post ID
+                      ),
+                    ),
+                  );
+                } : null, // Only enable tap for replies
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Row: Username, Time/Date, Views
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      child: Row(
+                        children: [
+                          Row(
+                            children: [
+                              // User Avatar
+                              CircleAvatar(
+                                radius: isReply ? 14 : 18,
+                                backgroundColor: Colors.tealAccent.withOpacity(0.2),
+                                backgroundImage: userAvatar != null && userAvatar.isNotEmpty ? NetworkImage(userAvatar) : null,
+                                child: userAvatar == null || userAvatar.isEmpty
+                                    ? Text(
+                                        avatarInitial,
+                                        style: GoogleFonts.poppins(
+                                          color: Colors.tealAccent,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: isReply ? 12 : 14,
+                                        ),
+                                      )
+                                    : null,
                               ),
+                              const SizedBox(width: 12),
+                              Text(
+                                '@$username',
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white,
+                                  fontSize: isReply ? 14 : 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '${DateFormat('h:mm a').format(timestamp)} · ${DateFormat('MMM d, yyyy').format(timestamp)} · $viewsCount views',
+                              style: GoogleFonts.roboto(
+                                fontSize: isReply ? 11 : 12,
+                                color: Colors.grey[400],
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          ],
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    // Column: Content and Attachments
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(left:55),
                           child: Text(
-                            '${DateFormat('h:mm a').format(timestamp)} · ${DateFormat('MMM d, yyyy').format(timestamp)} · $viewsCount views',
+                            content,
                             style: GoogleFonts.roboto(
-                              fontSize: isReply ? 11 : 12,
-                              color: Colors.grey[400],
+                              fontSize: isReply ? 13 : 14,
+                              color: const Color.fromARGB(255, 255, 255, 255),
+                              height: 1.5,
                             ),
-                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        if (correctlyTypedAttachments.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Padding(
+                            padding: const EdgeInsets.only(left:40),
+                            child: _buildReplyAttachmentGrid(
+                              correctlyTypedAttachments,
+                              postData, // Pass postData here
+                              username,
+                              userAvatar,
+                              timestamp,
+                              viewsCount,
+                              likesCount,
+                              repostsCount,
+                              content,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  // Column: Content and Attachments
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(left:55),
-                        child: Text(
-                          content,
-                          style: GoogleFonts.roboto(
-                            fontSize: isReply ? 13 : 14,
-                            color: const Color.fromARGB(255, 255, 255, 255),
-                            height: 1.5,
-                          ),
-                        ),
-                      ),
-                      if (correctlyTypedAttachments.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Padding(
-                          padding: const EdgeInsets.only(left:40),
-                          child: _buildReplyAttachmentGrid(
-                            correctlyTypedAttachments,
-                            postData, // Pass postData here
-                            username,
-                            userAvatar,
-                            timestamp,
-                            viewsCount,
-                            likesCount,
-                            repostsCount,
-                            content,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  // Row: Reply, Reposts, Like, Bookmark, Share
+                    const SizedBox(height: 8),
+                    // Row: Reply, Reposts, Like, Bookmark, Share (Action buttons should be outside GestureDetector if they have their own taps)
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        // Action buttons are moved outside the GestureDetector for clarity and to ensure their individual tap targets work.
+        Padding(
+          padding: const EdgeInsets.only(left: 40, top: 0), // Adjust top padding if needed after moving
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Reply Button
+              _buildStatButton(
+                icon: FeatherIcons.messageCircle,
+                text: '$repliesCount',
+                color: Colors.tealAccent,
+                onPressed: () {
+                  setState(() {
+                    _parentReplyId = currentEntryId;
+                    _showReplyField = true;
+                    FocusScope.of(context).requestFocus(_replyFocusNode);
+                  });
+                  _showSnackBar('Reply', 'Replying to @$username...', Colors.teal[700]!);
+                },
+              ),
+              // Repost Button
+              _buildStatButton(
+                icon: FeatherIcons.repeat,
+                text: '$repostsCount',
+                color: Colors.greenAccent,
+                onPressed: () async {
+                  if (isReply) {
+                    final result = await _dataController.repostReply(threadOriginalPostId, currentEntryId);
+                    if (result['success'] == true) {
+                      _showSnackBar('Success', result['message'] ?? 'Reply reposted!', Colors.green[700]!);
+                      setState(() {
+                        int replyIndex = _replies.indexWhere((r) => r['_id'] == currentEntryId);
+                        if (replyIndex != -1) {
+                          var originalReply = _replies[replyIndex];
+                          var newRepostsList = List<dynamic>.from(originalReply['reposts'] ?? []);
+                          if (!newRepostsList.contains(currentUserId)) {
+                             newRepostsList.add(currentUserId);
+                          }
+                          _replies[replyIndex] = {
+                            ...originalReply,
+                            'reposts': newRepostsList,
+                            'repostsCount': newRepostsList.length
+                          };
+                        }
+                      });
+                    } else {
+                      _showSnackBar('Error', result['message'] ?? 'Failed to repost reply.', Colors.red[700]!);
+                    }
+                  } else {
+                     _showSnackBar(
+                      'Repost Post',
+                      'Repost post by @$username (original functionality).', Colors.orange);
+                  }
+                },
+              ),
+              // Like Button
+              _buildStatButton(
+                icon: isLikedByCurrentUser ? Icons.favorite : FeatherIcons.heart,
+                text: '$likesCount',
+                color: isLikedByCurrentUser ? Colors.pinkAccent : Colors.pinkAccent.withOpacity(0.7),
+                onPressed: () async {
+                  if (isReply) {
+                    if (isLikedByCurrentUser) {
+                      final result = await _dataController.unlikeReply(threadOriginalPostId, currentEntryId);
+                      if (result['success'] == true) {
+                        _showSnackBar('Success', result['message'] ?? 'Reply unliked!', Colors.grey[700]!);
+                        setState(() {
+                          int replyIndex = _replies.indexWhere((r) => r['_id'] == currentEntryId);
+                          if (replyIndex != -1) {
+                            var originalReply = _replies[replyIndex];
+                            var newLikesList = List<dynamic>.from(originalReply['likes'] ?? []);
+                            newLikesList.removeWhere((id) => (id is Map ? id['_id'] == currentUserId : id.toString() == currentUserId));
+                            _replies[replyIndex] = {
+                              ...originalReply,
+                              'likes': newLikesList,
+                              'likesCount': newLikesList.length
+                            };
+                          }
+                        });
+                      } else {
+                        _showSnackBar('Error', result['message'] ?? 'Failed to unlike reply.', Colors.red[700]!);
+                      }
+                    } else {
+                      final result = await _dataController.likeReply(threadOriginalPostId, currentEntryId);
+                      if (result['success'] == true) {
+                        _showSnackBar('Success', result['message'] ?? 'Reply liked!', Colors.pink[700]!);
+                         setState(() {
+                          int replyIndex = _replies.indexWhere((r) => r['_id'] == currentEntryId);
+                          if (replyIndex != -1) {
+                            var originalReply = _replies[replyIndex];
+                            var newLikesList = List<dynamic>.from(originalReply['likes'] ?? []);
+                            if (!newLikesList.any((like) => (like is Map ? like['_id'] == currentUserId : like.toString() == currentUserId))) {
+                              newLikesList.add(currentUserId);
+                            }
+                            _replies[replyIndex] = {
+                              ...originalReply,
+                              'likes': newLikesList,
+                              'likesCount': newLikesList.length,
+                            };
+                          }
+                        });
+                      } else {
+                        _showSnackBar('Error', result['message'] ?? 'Failed to like reply.', Colors.red[700]!);
+                      }
+                    }
+                  } else {
+                     _showSnackBar(
+                      'Like Post',
+                      'Like post by @$username (original functionality).', Colors.orange);
+                  }
+                },
+              ),
+              if (!isReply)
+                _buildStatButton(
+                  icon: FeatherIcons.bookmark,
+                  text: '',
+                  color: Colors.white70,
+                  onPressed: () {
+                    _showSnackBar(
+                      'Bookmark Post',
+                      'Bookmark post by @$username (not implemented yet).',
+                      Colors.teal[700]!,
+                    );
+                  },
+                ),
+               if (isReply)
+                 const SizedBox(width: 24),
+
+              _buildStatButton(
+                icon: FeatherIcons.share2,
+                text: '',
+                color: Colors.white70,
+                onPressed: () => _sharePost(postData),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
                   Padding(
                     padding: const EdgeInsets.only(left: 40),
                     child: Row(
