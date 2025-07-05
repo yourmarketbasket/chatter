@@ -374,7 +374,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     final newReply = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ReplyPage(post: post),
+        builder: (context) => ReplyPage(post: post, postDepth: 0), // Original posts are at depth 0
       ),
     );
 

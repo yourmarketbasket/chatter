@@ -30,8 +30,9 @@ import 'package:path/path.dart' as path; // Used by _downloadFile
 class ReplyPage extends StatefulWidget {
   final Map<String, dynamic> post;
   final String? originalPostId; // ID of the ultimate root post of the thread
+  final int postDepth; // Depth of widget.post relative to the original post (0 for original, 1 for direct reply, etc.)
 
-  const ReplyPage({Key? key, required this.post, this.originalPostId}) : super(key: key);
+  const ReplyPage({Key? key, required this.post, this.originalPostId, required this.postDepth}) : super(key: key);
 
   @override
   _ReplyPageState createState() => _ReplyPageState();
@@ -734,7 +735,8 @@ class _ReplyPageState extends State<ReplyPage> {
             ),
           ),
           // Conditionally display the reply input area at the bottom
-          if (_showReplyField)
+          // Also check if the current post's depth allows for new replies
+          if (_showReplyField && widget.postDepth < 10)
             ReplyInputArea(
               replyFocusNode: _replyFocusNode,
               parentReplyId: _parentReplyId,
