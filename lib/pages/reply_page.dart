@@ -335,28 +335,31 @@ class _ReplyPageState extends State<ReplyPage> {
     );
   }
 
- Widget _buildPostContent(Map<String, dynamic> post, {required bool isReply, int indentLevel = 0}) {
-  final String username = post['username'] as String? ?? 'Unknown User';
+ Widget _buildPostContent(Map<String, dynamic> postData, {required bool isReply, int indentLevel = 0}) { // Renamed post to postData
+  final String postId = widget.post['_id'] as String; // ID of the main post
+  final String currentEntryId = postData['_id'] as String; // ID of the current post or reply
+  final String username = postData['username'] as String? ?? 'Unknown User';
+
   // Decode content if it's in buffer format
-  String content = post['content'] as String? ?? '';
-  if (post['buffer'] != null && post['buffer']['data'] is List) {
+  String content = postData['content'] as String? ?? '';
+  if (postData['buffer'] != null && postData['buffer']['data'] is List) {
     try {
-      final List<int> data = List<int>.from(post['buffer']['data'] as List);
+      final List<int> data = List<int>.from(postData['buffer']['data'] as List);
       content = utf8.decode(data); // Assuming UTF-8 encoding
     } catch (e) {
-      print('Error decoding buffer content: $e');
+      print('Error decoding buffer content for ${currentEntryId}: $e');
       content = 'Error displaying content.';
     }
   }
 
-  final String? userAvatar = post['useravatar'] as String?;
-  final String avatarInitial = post['avatarInitial'] as String? ?? (username.isNotEmpty ? username[0].toUpperCase() : '?');
-  final DateTime timestamp = post['createdAt'] is String
-      ? (DateTime.tryParse(post['createdAt'] as String) ?? DateTime.now())
-      : (post['createdAt'] is DateTime ? post['createdAt'] as DateTime : DateTime.now());
+  final String? userAvatar = postData['useravatar'] as String?;
+  final String avatarInitial = postData['avatarInitial'] as String? ?? (username.isNotEmpty ? username[0].toUpperCase() : '?');
+  final DateTime timestamp = postData['createdAt'] is String
+      ? (DateTime.tryParse(postData['createdAt'] as String) ?? DateTime.now())
+      : (postData['createdAt'] is DateTime ? postData['createdAt'] as DateTime : DateTime.now());
 
   List<Map<String, dynamic>> correctlyTypedAttachments = [];
-  final dynamic rawAttachments = post['attachments'];
+  final dynamic rawAttachments = postData['attachments'];
   if (rawAttachments is List && rawAttachments.isNotEmpty) {
     for (final item in rawAttachments) {
       if (item is Map<String, dynamic>) {
@@ -375,13 +378,39 @@ class _ReplyPageState extends State<ReplyPage> {
     }
   }
 
-  final int likesCount = post['likesCount'] as int? ?? (post['likes'] is List ? (post['likes'] as List).length : 0);
-  final int repostsCount = post['repostsCount'] as int? ?? (post['reposts'] is List ? (post['reposts'] as List).length : 0);
-  final int viewsCount = post['viewsCount'] as int? ?? (post['views'] is List ? (post['views'] as List).length : 0);
-  final int repliesCount = post['repliesCount'] as int? ?? (post['replies'] is List ? (post['replies'] as List).length : 0);
+  // Determine if the current user has liked this specific post/reply
+  final String currentUserId = _dataController.user.value['user']?['_id'] ?? '';
+  final List<dynamic> likesList = postData['likes'] is List ? postData['likes'] as List<dynamic> : [];
+  final bool isLikedByCurrentUser = likesList.any((like) =>
+      (like is Map ? like['_id'] == currentUserId : like.toString() == currentUserId)
+  );
+
+  final int likesCount = postData['likesCount'] as int? ?? likesList.length;
+  final int repostsCount = postData['repostsCount'] as int? ?? (postData['reposts'] is List ? (postData['reposts'] as List).length : 0);
+  final int viewsCount = postData['viewsCount'] as int? ?? (postData['views'] is List ? (postData['views'] as List).length : 0);
+  // Ensure repliesCount is accurately derived, especially for replies which might have their own replies.
+  // If postData['replies'] contains actual reply objects, count them. If it contains IDs, it's more complex without fetching.
+  // For now, assume 'repliesCount' is provided or direct children count is sufficient.
+  final int repliesCount = postData['repliesCount'] as int? ?? (postData['replies'] is List ? (postData['replies'] as List).length : 0);
+
 
   final EdgeInsets postItemPadding = isReply
-      ? EdgeInsets.only(left: 16.0 * indentLevel + 4.0, right: 4.0)
+      ? EdgeInsets.only(left: 16.0 * indentLevel + 4.0, right: 4.0) // Apply indentation for replies
+      : const EdgeInsets.only(right: 4.0); // No specific left indent for main post
+
+  // Call viewReply if this is a reply and it's being built
+  // This is a simplistic way to track views. A more robust way would be VisibilityDetector.
+  if (isReply) {
+    // Avoid calling viewReply for the main post itself via this logic path
+    // Ensure currentEntryId is not the same as the main post ID (widget.post['_id'])
+    if (currentEntryId != postId) {
+      _dataController.viewReply(postId, currentEntryId);
+    }
+  }
+
+
+  return Padding(
+    padding: postItemPadding,
       : const EdgeInsets.only(right: 4.0);
 
   return Padding(
@@ -467,7 +496,7 @@ class _ReplyPageState extends State<ReplyPage> {
                           padding: const EdgeInsets.only(left:40),
                           child: _buildReplyAttachmentGrid(
                             correctlyTypedAttachments,
-                            post,
+                            postData, // Pass postData here
                             username,
                             userAvatar,
                             timestamp,
@@ -487,47 +516,161 @@ class _ReplyPageState extends State<ReplyPage> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                         _buildStatButton(
-                          icon: FeatherIcons.messageCircle, // Reply
+                        // Reply Button
+                        _buildStatButton(
+                          icon: FeatherIcons.messageCircle,
                           text: '$repliesCount',
                           color: Colors.tealAccent,
                           onPressed: () {
                             setState(() {
-                              _parentReplyId = post['_id'] as String?;
+                              // If it's the main post, _parentReplyId is null (or widget.post['_id'] if we decide so)
+                              // If it's a reply, _parentReplyId is currentEntryId (the ID of this reply)
+                              _parentReplyId = currentEntryId; // Replying to the current item (post or reply)
                               _showReplyField = true;
+                               // Focus the text field when reply button is tapped
+                              FocusScope.of(context).requestFocus(_replyFocusNode);
                             });
-                            _showSnackBar(
-                              'Reply',
-                              'Replying to @$username.',
-                              Colors.teal[700]!,
-                            );
+                            _showSnackBar('Reply', 'Replying to @$username...', Colors.teal[700]!);
                           },
                         ),
+                        // Repost Button
                         _buildStatButton(
-                          icon: FeatherIcons.repeat, // Repost
+                          icon: FeatherIcons.repeat,
                           text: '$repostsCount',
                           color: Colors.greenAccent,
-                          onPressed: () {
-                            _showSnackBar(
-                              'Repost ${isReply ? "Reply" : "Post"}',
-                              'Repost ${isReply ? "reply" : "post"} by @$username (not implemented yet).',
-                              Colors.greenAccent,
-                            );
+                          onPressed: () async {
+                            if (isReply) {
+                              final result = await _dataController.repostReply(postId, currentEntryId);
+                              if (result['success'] == true) {
+                                _showSnackBar('Success', result['message'] ?? 'Reply reposted!', Colors.green[700]!);
+                                setState(() {
+                                  int replyIndex = _replies.indexWhere((r) => r['_id'] == currentEntryId);
+                                  if (replyIndex != -1) {
+                                    var originalReply = _replies[replyIndex];
+                                    var newRepostsList = List<dynamic>.from(originalReply['reposts'] ?? []);
+                                    if (!newRepostsList.contains(currentUserId)) {
+                                       newRepostsList.add(currentUserId);
+                                    }
+                                    _replies[replyIndex] = {
+                                      ...originalReply,
+                                      'reposts': newRepostsList,
+                                      'repostsCount': newRepostsList.length
+                                    };
+                                  }
+                                });
+                              } else {
+                                _showSnackBar('Error', result['message'] ?? 'Failed to repost reply.', Colors.red[700]!);
+                              }
+                            } else { // It's the main post -  Keep original behavior or make it non-interactive as per clarification
+                               _showSnackBar(
+                                'Repost Post',
+                                'Repost post by @$username (original functionality).', Colors.orange);
+                              // Original/Placeholder action for main post repost
+                              // final result = await _dataController.repostPost(currentEntryId);
+                              // if (result['success'] == true) {
+                              //   _showSnackBar('Success', result['message'] ?? 'Post reposted!', Colors.green[700]!);
+                              //   setState(() {
+                              //      _mainPostData['repostsCount'] = (_mainPostData['repostsCount'] ?? 0) + 1;
+                              //      if (_mainPostData['reposts'] is List) {
+                              //         (_mainPostData['reposts'] as List).add(currentUserId);
+                              //      } else {
+                              //         _mainPostData['reposts'] = [currentUserId];
+                              //      }
+                              //    });
+                              //  } else {
+                              //   _showSnackBar('Error', result['message'] ?? 'Failed to repost post.', Colors.red[700]!);
+                              //  }
+                            }
                           },
                         ),
+                        // Like Button
                         _buildStatButton(
-                          icon: FeatherIcons.heart, // Like
+                          icon: isLikedByCurrentUser ? Icons.favorite : FeatherIcons.heart,
                           text: '$likesCount',
-                          color: Colors.pinkAccent,
-                          onPressed: () {
-                            _showSnackBar(
-                              'Like ${isReply ? "Reply" : "Post"}',
-                              'Like ${isReply ? "reply" : "post"} by @$username (not implemented yet).',
-                              Colors.pinkAccent,
-                            );
+                          color: isLikedByCurrentUser ? Colors.pinkAccent : Colors.pinkAccent.withOpacity(0.7),
+                          onPressed: () async {
+                            if (isReply) { // Current item is a reply
+                              if (isLikedByCurrentUser) {
+                                final result = await _dataController.unlikeReply(postId, currentEntryId);
+                                if (result['success'] == true) {
+                                  _showSnackBar('Success', result['message'] ?? 'Reply unliked!', Colors.grey[700]!);
+                                  setState(() {
+                                    int replyIndex = _replies.indexWhere((r) => r['_id'] == currentEntryId);
+                                    if (replyIndex != -1) {
+                                      var originalReply = _replies[replyIndex];
+                                      var newLikesList = List<dynamic>.from(originalReply['likes'] ?? []);
+                                      newLikesList.removeWhere((id) => (id is Map ? id['_id'] == currentUserId : id.toString() == currentUserId));
+                                      _replies[replyIndex] = {
+                                        ...originalReply,
+                                        'likes': newLikesList,
+                                        'likesCount': newLikesList.length
+                                      };
+                                    }
+                                  });
+                                } else {
+                                  _showSnackBar('Error', result['message'] ?? 'Failed to unlike reply.', Colors.red[700]!);
+                                }
+                              } else { // Not liked yet, so like it
+                                final result = await _dataController.likeReply(postId, currentEntryId);
+                                if (result['success'] == true) {
+                                  _showSnackBar('Success', result['message'] ?? 'Reply liked!', Colors.pink[700]!);
+                                   setState(() {
+                                    int replyIndex = _replies.indexWhere((r) => r['_id'] == currentEntryId);
+                                    if (replyIndex != -1) {
+                                      var originalReply = _replies[replyIndex];
+                                      var newLikesList = List<dynamic>.from(originalReply['likes'] ?? []);
+                                      if (!newLikesList.any((like) => (like is Map ? like['_id'] == currentUserId : like.toString() == currentUserId))) {
+                                        newLikesList.add(currentUserId); // Or the like object if backend sends it
+                                      }
+                                      _replies[replyIndex] = {
+                                        ...originalReply,
+                                        'likes': newLikesList,
+                                        'likesCount': newLikesList.length,
+                                      };
+                                    }
+                                  });
+                                } else {
+                                  _showSnackBar('Error', result['message'] ?? 'Failed to like reply.', Colors.red[700]!);
+                                }
+                              }
+                            } else { // It's the main post - Keep original behavior or make it non-interactive
+                               _showSnackBar(
+                                'Like Post',
+                                'Like post by @$username (original functionality).', Colors.orange);
+                              // Original/Placeholder action for main post like
+                              // if (isLikedByCurrentUser) {
+                              //   final result = await _dataController.unlikePost(currentEntryId);
+                              //    if (result['success'] == true) {
+                              //     _showSnackBar('Success', result['message'] ?? 'Post unliked!', Colors.grey[700]!);
+                              //     setState(() {
+                              //       _mainPostData['likesCount'] = (_mainPostData['likesCount'] ?? 1) - 1;
+                              //       if (_mainPostData['likes'] is List) {
+                              //         (_mainPostData['likes'] as List).removeWhere((id) => id == currentUserId);
+                              //       }
+                              //     });
+                              //   } else {
+                              //     _showSnackBar('Error', result['message'] ?? 'Failed to unlike post.', Colors.red[700]!);
+                              //   }
+                              // } else {
+                              //   final result = await _dataController.likePost(currentEntryId);
+                              //   if (result['success'] == true) {
+                              //     _showSnackBar('Success', result['message'] ?? 'Post liked!', Colors.pink[700]!);
+                              //     setState(() {
+                              //       _mainPostData['likesCount'] = (_mainPostData['likesCount'] ?? 0) + 1;
+                              //       if (_mainPostData['likes'] is List) {
+                              //         (_mainPostData['likes'] as List).add(currentUserId);
+                              //       } else {
+                              //         _mainPostData['likes'] = [currentUserId];
+                              //       }
+                              //     });
+                              //   } else {
+                              //     _showSnackBar('Error', result['message'] ?? 'Failed to like post.', Colors.red[700]!);
+                              //   }
+                              // }
+                            }
                           },
                         ),
-                        if (!isReply) // Bookmark only for original post, not replies
+                        if (!isReply) // Bookmark only for original post (currentEntryId == postId), not replies
                           _buildStatButton(
                             icon: FeatherIcons.bookmark, // Bookmark
                             text: '',
@@ -541,13 +684,13 @@ class _ReplyPageState extends State<ReplyPage> {
                             },
                           ),
                          if (isReply) // Empty SizedBox to maintain spacing for replies if no bookmark
-                           const SizedBox(width: 24), // Adjust width as needed for alignment
+                           const SizedBox(width: 24), // Adjust width as needed for alignment if no bookmark
                     
                         _buildStatButton(
-                          icon: FeatherIcons.share2, // Share
+                          icon: FeatherIcons.share2,
                           text: '',
                           color: Colors.white70,
-                          onPressed: () => _sharePost(post),
+                          onPressed: () => _sharePost(postData), // Pass postData
                         ),
                       ],
                     ),
@@ -1201,49 +1344,74 @@ Widget _buildStatButton({
       }
       final postId = widget.post['_id'] as String?;
       if (postId == null) {
-        _showSnackBar('Error', 'Cannot post reply: Original post ID is missing.',
-            Colors.red[700]!);
+        _showSnackBar('Error', 'Cannot post reply: Original post ID is missing.', Colors.red[700]!);
         if (mounted) setState(() { _isSubmittingReply = false; });
         return;
       }
 
-      final replyData = {
-        'postId': postId,
-        'content': _replyController.text.trim(),
-        'attachments': uploadedReplyAttachments,
-        if (_parentReplyId != null) 'parentReplyId': _parentReplyId,
-      };
-
-      final result = await _dataController.replyToPost(replyData);
+      Map<String, dynamic> result;
+      // Determine if it's a reply to the main post or a reply to another reply
+      if (_parentReplyId != null && _parentReplyId != postId) { // Replying to a reply
+        final replyToReplyData = {
+          'postId': postId, // This is the ID of the original root post
+          'parentReplyId': _parentReplyId, // This is the ID of the reply we are replying to
+          'content': _replyController.text.trim(),
+          'attachments': uploadedReplyAttachments,
+        };
+        result = await _dataController.replyToReply(replyToReplyData);
+      } else { // Replying to the main post
+        final replyToPostData = {
+          'postId': postId, // ID of the main post
+          // 'parentReplyId' is not included or is null
+          'content': _replyController.text.trim(),
+          'attachments': uploadedReplyAttachments,
+        };
+        result = await _dataController.replyToPost(replyToPostData);
+      }
 
       if (!mounted) return;
 
-      if (result['success'] == true && result['reply'] != null) {
-        final newReply = result['reply'] as Map<String, dynamic>;
-        // New reply successfully posted and data is available
+      if (result['success'] == true) {
         _showSnackBar('Success', result['message'] ?? 'Reply posted!', Colors.teal[700]!);
-        setState(() {
-          _replies.insert(0, newReply); // Add to the top of the list
-          _replyController.clear();
-          _replyAttachments.clear();
-          _parentReplyId = null;
-          // No navigation, stay on the page. User sees their reply.
-        });
-      } else if (result['success'] == true && result['reply'] == null) {
-        // This case implies success but no immediate reply data, so we refresh.
-        _showSnackBar('Success', result['message'] ?? 'Reply posted! Refreshing replies...', Colors.teal[700]!);
         _replyController.clear();
-        if (mounted) setState(() { // Clear attachments and parent ID optimistically
-          _replyAttachments.clear();
-          _parentReplyId = null;
+        _replyAttachments.clear();
+
+        // If a new reply object is returned by the backend, add it.
+        // Otherwise, refresh all replies for the main post to see the new reply.
+        // This is crucial for replies to replies, as they might be nested.
+        final newReplyData = result['reply'] as Map<String, dynamic>?;
+        if (newReplyData != null) {
+           // TODO: This needs to be smarter for nested replies.
+           // If it's a reply to a reply, we need to find the parent reply in _replies
+           // and add this newReplyData to its 'replies' list, or trigger a refresh.
+           // For simplicity now, always refreshing if it was a reply to a reply,
+           // or if newReplyData is null.
+           if (_parentReplyId != null && _parentReplyId != postId) {
+            await _fetchPostReplies(showLoadingIndicator: false); // Refresh to get nested
+           } else {
+             setState(() {
+               _replies.insert(0, newReplyData); // Add to top for direct replies to main post
+             });
+           }
+        } else {
+          await _fetchPostReplies(showLoadingIndicator: false); // Refresh replies list
+        }
+
+        setState(() {
+           _parentReplyId = null; // Reset parent reply ID
+           _showReplyField = false; // Optionally hide reply field after successful submission
         });
-        await _fetchPostReplies(showLoadingIndicator: false); // Refresh replies list
-        // No navigation, stay on page.
+
       } else {
         _showSnackBar('Error', result['message'] ?? 'Failed to post reply.', Colors.red[700]!);
       }
     } catch (e) {
       print('Error in _submitReply: $e');
+      // Ensure _isSubmittingReply is reset even if an error occurs before the finally block
+      // (though finally should cover it)
+      if (mounted) {
+         _showSnackBar('Error', 'An unexpected error occurred: ${e.toString()}', Colors.red[700]!);
+      }
       if (mounted) {
         _showSnackBar('Error', 'An unexpected error occurred: ${e.toString()}',
             Colors.red[700]!);

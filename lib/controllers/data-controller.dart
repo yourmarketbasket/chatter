@@ -1088,4 +1088,211 @@ class DataController extends GetxController {
       mediaDidStopPlaying(videoId, 'video');
     }
   }
+
+  // --- Methods for Reply Interactions ---
+
+  Future<Map<String, dynamic>> replyToReply(Map<String, dynamic> data) async {
+    // data expected to contain: postId, parentReplyId, content, attachments
+    try {
+      String? token = user.value['token'];
+      String? currentUserId = user.value['user']?['_id'];
+
+      if (token == null || currentUserId == null) {
+        return {'success': false, 'message': 'User not authenticated'};
+      }
+
+      var response = await _dio.post(
+        'api/posts/reply-to-reply', // Endpoint as per user request
+        data: {
+          'userId': currentUserId,
+          'postId': data['postId'], // ID of the original top-level post
+          'parentReplyId': data['parentReplyId'], // ID of the reply being replied to
+          'content': data['content'],
+          'attachments': data['attachments'] ?? [],
+        },
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        // The backend might return the new reply, or the updated parent reply, or the updated main post.
+        // For now, assume it returns the new reply object.
+        // UI will likely need to re-fetch replies for the parent post or parent reply to show the new one.
+        print('[DataController] Reply to reply successful: ${response.data}');
+        // TODO: Determine how to update local state. Might need to fetch parent post's replies again.
+        // For now, just returning success and the new reply if available.
+        return {
+          'success': true,
+          'message': response.data['message'] ?? 'Reply posted successfully',
+          'reply': response.data['reply'] // Assuming the new reply is returned
+        };
+      } else {
+        return {'success': false, 'message': response.data['message'] ?? 'Failed to post reply to reply'};
+      }
+    } catch (e) {
+      print('[DataController] Error in replyToReply: $e');
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> likeReply(String postId, String replyId) async {
+    try {
+      String? token = user.value['token'];
+      String? currentUserId = user.value['user']?['_id'];
+
+      if (token == null || currentUserId == null) {
+        return {'success': false, 'message': 'User not authenticated'};
+      }
+
+      var response = await _dio.post(
+        'api/posts/like-reply', // Endpoint as per user request
+        data: {
+          'userId': currentUserId,
+          'postId': postId, // ID of the original top-level post
+          'replyId': replyId, // ID of the reply being liked
+        },
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        // TODO: Update local state for the specific reply.
+        // This might involve finding the post in `posts` list, then finding the reply in its replies.
+        // Or, if ReplyPage manages its own list of replies, it will need to update that.
+        // The response might contain the updated reply object.
+        print('[DataController] Like reply successful: ${response.data}');
+        return {
+          'success': true,
+          'message': response.data['message'] ?? 'Reply liked successfully',
+          'updatedReply': response.data['updatedReply'] // Assuming updated reply is returned
+        };
+      } else {
+        return {'success': false, 'message': response.data['message'] ?? 'Failed to like reply'};
+      }
+    } catch (e) {
+      print('[DataController] Error in likeReply: $e');
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> unlikeReply(String postId, String replyId) async {
+    try {
+      String? token = user.value['token'];
+      String? currentUserId = user.value['user']?['_id'];
+
+      if (token == null || currentUserId == null) {
+        return {'success': false, 'message': 'User not authenticated'};
+      }
+
+      var response = await _dio.post(
+        'api/posts/unlike-reply', // Endpoint as per user request
+        data: {
+          'userId': currentUserId,
+          'postId': postId,
+          'replyId': replyId,
+        },
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        // TODO: Update local state for the specific reply.
+        print('[DataController] Unlike reply successful: ${response.data}');
+        return {
+          'success': true,
+          'message': response.data['message'] ?? 'Reply unliked successfully',
+          'updatedReply': response.data['updatedReply'] // Assuming updated reply is returned
+        };
+      } else {
+        return {'success': false, 'message': response.data['message'] ?? 'Failed to unlike reply'};
+      }
+    } catch (e) {
+      print('[DataController] Error in unlikeReply: $e');
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> viewReply(String postId, String replyId) async {
+    // Note: View tracking for individual replies might be complex if not aggregated at the main post level.
+    // The impact on UI (e.g., displaying view counts for each reply) should be considered.
+    try {
+      String? token = user.value['token'];
+      String? currentUserId = user.value['user']?['_id'];
+
+      if (token == null || currentUserId == null) {
+        return {'success': false, 'message': 'User not authenticated'};
+      }
+      // Consider if a separate _pendingViewRegistrations set is needed for replies
+      // or if the existing one can be used with a composite key (e.g., "reply-$replyId").
+      // For now, not implementing pending registration for reply views to keep it simple.
+
+      var response = await _dio.post(
+        'api/posts/view-reply', // Endpoint as per user request
+        data: {
+          'userId': currentUserId,
+          'postId': postId,
+          'replyId': replyId,
+        },
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        print('[DataController] View reply successful: ${response.data}');
+        // Socket event 'replyViewed' or similar would ideally update counts if displayed.
+        return {'success': true, 'message': response.data['message'] ?? 'Reply viewed successfully'};
+      } else {
+        return {'success': false, 'message': response.data['message'] ?? 'Failed to view reply'};
+      }
+    } catch (e) {
+      print('[DataController] Error in viewReply: $e');
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> repostReply(String postId, String replyId) async {
+    try {
+      String? token = user.value['token'];
+      String? currentUserId = user.value['user']?['_id'];
+
+      if (token == null || currentUserId == null) {
+        return {'success': false, 'message': 'User not authenticated'};
+      }
+
+      var response = await _dio.post(
+        'api/posts/repost-reply', // Endpoint as per user request
+        data: {
+          'userId': currentUserId,
+          'postId': postId, // ID of the original top-level post
+          'replyId': replyId, // ID of the reply being reposted
+        },
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        // TODO: Update local state. A repost of a reply might create a new post on the user's feed.
+        // The main post's list of replies might also need its repost count updated for that specific reply.
+        print('[DataController] Repost reply successful: ${response.data}');
+        // The response might contain the newly created repost (as a Post object) or the updated reply.
+        return {
+          'success': true,
+          'message': response.data['message'] ?? 'Reply reposted successfully',
+          'repost': response.data['repost'], // If a new post is created for the repost
+          'updatedReply': response.data['updatedReply'] // If the original reply is updated
+        };
+      } else {
+        return {'success': false, 'message': response.data['message'] ?? 'Failed to repost reply'};
+      }
+    } catch (e) {
+      print('[DataController] Error in repostReply: $e');
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
 }
