@@ -182,30 +182,34 @@ class _PostContentState extends State<PostContent> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     GestureDetector(
-                      behavior: HitTestBehavior.opaque, // Ensure it captures taps within its bounds
+                      behavior: HitTestBehavior.opaque,
                       onTap: widget.isReply ? () {
-                        print("[PostContent onTap Navigating] Main content area tapped for Reply ID: ${_currentPostData['_id']}");
+                        print("[PostContent onTap Navigating] Main GESTUREDETECTOR tapped for Reply ID: ${_currentPostData['_id']}");
                         print("  - widget.isReply: ${widget.isReply}");
                         print("  - Navigating with post (content): '${_currentPostData['content']}' (ID: ${_currentPostData['_id']})");
                         print("  - Passing to new ReplyPage as originalPostId (threadOriginalPostId): $threadOriginalPostId");
-                        // Navigate to a new ReplyPage for this reply.
-                        // The postData for the new page is _currentPostData (this reply).
-                        // The originalPostId for the new page is threadOriginalPostId.
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => ReplyPage( // This creates a dependency on ReplyPage
+                            builder: (context) => ReplyPage(
                               post: _currentPostData,
                               originalPostId: threadOriginalPostId,
                             ),
                           ),
                         );
                       } : null,
-                      child: Container(
-                        color: Colors.red.withOpacity(0.1), // VISUAL DEBUG for tap area
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
+                      child: Listener( // Wrap with Listener for low-level tap debugging
+                        onPointerDown: (event) {
+                          print("[PostContent Listener onPointerDown] Event at ${event.position} for item ID: ${_currentPostData['_id']}");
+                        },
+                        onPointerUp: (event) {
+                          print("[PostContent Listener onPointerUp] Event at ${event.position} for item ID: ${_currentPostData['_id']}");
+                        },
+                        child: Container(
+                          color: Colors.red.withOpacity(0.1), // VISUAL DEBUG for tap area
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                           Row(
                             children: [
                               Text(
