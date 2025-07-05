@@ -401,7 +401,7 @@ class _PostContentState extends State<PostContent> {
                                 }
                               }
                             },
-                          ),
+                          ), // Explicitly ensuring comma here
                           if (!widget.isReply) // Bookmark only for original post
                             StatButton(
                               icon: FeatherIcons.bookmark,
