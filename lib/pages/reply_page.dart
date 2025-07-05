@@ -471,8 +471,9 @@ class _ReplyPageState extends State<ReplyPage> {
            // and add this newReplyData to its 'replies' list, or trigger a refresh.
            // For simplicity now, always refreshing if it was a reply to a reply,
            // or if newReplyData is null.
-           if (_parentReplyId != null && _parentReplyId != postId) {
-            await _fetchPostReplies(showLoadingIndicator: false); // Refresh to get nested
+           // currentItemPostId is the ID of the main post/reply this page is for.
+           if (_parentReplyId != null && _parentReplyId != currentItemPostId) { // If we replied to a listed reply (not the main item)
+            await _fetchPostReplies(showLoadingIndicator: false); // Refresh to get nested replies updated
            } else {
              setState(() {
                _replies.insert(0, newReplyData); // Add to top for direct replies to main post
