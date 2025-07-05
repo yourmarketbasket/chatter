@@ -112,18 +112,24 @@ class _ReplyPageState extends State<ReplyPage> {
 
       List<Map<String, dynamic>> fetchedReplies;
       if (widget.originalPostId == null) {
-        // This ReplyPage instance is for a top-level post. Fetch its direct replies.
-        print("[ReplyPage] Fetching replies for top-level post: $currentPostItemId");
+        // This ReplyPage instance is for a top-level post (e.g., Post A). Fetch its direct replies (e.g., Reply B).
+        print("[ReplyPage _fetchPostReplies] TOP-LEVEL POST. Post ID for fetching replies: $currentPostItemId");
         fetchedReplies = await _dataController.fetchReplies(currentPostItemId);
+        print("[ReplyPage _fetchPostReplies] Fetched replies for TOP-LEVEL POST $currentPostItemId: ${fetchedReplies.length} replies.");
+        fetchedReplies.forEach((r) => print("  - Reply ID: ${r['_id']}, Content: ${r['content']}, Replies Count: ${r['repliesCount']}"));
       } else {
-        // This ReplyPage instance is for a reply (widget.post is a reply).
-        // Fetch replies for this reply using originalPostId and currentPostItemId (which is the parentReplyId).
-        print("[ReplyPage] Fetching replies for reply: $currentPostItemId (original post: ${widget.originalPostId})");
+        // This ReplyPage instance is for a reply (e.g., Reply B is widget.post).
+        // Fetch replies *for this reply* (e.g., Reply C, which is a child of Reply B).
+        // currentPostItemId is the ID of Reply B. widget.originalPostId is the ID of Post A.
+        print("[ReplyPage _fetchPostReplies] NESTED REPLY. Main item ID (parent for these new replies): $currentPostItemId. Thread's Original Post ID: ${widget.originalPostId}");
         fetchedReplies = await _dataController.fetchRepliesForReply(widget.originalPostId!, currentPostItemId);
+        print("[ReplyPage _fetchPostReplies] Fetched replies for NESTED REPLY $currentPostItemId: ${fetchedReplies.length} replies.");
+        fetchedReplies.forEach((r) => print("  - Reply ID: ${r['_id']}, Content: ${r['content']}, Replies Count: ${r['repliesCount']}"));
       }
 
       // print(fetchedReplies); // Already printed inside DataController methods
       if (mounted) {
+        print("[ReplyPage _fetchPostReplies] Setting state with ${fetchedReplies.length} replies for item $currentPostItemId.");
         setState(() {
           _replies = fetchedReplies;
           if (showLoadingIndicator) _isLoadingReplies = false;
