@@ -182,7 +182,12 @@ class _PostContentState extends State<PostContent> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     GestureDetector(
+                      behavior: HitTestBehavior.opaque, // Ensure it captures taps within its bounds
                       onTap: widget.isReply ? () {
+                        print("[PostContent onTap Navigating] Main content area tapped for Reply ID: ${_currentPostData['_id']}");
+                        print("  - widget.isReply: ${widget.isReply}");
+                        print("  - Navigating with post (content): '${_currentPostData['content']}' (ID: ${_currentPostData['_id']})");
+                        print("  - Passing to new ReplyPage as originalPostId (threadOriginalPostId): $threadOriginalPostId");
                         // Navigate to a new ReplyPage for this reply.
                         // The postData for the new page is _currentPostData (this reply).
                         // The originalPostId for the new page is threadOriginalPostId.
@@ -196,9 +201,11 @@ class _PostContentState extends State<PostContent> {
                           ),
                         );
                       } : null,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
+                      child: Container(
+                        color: Colors.red.withOpacity(0.1), // VISUAL DEBUG for tap area
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                           Row(
                             children: [
                               Text(

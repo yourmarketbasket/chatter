@@ -397,8 +397,16 @@ class _ReplyPageState extends State<ReplyPage> {
       final String threadOriginalPostId = widget.originalPostId ?? currentItemPostId;
 
       Map<String, dynamic> result;
+      print("[ReplyPage _submitReply] Attempting to submit reply.");
+      print("  - widget.originalPostId (Root ID for this page): ${widget.originalPostId}");
+      print("  - currentItemPostId (Main item on this page): $currentItemPostId");
+      print("  - _parentReplyId (Item being directly replied to): $_parentReplyId");
+
       // Determine if it's a reply to the main item of this page or a reply to another reply listed on this page
       if (_parentReplyId != null && _parentReplyId != currentItemPostId) { // Replying to a listed reply
+        print("  - Path: Replying to a LISTED reply.");
+        print("    - API 'postId' (threadOriginalPostId): $threadOriginalPostId");
+        print("    - API 'parentReplyId' (_parentReplyId): $_parentReplyId");
         final replyToReplyData = {
           // This 'postId' for the backend API call must be the ultimate original post ID of the thread.
           'postId': threadOriginalPostId,
@@ -408,7 +416,8 @@ class _ReplyPageState extends State<ReplyPage> {
         };
         result = await _dataController.replyToReply(replyToReplyData);
       } else { // Replying to the main item displayed on this ReplyPage
-        final replyToPostData = {
+        print("  - Path: Replying to the MAIN item on this page.");
+        final replyToPostData = { // This variable definition is a bit broad, specific params used below.
           // If replying to the main item of the page:
           // - If this page is for an original post (widget.originalPostId == null), then currentItemPostId is the original post's ID.
           // - If this page is for a reply (widget.originalPostId != null), then currentItemPostId is that reply's ID,
@@ -443,6 +452,9 @@ class _ReplyPageState extends State<ReplyPage> {
           // We are replying to widget.post (which is a reply). So use replyToReply.
           // _parentReplyId would be currentItemPostId in this case if "reply" on main post was hit.
           final actualParentReplyId = _parentReplyId ?? currentItemPostId;
+          print("    - Path: Main item is a REPLY. Calling replyToReply.");
+          print("      - API 'postId' (threadOriginalPostId): $threadOriginalPostId");
+          print("      - API 'parentReplyId' (actualParentReplyId): $actualParentReplyId");
           result = await _dataController.replyToReply({
             'postId': threadOriginalPostId, // Ultimate root post
             'parentReplyId': actualParentReplyId, // The reply we are replying to
@@ -452,6 +464,8 @@ class _ReplyPageState extends State<ReplyPage> {
         } else { // The main item of this page is an original post.
           // We are replying to widget.post (which is an original post). So use replyToPost.
           // _parentReplyId would be currentItemPostId here.
+          print("    - Path: Main item is an ORIGINAL POST. Calling replyToPost.");
+          print("      - API 'postId' (currentItemPostId): $currentItemPostId");
           result = await _dataController.replyToPost({
             'postId': currentItemPostId, // The original post we are replying to
             'content': _replyController.text.trim(),
