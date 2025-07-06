@@ -248,12 +248,12 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
              message = "Failed to create post. Please try again.";
           } else if (progress == 0) {
             message = "Preparing...";
-          } else if (progress < DataController._uploadPhaseProportion) { // Upload phase
-            double uploadPhaseProgress = progress / DataController._uploadPhaseProportion;
+          } else if (progress < 0.8) { // Upload phase (using literal 0.8)
+            double uploadPhaseProgress = progress / 0.8;
             message = "Uploading attachments: ${(uploadPhaseProgress * 100).toStringAsFixed(0)}%";
-          } else if (progress < 1.0) { // Save phase
+          } else if (progress < 1.0) { // Save phase (using literal 0.2 for calculation)
             // Calculate progress within the save phase
-            double savePhaseProgress = (progress - DataController._uploadPhaseProportion) / DataController._savePhaseProportion;
+            double savePhaseProgress = (progress - 0.8) / 0.2; // (currentProgress - uploadPortion) / savePortion
             message = "Saving post: ${(savePhaseProgress * 100).toStringAsFixed(0)}%";
           } else { // Success state (progress >= 1.0)
             message = "Your chatter is live!";
