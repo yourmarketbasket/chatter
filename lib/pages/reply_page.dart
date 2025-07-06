@@ -493,7 +493,7 @@ class _ReplyPageState extends State<ReplyPage> {
               Positioned.fill(
                 child: CustomPaint(
                   painter: _MainReplyLinePainter(
-                    lineX: firstLevelAvatarRadius, // Line X aligns with the center of the avatar
+                    lineX: firstLevelAvatarRadius + 10.0, // Line X shifted 10px to the right of avatar's center
                     avatarTopY: avatarTopYInPostContent,
                     avatarRadius: firstLevelAvatarRadius,
                     isLastInList: isLastFirstLevelReplyInList,
