@@ -361,10 +361,9 @@ class _ReplyPageState extends State<ReplyPage> {
     // Define constants for avatar and padding to calculate line positions
     const double firstLevelAvatarRadius = 14.0; // From PostContent for isReply=true
     const double avatarRightPadding = 12.0; // Padding to the right of avatar in PostContent
-    // Space allocated for the main vertical line and visual separation before content starts
-    const double lineAndAvatarAreaTotalWidth = 20.0; // Matches PostContent's internal line area (avatarRadius + 6 for line)
-    // Indentation for the content of first-level replies, after the line/avatar area
-    const double firstLevelContentIndent = firstLevelAvatarRadius * 2 + avatarRightPadding; // Standard content start after avatar
+    const double lineAndAvatarAreaTotalWidth = 20.0;
+    // Y-offset for the top of the avatar within PostContent (due to PostContent's internal Padding(top: 8.0))
+    const double avatarTopYInPostContent = 8.0;
 
     for (int i = 0; i < _replies.length; i++) {
       final firstLevelReply = _replies[i];
@@ -460,20 +459,15 @@ class _ReplyPageState extends State<ReplyPage> {
               Positioned.fill(
                 child: CustomPaint(
                   painter: _MainReplyLinePainter(
-                    lineX: lineAndAvatarAreaTotalWidth / 2, // Centered in the allocated space
+                    lineX: firstLevelAvatarRadius, // Line X aligns with the center of the avatar
+                    avatarTopY: avatarTopYInPostContent,
                     avatarRadius: firstLevelAvatarRadius,
-                    hasNextSibling: !isLastFirstLevelReplyInList,
-                    // hasChildren is not strictly needed by the painter if we don't draw a horizontal connector yet
-                    // but keeping it doesn't harm and might be useful for future enhancements.
-                    hasChildren: childrenReplies.isNotEmpty,
+                    isLastInList: isLastFirstLevelReplyInList,
                   ),
                 ),
               ),
-              Padding(
-                // Shift contentGroup to the right to make space for the line drawing area
-                padding: const EdgeInsets.only(left: lineAndAvatarAreaTotalWidth),
-                child: contentGroup,
-              ),
+              // contentGroup is now directly in the Stack, PostContent will handle its own layout.
+              contentGroup,
             ],
           ),
         )
@@ -634,48 +628,58 @@ class _ReplyPageState extends State<ReplyPage> {
   }
 }
 
-// Ensure _MainReplyLinePainter is defined as a top-level class or static nested class.
-// For simplicity, defining it as a top-level class here (or at least outside _ReplyPageState).
+// Painter for the main vertical line connecting first-level replies.
 class _MainReplyLinePainter extends CustomPainter {
-  final double lineX;
-  final double avatarRadius;
-  final bool hasNextSibling;
-  final bool hasChildren;
+  final double lineX;           // X-coordinate for the center of the vertical line.
+  final double avatarTopY;      // Y-coordinate of the top of the first-level reply's avatar circle.
+  final double avatarRadius;    // Radius of the avatar.
+  final bool isLastInList;      // True if this is the last first-level reply in the list.
 
   _MainReplyLinePainter({
     required this.lineX,
+    required this.avatarTopY,
     required this.avatarRadius,
-    required this.hasNextSibling,
-    required this.hasChildren,
+    required this.isLastInList,
   });
 
   @override
-  void paint(Canvas canvas, Size size) {
+  void paint(Canvas canvas, Size size) { // size.height is the total height of the Stack item
     final paint = Paint()
       ..color = Colors.grey[700]!
       ..strokeWidth = 1.5;
 
-    final double effectiveLineX = this.lineX;
-    final double lineStartY = avatarRadius;
-    final double lineEndY = size.height;
+    // Start point: bottom-center of the current first-level reply's avatar.
+    // avatarTopY is the Y where the avatar circle begins.
+    final double startY = avatarTopY + (avatarRadius * 2);
+    final Offset p1 = Offset(lineX, startY);
 
-    canvas.drawLine(Offset(effectiveLineX, lineStartY), Offset(effectiveLineX, lineEndY), paint);
+    // End point calculation
+    double endY;
+    if (!isLastInList) {
+      // If not the last item, the line extends to the bottom of the current item's full height.
+      // This allows it to visually connect to the line of the next item, which will start at its avatar's top.
+      endY = size.height;
+    } else {
+      // If it's the last item, the line extends a short fixed distance below its avatar.
+      endY = startY + 30.0; // Extend 30px below avatar's bottom.
+      if (endY > size.height) { // Don't draw past the allocated space for this item.
+        endY = size.height;
+      }
+    }
 
-    // Horizontal connector for children - deferred for now.
-    // if (hasChildren) {
-    //   final double connectorY = lineStartY + avatarRadius + 10.0; // Example Y pos
-    //   final double connectorLength = 10.0;
-    //   if (connectorY < size.height) { // Ensure connector is within bounds
-    //     canvas.drawLine(Offset(effectiveLineX, connectorY), Offset(effectiveLineX + connectorLength, connectorY), paint);
-    //   }
-    // }
+    final Offset p2 = Offset(lineX, endY);
+
+    // Only draw if the line has a positive length.
+    if (p1.dy < p2.dy) {
+      canvas.drawLine(p1, p2, paint);
+    }
   }
 
   @override
   bool shouldRepaint(covariant _MainReplyLinePainter oldDelegate) {
     return oldDelegate.lineX != lineX ||
+        oldDelegate.avatarTopY != avatarTopY ||
         oldDelegate.avatarRadius != avatarRadius ||
-        oldDelegate.hasNextSibling != hasNextSibling ||
-        oldDelegate.hasChildren != hasChildren;
+        oldDelegate.isLastInList != isLastInList;
   }
 }
