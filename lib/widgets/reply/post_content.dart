@@ -351,7 +351,7 @@ class _PostContentState extends State<PostContent> {
 
     return Padding(
       padding: outerPadding,
-      child: content,
+      child: contentColumn,
     );
   }
 }

@@ -472,7 +472,7 @@ class _ReplyPageState extends State<ReplyPage> {
                 ...subReplyWidgets, // These are already PostContent(isPreview:true)
                 // "Show more" button is already part of subReplyWidgets if applicable
                 // Bottom divider for the sub-reply block
-                Divider(color: Colors.grey[800], height: 1, thickness: 0.5, indent: 20.0, endIndent: 10),
+                // Divider(color: Colors.grey[800], height: 1, thickness: 0.5, indent: 20.0, endIndent: 10),
               ],
             ),
           )
@@ -493,7 +493,7 @@ class _ReplyPageState extends State<ReplyPage> {
               Positioned.fill(
                 child: CustomPaint(
                   painter: _MainReplyLinePainter(
-                    lineX: firstLevelAvatarRadius + 10.0, // Line X shifted 10px to the right of avatar's center
+                    lineX: firstLevelAvatarRadius + 5.0, // Line X shifted 10px to the right of avatar's center
                     avatarTopY: avatarTopYInPostContent,
                     avatarRadius: firstLevelAvatarRadius,
                     isLastInList: isLastFirstLevelReplyInList,
@@ -583,7 +583,7 @@ class _ReplyPageState extends State<ReplyPage> {
                   Container( // Main Post Display
                     decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Colors.grey[800]!))),
                     child: Padding(
-                      padding: const EdgeInsets.only(bottom: 20.0),
+                      padding: const EdgeInsets.only(bottom: 5.0),
                       child: PostContent(
                         postData: _mainPostData,
                         isReply: false, // Main post is not a reply in its own context
@@ -607,7 +607,7 @@ class _ReplyPageState extends State<ReplyPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  
                   Padding( // Replies Section
                     padding: const EdgeInsets.only(left: 8.0, right: 8.0, top:0.0), // Added horizontal padding
                     child: Column(
@@ -617,17 +617,19 @@ class _ReplyPageState extends State<ReplyPage> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             _isLoadingReplies && _fetchRepliesError == null
-                                ? Row(children: [ Text("Reloading Replies...", style: GoogleFonts.poppins(fontSize: 16, color: Colors.grey[400])), const SizedBox(width: 8), const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent)))])
-                                : Text("Replies", style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white)),
+                                ? Row(children: [ 
+                                  Text("Reloading Replies...", style: GoogleFonts.poppins(fontSize: 10, color: Colors.grey[400])), 
+                                ])
+                                : Text("Replies", style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.white)),
                             Row(children: [
-                              IconButton(icon: const Icon(Icons.refresh, color: Colors.tealAccent), tooltip: "Refresh Replies", onPressed: () => _fetchPostReplies(showLoadingIndicator: true)),
-                              IconButton(icon: Icon(_showReplyField ? FeatherIcons.messageCircle : FeatherIcons.edit3, color: Colors.tealAccent), tooltip: _showReplyField ? "Hide Reply Field" : "Show Reply Field", onPressed: () { setState(() { _showReplyField = !_showReplyField; if (!_showReplyField) _parentReplyId = null;}); }),
+                              IconButton(icon: const Icon(Icons.refresh, color: Colors.tealAccent, size: 15), tooltip: "Refresh Replies", onPressed: () => _fetchPostReplies(showLoadingIndicator: true)),
+                              IconButton(icon: Icon(_showReplyField ? FeatherIcons.messageCircle : FeatherIcons.edit3, color: Colors.tealAccent, size: 15), tooltip: _showReplyField ? "Hide Reply Field" : "Show Reply Field", onPressed: () { setState(() { _showReplyField = !_showReplyField; if (!_showReplyField) _parentReplyId = null;}); }),
                             ]),
                           ],
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 5),
                         _isLoadingReplies && _fetchRepliesError == null
-                            ? const Center(child: Padding(padding: EdgeInsets.symmetric(vertical: 20.0), child: CircularProgressIndicator(color: Colors.tealAccent)))
+                            ? Center(child: Padding(padding: EdgeInsets.symmetric(vertical: 20.0), child: CircularProgressIndicator(color: Colors.tealAccent, strokeWidth: 1.0, backgroundColor: Colors.grey[800])))
                             : _fetchRepliesError != null
                                 ? Center(child: Padding(padding: const EdgeInsets.symmetric(vertical: 20.0), child: Text("Couldn't load replies. Tap refresh to try again.", style: GoogleFonts.roboto(color: Colors.redAccent, fontSize: 14), textAlign: TextAlign.center)))
                                 : _replies.isEmpty
@@ -680,10 +682,10 @@ class _MainReplyLinePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) { // size.height is the total height of the Stack item
     final paint = Paint()
       ..color = Colors.grey[700]!
-      ..strokeWidth = 1.5;
+      ..strokeWidth = 1;
 
     // Start point: bottom-center of the current first-level reply's avatar, plus safe gap.
-    final double startY = avatarTopY + (avatarRadius * 2) + SsafeLineGap;
+    final double startY = avatarTopY + (avatarRadius * 3) + SsafeLineGap;
     final Offset p1 = Offset(lineX, startY);
 
     // End point calculation
