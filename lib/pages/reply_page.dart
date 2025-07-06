@@ -1,28 +1,19 @@
 import 'package:chatter/controllers/data-controller.dart';
 import 'package:chatter/pages/home-feed-screen.dart'; // Used for navigation context in example, keep for now
 import 'package:chatter/pages/media_view_page.dart'; // Used for navigation
-// import 'package:chatter/widgets/video_attachment_widget.dart'; // Moved to ReplyAttachmentDisplayWidget
-// import 'package:chatter/widgets/reply/stat_button.dart'; // No longer directly used in reply_page
 import 'package:chatter/widgets/reply/reply_input_area.dart';
 import 'package:chatter/widgets/reply/post_content.dart';
 import 'package:chatter/widgets/reply/actions_bottom_sheet.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:intl/intl.dart'; // Keep for potential direct use or if PostContent usage implies a general need.
-// import 'package:file_picker/file_picker.dart'; // Now handled by ReplyInputArea
+// import 'package:intl/intl.dart'; // No longer directly used here
 import 'dart:io'; // Used by File operations, _downloadFile
-// import 'dart:convert'; // Moved to PostContent
 import 'package:flutter/services.dart'; // Used by Clipboard
 import 'package:feather_icons/feather_icons.dart'; // Used for icons in AppBar and reply area toggle
 import 'package:google_fonts/google_fonts.dart'; // Used for text styles
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart'; // Used by _sharePost
-// import 'package:image_picker/image_picker.dart'; // Now handled by ReplyInputArea
-// import 'package:pdfrx/pdfrx.dart'; // Moved to ReplyAttachmentDisplayWidget
-// import 'package:permission_handler/permission_handler.dart'; // Now handled by ReplyInputArea
-// import 'package:device_info_plus/device_info_plus.dart'; // Now handled by ReplyInputArea
-// import 'package:chatter/widgets/audio_attachment_widget.dart'; // Moved to ReplyAttachmentDisplayWidget
 import 'package:http/http.dart' as http; // Used by _downloadFile
 import 'package:path_provider/path_provider.dart'; // Used by _downloadFile
 import 'package:path/path.dart' as path; // Used by _downloadFile
@@ -43,29 +34,20 @@ class _ReplyPageState extends State<ReplyPage> {
   late DataController _dataController;
   final DeviceInfoPlugin _deviceInfo = DeviceInfoPlugin();
 
-  // State variable for the main post to allow modifications (likes, etc.)
   late Map<String, dynamic> _mainPostData;
-
-  List<Map<String, dynamic>> _replies = [];
+  List<Map<String, dynamic>> _replies = []; // This will store replies hierarchically
   bool _isLoadingReplies = true;
   String? _fetchRepliesError;
   bool _isSubmittingReply = false;
-  bool _showReplyField = false; // Default to false to hide reply field initially
-  String? _parentReplyId;
-  final FocusNode _replyFocusNode = FocusNode(); // For focusing the reply text field
+  bool _showReplyField = false;
+  String? _parentReplyId; // ID of the item (post or reply) we are directly replying to
+  final FocusNode _replyFocusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
     _dataController = Get.find<DataController>();
-    // Initialize _mainPostData with a deep copy of widget.post
     _mainPostData = Map<String, dynamic>.from(widget.post);
-    // Ensure nested lists like 'likes' or 'reposts' are also copied if they exist, to avoid modifying the original widget.post's lists.
-    // For simplicity, we'll assume top-level copy is enough for now, but deep copy is safer.
-    // A more robust deep copy: _mainPostData = jsonDecode(jsonEncode(widget.post));
-    // However, jsonEncode/Decode won't work if widget.post contains non-JSON serializable types (like File objects if any were there).
-    // For this app's structure, Map.from should be okay for fields like 'likes', 'reposts' if they are lists of strings/basic types.
-    // Let's ensure 'likes' and 'reposts' are new lists if they exist.
     if (_mainPostData['likes'] != null && _mainPostData['likes'] is List) {
       _mainPostData['likes'] = List<dynamic>.from(_mainPostData['likes'] as List);
     }
@@ -73,16 +55,13 @@ class _ReplyPageState extends State<ReplyPage> {
       _mainPostData['reposts'] = List<dynamic>.from(_mainPostData['reposts'] as List);
     }
 
-
     _fetchPostReplies();
 
-    // View the main item of this page (could be a post or a reply acting as a post)
     final String currentPostId = _mainPostData['_id'] as String? ?? "";
     if (currentPostId.isNotEmpty) {
-      if (widget.originalPostId == null) { // This is a top-level post
+      if (widget.originalPostId == null) {
         _dataController.viewPost(currentPostId);
-      } else { // This is a reply being viewed as a main post, so call viewReply
-             // We need the originalPostId of the thread, and currentPostId is the replyId
+      } else {
         _dataController.viewReply(widget.originalPostId!, currentPostId);
       }
     } else {
@@ -90,7 +69,46 @@ class _ReplyPageState extends State<ReplyPage> {
     }
   }
 
- Future<void> _fetchPostReplies({bool showLoadingIndicator = true}) async {
+  // Recursive function to process fetched replies and their children
+  Future<List<Map<String, dynamic>>> _processFetchedReplies(
+      List<Map<String, dynamic>> fetchedReplies,
+      String currentOriginalPostId,
+      int currentDepth) async {
+
+    // Define max depth for initial recursive fetching, e.g., 1 level deep from direct replies
+    const int maxRecursiveFetchDepth = 1;
+
+    List<Map<String, dynamic>> processed = [];
+    for (var reply in fetchedReplies) {
+      Map<String, dynamic> processedReply = Map<String, dynamic>.from(reply);
+      processedReply['indentationLevel'] = currentDepth; // Set indent based on current depth
+
+      // Check if this reply itself has children replies and we are within fetch depth
+      bool hasChildren = (reply['repliesCount'] as int? ?? 0) > 0 || (reply['replies'] as List?)?.isNotEmpty == true;
+
+      if (hasChildren && currentDepth < maxRecursiveFetchDepth) {
+        try {
+          print("[ReplyPage] Recursively fetching replies for reply ID: ${reply['_id']} at depth $currentDepth");
+          List<Map<String, dynamic>> children = await _dataController.fetchRepliesForReply(
+            currentOriginalPostId, // originalPostId of the root post of the thread
+            reply['_id'] as String,  // parentReplyId for this fetch is the current reply's ID
+          );
+          // Recursively process these children, incrementing depth
+          processedReply['children_replies'] = await _processFetchedReplies(children, currentOriginalPostId, currentDepth + 1);
+        } catch (e) {
+          print("Error fetching children for reply ${reply['_id']}: $e");
+          processedReply['children_replies'] = []; // Default to empty on error
+        }
+      } else {
+        processedReply['children_replies'] = []; // No children or max depth reached
+      }
+      processed.add(processedReply);
+    }
+    return processed;
+  }
+
+
+  Future<void> _fetchPostReplies({bool showLoadingIndicator = true}) async {
     if (!mounted) return;
     setState(() {
       if (showLoadingIndicator) _isLoadingReplies = true;
@@ -100,32 +118,27 @@ class _ReplyPageState extends State<ReplyPage> {
     try {
       final String currentPostItemId = widget.post['_id'] as String? ?? "";
       if (currentPostItemId.isEmpty) {
-        print("Error: Current post item ID is null/empty in _fetchPostReplies. Cannot fetch replies.");
-        if (mounted) {
-          setState(() {
-            _fetchRepliesError = 'Cannot load replies: Current item ID is missing.';
-            _isLoadingReplies = false;
-          });
-        }
+        if (mounted) setState(() { _fetchRepliesError = 'Cannot load replies: Current item ID is missing.'; _isLoadingReplies = false; });
         return;
       }
 
-      List<Map<String, dynamic>> fetchedReplies;
-      if (widget.originalPostId == null) {
-        // This ReplyPage instance is for a top-level post. Fetch its direct replies.
-        print("[ReplyPage] Fetching replies for top-level post: $currentPostItemId");
-        fetchedReplies = await _dataController.fetchReplies(currentPostItemId);
-      } else {
-        // This ReplyPage instance is for a reply (widget.post is a reply).
-        // Fetch replies for this reply using originalPostId and currentPostItemId (which is the parentReplyId).
-        print("[ReplyPage] Fetching replies for reply: $currentPostItemId (original post: ${widget.originalPostId})");
-        fetchedReplies = await _dataController.fetchRepliesForReply(widget.originalPostId!, currentPostItemId);
+      List<Map<String, dynamic>> fetchedRootReplies;
+      // Determine the original post ID for the entire thread for recursive calls.
+      // If widget.originalPostId is null, it means widget.post is the root post.
+      // Otherwise, widget.originalPostId is the root post ID.
+      final String threadOriginalPostId = widget.originalPostId ?? currentPostItemId;
+
+      if (widget.originalPostId == null) { // This page is for a top-level post
+        fetchedRootReplies = await _dataController.fetchReplies(currentPostItemId);
+      } else { // This page is for a reply (widget.post is a reply)
+        fetchedRootReplies = await _dataController.fetchRepliesForReply(widget.originalPostId!, currentPostItemId);
       }
 
-      // print(fetchedReplies); // Already printed inside DataController methods
+      // Process replies and their children recursively, starting at depth 0 for direct replies
+      _replies = await _processFetchedReplies(fetchedRootReplies, threadOriginalPostId, 0);
+
       if (mounted) {
         setState(() {
-          _replies = fetchedReplies;
           if (showLoadingIndicator) _isLoadingReplies = false;
         });
       }
@@ -140,9 +153,11 @@ class _ReplyPageState extends State<ReplyPage> {
     }
   }
 
+
   @override
   void dispose() {
     _replyController.dispose();
+    _replyFocusNode.dispose();
     super.dispose();
   }
 
@@ -153,20 +168,11 @@ class _ReplyPageState extends State<ReplyPage> {
         final directory = await getTemporaryDirectory();
         String extension;
         switch (type) {
-          case 'image':
-            extension = path.extension(url).isNotEmpty ? path.extension(url) : '.jpg';
-            break;
-          case 'video':
-            extension = path.extension(url).isNotEmpty ? path.extension(url) : '.mp4';
-            break;
-          case 'pdf':
-            extension = '.pdf';
-            break;
-          case 'audio':
-            extension = path.extension(url).isNotEmpty ? path.extension(url) : '.mp3';
-            break;
-          default:
-            extension = path.extension(url).isNotEmpty ? path.extension(url) : '.bin';
+          case 'image': extension = path.extension(url).isNotEmpty ? path.extension(url) : '.jpg'; break;
+          case 'video': extension = path.extension(url).isNotEmpty ? path.extension(url) : '.mp4'; break;
+          case 'pdf': extension = '.pdf'; break;
+          case 'audio': extension = path.extension(url).isNotEmpty ? path.extension(url) : '.mp3'; break;
+          default: extension = path.extension(url).isNotEmpty ? path.extension(url) : '.bin';
         }
         final sanitizedFilename = filename.replaceAll(RegExp(r'[^\w\.]'), '_');
         final filePath = '${directory.path}/$sanitizedFilename$extension';
@@ -190,11 +196,7 @@ class _ReplyPageState extends State<ReplyPage> {
 
     final dynamic rawAttachments = post['attachments'];
     if (rawAttachments is List && rawAttachments.isNotEmpty) {
-      attachments = rawAttachments
-          .whereType<Map>()
-          .map((item) => Map<String, dynamic>.from(
-              item.map((key, value) => MapEntry(key.toString(), value))))
-          .toList();
+      attachments = rawAttachments.whereType<Map>().map((item) => Map<String, dynamic>.from(item.map((key, value) => MapEntry(key.toString(), value)))).toList();
     }
 
     for (var attachment in attachments) {
@@ -207,11 +209,7 @@ class _ReplyPageState extends State<ReplyPage> {
         file = attachment['file'] as File;
         filePaths.add(file.path);
       } else if ((url ?? '').isNotEmpty && (type ?? '').isNotEmpty) {
-        file = await _downloadFile(
-          url ?? '',
-          filename ?? 'attachment_${DateTime.now().millisecondsSinceEpoch}',
-          type ?? 'unknown',
-        );
+        file = await _downloadFile(url!, filename!, type!);
         if (file != null) {
           filePaths.add(file.path);
         } else {
@@ -222,145 +220,56 @@ class _ReplyPageState extends State<ReplyPage> {
 
     if (filePaths.isNotEmpty) {
       final xFiles = filePaths.map((path) => XFile(path)).toList();
-      await Share.shareXFiles(
-        xFiles,
-        text: content.isNotEmpty ? content : null,
-        subject: 'Shared from Chatter',
-      );
+      await Share.shareXFiles(xFiles, text: content.isNotEmpty ? content : null, subject: 'Shared from Chatter');
     } else {
-      await Share.share(
-        content.isNotEmpty ? content : 'Check out this post from Chatter!',
-        subject: 'Shared from Chatter',
-      );
+      await Share.share(content.isNotEmpty ? content : 'Check out this post from Chatter!', subject: 'Shared from Chatter');
     }
   }
 
-  Future<int?> _getAndroidSdkVersion() async {
-    if (Platform.isAndroid) {
-      try {
-        final androidInfo = await _deviceInfo.androidInfo;
-        return androidInfo.version.sdkInt;
-      } catch (e) {
-        print('Error getting Android SDK version: $e');
-        return null;
-      }
-    }
-    return null;
-  }
+  void _showSnackBar(String title, String message, Color backgroundColor, {bool isSuccess = false}) {
+    if (isSuccess) return; // Skip success snackbars
 
-  Future<bool> _requestMediaPermissions(String action) async {
-    if (!Platform.isAndroid) return true;
-    final int? sdkInt = await _getAndroidSdkVersion();
-    if (sdkInt == null) {
-      _showSnackBar('Error', 'Unable to determine Android version. Check permissions in settings.', Colors.red[700]!);
-      return false;
-    }
-    Permission? permission;
-    String permissionName = '';
-    switch (action) {
-      case 'image':
-        permission = sdkInt >= 33 ? Permission.photos : Permission.storage;
-        permissionName = 'Photos';
-        break;
-      case 'video':
-        permission = sdkInt >= 33 ? Permission.videos : Permission.storage;
-        permissionName = 'Videos';
-        break;
-      case 'audio':
-        permission = sdkInt >= 33 ? Permission.audio : Permission.storage;
-        permissionName = 'Audio';
-        break;
-      case 'pdf':
-        permission = sdkInt < 33 ? Permission.storage : null;
-        permissionName = 'Storage';
-        break;
-      default:
-        return false;
-    }
-    if (action == 'pdf' && sdkInt >= 33) return true;
-    if (permission == null) return false;
-    final status = await permission.request();
-    if (status.isGranted) return true;
-    _showSnackBar('$permissionName Permission Required',
-        status.isPermanentlyDenied
-            ? 'Please enable $permissionName permission in app settings.'
-            : 'Please grant $permissionName permission to continue.',
-        Colors.red[700]!);
-    return false;
-  }
-
-  void _showSnackBar(String title, String message, Color backgroundColor) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('$title: $message',
-            style: GoogleFonts.roboto(color: Colors.white)),
+        content: Text('$title: $message', style: GoogleFonts.roboto(color: Colors.white)),
         backgroundColor: backgroundColor));
   }
 
   void _showActionsBottomSheet() {
-    // final String postUsername = widget.post['username'] as String? ?? 'User'; // No longer needed here directly
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF2C2C2C), // Or pass color to ActionsBottomSheetContent if you want it configurable there
+      backgroundColor: const Color(0xFF2C2C2C),
       builder: (BuildContext context) {
         return ActionsBottomSheetContent(
-          post: _mainPostData, // Use _mainPostData which is the mutable version of widget.post
-          showSnackBar: _showSnackBar,
+          post: _mainPostData,
+          showSnackBar: (title, message, color) => _showSnackBar(title, message, color), // Pass non-success version
         );
       },
     );
   }
 
-// Widget _buildPostContent(Map<String, dynamic> postData, {required bool isReply, int indentLevel = 0}) { // Renamed post to postData
-// Removed the large block of code that was the old _buildPostContent method and its helpers.
-// Also removed _buildReplyAttachmentWidget, _buildReplyAttachmentGrid, _parseAspectRatio.
-// Methods like _pickAndAddAttachment and _showAttachmentPicker were moved to ReplyInputArea.
-// _getAndroidSdkVersion and _requestMediaPermissions were also part of ReplyInputArea's context.
-
   void _submitReply() async {
     if (_isSubmittingReply) return;
     if (_replyController.text.trim().isEmpty && _replyAttachments.isEmpty) {
-      _showSnackBar('Input Error', 'Please enter text or add an attachment.',
-          Colors.red[700]!);
+      _showSnackBar('Input Error', 'Please enter text or add an attachment.', Colors.red[700]!);
       return;
     }
-    if (mounted) setState(() { _isSubmittingReply = true; });
-    else return;
+    if (mounted) setState(() { _isSubmittingReply = true; }); else return;
 
     List<Map<String, dynamic>> uploadedReplyAttachments = [];
     try {
       if (_replyAttachments.isNotEmpty) {
-        final filesToUpload = _replyAttachments
-            .where((a) => a['file'] != null && a['file'] is File)
-            .map((a) => {
-                  'file': a['file'],
-                  'type': a['type'],
-                  'filename': a['filename'],
-                  'size': a['size']
-                })
-            .toList();
+        final filesToUpload = _replyAttachments.where((a) => a['file'] != null && a['file'] is File).map((a) => {'file': a['file'], 'type': a['type'], 'filename': a['filename'], 'size': a['size']}).toList();
         if (filesToUpload.isNotEmpty) {
           final uploadResults = await _dataController.uploadFiles(filesToUpload);
           int uploadResultIndex = 0;
           for (var originalAttachment in _replyAttachments) {
-            if (originalAttachment['file'] != null &&
-                originalAttachment['file'] is File) {
+            if (originalAttachment['file'] != null && originalAttachment['file'] is File) {
               if (uploadResultIndex < uploadResults.length) {
                 final result = uploadResults[uploadResultIndex];
                 if (result['success'] == true && result['url'] != null) {
-                  uploadedReplyAttachments.add({
-                    'type': originalAttachment['type'],
-                    'filename': originalAttachment['filename'] ??
-                        result['filename'] ??
-                        'unknown',
-                    'size': originalAttachment['size'] ?? result['size'] ?? 0,
-                    'url': result['url'] as String,
-                    'thumbnailUrl': result['thumbnailUrl'] as String?
-                  });
+                  uploadedReplyAttachments.add({'type': originalAttachment['type'], 'filename': originalAttachment['filename'] ?? result['filename'] ?? 'unknown', 'size': originalAttachment['size'] ?? result['size'] ?? 0, 'url': result['url'] as String, 'thumbnailUrl': result['thumbnailUrl'] as String?});
                 } else {
-                  _showSnackBar(
-                      'Upload Error',
-                      'Failed to upload ${originalAttachment['filename'] ?? 'a file'}: ${result['message'] ?? 'Unknown error'}',
-                      Colors.red[700]!);
+                  _showSnackBar('Upload Error', 'Failed to upload ${originalAttachment['filename'] ?? 'a file'}: ${result['message'] ?? 'Unknown error'}', Colors.red[700]!);
                 }
                 uploadResultIndex++;
               }
@@ -370,15 +279,14 @@ class _ReplyPageState extends State<ReplyPage> {
           }
         }
       }
-      if (_replyController.text.trim().isEmpty &&
-          uploadedReplyAttachments.isEmpty &&
-          _replyAttachments.isNotEmpty) {
-        _showSnackBar('Upload Error',
-            'Failed to upload attachments. Reply not sent.', Colors.red[700]!);
+      if (_replyController.text.trim().isEmpty && uploadedReplyAttachments.isEmpty && _replyAttachments.isNotEmpty) {
+        _showSnackBar('Upload Error', 'Failed to upload attachments. Reply not sent.', Colors.red[700]!);
         if (mounted) setState(() { _isSubmittingReply = false; });
         return;
       }
-      final postId = widget.post['_id'] as String?;
+      final postId = widget.post['_id'] as String?; // This is the ID of the post this ReplyPage is for.
+      final String ultimateRootPostId = widget.originalPostId ?? postId!; // ID of the ultimate root of the thread.
+
       if (postId == null) {
         _showSnackBar('Error', 'Cannot post reply: Original post ID is missing.', Colors.red[700]!);
         if (mounted) setState(() { _isSubmittingReply = false; });
@@ -386,71 +294,142 @@ class _ReplyPageState extends State<ReplyPage> {
       }
 
       Map<String, dynamic> result;
-      // Determine if it's a reply to the main post or a reply to another reply
+      // _parentReplyId is the ID of the specific item (main post or another reply) we are replying to.
+      // If _parentReplyId is null or same as postId, we are replying to the main post of this page.
+      // If _parentReplyId is different from postId, it means we are replying to a reply shown on this page.
       if (_parentReplyId != null && _parentReplyId != postId) { // Replying to a reply
         final replyToReplyData = {
-          'postId': postId, // This is the ID of the original root post
-          'parentReplyId': _parentReplyId, // This is the ID of the reply we are replying to
+          'postId': ultimateRootPostId, // ID of the original root post of the thread
+          'parentReplyId': _parentReplyId, // ID of the reply we are replying to
           'content': _replyController.text.trim(),
           'attachments': uploadedReplyAttachments,
         };
         result = await _dataController.replyToReply(replyToReplyData);
-      } else { // Replying to the main post
+      } else { // Replying to the main post (or the item this ReplyPage is focused on)
         final replyToPostData = {
-          'postId': postId, // ID of the main post
-          // 'parentReplyId' is not included or is null
-          'content': _replyController.text.trim(),
-          'attachments': uploadedReplyAttachments,
-        };
-        result = await _dataController.replyToPost(replyToPostData);
+          'postId': ultimateRootPostId, // ID of the root post for direct replies
+          // If this ReplyPage is for a reply itself (widget.originalPostId != null),
+          // then _parentReplyId here should be widget.post['_id'] to reply to *this* specific reply.
+          // So, `parentReplyId` in the API call should be `_parentReplyId` if set, otherwise null.
+          // The key in API for replyToPost is `postId` for the root, and it implicitly knows it's a direct reply.
+          // If replying to a reply, the API is `replyToReply` and needs `parentReplyId`.
+          // Let's simplify: `replyToPost` always targets the `ultimateRootPostId`.
+          // If `_parentReplyId` is set and is *not* `ultimateRootPostId`, it means we are replying to a reply, so use `replyToReply`.
+          // If `_parentReplyId` *is* `ultimateRootPostId` (or null, implying root), use `replyToPost`.
+
+          // Corrected logic:
+          // The `replyToPost` endpoint likely means replying directly to `ultimateRootPostId`.
+          // If `_parentReplyId` is set, it means we are replying to an item.
+          // If that item is the `ultimateRootPostId`, then it's a direct reply to the root.
+          // If that item is *another reply*, then we use `replyToReply`.
+
+          // The existing logic seems fine: if _parentReplyId != postId (where postId is widget.post['_id']),
+          // it's a reply to a reply. Otherwise, it's a reply to widget.post.
+          // The `postId` in `replyToPostData` should be the one being replied to.
+          // If widget.post is the root, then 'postId' is correct.
+          // If widget.post is a reply, then 'postId' is that reply's ID, and API needs to handle it.
+          // DataController's `replyToPost` takes `postId` (of item being replied to).
+          // DataController's `replyToReply` takes `postId` (of root post) and `parentReplyId` (of reply being replied to).
+
+          // Re-evaluating:
+          // If _parentReplyId is the ID of the item we are replying to.
+          // Case 1: Replying to the main post of the page (widget.post).
+          //         _parentReplyId will be widget.post['_id'].
+          //         If widget.post is the root: use replyToPost, postId = widget.post['_id'].
+          //         If widget.post is a reply: use replyToReply, postId = widget.originalPostId, parentReplyId = widget.post['_id'].
+
+          // Case 2: Replying to a reply listed on the page.
+          //         _parentReplyId will be the ID of that listed reply.
+          //         Use replyToReply, postId = widget.originalPostId ?? widget.post['_id'], parentReplyId = _parentReplyId.
+
+          // Let's use the DataController methods as they are designed:
+          // replyToPost(data) - data['postId'] is the ID of the post being directly replied to.
+          // replyToReply(data) - data['postId'] is root, data['parentReplyId'] is the reply being replied to.
+
+          // If _parentReplyId is set (meaning user clicked reply on something):
+          if (_parentReplyId != null) {
+            // Is _parentReplyId the root post of the entire thread?
+            // The root post of the thread is `ultimateRootPostId`.
+            // If we are replying to the `ultimateRootPostId` itself, it's a "direct reply to root".
+            // This should use an API like `replyToPost` where `postId` is `ultimateRootPostId`.
+
+            // However, `_parentReplyId` is set by clicking reply on an item displayed.
+            // If that item *is* the `ultimateRootPostId` (i.e., `_mainPostData['_id'] == ultimateRootPostId`),
+            // then we are replying to the root.
+            // Otherwise, we are replying to some reply.
+
+            bool isReplyingToRootPostOfThread = (_parentReplyId == ultimateRootPostId);
+            // A special case: if this ReplyPage is for a reply (widget.originalPostId != null),
+            // and we click "reply" on _mainPostData (which is a reply itself), then _parentReplyId becomes _mainPostData['_id'].
+            // In this scenario, we are replying to _mainPostData. This is a "reply to a reply".
+            // `ultimateRootPostId` is widget.originalPostId. `_parentReplyId` is _mainPostData['_id'].
+
+            if (isReplyingToRootPostOfThread && _parentReplyId == widget.post['_id'] && widget.originalPostId == null) {
+              // Replying to the main post of this page, AND this page is for the root post.
+              // This is a direct reply to the root post.
+               final replyToPostData = {
+                'postId': _parentReplyId, // ID of the root post being replied to
+                'content': _replyController.text.trim(),
+                'attachments': uploadedReplyAttachments,
+              };
+              result = await _dataController.replyToPost(replyToPostData);
+            } else {
+              // Replying to a reply (either a reply listed under _mainPostData, or _mainPostData itself if it's a reply)
+              final replyToReplyData = {
+                'postId': ultimateRootPostId, // ID of the original root post
+                'parentReplyId': _parentReplyId, // ID of the reply we are replying to
+                'content': _replyController.text.trim(),
+                'attachments': uploadedReplyAttachments,
+              };
+              result = await _dataController.replyToReply(replyToReplyData);
+            }
+          } else {
+             // This case should ideally not happen if _showReplyField is true,
+             // as _parentReplyId should be set. Defaulting to replying to the main post of the page.
+             // This means _parentReplyId should have been widget.post['_id'].
+             // If widget.post is root:
+             if (widget.originalPostId == null) { // widget.post is the root
+                final replyToPostData = {
+                  'postId': widget.post['_id']!,
+                  'content': _replyController.text.trim(),
+                  'attachments': uploadedReplyAttachments,
+                };
+                result = await _dataController.replyToPost(replyToPostData);
+             } else { // widget.post is a reply
+                final replyToReplyData = {
+                  'postId': widget.originalPostId!, // root post
+                  'parentReplyId': widget.post['_id']!, // replying to the reply this page is for
+                  'content': _replyController.text.trim(),
+                  'attachments': uploadedReplyAttachments,
+                };
+                result = await _dataController.replyToReply(replyToReplyData);
+             }
+          }
       }
+
 
       if (!mounted) return;
 
       if (result['success'] == true) {
-        _showSnackBar('Success', result['message'] ?? 'Reply posted!', Colors.teal[700]!);
+        // _showSnackBar('Success', result['message'] ?? 'Reply posted!', Colors.teal[700]!, isSuccess: true);
         _replyController.clear();
-        _replyAttachments.clear();
+        if(mounted) setState(() { _replyAttachments.clear(); });
 
-        // If a new reply object is returned by the backend, add it.
-        // Otherwise, refresh all replies for the main post to see the new reply.
-        // This is crucial for replies to replies, as they might be nested.
-        final newReplyData = result['reply'] as Map<String, dynamic>?;
-        if (newReplyData != null) {
-           // TODO: This needs to be smarter for nested replies.
-           // If it's a reply to a reply, we need to find the parent reply in _replies
-           // and add this newReplyData to its 'replies' list, or trigger a refresh.
-           // For simplicity now, always refreshing if it was a reply to a reply,
-           // or if newReplyData is null.
-           if (_parentReplyId != null && _parentReplyId != postId) {
-            await _fetchPostReplies(showLoadingIndicator: false); // Refresh to get nested
-           } else {
-             setState(() {
-               _replies.insert(0, newReplyData); // Add to top for direct replies to main post
-             });
-           }
-        } else {
-          await _fetchPostReplies(showLoadingIndicator: false); // Refresh replies list
+        await _fetchPostReplies(showLoadingIndicator: false); // Refresh replies list
+
+        if(mounted) {
+          setState(() {
+            _parentReplyId = null;
+            _showReplyField = false;
+          });
         }
-
-        setState(() {
-           _parentReplyId = null; // Reset parent reply ID
-           _showReplyField = false; // Optionally hide reply field after successful submission
-        });
-
       } else {
         _showSnackBar('Error', result['message'] ?? 'Failed to post reply.', Colors.red[700]!);
       }
     } catch (e) {
       print('Error in _submitReply: $e');
-      // Ensure _isSubmittingReply is reset even if an error occurs before the finally block
-      // (though finally should cover it)
       if (mounted) {
          _showSnackBar('Error', 'An unexpected error occurred: ${e.toString()}', Colors.red[700]!);
-      }
-      if (mounted) {
-        _showSnackBar('Error', 'An unexpected error occurred: ${e.toString()}',
-            Colors.red[700]!);
       }
     } finally {
       if (mounted) {
@@ -459,16 +438,78 @@ class _ReplyPageState extends State<ReplyPage> {
     }
   }
 
+
+  // Helper to build the list of replies recursively
+  List<Widget> _buildRepliesList(List<Map<String, dynamic>> replies, int currentIndentationLevel) {
+    List<Widget> widgets = [];
+    for (var reply in replies) {
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 1.0), // Minimal vertical padding
+          child: PostContent(
+            postData: reply,
+            isReply: true,
+            indentationLevel: currentIndentationLevel,
+            // Determine if this reply should be a "preview"
+            // For now, let's say only direct children (level 0) are not previews, deeper ones are.
+            // This logic might need to be more sophisticated based on requirements.
+            isPreview: currentIndentationLevel > 0, // Example: children of direct replies are previews
+            pageOriginalPostId: widget.originalPostId ?? widget.post['_id'] as String,
+            showSnackBar: (title, message, color) => _showSnackBar(title, message, color),
+            onSharePost: _sharePost,
+            onReplyToItem: (String itemId) {
+              setState(() {
+                _parentReplyId = itemId;
+                _showReplyField = true;
+                FocusScope.of(context).requestFocus(_replyFocusNode);
+              });
+              // final replyingToUser = reply['username'] ?? 'user';
+              // _showSnackBar('Reply', 'Replying to @$replyingToUser...', Colors.teal[700]!, isSuccess: true); // Removed this snackbar
+            },
+            refreshReplies: () => _fetchPostReplies(showLoadingIndicator: false),
+            onReplyDataUpdated: (updatedReply) {
+              if (mounted) {
+                // This needs to find and update the reply in the potentially nested _replies list
+                setState(() => _updateNestedReply(_replies, updatedReply));
+              }
+            },
+          ),
+        ),
+      );
+      // If the reply has children, recursively add them
+      if (reply['children_replies'] != null && (reply['children_replies'] as List).isNotEmpty) {
+        widgets.addAll(_buildRepliesList(
+          List<Map<String, dynamic>>.from(reply['children_replies'] as List),
+          currentIndentationLevel + 1, // Increment indentation for children
+        ));
+      }
+       // Add divider only if not a preview and not the last item in its current list segment
+      if (currentIndentationLevel == 0 && !(currentIndentationLevel > 0) ) { // only for direct replies for now
+         widgets.add(Divider(color: Colors.grey[800], height: 1, indent: (currentIndentationLevel +1) * 20.0 + 56, endIndent: 10,)); // 56 = approx avatar + padding
+      }
+    }
+    return widgets;
+  }
+
+  // Helper to find and update a reply in a nested list
+  bool _updateNestedReply(List<Map<String, dynamic>> listToSearch, Map<String, dynamic> updatedReply) {
+    for (int i = 0; i < listToSearch.length; i++) {
+      if (listToSearch[i]['_id'] == updatedReply['_id']) {
+        listToSearch[i] = updatedReply;
+        return true;
+      }
+      if (listToSearch[i]['children_replies'] != null && (listToSearch[i]['children_replies'] as List).isNotEmpty) {
+        if (_updateNestedReply(List<Map<String, dynamic>>.from(listToSearch[i]['children_replies'] as List), updatedReply)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+
   @override
   Widget build(BuildContext context) {
-    // final String postUsername = widget.post['username'] as String? ?? 'User'; // No longer directly used here for AppBar title logic
-    // final DateTime parsedTimestamp = widget.post['createdAt'] is String // No longer directly used here
-    //     ? (DateTime.tryParse(widget.post['createdAt'] as String) ??
-    //         DateTime.now())
-    //     : (widget.post['createdAt'] is DateTime
-    //         ? widget.post['createdAt']
-    //         : DateTime.now());
-
     return Scaffold(
       backgroundColor: const Color(0xFF000000),
       appBar: AppBar(
@@ -478,7 +519,7 @@ class _ReplyPageState extends State<ReplyPage> {
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(FeatherIcons.moreVertical, color: Colors.white), // Using Feather icon for consistency
+            icon: const Icon(FeatherIcons.moreVertical, color: Colors.white),
             onPressed: _showActionsBottomSheet,
             tooltip: 'More Actions',
           ),
@@ -488,174 +529,63 @@ class _ReplyPageState extends State<ReplyPage> {
         children: [
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(0), // Will be handled by items
+              padding: const EdgeInsets.all(0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    decoration: BoxDecoration(
-                        border: Border(bottom: BorderSide(color: Colors.grey[800]!))),
+                  Container( // Main Post Display
+                    decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Colors.grey[800]!))),
                     child: Padding(
                       padding: const EdgeInsets.only(bottom: 20.0),
-                      // child: _buildPostContent(widget.post, isReply: false), // Old way
                       child: PostContent(
-                        postData: _mainPostData, // Use the mutable _mainPostData
-                        isReply: false,
-                        pageOriginalPostId: widget.originalPostId, // Pass the page's original post ID
-                        showSnackBar: _showSnackBar,
+                        postData: _mainPostData,
+                        isReply: false, // Main post is not a reply in its own context
+                        isPreview: false, // Main post is not a preview
+                        indentationLevel: 0,
+                        pageOriginalPostId: widget.originalPostId,
+                        showSnackBar: (title, message, color) => _showSnackBar(title, message, color),
                         onSharePost: _sharePost,
-                        onReplyToItem: (String itemId) {
+                        onReplyToItem: (String itemId) { // itemId here is _mainPostData['_id']
                           setState(() {
-                            _parentReplyId = itemId; // This will be the main post's ID
+                            _parentReplyId = itemId;
                             _showReplyField = true;
                             FocusScope.of(context).requestFocus(_replyFocusNode);
                           });
-                          _showSnackBar('Reply', 'Replying to main post...', Colors.teal[700]!);
+                          // _showSnackBar('Reply', 'Replying to main post...', Colors.teal[700]!, isSuccess: true); // Removed
                         },
                         refreshReplies: () => _fetchPostReplies(showLoadingIndicator: false),
                         onReplyDataUpdated: (updatedPost) {
-                          // This callback is for when the main post's data (likes, reposts) is changed by PostContent actions
-                          if (mounted) {
-                            setState(() {
-                              _mainPostData = updatedPost;
-                            });
-                          }
+                          if (mounted) setState(() { _mainPostData = updatedPost; });
                         },
                       ),
                     ),
                   ),
                   const SizedBox(height: 10),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 0.0), // No top padding for the list itself
+                  Padding( // Replies Section
+                    padding: const EdgeInsets.only(left: 8.0, right: 8.0, top:0.0), // Added horizontal padding
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
+                        Row( // "Replies" title and action buttons
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             _isLoadingReplies && _fetchRepliesError == null
-                                ? Row(
-                                    children: [
-                                      Text("Reloading Replies...",
-                                          style: GoogleFonts.poppins(
-                                              fontSize: 16, color: Colors.grey[400])),
-                                      const SizedBox(width: 8),
-                                      const SizedBox(
-                                          width: 16,
-                                          height: 16,
-                                          child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              valueColor:
-                                                  AlwaysStoppedAnimation<Color>(
-                                                      Colors.tealAccent))),
-                                    ],
-                                  )
-                                : Text("Replies",
-                                    style: GoogleFonts.poppins(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.white)),
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.refresh, color: Colors.tealAccent),
-                                  tooltip: "Refresh Replies",
-                                  onPressed: () =>
-                                      _fetchPostReplies(showLoadingIndicator: true),
-                                ),
-                                IconButton(
-                                  icon: Icon(
-                                      _showReplyField
-                                          ? FeatherIcons.messageCircle
-                                          : FeatherIcons.edit3,
-                                      color: Colors.tealAccent),
-                                  tooltip: _showReplyField
-                                      ? "Hide Reply Field"
-                                      : "Show Reply Field",
-                                  onPressed: () {
-                                    setState(() {
-                                      _showReplyField = !_showReplyField;
-                                      if (!_showReplyField) _parentReplyId = null;
-                                    });
-                                  },
-                                ),
-                              ],
-                            ),
+                                ? Row(children: [ Text("Reloading Replies...", style: GoogleFonts.poppins(fontSize: 16, color: Colors.grey[400])), const SizedBox(width: 8), const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent)))])
+                                : Text("Replies", style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white)),
+                            Row(children: [
+                              IconButton(icon: const Icon(Icons.refresh, color: Colors.tealAccent), tooltip: "Refresh Replies", onPressed: () => _fetchPostReplies(showLoadingIndicator: true)),
+                              IconButton(icon: Icon(_showReplyField ? FeatherIcons.messageCircle : FeatherIcons.edit3, color: Colors.tealAccent), tooltip: _showReplyField ? "Hide Reply Field" : "Show Reply Field", onPressed: () { setState(() { _showReplyField = !_showReplyField; if (!_showReplyField) _parentReplyId = null;}); }),
+                            ]),
                           ],
                         ),
                         const SizedBox(height: 8),
                         _isLoadingReplies && _fetchRepliesError == null
-                            ? const Center(
-                                child: Padding(
-                                    padding: EdgeInsets.symmetric(vertical: 20.0),
-                                    child: CircularProgressIndicator(
-                                        color: Colors.tealAccent)))
+                            ? const Center(child: Padding(padding: EdgeInsets.symmetric(vertical: 20.0), child: CircularProgressIndicator(color: Colors.tealAccent)))
                             : _fetchRepliesError != null
-                                ? Center(
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 20.0),
-                                      child: Text(
-                                        "Couldn't load replies. Tap refresh to try again.",
-                                        style: GoogleFonts.roboto(
-                                            color: Colors.redAccent, fontSize: 14),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ),
-                                  )
+                                ? Center(child: Padding(padding: const EdgeInsets.symmetric(vertical: 20.0), child: Text("Couldn't load replies. Tap refresh to try again.", style: GoogleFonts.roboto(color: Colors.redAccent, fontSize: 14), textAlign: TextAlign.center)))
                                 : _replies.isEmpty
-                                    ? Center(
-                                        child: Padding(
-                                          padding:
-                                              const EdgeInsets.symmetric(vertical: 20.0),
-                                          child: Text(
-                                            "No replies yet.",
-                                            style: GoogleFonts.roboto(
-                                                color: Colors.grey[500], fontSize: 14),
-                                          ),
-                                        ),
-                                      )
-                                    : ListView.separated(
-                                        separatorBuilder: (context, index) =>
-                                             Divider(color: Colors.grey[800]),
-                                        shrinkWrap: true,
-                                        physics: const NeverScrollableScrollPhysics(),
-                                        itemCount: _replies.length,
-                                        itemBuilder: (context, index) {
-                                          final reply = _replies[index];
-                                          return Padding(
-                                            padding: const EdgeInsets.symmetric(vertical: 1.0),
-                                            // child: _buildPostContent(reply, isReply: true), // Old way
-                                            child: PostContent(
-                                              postData: reply,
-                                              isReply: true,
-                                              pageOriginalPostId: widget.originalPostId ?? widget.post['_id'] as String, // Root post ID of the thread
-                                              showSnackBar: _showSnackBar,
-                                              onSharePost: _sharePost,
-                                              onReplyToItem: (String itemId) {
-                                                setState(() {
-                                                  _parentReplyId = itemId; // This is the ID of the reply being replied to
-                                                  _showReplyField = true;
-                                                  FocusScope.of(context).requestFocus(_replyFocusNode);
-                                                });
-                                                final replyingToUser = reply['username'] ?? 'user';
-                                                _showSnackBar('Reply', 'Replying to @$replyingToUser...', Colors.teal[700]!);
-                                              },
-                                              refreshReplies: () => _fetchPostReplies(showLoadingIndicator: false),
-                                              onReplyDataUpdated: (updatedReply) {
-                                                // This callback is for when a reply's data (likes, reposts) is changed
-                                                if (mounted) {
-                                                  setState(() {
-                                                    final replyIndex = _replies.indexWhere((r) => r['_id'] == updatedReply['_id']);
-                                                    if (replyIndex != -1) {
-                                                      _replies[replyIndex] = updatedReply;
-                                                    }
-                                                  });
-                                                }
-                                              },
-                                            ),
-                                          );
-                                        },
-                                      ),
+                                    ? Center(child: Padding(padding: const EdgeInsets.symmetric(vertical: 20.0), child: Text("No replies yet.", style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 14))))
+                                    : Column(children: _buildRepliesList(_replies, 0)), // Use recursive builder
                       ],
                     ),
                   ),
@@ -663,46 +593,24 @@ class _ReplyPageState extends State<ReplyPage> {
               ),
             ),
           ),
-          // Conditionally display the reply input area at the bottom
           if (_showReplyField)
             ReplyInputArea(
               replyFocusNode: _replyFocusNode,
-              parentReplyId: _parentReplyId,
-              mainPost: widget.post,
-              currentReplies: _replies,
-              showSnackBar: _showSnackBar,
-              onSubmitReply: ({
-                required String content,
-                required List<Map<String, dynamic>> attachments,
-                required String? parentId,
-              }) {
-                // Update controller and attachments from the child widget if necessary,
-                // though the child now manages its own controller and attachments.
-                // For this handoff, we'll use the values it passes up.
-                _replyController.text = content; // Keep it in sync if needed elsewhere, or remove if not.
+              parentReplyId: _parentReplyId, // This is the ID of the item being replied to
+              mainPost: widget.post, // The main post of the page, for context
+              currentReplies: _replies, // Pass current replies for context if needed by input area
+              showSnackBar: (title, message, color) => _showSnackBar(title, message, color),
+              onSubmitReply: ({ required String content, required List<Map<String, dynamic>> attachments, required String? parentId /* This parentId is the one from ReplyInputArea, which is _parentReplyId */}) {
+                _replyController.text = content;
                 _replyAttachments.clear();
                 _replyAttachments.addAll(attachments);
-                // _parentReplyId is already set by the UI interaction that shows the ReplyInputArea or by tapping reply on a post/reply
-                _submitReply(); // Call the existing submit logic
+                // _parentReplyId is already set correctly by onReplyToItem
+                _submitReply();
               },
-              isSubmittingReply: _isSubmittingReply, // Pass the state here
+              isSubmittingReply: _isSubmittingReply,
             ),
         ],
       ),
     );
   }
-
-// Removed _buildReplyInputArea, _pickAndAddAttachment, _showAttachmentPicker,
-// _getAndroidSdkVersion, _requestMediaPermissions as they are now part of ReplyInputArea widget or handled there.
-// The _submitReply method in ReplyPage will now be called by the callback from ReplyInputArea.
-// _replyController and _replyAttachments in ReplyPage state might still be used by _submitReply,
-// or _submitReply can be refactored to take content and attachments directly.
-// For now, _submitReply will use the state variables which are updated by the callback.
-
-// Removed _buildPostContent, _buildReplyAttachmentWidget, _buildReplyAttachmentGrid,
-// and _parseAspectRatio methods as they are now part of their respective new widget files.
-// Helper methods like _sharePost, _downloadFile are kept in ReplyPage if they are general utilities
-// or called by multiple parts of the page. _showSnackBar is also kept.
-// _showActionsBottomSheet is still here, will be handled in the next step.
-
 }

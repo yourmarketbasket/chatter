@@ -174,11 +174,14 @@ class _ReplyInputAreaState extends State<ReplyInputArea> {
             });
           });
         }
-        message =
-            '${type[0].toUpperCase()}${type.substring(1)} selected: ${file.path.split('/').last}';
-        widget.showSnackBar(dialogTitle, message, Colors.teal[700]!);
+        // Success message for selection removed
+        // message =
+        //     '${type[0].toUpperCase()}${type.substring(1)} selected: ${file.path.split('/').last}';
+        // widget.showSnackBar(dialogTitle, message, Colors.teal[700]!);
+        print('${type[0].toUpperCase()}${type.substring(1)} selected: ${file.path.split('/').last}');
       } else {
         // message = 'No file selected for $type.'; // User might cancel, not always an error
+        // Non-error snackbar for 'no file selected' also removed.
         // widget.showSnackBar(dialogTitle, message, Colors.orange);
       }
     } catch (e) {
