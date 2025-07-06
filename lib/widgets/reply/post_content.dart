@@ -340,7 +340,7 @@ class _PostContentState extends State<PostContent> {
       // Padding might still be desired for previews, but not the borders.
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
-        child: contentColumn,
+        child: contentColumn, // Corrected variable name here
       );
     }
 
