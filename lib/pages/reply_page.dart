@@ -604,7 +604,7 @@ class _ReplyPageState extends State<ReplyPage> {
                                 ? Center(child: Padding(padding: const EdgeInsets.symmetric(vertical: 20.0), child: Text("Couldn't load replies. Tap refresh to try again.", style: GoogleFonts.roboto(color: Colors.redAccent, fontSize: 14), textAlign: TextAlign.center)))
                                 : _replies.isEmpty
                                     ? Center(child: Padding(padding: const EdgeInsets.symmetric(vertical: 20.0), child: Text("No replies yet.", style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 14))))
-                                    : Column(children: _buildRepliesList(_replies, 0)), // Use recursive builder
+                                    : Column(children: _buildRepliesListWidgets()), // Use recursive builder - CORRECTED NAME
                       ],
                     ),
                   ),
@@ -631,5 +631,51 @@ class _ReplyPageState extends State<ReplyPage> {
         ],
       ),
     );
+  }
+}
+
+// Ensure _MainReplyLinePainter is defined as a top-level class or static nested class.
+// For simplicity, defining it as a top-level class here (or at least outside _ReplyPageState).
+class _MainReplyLinePainter extends CustomPainter {
+  final double lineX;
+  final double avatarRadius;
+  final bool hasNextSibling;
+  final bool hasChildren;
+
+  _MainReplyLinePainter({
+    required this.lineX,
+    required this.avatarRadius,
+    required this.hasNextSibling,
+    required this.hasChildren,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.grey[700]!
+      ..strokeWidth = 1.5;
+
+    final double effectiveLineX = this.lineX;
+    final double lineStartY = avatarRadius;
+    final double lineEndY = size.height;
+
+    canvas.drawLine(Offset(effectiveLineX, lineStartY), Offset(effectiveLineX, lineEndY), paint);
+
+    // Horizontal connector for children - deferred for now.
+    // if (hasChildren) {
+    //   final double connectorY = lineStartY + avatarRadius + 10.0; // Example Y pos
+    //   final double connectorLength = 10.0;
+    //   if (connectorY < size.height) { // Ensure connector is within bounds
+    //     canvas.drawLine(Offset(effectiveLineX, connectorY), Offset(effectiveLineX + connectorLength, connectorY), paint);
+    //   }
+    // }
+  }
+
+  @override
+  bool shouldRepaint(covariant _MainReplyLinePainter oldDelegate) {
+    return oldDelegate.lineX != lineX ||
+        oldDelegate.avatarRadius != avatarRadius ||
+        oldDelegate.hasNextSibling != hasNextSibling ||
+        oldDelegate.hasChildren != hasChildren;
   }
 }
