@@ -18,6 +18,8 @@ import 'package:http/http.dart' as http; // Used by _downloadFile
 import 'package:path_provider/path_provider.dart'; // Used by _downloadFile
 import 'package:path/path.dart' as path; // Used by _downloadFile
 
+const double SsafeLineGap = 4.0; // Safe distance for line from avatar
+
 class ReplyPage extends StatefulWidget {
   final Map<String, dynamic> post;
   final String? originalPostId; // ID of the ultimate root post of the thread
@@ -648,9 +650,8 @@ class _MainReplyLinePainter extends CustomPainter {
       ..color = Colors.grey[700]!
       ..strokeWidth = 1.5;
 
-    // Start point: bottom-center of the current first-level reply's avatar.
-    // avatarTopY is the Y where the avatar circle begins.
-    final double startY = avatarTopY + (avatarRadius * 2);
+    // Start point: bottom-center of the current first-level reply's avatar, plus safe gap.
+    final double startY = avatarTopY + (avatarRadius * 2) + SsafeLineGap;
     final Offset p1 = Offset(lineX, startY);
 
     // End point calculation
