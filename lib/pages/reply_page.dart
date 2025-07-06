@@ -284,129 +284,43 @@ class _ReplyPageState extends State<ReplyPage> {
         if (mounted) setState(() { _isSubmittingReply = false; });
         return;
       }
-      final postId = widget.post['_id'] as String?; // This is the ID of the post this ReplyPage is for.
-      final String ultimateRootPostId = widget.originalPostId ?? postId!; // ID of the ultimate root of the thread.
 
-      if (postId == null) {
-        _showSnackBar('Error', 'Cannot post reply: Original post ID is missing.', Colors.red[700]!);
-        if (mounted) setState(() { _isSubmittingReply = false; });
-        return;
+      final String ultimateRootPostId = widget.originalPostId ?? widget.post['_id']!;
+      Map<String, dynamic> result;
+
+      if (_parentReplyId == null) {
+        // This implies the reply is to the main content of the page (widget.post)
+        // This case should ideally be covered by onReplyToItem setting _parentReplyId = widget.post['_id']
+        // However, as a fallback or if the "Show Reply Field" button is used without a specific target:
+        _parentReplyId = widget.post['_id']!;
+        print("Warning: _parentReplyId was null in _submitReply. Defaulting to widget.post._id: ${_parentReplyId}");
       }
 
-      Map<String, dynamic> result;
-      // _parentReplyId is the ID of the specific item (main post or another reply) we are replying to.
-      // If _parentReplyId is null or same as postId, we are replying to the main post of this page.
-      // If _parentReplyId is different from postId, it means we are replying to a reply shown on this page.
-      if (_parentReplyId != null && _parentReplyId != postId) { // Replying to a reply
-        final replyToReplyData = {
-          'postId': ultimateRootPostId, // ID of the original root post of the thread
-          'parentReplyId': _parentReplyId, // ID of the reply we are replying to
+      // Now, _parentReplyId is the ID of the item being directly replied to.
+
+      // Check if the item we are replying to (_parentReplyId) is the actual root post of the entire thread.
+      if (_parentReplyId == ultimateRootPostId) {
+        // We are making a direct reply to the root post of the thread.
+        final replyToPostData = {
+          'postId': _parentReplyId, // The ID of the root post.
           'content': _replyController.text.trim(),
           'attachments': uploadedReplyAttachments,
         };
+        print("[ReplyPage] Submitting reply to ROOT post: $replyToPostData");
+        result = await _dataController.replyToPost(replyToPostData);
+      } else {
+        // We are replying to another reply.
+        // The item we are replying to is _parentReplyId.
+        // The root of its thread is ultimateRootPostId.
+        final replyToReplyData = {
+          'postId': ultimateRootPostId,    // ID of the original root post of the thread.
+          'parentReplyId': _parentReplyId!, // ID of the reply we are directly replying to.
+          'content': _replyController.text.trim(),
+          'attachments': uploadedReplyAttachments,
+        };
+        print("[ReplyPage] Submitting reply to REPLY: $replyToReplyData");
         result = await _dataController.replyToReply(replyToReplyData);
-      } else { // Replying to the main post (or the item this ReplyPage is focused on)
-        final replyToPostData = {
-          'postId': ultimateRootPostId, // ID of the root post for direct replies
-          // If this ReplyPage is for a reply itself (widget.originalPostId != null),
-          // then _parentReplyId here should be widget.post['_id'] to reply to *this* specific reply.
-          // So, `parentReplyId` in the API call should be `_parentReplyId` if set, otherwise null.
-          // The key in API for replyToPost is `postId` for the root, and it implicitly knows it's a direct reply.
-          // If replying to a reply, the API is `replyToReply` and needs `parentReplyId`.
-          // Let's simplify: `replyToPost` always targets the `ultimateRootPostId`.
-          // If `_parentReplyId` is set and is *not* `ultimateRootPostId`, it means we are replying to a reply, so use `replyToReply`.
-          // If `_parentReplyId` *is* `ultimateRootPostId` (or null, implying root), use `replyToPost`.
-
-          // Corrected logic:
-          // The `replyToPost` endpoint likely means replying directly to `ultimateRootPostId`.
-          // If `_parentReplyId` is set, it means we are replying to an item.
-          // If that item is the `ultimateRootPostId`, then it's a direct reply to the root.
-          // If that item is *another reply*, then we use `replyToReply`.
-
-          // The existing logic seems fine: if _parentReplyId != postId (where postId is widget.post['_id']),
-          // it's a reply to a reply. Otherwise, it's a reply to widget.post.
-          // The `postId` in `replyToPostData` should be the one being replied to.
-          // If widget.post is the root, then 'postId' is correct.
-          // If widget.post is a reply, then 'postId' is that reply's ID, and API needs to handle it.
-          // DataController's `replyToPost` takes `postId` (of item being replied to).
-          // DataController's `replyToReply` takes `postId` (of root post) and `parentReplyId` (of reply being replied to).
-
-          // Re-evaluating:
-          // If _parentReplyId is the ID of the item we are replying to.
-          // Case 1: Replying to the main post of the page (widget.post).
-          //         _parentReplyId will be widget.post['_id'].
-          //         If widget.post is the root: use replyToPost, postId = widget.post['_id'].
-          //         If widget.post is a reply: use replyToReply, postId = widget.originalPostId, parentReplyId = widget.post['_id'].
-
-          // Case 2: Replying to a reply listed on the page.
-          //         _parentReplyId will be the ID of that listed reply.
-          //         Use replyToReply, postId = widget.originalPostId ?? widget.post['_id'], parentReplyId = _parentReplyId.
-
-          // Let's use the DataController methods as they are designed:
-          // replyToPost(data) - data['postId'] is the ID of the post being directly replied to.
-          // replyToReply(data) - data['postId'] is root, data['parentReplyId'] is the reply being replied to.
-
-          // If _parentReplyId is set (meaning user clicked reply on something):
-          if (_parentReplyId != null) {
-            // Is _parentReplyId the root post of the entire thread?
-            // The root post of the thread is `ultimateRootPostId`.
-            // If we are replying to the `ultimateRootPostId` itself, it's a "direct reply to root".
-            // This should use an API like `replyToPost` where `postId` is `ultimateRootPostId`.
-
-            // However, `_parentReplyId` is set by clicking reply on an item displayed.
-            // If that item *is* the `ultimateRootPostId` (i.e., `_mainPostData['_id'] == ultimateRootPostId`),
-            // then we are replying to the root.
-            // Otherwise, we are replying to some reply.
-
-            bool isReplyingToRootPostOfThread = (_parentReplyId == ultimateRootPostId);
-            // A special case: if this ReplyPage is for a reply (widget.originalPostId != null),
-            // and we click "reply" on _mainPostData (which is a reply itself), then _parentReplyId becomes _mainPostData['_id'].
-            // In this scenario, we are replying to _mainPostData. This is a "reply to a reply".
-            // `ultimateRootPostId` is widget.originalPostId. `_parentReplyId` is _mainPostData['_id'].
-
-            if (isReplyingToRootPostOfThread && _parentReplyId == widget.post['_id'] && widget.originalPostId == null) {
-              // Replying to the main post of this page, AND this page is for the root post.
-              // This is a direct reply to the root post.
-               final replyToPostData = {
-                'postId': _parentReplyId, // ID of the root post being replied to
-                'content': _replyController.text.trim(),
-                'attachments': uploadedReplyAttachments,
-              };
-              result = await _dataController.replyToPost(replyToPostData);
-            } else {
-              // Replying to a reply (either a reply listed under _mainPostData, or _mainPostData itself if it's a reply)
-              final replyToReplyData = {
-                'postId': ultimateRootPostId, // ID of the original root post
-                'parentReplyId': _parentReplyId, // ID of the reply we are replying to
-                'content': _replyController.text.trim(),
-                'attachments': uploadedReplyAttachments,
-              };
-              result = await _dataController.replyToReply(replyToReplyData);
-            }
-          } else {
-             // This case should ideally not happen if _showReplyField is true,
-             // as _parentReplyId should be set. Defaulting to replying to the main post of the page.
-             // This means _parentReplyId should have been widget.post['_id'].
-             // If widget.post is root:
-             if (widget.originalPostId == null) { // widget.post is the root
-                final replyToPostData = {
-                  'postId': widget.post['_id']!,
-                  'content': _replyController.text.trim(),
-                  'attachments': uploadedReplyAttachments,
-                };
-                result = await _dataController.replyToPost(replyToPostData);
-             } else { // widget.post is a reply
-                final replyToReplyData = {
-                  'postId': widget.originalPostId!, // root post
-                  'parentReplyId': widget.post['_id']!, // replying to the reply this page is for
-                  'content': _replyController.text.trim(),
-                  'attachments': uploadedReplyAttachments,
-                };
-                result = await _dataController.replyToReply(replyToReplyData);
-             }
-          }
       }
-
 
       if (!mounted) return;
 

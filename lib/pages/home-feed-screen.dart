@@ -233,14 +233,12 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       GetSnackBar(
         titleText: Obx(() {
           String title = "Creating Post...";
-          // No "Success!" title anymore. Error title remains.
-          if (dataController.uploadProgress.value < 0) { // Using negative to indicate error
+          if (dataController.uploadProgress.value < 0) { // Error state
             title = "Error";
-          } else if (dataController.uploadProgress.value >= 1.0) {
-            // If complete, snackbar will be dismissed, so title for this state doesn't matter much.
-            // Could be "Completing..." or just kept as "Creating Post..."
-            title = "Finishing up...";
+          } else if (dataController.uploadProgress.value >= 1.0) { // Success state
+            title = "Success!";
           }
+          // For in-progress states, title remains "Creating Post..."
           return Text(title, style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold));
         }),
         messageText: Obx(() {
@@ -250,16 +248,15 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
              message = "Failed to create post. Please try again.";
           } else if (progress == 0) {
             message = "Preparing...";
-          } else if (progress < dataController.uploadPhaseProportion) { // Upload phase
-            double uploadPhaseProgress = progress / dataController.uploadPhaseProportion;
+          } else if (progress < DataController._uploadPhaseProportion) { // Upload phase
+            double uploadPhaseProgress = progress / DataController._uploadPhaseProportion;
             message = "Uploading attachments: ${(uploadPhaseProgress * 100).toStringAsFixed(0)}%";
           } else if (progress < 1.0) { // Save phase
             // Calculate progress within the save phase
-            double savePhaseProgress = (progress - dataController.uploadPhaseProportion) / dataController.savePhaseProportion;
+            double savePhaseProgress = (progress - DataController._uploadPhaseProportion) / DataController._savePhaseProportion;
             message = "Saving post: ${(savePhaseProgress * 100).toStringAsFixed(0)}%";
-          } else {
-            // This state (progress >= 1.0) should lead to dismissal, message not shown long.
-            message = "Post created!"; // This message will be very brief before dismissal.
+          } else { // Success state (progress >= 1.0)
+            message = "Your chatter is live!";
           }
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -291,13 +288,17 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     );
 
     // Watch for completion or error to dismiss the snackbar programmatically
+    // Only auto-dismiss for errors. Success message will persist for the GetSnackBar's duration.
     ever(dataController.uploadProgress, (double progress) {
-      if (progress >= 1.0 || progress < 0) { // Completed or error
-        Future.delayed(const Duration(milliseconds: 500), () { // Short delay for user to see final state if error
-             if (Get.isSnackbarOpen) {
-                Get.back();
-             }
-        });
+      if (progress < 0) { // Error
+        // Snackbar duration is already set to 3s for error, so it will auto-dismiss.
+        // If we wanted immediate dismissal on error:
+        // Future.delayed(const Duration(milliseconds: 100), () {
+        //   if (Get.isSnackbarOpen) Get.back();
+        // });
+      } else if (progress >= 1.0) { // Success
+        // The snackbar's own duration (3 seconds) will handle dismissal for success.
+        // No need to programmatically Get.back() here unless we want to override that.
       }
     });
 
