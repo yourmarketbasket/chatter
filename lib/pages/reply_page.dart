@@ -421,35 +421,67 @@ class _ReplyPageState extends State<ReplyPage> {
         }
       }
 
-      // Group first-level reply and its sub-replies for line painting
+      List<Widget> itemGroupChildren = [];
+
+      // Add First-Level Reply PostContent
+      itemGroupChildren.add(
+        PostContent(
+          postData: firstLevelReply,
+          isReply: true,
+          indentationLevel: 0,
+          isPreview: false,
+          drawInternalVerticalLine: false, // Main line is handled by _MainReplyLinePainter
+          pageOriginalPostId: widget.originalPostId ?? widget.post['_id'] as String,
+          showSnackBar: (title, message, color) => _showSnackBar(title, message, color),
+          onSharePost: _sharePost,
+          onReplyToItem: (String itemId) { setState(() { _parentReplyId = itemId; _showReplyField = true; FocusScope.of(context).requestFocus(_replyFocusNode); }); },
+          refreshReplies: () => _fetchPostReplies(showLoadingIndicator: false),
+          onReplyDataUpdated: (updatedReply) { if (mounted) setState(() => _updateNestedReply(_replies, updatedReply)); },
+        )
+      );
+
+      // Sub-Reply Block (with top/bottom dividers)
+      if (subReplyWidgets.isNotEmpty) {
+        // Calculate indent for these dividers to align with sub-reply content
+        // Sub-reply PostContent (indentationLevel: 1) has internal indentOffset of 20.
+        // Its text starts after its avatar area (20 + 14 + 12 = 46 from its own left edge).
+        // The sub-reply PostContent items are children of contentGroup, which is a child of Stack.
+        // Their left edge aligns with firstLevelReply PostContent's left edge.
+        // The padding for the line area itself is lineAndAvatarAreaTotalWidth (20).
+        // So, the indent for divider should be from the edge of the contentGroup.
+        // If contentGroup starts at X=0 of the stack item, then this PostContent starts at X=0.
+        // The first-level reply's PostContent (level 0) has its text start at X = 14(radius)+12(padding)=26.
+        // The sub-reply PostContent (level 1) has its text start at X = 20(L1_indent) + 14(radius)+12(padding)=46.
+        final double subReplyBlockDividerIndent = (firstLevelAvatarRadius + avatarRightPadding) + 20.0; // Aligns with text of level 1 reply if avatar areas are same.
+                                                                                                    // More simply: indent to where sub-reply content starts.
+                                                                                                    // PostContent L0 text starts at ~26px from its left.
+                                                                                                    // PostContent L1 text starts at ~46px from its left.
+                                                                                                    // The sub-reply block itself is padded by 20px.
+                                                                                                    // So, divider indent relative to sub-reply block's left edge is 26px.
+
+        itemGroupChildren.add(
+          Padding(
+            padding: const EdgeInsets.only(left: 20.0), // This is the padding for the sub-reply block itself
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Indent for divider should match where PostContent (indentationLevel:1) starts its own content area for avatar.
+                // PostContent's avatar padding is `left: widget.isReply ? indentOffset : 8.0`.
+                // For indentationLevel:1, indentOffset is 20.0.
+                Divider(color: Colors.grey[800], height: 1, thickness: 0.5, indent: 20.0, endIndent: 10),
+                ...subReplyWidgets, // These are already PostContent(isPreview:true)
+                // "Show more" button is already part of subReplyWidgets if applicable
+                // Bottom divider for the sub-reply block
+                Divider(color: Colors.grey[800], height: 1, thickness: 0.5, indent: 20.0, endIndent: 10),
+              ],
+            ),
+          )
+        );
+      }
+
       Widget contentGroup = Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          PostContent( // First-level reply
-            postData: firstLevelReply,
-            isReply: true,
-            indentationLevel: 0,
-            isPreview: false,
-            drawInternalVerticalLine: false, // Main line is handled by _MainReplyLinePainter
-            pageOriginalPostId: widget.originalPostId ?? widget.post['_id'] as String,
-            showSnackBar: (title, message, color) => _showSnackBar(title, message, color),
-            onSharePost: _sharePost,
-            onReplyToItem: (String itemId) { setState(() { _parentReplyId = itemId; _showReplyField = true; FocusScope.of(context).requestFocus(_replyFocusNode); }); },
-            refreshReplies: () => _fetchPostReplies(showLoadingIndicator: false),
-            onReplyDataUpdated: (updatedReply) { if (mounted) setState(() => _updateNestedReply(_replies, updatedReply)); },
-          ),
-          if (subReplyWidgets.isNotEmpty)
-            Padding(
-              // Sub-replies content should be indented relative to the start of the first-level reply's content area.
-              // The first-level reply's PostContent itself will handle its internal padding for its text.
-              // This padding here is for the *block* of sub-replies.
-              // It should be indented by `indentationLevel: 1`'s offset (20.0) from where the parent content begins.
-              // The parent content begins after `lineAndAvatarAreaTotalWidth`.
-              // So, this should effectively be `20.0` to align with PostContent's level 1 indent.
-              padding: const EdgeInsets.only(left: 20.0),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: subReplyWidgets),
-            ),
-        ],
+        children: itemGroupChildren,
       );
 
       widgets.add(

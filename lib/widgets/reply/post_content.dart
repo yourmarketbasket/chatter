@@ -133,7 +133,7 @@ class _PostContentState extends State<PostContent> {
       _dataController.viewReply(threadOriginalPostId, currentEntryId);
     }
 
-    Widget content = Column(
+    Widget contentColumn = Column( // Renamed to contentColumn to avoid conflict with content variable below
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
@@ -335,19 +335,16 @@ class _PostContentState extends State<PostContent> {
     );
 
     if (widget.isPreview) {
-      return Container(
-        decoration: BoxDecoration(
-          border: Border(
-            top: BorderSide(color: Colors.grey[800]!, width: 0.5),
-            bottom: BorderSide(color: Colors.grey[800]!, width: 0.5),
-          ),
-        ),
-        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0), // Added horizontal padding
-        child: content,
+      // If it's a preview, just return the contentColumn without the explicit top/bottom borders here.
+      // The ReplyPage will handle adding a single divider before/after the block of previews.
+      // Padding might still be desired for previews, but not the borders.
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+        child: contentColumn,
       );
     }
 
-    // Base padding for all items, adjusted if it's a reply for indentation
+    // Base padding for all non-preview items, adjusted if it's a reply for indentation
     final EdgeInsets outerPadding = widget.isReply
         ? EdgeInsets.only(left: 4.0, right: 4.0, top: 4.0, bottom: 4.0) // Consistent padding for replies
         : EdgeInsets.only(left: 8.0, right: 4.0, top: 8.0, bottom: 4.0); // Padding for main post
