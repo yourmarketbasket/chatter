@@ -353,59 +353,164 @@ class _ReplyPageState extends State<ReplyPage> {
   }
 
 
-  // Helper to build the list of replies recursively
-  List<Widget> _buildRepliesList(List<Map<String, dynamic>> replies, int currentIndentationLevel) {
+  // Builds the list of replies, including first-level replies and previews of their sub-replies.
+  List<Widget> _buildRepliesListWidgets() {
     List<Widget> widgets = [];
-    for (var reply in replies) {
-      widgets.add(
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 1.0), // Minimal vertical padding
-          child: PostContent(
-            postData: reply,
+    if (_replies == null) return widgets;
+
+    // Define constants for avatar and padding to calculate line positions
+    const double firstLevelAvatarRadius = 14.0; // From PostContent for isReply=true
+    const double avatarRightPadding = 12.0; // Padding to the right of avatar in PostContent
+    // Space allocated for the main vertical line and visual separation before content starts
+    const double lineAndAvatarAreaTotalWidth = 20.0; // Matches PostContent's internal line area (avatarRadius + 6 for line)
+    // Indentation for the content of first-level replies, after the line/avatar area
+    const double firstLevelContentIndent = firstLevelAvatarRadius * 2 + avatarRightPadding; // Standard content start after avatar
+
+    for (int i = 0; i < _replies.length; i++) {
+      final firstLevelReply = _replies[i];
+      final bool isLastFirstLevelReplyInList = i == _replies.length - 1;
+
+      List<Widget> subReplyWidgets = [];
+      final List<Map<String, dynamic>> childrenReplies = List<Map<String, dynamic>>.from(firstLevelReply['children_replies'] ?? []);
+
+      if (childrenReplies.isNotEmpty) {
+        int subRepliesToShow = childrenReplies.length > 3 ? 3 : childrenReplies.length;
+        for (int j = 0; j < subRepliesToShow; j++) {
+          final subReply = childrenReplies[j];
+          subReplyWidgets.add(
+            PostContent(
+              postData: subReply,
+              isReply: true,
+              indentationLevel: 1,
+              isPreview: true,
+              pageOriginalPostId: widget.originalPostId ?? widget.post['_id'] as String,
+              showSnackBar: (title, message, color) => _showSnackBar(title, message, color),
+              onSharePost: _sharePost,
+              onReplyToItem: (String itemId) { setState(() { _parentReplyId = itemId; _showReplyField = true; FocusScope.of(context).requestFocus(_replyFocusNode); }); },
+              refreshReplies: () => _fetchPostReplies(showLoadingIndicator: false),
+              onReplyDataUpdated: (updatedReply) {
+                if (mounted) {
+                  setState(() {
+                    final parentIndex = _replies.indexWhere((r) => r['_id'] == firstLevelReply['_id']);
+                    if (parentIndex != -1) {
+                      final childrenList = _replies[parentIndex]['children_replies'] as List<Map<String,dynamic>>?;
+                      if (childrenList != null) {
+                        final childIndex = childrenList.indexWhere((c) => c['_id'] == updatedReply['_id']);
+                        if (childIndex != -1) childrenList[childIndex] = updatedReply;
+                      }
+                    }
+                  });
+                }
+              },
+            ),
+          );
+        }
+        if (childrenReplies.length > 3) {
+          subReplyWidgets.add(
+            Padding(
+              padding: const EdgeInsets.only(left: 20.0, top: 4.0, bottom: 8.0), // Indent "show more" slightly more
+              child: TextButton(
+                onPressed: () {
+                   Navigator.push(context, MaterialPageRoute(builder: (context) => ReplyPage(post: firstLevelReply, originalPostId: widget.originalPostId ?? widget.post['_id'] as String)));
+                },
+                child: Text('Show ${childrenReplies.length - 3} more replies', style: GoogleFonts.poppins(color: Colors.tealAccent, fontSize: 13)),
+              ),
+            ),
+          );
+        }
+      }
+
+      // Group first-level reply and its sub-replies for line painting
+      Widget contentGroup = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          PostContent( // First-level reply
+            postData: firstLevelReply,
             isReply: true,
-            indentationLevel: currentIndentationLevel,
-            // Determine if this reply should be a "preview"
-            // For now, let's say only direct children (level 0) are not previews, deeper ones are.
-            // This logic might need to be more sophisticated based on requirements.
-            isPreview: currentIndentationLevel > 0, // Example: children of direct replies are previews
+            indentationLevel: 0,
+            isPreview: false,
+            drawInternalVerticalLine: false, // Main line is handled by _MainReplyLinePainter
             pageOriginalPostId: widget.originalPostId ?? widget.post['_id'] as String,
             showSnackBar: (title, message, color) => _showSnackBar(title, message, color),
             onSharePost: _sharePost,
-            onReplyToItem: (String itemId) {
-              setState(() {
-                _parentReplyId = itemId;
-                _showReplyField = true;
-                FocusScope.of(context).requestFocus(_replyFocusNode);
-              });
-              // final replyingToUser = reply['username'] ?? 'user';
-              // _showSnackBar('Reply', 'Replying to @$replyingToUser...', Colors.teal[700]!, isSuccess: true); // Removed this snackbar
-            },
+            onReplyToItem: (String itemId) { setState(() { _parentReplyId = itemId; _showReplyField = true; FocusScope.of(context).requestFocus(_replyFocusNode); }); },
             refreshReplies: () => _fetchPostReplies(showLoadingIndicator: false),
-            onReplyDataUpdated: (updatedReply) {
-              if (mounted) {
-                // This needs to find and update the reply in the potentially nested _replies list
-                setState(() => _updateNestedReply(_replies, updatedReply));
-              }
-            },
+            onReplyDataUpdated: (updatedReply) { if (mounted) setState(() => _updateNestedReply(_replies, updatedReply)); },
           ),
-        ),
+          if (subReplyWidgets.isNotEmpty)
+            Padding(
+              // Sub-replies content should be indented relative to the start of the first-level reply's content area.
+              // The first-level reply's PostContent itself will handle its internal padding for its text.
+              // This padding here is for the *block* of sub-replies.
+              // It should be indented by `indentationLevel: 1`'s offset (20.0) from where the parent content begins.
+              // The parent content begins after `lineAndAvatarAreaTotalWidth`.
+              // So, this should effectively be `20.0` to align with PostContent's level 1 indent.
+              padding: const EdgeInsets.only(left: 20.0),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: subReplyWidgets),
+            ),
+        ],
       );
-      // If the reply has children, recursively add them
-      if (reply['children_replies'] != null && (reply['children_replies'] as List).isNotEmpty) {
-        widgets.addAll(_buildRepliesList(
-          List<Map<String, dynamic>>.from(reply['children_replies'] as List),
-          currentIndentationLevel + 1, // Increment indentation for children
-        ));
-      }
-       // Add divider only if not a preview and not the last item in its current list segment
-      if (currentIndentationLevel == 0 && !(currentIndentationLevel > 0) ) { // only for direct replies for now
-         widgets.add(Divider(color: Colors.grey[800], height: 1, indent: (currentIndentationLevel +1) * 20.0 + 56, endIndent: 10,)); // 56 = approx avatar + padding
+
+      widgets.add(
+        IntrinsicHeight( // Ensure Stack children can be measured if needed, though painter might not need it.
+          child: Stack(
+            children: [
+              // The CustomPaint for the main vertical line.
+              // It's positioned at the start of the Stack, and contentGroup is padded left.
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: _MainReplyLinePainter(
+                    lineX: lineAndAvatarAreaTotalWidth / 2, // Centered in the allocated space
+                    avatarRadius: firstLevelAvatarRadius,
+                    hasNextSibling: !isLastFirstLevelReplyInList,
+                    // hasChildren is not strictly needed by the painter if we don't draw a horizontal connector yet
+                    // but keeping it doesn't harm and might be useful for future enhancements.
+                    hasChildren: childrenReplies.isNotEmpty,
+                  ),
+                ),
+              ),
+              Padding(
+                // Shift contentGroup to the right to make space for the line drawing area
+                padding: const EdgeInsets.only(left: lineAndAvatarAreaTotalWidth),
+                child: contentGroup,
+              ),
+            ],
+          ),
+        )
+      );
+
+      if (!isLastFirstLevelReplyInList) {
+        // Divider's indent should align with the start of the content of first-level replies
+        // which is after lineAndAvatarAreaTotalWidth + PostContent's internal avatar area (left padding of PostContent for avatar + avatar width + right padding of avatar)
+        // PostContent for level 0 has effective avatar area start at 0, avatar radius 14, right padding 12.
+        // So content starts after 0 + 14*2 + 12 = 40 from its own left edge.
+        // The left edge of PostContent is already lineAndAvatarAreaTotalWidth from the Stack's left.
+        // So, indent = lineAndAvatarAreaTotalWidth. (No, this is where the content *starts*, PostContent handles its own avatar padding)
+        // The divider should start where the text content of the PostContent starts.
+        // PostContent's padding logic: left: widget.isReply ? indentOffset : 8.0. For level 0 reply, indentOffset is 0.
+        // Then avatar area. Avatar: CircleAvatar(radius: 14). Padding around avatar: right: 12.0.
+        // So text starts roughly at lineAndAvatarAreaTotalWidth + (isReply ? 0 : 8.0) + 14 (avatar radius, for center) + 12 (avatar right padding).
+        // Let's use the previously defined firstLevelContentIndent which is from very left.
+        // The contentGroup is already padded by lineAndAvatarAreaTotalWidth.
+        // PostContent's internal padding for its content (after avatar) is what matters here.
+        // For a level 0 reply, PostContent's avatar is at left:0 (within its box), radius 14, right padding 12. Content starts after that.
+        // So, the indent for the divider should be: lineAndAvatarAreaTotalWidth + (avatarRadius + avatarRightPadding)
+        // No, it's simpler: lineAndAvatarAreaTotalWidth + (firstLevelAvatarRadius + avatarRightPadding + firstLevelAvatarRadius (other side of avatar))
+        // Let's use: lineAndAvatarAreaTotalWidth + firstLevelAvatarRadius (center of avatar) + avatarRightPadding (space after avatar)
+        // Or more simply, align with the start of PostContent's main text body.
+        // PostContent's text is inside an Expanded Column, which is sibling to avatar's Padding.
+        // Avatar padding: EdgeInsets.only(left: widget.isReply ? indentOffset : 8.0, right: 12.0). For level 0 reply, left is 0.
+        // So, the space for avatar is radius + right padding.
+        // The text starts after the avatar. So the divider indent from the edge of the contentGroup is radius + right padding.
+        // The contentGroup itself is padded by lineAndAvatarAreaTotalWidth.
+        // So, total indent: lineAndAvatarAreaTotalWidth + firstLevelAvatarRadius + avatarRightPadding.
+        widgets.add(Divider(color: Colors.grey[800], height: 1, indent: lineAndAvatarAreaTotalWidth + firstLevelAvatarRadius + avatarRightPadding, endIndent: 10));
       }
     }
     return widgets;
   }
 
-  // Helper to find and update a reply in a nested list
+  // Helper to find and update a reply in a nested list (can be simplified if only one level of children is managed in state)
   bool _updateNestedReply(List<Map<String, dynamic>> listToSearch, Map<String, dynamic> updatedReply) {
     for (int i = 0; i < listToSearch.length; i++) {
       if (listToSearch[i]['_id'] == updatedReply['_id']) {

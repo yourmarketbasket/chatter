@@ -25,19 +25,21 @@ class PostContent extends StatefulWidget {
   final Function(String parentReplyId) onReplyToItem; // Callback to initiate a reply
   final Function() refreshReplies; // Callback to refresh replies list after an action
   final Function(Map<String, dynamic> updatedReplyData) onReplyDataUpdated;
+  final bool drawInternalVerticalLine; // New flag
 
   const PostContent({
     Key? key,
     required this.postData,
     required this.isReply,
-    this.indentationLevel = 0, // Default value
-    this.isPreview = false, // Default value
+    this.indentationLevel = 0,
+    this.isPreview = false,
     this.pageOriginalPostId,
     required this.showSnackBar,
     required this.onSharePost,
     required this.onReplyToItem,
     required this.refreshReplies,
     required this.onReplyDataUpdated,
+    this.drawInternalVerticalLine = true, // Default to true
   }) : super(key: key);
 
   @override
@@ -144,9 +146,9 @@ class _PostContentState extends State<PostContent> {
                 top: 8.0,
                 right: 12.0,
               ),
-              child: widget.isReply && !widget.isPreview // Only show line for grouped, non-preview replies
+              child: widget.isReply && !widget.isPreview && widget.drawInternalVerticalLine
                   ? CustomPaint(
-                      painter: _VerticalLinePainter(avatarRadius: avatarRadius, avatarLeftPadding: 0), // No extra padding here
+                      painter: _VerticalLinePainter(avatarRadius: avatarRadius, avatarLeftPadding: 0),
                       child: Padding(
                         padding: EdgeInsets.only(left: avatarRadius + 6), // Space for line then avatar
                         child: CircleAvatar(
