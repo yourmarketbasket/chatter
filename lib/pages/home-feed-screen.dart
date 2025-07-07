@@ -548,11 +548,17 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
             children: [
               GestureDetector(
                 onTap: () {
-                  // Extract or determine userId. Assuming 'userId' is a field in the 'post' map.
-                  // If 'userId' is not directly on post, this needs adjustment (e.g. post['user']['_id'])
-                  String authorUserId = post['userId'] as String? ??
-                                        (post['user'] is Map ? post['user']['_id'] as String? : null) ??
-                                        postId; // Fallback to postId if no specific userId, though not ideal for profiles.
+                  String? authorUserId;
+                  if (post['user'] is Map && (post['user'] as Map).containsKey('_id')) {
+                    authorUserId = post['user']['_id'] as String?;
+                  } else if (post['userId'] is String) {
+                    authorUserId = post['userId'] as String?;
+                  } else if (post['userId'] is Map && (post['userId'] as Map).containsKey('_id')) {
+                    // Less common, but handle if userId itself is an object
+                    authorUserId = post['userId']['_id'] as String?;
+                  }
+                  authorUserId ??= postId; // Fallback to postId if no proper userId found
+
                   _navigateToProfilePage(context, authorUserId, username, userAvatar);
                 },
                 child: CircleAvatar(

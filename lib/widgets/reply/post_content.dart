@@ -244,9 +244,15 @@ class _PostContentState extends State<PostContent> {
                         padding: EdgeInsets.only(left: avatarRadius + 6),
                         child: GestureDetector(
                           onTap: () {
-                            String authorUserId = _currentPostData['userId'] as String? ??
-                                                (_currentPostData['user'] is Map ? _currentPostData['user']['_id'] as String? : null) ??
-                                                currentEntryId; // Fallback, not ideal for profile
+                            String? authorUserId;
+                            if (_currentPostData['user'] is Map && (_currentPostData['user'] as Map).containsKey('_id')) {
+                              authorUserId = _currentPostData['user']['_id'] as String?;
+                            } else if (_currentPostData['userId'] is String) {
+                              authorUserId = _currentPostData['userId'] as String?;
+                            } else if (_currentPostData['userId'] is Map && (_currentPostData['userId'] as Map).containsKey('_id')) {
+                              authorUserId = _currentPostData['userId']['_id'] as String?;
+                            }
+                            authorUserId ??= currentEntryId; // Fallback to currentEntryId (post/reply ID)
                             _navigateToProfilePage(context, authorUserId, username, userAvatar);
                           },
                           child: CircleAvatar(
@@ -269,9 +275,15 @@ class _PostContentState extends State<PostContent> {
                     )
                   : GestureDetector(
                       onTap: () {
-                        String authorUserId = _currentPostData['userId'] as String? ??
-                                            (_currentPostData['user'] is Map ? _currentPostData['user']['_id'] as String? : null) ??
-                                            currentEntryId; // Fallback
+                        String? authorUserId;
+                        if (_currentPostData['user'] is Map && (_currentPostData['user'] as Map).containsKey('_id')) {
+                          authorUserId = _currentPostData['user']['_id'] as String?;
+                        } else if (_currentPostData['userId'] is String) {
+                          authorUserId = _currentPostData['userId'] as String?;
+                        } else if (_currentPostData['userId'] is Map && (_currentPostData['userId'] as Map).containsKey('_id')) {
+                          authorUserId = _currentPostData['userId']['_id'] as String?;
+                        }
+                        authorUserId ??= currentEntryId; // Fallback
                         _navigateToProfilePage(context, authorUserId, username, userAvatar);
                       },
                       child: CircleAvatar(
