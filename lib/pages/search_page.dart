@@ -44,18 +44,49 @@ class _SearchPageState extends State<SearchPage> {
     }
 
     final allPosts = _dataController.posts.toList();
+    final Set<String> addedPostIds = {}; // To track IDs of posts already added
+    final List<Map<String, dynamic>> postsToDisplay = [];
+    final String query = _searchQuery.toLowerCase();
 
-    final filteredPosts = allPosts.where((post) {
-      final content = post['content'] as String? ?? '';
-      final username = post['username'] as String? ?? '';
-      final contentMatches = content.toLowerCase().contains(_searchQuery.toLowerCase());
-      final usernameMatches = username.toLowerCase().contains(_searchQuery.toLowerCase());
-      return contentMatches || usernameMatches;
-    }).toList();
+    for (var post in allPosts) {
+      final String postId = post['_id'] as String? ?? '';
+      if (postId.isEmpty || addedPostIds.contains(postId)) {
+        continue; // Skip if no ID or already added
+      }
+
+      // Check main post content and username
+      final String postContent = post['content'] as String? ?? '';
+      final String postUsername = post['username'] as String? ?? '';
+      bool matches = postContent.toLowerCase().contains(query) ||
+                     postUsername.toLowerCase().contains(query);
+
+      if (matches) {
+        postsToDisplay.add(post);
+        addedPostIds.add(postId);
+        continue; // Move to next post
+      }
+
+      // Check replies if main post didn't match
+      final List<dynamic> repliesRaw = post['replies'] as List<dynamic>? ?? [];
+      if (repliesRaw.isNotEmpty) {
+        for (var replyRaw in repliesRaw) {
+          if (replyRaw is Map<String, dynamic>) {
+            final String replyContent = replyRaw['content'] as String? ?? '';
+            final String replyUsername = replyRaw['username'] as String? ?? ''; // Assuming replies also have a username
+
+            if (replyContent.toLowerCase().contains(query) || replyUsername.toLowerCase().contains(query)) {
+              postsToDisplay.add(post); // Add the parent post
+              addedPostIds.add(postId);
+              break; // Found a matching reply, no need to check other replies for this post
+            }
+          }
+        }
+      }
+    }
 
     if (mounted) {
       setState(() {
-        _searchResults = filteredPosts;
+        _searchResults = postsToDisplay;
       });
     }
   }
