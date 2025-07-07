@@ -1446,4 +1446,126 @@ class DataController extends GetxController {
       return {'success': false, 'message': errorMessage};
     }
   }
+
+  Future<Map<String, dynamic>> followUser(String userIdToFollow) async {
+    final String? token = user.value['token'];
+    final String? currentUserId = user.value['user']?['_id'];
+
+    if (token == null || currentUserId == null) {
+      return {'success': false, 'message': 'User not authenticated.'};
+    }
+
+    try {
+      final response = await _dio.post(
+        '/api/users/follow', // As per plan, backend needs this route
+        data: {
+          'userId': currentUserId, // The user performing the action
+          'userIdToFollow': userIdToFollow // The user to be followed
+        },
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return {'success': true, 'message': response.data['message'] ?? 'Successfully followed user.'};
+      } else {
+        return {'success': false, 'message': response.data['message'] ?? 'Failed to follow user.'};
+      }
+    } catch (e) {
+      print('[DataController] Error following user $userIdToFollow: $e');
+      String errorMessage = 'An error occurred while trying to follow.';
+      if (e is dio.DioException && e.response?.data != null && e.response!.data['message'] != null) {
+        errorMessage = e.response!.data['message'];
+      } else if (e is dio.DioException) {
+        errorMessage = e.message ?? errorMessage;
+      }
+      return {'success': false, 'message': errorMessage};
+    }
+  }
+
+  Future<Map<String, dynamic>> unfollowUser(String userIdToUnfollow) async {
+    final String? token = user.value['token'];
+    final String? currentUserId = user.value['user']?['_id'];
+
+    if (token == null || currentUserId == null) {
+      return {'success': false, 'message': 'User not authenticated.'};
+    }
+
+    try {
+      final response = await _dio.post(
+        '/api/users/unfollow', // As per plan, backend needs this route
+        data: {
+          'userId': currentUserId, // The user performing the action
+          'userIdToUnfollow': userIdToUnfollow // The user to be unfollowed
+        },
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return {'success': true, 'message': response.data['message'] ?? 'Successfully unfollowed user.'};
+      } else {
+        return {'success': false, 'message': response.data['message'] ?? 'Failed to unfollow user.'};
+      }
+    } catch (e) {
+      print('[DataController] Error unfollowing user $userIdToUnfollow: $e');
+      String errorMessage = 'An error occurred while trying to unfollow.';
+      if (e is dio.DioException && e.response?.data != null && e.response!.data['message'] != null) {
+        errorMessage = e.response!.data['message'];
+      } else if (e is dio.DioException) {
+        errorMessage = e.message ?? errorMessage;
+      }
+      return {'success': false, 'message': errorMessage};
+    }
+  }
+
+  Future<Map<String, dynamic>> updateAboutInfo(String aboutText) async {
+    final String? token = user.value['token'];
+    final String? currentUserId = user.value['user']?['_id'];
+
+    if (token == null || currentUserId == null) {
+      return {'success': false, 'message': 'User not authenticated. Please log in again.'};
+    }
+
+    try {
+      final response = await _dio.put(
+        '/api/users/me/about', // Endpoint to update "about" for the logged-in user
+        data: {'about': aboutText},
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        // Optimistically update local user data
+        if (user.value['user'] is Map) {
+          var updatedUserObject = Map<String, dynamic>.from(user.value['user']);
+          updatedUserObject['about'] = aboutText; // Assuming the backend returns the updated user or just the new 'about' text
+
+          var mainUserMap = Map<String, dynamic>.from(user.value);
+          mainUserMap['user'] = updatedUserObject;
+          user.value = mainUserMap;
+          user.refresh();
+
+          // Save updated user object to secure storage
+          await _storage.write(key: 'user', value: jsonEncode(user.value));
+          print('[DataController] "About" info updated locally and in storage.');
+        }
+        return {'success': true, 'message': response.data['message'] ?? 'About information updated successfully.'};
+      } else {
+        return {'success': false, 'message': response.data['message'] ?? 'Failed to update about information.'};
+      }
+    } catch (e) {
+      print('[DataController] Error updating about info: $e');
+      String errorMessage = 'An error occurred while updating about information.';
+      if (e is dio.DioException && e.response?.data != null && e.response!.data['message'] != null) {
+        errorMessage = e.response!.data['message'];
+      } else if (e is dio.DioException) {
+        errorMessage = e.message ?? errorMessage;
+      }
+      return {'success': false, 'message': errorMessage};
+    }
+  }
 }

@@ -28,6 +28,7 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _isLoading = true;
   Map<String, dynamic>? _profileData;
   String? _error;
+  bool _isFollowProcessing = false; // For Follow/Unfollow button loading state
 
   @override
   void initState() {
@@ -35,12 +36,14 @@ class _ProfilePageState extends State<ProfilePage> {
     _loadProfileData();
   }
 
-  Future<void> _loadProfileData() async {
+  Future<void> _loadProfileData({bool showLoading = true}) async {
     if (!mounted) return;
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    if (showLoading) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
 
     final result = await _dataController.fetchUserProfile(widget.username);
 
@@ -49,15 +52,60 @@ class _ProfilePageState extends State<ProfilePage> {
     if (result['success'] == true && result['user'] != null) {
       setState(() {
         _profileData = result['user'] as Map<String, dynamic>;
-        _isLoading = false;
+        if (showLoading) _isLoading = false;
       });
     } else {
       setState(() {
         _error = result['message'] as String? ?? 'Failed to load profile.';
-        _isLoading = false;
+        if (showLoading) _isLoading = false;
       });
     }
   }
+
+  Future<void> _toggleFollow() async {
+    if (_isFollowProcessing || _profileData == null) return;
+
+    setState(() {
+      _isFollowProcessing = true;
+    });
+
+    final String loggedInUserId = _dataController.user.value['user']?['_id'] ?? '';
+    final String targetUserId = _profileData!['_id'] as String; // ID of the profile being viewed
+
+    // Determine if currently following
+    final List<dynamic> followersList = _profileData!['followers'] as List<dynamic>? ?? [];
+    // Assuming followersList contains user IDs or objects with an _id field
+    final bool isCurrentlyFollowing = followersList.any((follower) {
+        if (follower is String) return follower == loggedInUserId;
+        if (follower is Map && follower.containsKey('_id')) return follower['_id'] == loggedInUserId;
+        return false;
+    });
+
+    Map<String, dynamic> result;
+    if (isCurrentlyFollowing) {
+      result = await _dataController.unfollowUser(targetUserId);
+    } else {
+      result = await _dataController.followUser(targetUserId);
+    }
+
+    if (mounted) {
+      setState(() {
+        _isFollowProcessing = false;
+      });
+      if (result['success'] == true) {
+        // Refresh profile data to get updated follower counts and button state
+        _loadProfileData(showLoading: false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['message'] ?? 'Action successful!'), backgroundColor: Colors.green),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['message'] ?? 'Action failed.'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -155,46 +203,85 @@ class _ProfilePageState extends State<ProfilePage> {
                             style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 14),
                           ),
                         const SizedBox(height: 20),
-                        // Followers, Following, and DM Button Row
+                        // Followers and Following Counts
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 8.0),
                           child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly, // Adjust alignment as needed
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                'Followers: (coming soon)  ·  Following: (coming soon)',
-                                style: GoogleFonts.roboto(
-                                  color: Colors.grey[400],
-                                  fontSize: 14, // Slightly smaller for row layout
-                                ),
+                                // ignore: prefer_interpolation_to_compose_strings
+                                'Followers: ' + (_profileData?['followers'] as List<dynamic>? ?? []).length.toString(),
+                                style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 14),
                               ),
-                              // Removed DM button from here to place it below as per common UI patterns for clarity
+                              Text(
+                                '  ·  ',
+                                style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 14),
+                              ),
+                              Text(
+                                // ignore: prefer_interpolation_to_compose_strings
+                                'Following: ' + (_profileData?['following'] as List<dynamic>? ?? []).length.toString(),
+                                style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 14),
+                              ),
                             ],
                           ),
                         ),
-                        const SizedBox(height: 15),
-                        ElevatedButton.icon(
-                          icon: Icon(FeatherIcons.messageCircle, color: Colors.black, size: 18),
-                          label: Text(
-                            'Direct Message', // Simplified text
-                            style: GoogleFonts.poppins(color: Colors.black, fontWeight: FontWeight.w600, fontSize: 14),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.tealAccent,
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          onPressed: () {
-                            print('Direct Message button tapped for user ${widget.userId} ($displayName)');
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Direct Message functionality coming soon for $displayName!', style: GoogleFonts.roboto()),
-                                backgroundColor: Colors.tealAccent.withOpacity(0.8),
+                        const SizedBox(height: 20),
+
+                        // Follow/Unfollow and DM Buttons
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            if (_dataController.user.value['user']?['_id'] != _profileData?['_id']) // Don't show follow button for own profile
+                              ElevatedButton.icon(
+                                icon: Icon(
+                                  (_profileData?['followers'] as List<dynamic>? ?? []).any((f) => (f is String ? f : f?['_id']) == _dataController.user.value['user']?['_id'])
+                                    ? FeatherIcons.userMinus // Already following: show Unfollow
+                                    : FeatherIcons.userPlus, // Not following: show Follow
+                                  color: (_profileData?['followers'] as List<dynamic>? ?? []).any((f) => (f is String ? f : f?['_id']) == _dataController.user.value['user']?['_id'])
+                                    ? Colors.black
+                                    : Colors.black, // Icon color
+                                  size: 18,
+                                ),
+                                label: Text(
+                                  _isFollowProcessing
+                                    ? 'Processing...'
+                                    : (_profileData?['followers'] as List<dynamic>? ?? []).any((f) => (f is String ? f : f?['_id']) == _dataController.user.value['user']?['_id'])
+                                      ? 'Unfollow'
+                                      : 'Follow',
+                                  style: GoogleFonts.poppins(color: Colors.black, fontWeight: FontWeight.w600, fontSize: 14),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: (_profileData?['followers'] as List<dynamic>? ?? []).any((f) => (f is String ? f : f?['_id']) == _dataController.user.value['user']?['_id'])
+                                    ? Colors.grey[400] // Style for "Unfollow"
+                                    : Colors.tealAccent, // Style for "Follow"
+                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                onPressed: _isFollowProcessing ? null : _toggleFollow,
                               ),
-                            );
-                          },
+                            ElevatedButton.icon(
+                              icon: Icon(FeatherIcons.messageCircle, color: Colors.black, size: 18),
+                              label: Text(
+                                'Message',
+                                style: GoogleFonts.poppins(color: Colors.black, fontWeight: FontWeight.w600, fontSize: 14),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.tealAccent,
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              onPressed: () {
+                                print('Direct Message button tapped for user ${widget.userId} ($displayName)');
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Direct Message functionality coming soon for $displayName!', style: GoogleFonts.roboto()),
+                                    backgroundColor: Colors.tealAccent.withOpacity(0.8),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 20),
                         Divider(color: Colors.grey[800], thickness: 0.5),
@@ -202,7 +289,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         Align(
                           alignment: Alignment.centerLeft,
                           child: Text(
-                            'About Me',
+                            'About', // Changed from "About Me" to "About"
                             style: GoogleFonts.poppins(
                               color: Colors.white,
                               fontSize: 18,
@@ -214,7 +301,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         Align(
                           alignment: Alignment.centerLeft,
                           child: Text(
-                            'Hello! I am @$displayName. Passionate about Flutter development and creating amazing user experiences. Currently exploring new ares in tech and always open to learning. (This is dummy about me text - replace with actual user bio later!)',
+                            _profileData?['about'] as String? ?? 'No bio yet.', // Display actual 'about' text or fallback
                             style: GoogleFonts.roboto(
                               color: Colors.grey[300],
                               fontSize: 15,

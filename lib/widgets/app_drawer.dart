@@ -12,6 +12,7 @@ import 'package:chatter/controllers/data-controller.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:feather_icons/feather_icons.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:chatter/pages/edit_about_page.dart'; // Import the new page
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({Key? key}) : super(key: key);
@@ -329,6 +330,17 @@ class AppDrawer extends StatelessWidget {
             },
           ),
           const Divider(color: Color(0xFF303030)),
+          ListTile(
+            leading: Icon(FeatherIcons.edit3, color: Colors.grey[300]), // Changed icon
+            title: Text(
+              'Edit About Info', // Changed text
+              style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16),
+            ),
+            onTap: () {
+              Get.back();
+              Get.to(() => const EditAboutPage()); // Navigate to EditAboutPage
+            },
+          ),
           ListTile(
             leading: Icon(FeatherIcons.settings, color: Colors.grey[300]),
             title: Text(
