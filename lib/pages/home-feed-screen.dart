@@ -576,36 +576,20 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                         Icon(Icons.verified, color: Colors.amber, size: isReply ? 13 : 15), // Yellow checkmark
                         const SizedBox(width: 8.0),
 
-                        // Part 2: @username, Time, Time Ago, Date (takes remaining flexible space)
-                        Expanded(
-                          child: Wrap( // Using Wrap to allow elements to flow and prevent overflow if too condensed.
-                            alignment: WrapAlignment.start, // Align to the start of the expanded section
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            spacing: 6.0, // Horizontal spacing between items
-                            runSpacing: 2.0, // Vertical spacing if items wrap
-                            children: [
-                              Text(
-                                '@$username', // @username handle
-                                style: GoogleFonts.poppins(fontSize: isReply ? 11 : 12, color: Colors.grey[500]), // Style for handle
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              Text(
-                                DateFormat('h:mm a').format(timestamp.toLocal()), // Time
-                                style: GoogleFonts.poppins(fontSize: isReply ? 11 : 12, color: Colors.white70),
-                              ),
-                              RealtimeTimeagoText( // Time Ago
-                                timestamp: timestamp,
-                                style: GoogleFonts.poppins(fontSize: isReply ? 11 : 12, color: Colors.white70),
-                              ),
-                              Text(
-                                DateFormat('MMM d, yyyy').format(timestamp.toLocal()), // Date
-                                style: GoogleFonts.poppins(fontSize: isReply ? 11 : 12, color: Colors.white70),
-                              ),
-                            ],
+                        // Part 2: @username · Time · Time Ago · Date (dot separated)
+                        // This part will no longer be Expanded.
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0), // Add some horizontal padding
+                          child: Text(
+                            '@$username · ${DateFormat('h:mm a').format(timestamp.toLocal())} · ${timeago.format(timestamp)} · ${DateFormat('MMM d, yyyy').format(timestamp.toLocal())}',
+                            style: GoogleFonts.poppins(fontSize: isReply ? 11 : 12, color: Colors.grey[500]),
+                            overflow: TextOverflow.ellipsis,
+                            softWrap: false, // Try to keep it on one line
                           ),
                         ),
+                        // const Spacer(), // REMOVED: Spacer should not be here if follow button is not at far right
 
-                        // Part 3: Follow/Unfollow Button (at the far right)
+                        // Part 3: Follow/Unfollow Button
                         Obx(() {
                           final loggedInUserId = dataController.user.value['user']?['_id'];
                           String? extractAuthorId(Map<String, dynamic> postMap) {

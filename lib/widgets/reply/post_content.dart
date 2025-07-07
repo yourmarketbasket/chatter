@@ -361,16 +361,15 @@ class _PostContentState extends State<PostContent> {
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(width: 8.0), // Space before timestamp
-                            Expanded(
-                              child: Text(
-                                '${DateFormat('h:mm a').format(timestamp.toLocal())} · ${timeago.format(timestamp)} · ${DateFormat('MMM d, yyyy').format(timestamp.toLocal())}',
-                                style: GoogleFonts.roboto(
-                                  fontSize: widget.isReply ? 11 : 12,
-                                  color: Colors.grey[400],
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                                softWrap: false,
+                            // Expanded has been removed from the Text widget below
+                            Text(
+                              '${DateFormat('h:mm a').format(timestamp.toLocal())} · ${timeago.format(timestamp)} · ${DateFormat('MMM d, yyyy').format(timestamp.toLocal())}',
+                              style: GoogleFonts.roboto(
+                                fontSize: widget.isReply ? 11 : 12,
+                                color: Colors.grey[400],
                               ),
+                              overflow: TextOverflow.ellipsis,
+                              softWrap: false,
                             ),
                             // Follow/Unfollow Button - Placed at the end
                             if (_dataController.user.value['user']?['_id'] != null &&
