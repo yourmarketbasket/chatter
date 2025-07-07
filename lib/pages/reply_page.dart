@@ -23,7 +23,7 @@ const double SsafeLineGap = 4.0; // Safe distance for line from avatar
 class ReplyPage extends StatefulWidget {
   final Map<String, dynamic> post;
   final String? originalPostId; // ID of the ultimate root post of the thread
-  final int postDepth; // Depth of widget.post relative to the original post (0 for original, 1 for direct reply, etc.)
+  final int postDepth;
 
   const ReplyPage({Key? key, required this.post, this.originalPostId, required this.postDepth}) : super(key: key);
 
