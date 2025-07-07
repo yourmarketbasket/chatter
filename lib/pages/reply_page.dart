@@ -141,7 +141,7 @@ class _ReplyPageState extends State<ReplyPage> {
       _replies = await _processFetchedReplies(fetchedRootReplies, threadOriginalPostId, 0);
 
       if (mounted) {
-        print("[ReplyPage _fetchPostReplies] Setting state with ${fetchedReplies.length} replies for item $currentPostItemId.");
+        print("[ReplyPage _fetchPostReplies] Setting state with ${fetchedRootReplies.length} replies for item $currentPostItemId.");
         setState(() {
           if (showLoadingIndicator) _isLoadingReplies = false;
         });
