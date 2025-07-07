@@ -609,7 +609,20 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                         // Follow/Unfollow Button
                         Obx(() {
                           final loggedInUserId = dataController.user.value['user']?['_id'];
-                          final postAuthorUserId = post['userId'] as String? ?? (post['user'] is Map ? post['user']['_id'] as String? : null);
+
+                          String? extractAuthorId(Map<String, dynamic> postMap) {
+                            if (postMap['user'] is Map && (postMap['user'] as Map).containsKey('_id')) {
+                              return postMap['user']['_id'] as String?;
+                            }
+                            if (postMap['userId'] is String) {
+                              return postMap['userId'] as String?;
+                            }
+                            if (postMap['userId'] is Map && (postMap['userId'] as Map).containsKey('_id')) {
+                              return postMap['userId']['_id'] as String?;
+                            }
+                            return null;
+                          }
+                          final String? postAuthorUserId = extractAuthorId(post);
 
                           if (loggedInUserId != null && postAuthorUserId != null && loggedInUserId != postAuthorUserId) {
                             final List<dynamic> followingListRaw = dataController.user.value['user']?['following'] as List<dynamic>? ?? [];

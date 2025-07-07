@@ -356,8 +356,26 @@ class _PostContentState extends State<PostContent> {
                               Padding(
                                 padding: const EdgeInsets.only(left: 8.0),
                                 child: Obx(() { // Use Obx to listen to changes in follow list
-                                  final loggedInUserId = _dataController.user.value['user']['_id'];
-                                  final authorId = _currentPostData['userId'] as String;
+                                  final loggedInUserId = _dataController.user.value['user']?['_id'];
+
+                                  String? extractAuthorId(Map<String, dynamic> dataMap) {
+                                    if (dataMap['user'] is Map && (dataMap['user'] as Map).containsKey('_id')) {
+                                      return dataMap['user']['_id'] as String?;
+                                    }
+                                    if (dataMap['userId'] is String) {
+                                      return dataMap['userId'] as String?;
+                                    }
+                                    if (dataMap['userId'] is Map && (dataMap['userId'] as Map).containsKey('_id')) {
+                                      return dataMap['userId']['_id'] as String?;
+                                    }
+                                    return null;
+                                  }
+                                  final String? authorId = extractAuthorId(_currentPostData);
+
+                                  if (loggedInUserId == null || authorId == null || loggedInUserId == authorId) {
+                                    return const SizedBox.shrink(); // Don't show button
+                                  }
+
                                   final List<dynamic> followingListRaw = _dataController.user.value['user']?['following'] as List<dynamic>? ?? [];
                                   final List<String> followingList = followingListRaw.map((e) => e.toString()).toList();
                                   final bool isFollowing = followingList.contains(authorId);
