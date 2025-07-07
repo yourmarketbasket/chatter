@@ -8,6 +8,7 @@ import 'package:feather_icons/feather_icons.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:timeago/timeago.dart' as timeago;
 
 class PostContent extends StatefulWidget {
   final Map<String, dynamic> postData;
@@ -183,9 +184,21 @@ class _PostContentState extends State<PostContent> {
     final String threadOriginalPostId = widget.pageOriginalPostId ?? (_currentPostData['originalPostId'] as String? ?? currentEntryId);
     final String? userAvatar = _currentPostData['useravatar'] as String?;
     final String avatarInitial = _currentPostData['avatarInitial'] as String? ?? (username.isNotEmpty ? username[0].toUpperCase() : '?');
-    final DateTime timestamp = _currentPostData['createdAt'] is String
-        ? (DateTime.tryParse(_currentPostData['createdAt'] as String) ?? DateTime.now())
-        : (_currentPostData['createdAt'] is DateTime ? _currentPostData['createdAt'] as DateTime : DateTime.now());
+    DateTime timestamp = DateTime.now(); // Default to now
+    if (_currentPostData['createdAt'] is String) {
+      timestamp = DateTime.tryParse(_currentPostData['createdAt'] as String)?.toUtc() ?? DateTime.now().toUtc();
+    } else if (_currentPostData['createdAt'] is DateTime) {
+      timestamp = (_currentPostData['createdAt'] as DateTime).toUtc();
+    } else {
+      // Fallback for older data that might not be a string or DateTime, try to parse from a map if necessary
+      // This part depends on how legacy date objects might be stored, e.g., from MongoDB directly without proper model conversion
+      if (_currentPostData['createdAt'] is Map && _currentPostData['createdAt'].containsKey('\$date')) {
+        timestamp = DateTime.tryParse(_currentPostData['createdAt']['\$date'] as String)?.toUtc() ?? DateTime.now().toUtc();
+      } else {
+        timestamp = DateTime.now().toUtc(); // Final fallback
+      }
+    }
+
 
     final String contentText = _getContentText();
     final List<Map<String, dynamic>> attachments = _processAttachments();
@@ -293,7 +306,8 @@ class _PostContentState extends State<PostContent> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                '${DateFormat('h:mm a').format(timestamp)} · ${DateFormat('MMM d, yyyy').format(timestamp)} · $viewsCount views',
+                                // Format: HH:mm AM/PM · {timeago} · MMM d, yyyy
+                                '${DateFormat('h:mm a').format(timestamp.toLocalTime())} · ${timeago.format(timestamp)} · ${DateFormat('MMM d, yyyy').format(timestamp.toLocalTime())}',
                                 style: GoogleFonts.roboto(
                                   fontSize: widget.isReply ? 11 : 12,
                                   color: Colors.grey[400],
