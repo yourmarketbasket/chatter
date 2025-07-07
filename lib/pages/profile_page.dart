@@ -154,25 +154,34 @@ class _ProfilePageState extends State<ProfilePage> {
                             joinDateFormatted,
                             style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 14),
                           ),
-                        const SizedBox(height: 30),
-                        Text(
-                          'Followers: (coming soon)',
-                          style: GoogleFonts.roboto(
-                            color: Colors.grey[400],
-                            fontSize: 16,
+                        const SizedBox(height: 20),
+                        // Followers, Following, and DM Button Row
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly, // Adjust alignment as needed
+                            children: [
+                              Text(
+                                'Followers: (coming soon)  ·  Following: (coming soon)',
+                                style: GoogleFonts.roboto(
+                                  color: Colors.grey[400],
+                                  fontSize: 14, // Slightly smaller for row layout
+                                ),
+                              ),
+                              // Removed DM button from here to place it below as per common UI patterns for clarity
+                            ],
                           ),
                         ),
                         const SizedBox(height: 15),
                         ElevatedButton.icon(
-                          icon: Icon(FeatherIcons.messageCircle, color: Colors.black),
+                          icon: Icon(FeatherIcons.messageCircle, color: Colors.black, size: 18),
                           label: Text(
-                            'Direct Message (coming soon)',
-                            style: GoogleFonts.poppins(color: Colors.black, fontWeight: FontWeight.w600),
+                            'Direct Message', // Simplified text
+                            style: GoogleFonts.poppins(color: Colors.black, fontWeight: FontWeight.w600, fontSize: 14),
                           ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.tealAccent,
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                            textStyle: const TextStyle(fontSize: 16),
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
@@ -186,6 +195,32 @@ class _ProfilePageState extends State<ProfilePage> {
                               ),
                             );
                           },
+                        ),
+                        const SizedBox(height: 20),
+                        Divider(color: Colors.grey[800], thickness: 0.5),
+                        const SizedBox(height: 20),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'About Me',
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Hello! I am @$displayName. Passionate about Flutter development and creating amazing user experiences. Currently exploring new ares in tech and always open to learning. (This is dummy about me text - replace with actual user bio later!)',
+                            style: GoogleFonts.roboto(
+                              color: Colors.grey[300],
+                              fontSize: 15,
+                              height: 1.5,
+                            ),
+                          ),
                         ),
                       ],
                     ),
