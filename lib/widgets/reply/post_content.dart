@@ -328,7 +328,16 @@ class _PostContentState extends State<PostContent> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.center, // Align items vertically center
                           children: [
+                            // Checkmark icon (using a default one, replace as needed)
+                            // Assuming 'isVerified' is a boolean variable available in this scope indicating if user is verified.
+                            // For demonstration, let's assume it's true. Replace with actual logic.
+                            // if (isVerifiedUser) // Replace with actual condition
+                            Padding(
+                              padding: const EdgeInsets.only(right: 4.0), // Space between checkmark and username
+                              child: Icon(Icons.check_circle, color: Colors.tealAccent, size: widget.isReply ? 14 : 16),
+                            ),
                             Text(
                               '@$username',
                               style: GoogleFonts.poppins(
@@ -337,13 +346,27 @@ class _PostContentState extends State<PostContent> {
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            // Follow/Unfollow Button for PostContent - Moved before timestamp
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                                child: Text(
+                                  // Format: Time -> Time Ago -> Date
+                                  '${DateFormat('h:mm a').format(timestamp.toLocal())} · ${timeago.format(timestamp)} · ${DateFormat('MMM d, yyyy').format(timestamp.toLocal())}',
+                                  style: GoogleFonts.roboto(
+                                    fontSize: widget.isReply ? 11 : 12,
+                                    color: Colors.grey[400],
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  softWrap: false, // Prevent wrapping to ensure it pushes follow button
+                                ),
+                              ),
+                            ),
+                            // Follow/Unfollow Button - Moved to the end
                             if (_dataController.user.value['user']?['_id'] != null &&
                                 _currentPostData['userId'] != null &&
                                 _dataController.user.value['user']['_id'] != _currentPostData['userId'])
                               Padding(
-                                padding: const EdgeInsets.only(right: 8.0), // Add some padding to its right
+                                padding: const EdgeInsets.only(left: 8.0), // Padding to the left of the button
                                 child: Obx(() {
                                   final loggedInUserId = _dataController.user.value['user']?['_id'];
                                   String? extractAuthorId(Map<String, dynamic> dataMap) {
@@ -355,7 +378,7 @@ class _PostContentState extends State<PostContent> {
                                   final String? authorId = extractAuthorId(_currentPostData);
 
                                   if (loggedInUserId == null || authorId == null || loggedInUserId == authorId) {
-                                    return const SizedBox.shrink();
+                                    return const SizedBox.shrink(); // Should not show follow for oneself or if data is missing
                                   }
 
                                   final List<dynamic> followingListRaw = _dataController.user.value['user']?['following'] as List<dynamic>? ?? [];
@@ -365,32 +388,34 @@ class _PostContentState extends State<PostContent> {
                                   return TextButton(
                                     onPressed: _isProcessingFollow ? null : () async {
                                       setState(() => _isProcessingFollow = true);
-                                      if (isFollowing) { await _dataController.unfollowUser(authorId); }
-                                      else { await _dataController.followUser(authorId); }
+                                      if (isFollowing) {
+                                        await _dataController.unfollowUser(authorId);
+                                      } else {
+                                        await _dataController.followUser(authorId);
+                                      }
                                       if(mounted) setState(() => _isProcessingFollow = false);
                                     },
                                     style: TextButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), minimumSize: Size.zero,
-                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap, visualDensity: VisualDensity.compact,
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), // Increased padding
+                                      minimumSize: Size.zero, // Ensure the button can be small
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap, // Minimize tap area
+                                      visualDensity: VisualDensity.compact, // Make it compact
                                       side: BorderSide(color: isFollowing ? Colors.grey[600]! : Colors.tealAccent, width: 1),
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                                       backgroundColor: _isProcessingFollow ? Colors.grey[700] : (isFollowing ? Colors.transparent : Colors.tealAccent.withOpacity(0.1)),
                                     ),
-                                    child: Text( _isProcessingFollow ? '...' : (isFollowing ? 'Unfollow' : 'Follow'),
-                                      style: GoogleFonts.roboto( color: isFollowing ? Colors.grey[300] : Colors.tealAccent, fontSize: 10, fontWeight: FontWeight.w500)),
+                                    child: _isProcessingFollow
+                                        ? SizedBox(width: 10, height: 10, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent)))
+                                        : Text(
+                                            isFollowing ? 'Unfollow' : 'Follow',
+                                            style: GoogleFonts.roboto(
+                                                color: isFollowing ? Colors.grey[300] : Colors.tealAccent,
+                                                fontSize: 10, // Adjusted font size for compactness
+                                                fontWeight: FontWeight.w500),
+                                          ),
                                   );
                                 }),
                               ),
-                            Expanded( // Timestamp takes remaining space
-                              child: Text(
-                                '${DateFormat('h:mm a').format(timestamp.toLocal())} · ${timeago.format(timestamp)} · ${DateFormat('MMM d, yyyy').format(timestamp.toLocal())}',
-                                style: GoogleFonts.roboto(
-                                  fontSize: widget.isReply ? 11 : 12,
-                                  color: Colors.grey[400],
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
                           ],
                         ),
                         const SizedBox(height: 6),
