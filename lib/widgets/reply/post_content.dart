@@ -328,45 +328,56 @@ class _PostContentState extends State<PostContent> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
-                          crossAxisAlignment: CrossAxisAlignment.center, // Align items vertically center
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            // Checkmark icon (using a default one, replace as needed)
-                            // Assuming 'isVerified' is a boolean variable available in this scope indicating if user is verified.
-                            // For demonstration, let's assume it's true. Replace with actual logic.
-                            // if (isVerifiedUser) // Replace with actual condition
-                            Padding(
-                              padding: const EdgeInsets.only(right: 4.0), // Space between checkmark and username
-                              child: Icon(Icons.check_circle, color: Colors.tealAccent, size: widget.isReply ? 14 : 16),
-                            ),
+                            // Display Name (using 'username' from postData, which might be the handle or a display name)
                             Text(
-                              '@$username',
+                              username, // This is _currentPostData['username']
                               style: GoogleFonts.poppins(
                                 color: Colors.white,
-                                fontSize: widget.isReply ? 14 : 16,
+                                fontSize: widget.isReply ? 14 : 16, // Size based on context
                                 fontWeight: FontWeight.w600,
                               ),
+                              overflow: TextOverflow.ellipsis,
                             ),
+                            const SizedBox(width: 4.0),
+                            // Yellow Checkmark (assuming 'isVerified' is a property or can be derived)
+                            // For now, let's assume it's always shown for consistency with home feed if user is "verified"
+                            // This part might need adjustment if verification status is available in _currentPostData
+                            Icon(
+                              Icons.verified, // Standard verified icon
+                              color: Colors.amber, // Yellow color as specified
+                              size: widget.isReply ? 13 : 15, // Size based on context
+                            ),
+                            const SizedBox(width: 4.0),
+                            // @username handle
+                            Text(
+                              '@$username', // Prepends '@' to the username
+                              style: GoogleFonts.poppins(
+                                color: Colors.grey[500], // Typically a lighter color for handles
+                                fontSize: widget.isReply ? 12 : 14,
+                                fontWeight: FontWeight.normal,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(width: 8.0), // Space before timestamp
                             Expanded(
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                                child: Text(
-                                  // Format: Time -> Time Ago -> Date
-                                  '${DateFormat('h:mm a').format(timestamp.toLocal())} · ${timeago.format(timestamp)} · ${DateFormat('MMM d, yyyy').format(timestamp.toLocal())}',
-                                  style: GoogleFonts.roboto(
-                                    fontSize: widget.isReply ? 11 : 12,
-                                    color: Colors.grey[400],
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                  softWrap: false, // Prevent wrapping to ensure it pushes follow button
+                              child: Text(
+                                '${DateFormat('h:mm a').format(timestamp.toLocal())} · ${timeago.format(timestamp)} · ${DateFormat('MMM d, yyyy').format(timestamp.toLocal())}',
+                                style: GoogleFonts.roboto(
+                                  fontSize: widget.isReply ? 11 : 12,
+                                  color: Colors.grey[400],
                                 ),
+                                overflow: TextOverflow.ellipsis,
+                                softWrap: false,
                               ),
                             ),
-                            // Follow/Unfollow Button - Moved to the end
+                            // Follow/Unfollow Button - Placed at the end
                             if (_dataController.user.value['user']?['_id'] != null &&
                                 _currentPostData['userId'] != null &&
                                 _dataController.user.value['user']['_id'] != _currentPostData['userId'])
                               Padding(
-                                padding: const EdgeInsets.only(left: 8.0), // Padding to the left of the button
+                                padding: const EdgeInsets.only(left: 8.0), // Padding to its left
                                 child: Obx(() {
                                   final loggedInUserId = _dataController.user.value['user']?['_id'];
                                   String? extractAuthorId(Map<String, dynamic> dataMap) {
@@ -378,7 +389,7 @@ class _PostContentState extends State<PostContent> {
                                   final String? authorId = extractAuthorId(_currentPostData);
 
                                   if (loggedInUserId == null || authorId == null || loggedInUserId == authorId) {
-                                    return const SizedBox.shrink(); // Should not show follow for oneself or if data is missing
+                                    return const SizedBox.shrink();
                                   }
 
                                   final List<dynamic> followingListRaw = _dataController.user.value['user']?['following'] as List<dynamic>? ?? [];
@@ -388,31 +399,25 @@ class _PostContentState extends State<PostContent> {
                                   return TextButton(
                                     onPressed: _isProcessingFollow ? null : () async {
                                       setState(() => _isProcessingFollow = true);
-                                      if (isFollowing) {
-                                        await _dataController.unfollowUser(authorId);
-                                      } else {
-                                        await _dataController.followUser(authorId);
-                                      }
+                                      if (isFollowing) { await _dataController.unfollowUser(authorId); }
+                                      else { await _dataController.followUser(authorId); }
                                       if(mounted) setState(() => _isProcessingFollow = false);
                                     },
                                     style: TextButton.styleFrom(
                                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), // Increased padding
-                                      minimumSize: Size.zero, // Ensure the button can be small
-                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap, // Minimize tap area
-                                      visualDensity: VisualDensity.compact, // Make it compact
+                                      minimumSize: Size.zero,
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      visualDensity: VisualDensity.compact,
                                       side: BorderSide(color: isFollowing ? Colors.grey[600]! : Colors.tealAccent, width: 1),
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                                       backgroundColor: _isProcessingFollow ? Colors.grey[700] : (isFollowing ? Colors.transparent : Colors.tealAccent.withOpacity(0.1)),
                                     ),
                                     child: _isProcessingFollow
-                                        ? SizedBox(width: 10, height: 10, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent)))
-                                        : Text(
-                                            isFollowing ? 'Unfollow' : 'Follow',
-                                            style: GoogleFonts.roboto(
-                                                color: isFollowing ? Colors.grey[300] : Colors.tealAccent,
-                                                fontSize: 10, // Adjusted font size for compactness
-                                                fontWeight: FontWeight.w500),
-                                          ),
+                                      ? SizedBox(width: 10, height: 10, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent)))
+                                      : Text(
+                                          isFollowing ? 'Unfollow' : 'Follow',
+                                          style: GoogleFonts.roboto(color: isFollowing ? Colors.grey[300] : Colors.tealAccent, fontSize: 10, fontWeight: FontWeight.w500),
+                                        ),
                                   );
                                 }),
                               ),

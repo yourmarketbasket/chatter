@@ -566,12 +566,47 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // Part 1: Username, Verified Icon, Follow Button (takes as much space as needed)
-                        Text(username, style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: isReply ? 14 : 16, color: Colors.white), overflow: TextOverflow.ellipsis),
+                        // Part 1: Display Name, Yellow Checkmark
+                        Text(
+                          username, // This is the display name
+                          style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: isReply ? 14 : 16, color: Colors.white),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                         const SizedBox(width: 4.0),
-                        Icon(Icons.verified, color: Colors.amber, size: isReply ? 13 : 15),
-                        const SizedBox(width: 6.0),
-                        Obx(() { // Follow/Unfollow Button
+                        Icon(Icons.verified, color: Colors.amber, size: isReply ? 13 : 15), // Yellow checkmark
+                        const SizedBox(width: 8.0),
+
+                        // Part 2: @username, Time, Time Ago, Date (takes remaining flexible space)
+                        Expanded(
+                          child: Wrap( // Using Wrap to allow elements to flow and prevent overflow if too condensed.
+                            alignment: WrapAlignment.start, // Align to the start of the expanded section
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 6.0, // Horizontal spacing between items
+                            runSpacing: 2.0, // Vertical spacing if items wrap
+                            children: [
+                              Text(
+                                '@$username', // @username handle
+                                style: GoogleFonts.poppins(fontSize: isReply ? 11 : 12, color: Colors.grey[500]), // Style for handle
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                DateFormat('h:mm a').format(timestamp.toLocal()), // Time
+                                style: GoogleFonts.poppins(fontSize: isReply ? 11 : 12, color: Colors.white70),
+                              ),
+                              RealtimeTimeagoText( // Time Ago
+                                timestamp: timestamp,
+                                style: GoogleFonts.poppins(fontSize: isReply ? 11 : 12, color: Colors.white70),
+                              ),
+                              Text(
+                                DateFormat('MMM d, yyyy').format(timestamp.toLocal()), // Date
+                                style: GoogleFonts.poppins(fontSize: isReply ? 11 : 12, color: Colors.white70),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Part 3: Follow/Unfollow Button (at the far right)
+                        Obx(() {
                           final loggedInUserId = dataController.user.value['user']?['_id'];
                           String? extractAuthorId(Map<String, dynamic> postMap) {
                             if (postMap['user'] is Map && (postMap['user'] as Map).containsKey('_id')) { return postMap['user']['_id'] as String?; }
@@ -586,8 +621,8 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                             final List<String> followingList = followingListRaw.map((e) => e.toString()).toList();
                             final bool isFollowing = followingList.contains(postAuthorUserId);
                             final bool isProcessing = _processingFollowForPostId.value == postId;
-                            return Container(
-                              margin: const EdgeInsets.only(right: 8.0),
+                            return Padding( // Changed Container to Padding for consistency
+                              padding: const EdgeInsets.only(left: 8.0), // Keep some space from the timestamp block
                               child: TextButton(
                                 onPressed: isProcessing ? null : () async {
                                   _processingFollowForPostId.value = postId;
@@ -595,38 +630,25 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                                   _processingFollowForPostId.value = '';
                                 },
                                 style: TextButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), minimumSize: Size.zero,
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap, visualDensity: VisualDensity.compact,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), // Increased padding
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  visualDensity: VisualDensity.compact,
                                   side: BorderSide(color: isFollowing ? Colors.grey[600]! : Colors.tealAccent, width: 1),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                                   backgroundColor: isProcessing ? Colors.grey[700] : (isFollowing ? Colors.transparent : Colors.tealAccent.withOpacity(0.1)),
                                 ),
-                                child: Text(isProcessing ? '...' : (isFollowing ? 'Unfollow' : 'Follow'),
-                                  style: GoogleFonts.roboto(color: isFollowing ? Colors.grey[300] : Colors.tealAccent, fontSize: 10, fontWeight: FontWeight.w500)),
+                                child: isProcessing
+                                  ? SizedBox(width: 10, height: 10, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent)))
+                                  : Text(
+                                      isFollowing ? 'Unfollow' : 'Follow',
+                                      style: GoogleFonts.roboto(color: isFollowing ? Colors.grey[300] : Colors.tealAccent, fontSize: 10, fontWeight: FontWeight.w500),
+                                    ),
                               ),
                             );
                           }
                           return const SizedBox.shrink();
                         }),
-                        // Part 2: Date, @username, Time, Timeago (takes remaining flexible space)
-                        Flexible(
-                          child: Align(
-                            alignment: Alignment.centerRight, // Align this to the right of available space
-                            child: Wrap( // Use Wrap to allow text to flow and prevent overflow if too long
-                              alignment: WrapAlignment.end, // Align items within Wrap to the end
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              spacing: 4.0,
-                              runSpacing: 0,
-                              children: [
-                                Text(DateFormat('MMM d, yyyy').format(timestamp.toLocal()), style: GoogleFonts.poppins(fontSize: isReply ? 10 : 11, color: Colors.white70)),
-                                Text('· @$username', style: GoogleFonts.poppins(fontSize: isReply ? 10 : 11, color: Colors.white70), overflow: TextOverflow.ellipsis),
-                                Text('· ${DateFormat('h:mm a').format(timestamp.toLocal())}', style: GoogleFonts.poppins(fontSize: isReply ? 10 : 11, color: Colors.white70)),
-                                Text('·', style: GoogleFonts.poppins(fontSize: isReply ? 10 : 11, color: Colors.white70)),
-                                RealtimeTimeagoText(timestamp: timestamp, style: GoogleFonts.poppins(fontSize: isReply ? 10 : 11, color: Colors.white70)),
-                              ],
-                            ),
-                          ),
-                        ),
                       ],
                     ),
                     const SizedBox(height: 6),
