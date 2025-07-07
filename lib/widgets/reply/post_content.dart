@@ -338,42 +338,24 @@ class _PostContentState extends State<PostContent> {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                // Format: HH:mm AM/PM · {timeago} · MMM d, yyyy
-                                '${DateFormat('h:mm a').format(timestamp.toLocal())} · ${timeago.format(timestamp)} · ${DateFormat('MMM d, yyyy').format(timestamp.toLocal())}',
-                                style: GoogleFonts.roboto(
-                                  fontSize: widget.isReply ? 11 : 12,
-                                  color: Colors.grey[400],
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            // Follow/Unfollow Button for PostContent
+                            // Follow/Unfollow Button for PostContent - Moved before timestamp
                             if (_dataController.user.value['user']?['_id'] != null &&
                                 _currentPostData['userId'] != null &&
                                 _dataController.user.value['user']['_id'] != _currentPostData['userId'])
                               Padding(
-                                padding: const EdgeInsets.only(left: 8.0),
-                                child: Obx(() { // Use Obx to listen to changes in follow list
+                                padding: const EdgeInsets.only(right: 8.0), // Add some padding to its right
+                                child: Obx(() {
                                   final loggedInUserId = _dataController.user.value['user']?['_id'];
-
                                   String? extractAuthorId(Map<String, dynamic> dataMap) {
-                                    if (dataMap['user'] is Map && (dataMap['user'] as Map).containsKey('_id')) {
-                                      return dataMap['user']['_id'] as String?;
-                                    }
-                                    if (dataMap['userId'] is String) {
-                                      return dataMap['userId'] as String?;
-                                    }
-                                    if (dataMap['userId'] is Map && (dataMap['userId'] as Map).containsKey('_id')) {
-                                      return dataMap['userId']['_id'] as String?;
-                                    }
+                                    if (dataMap['user'] is Map && (dataMap['user'] as Map).containsKey('_id')) { return dataMap['user']['_id'] as String?; }
+                                    if (dataMap['userId'] is String) { return dataMap['userId'] as String?; }
+                                    if (dataMap['userId'] is Map && (dataMap['userId'] as Map).containsKey('_id')) { return dataMap['userId']['_id'] as String?; }
                                     return null;
                                   }
                                   final String? authorId = extractAuthorId(_currentPostData);
 
                                   if (loggedInUserId == null || authorId == null || loggedInUserId == authorId) {
-                                    return const SizedBox.shrink(); // Don't show button
+                                    return const SizedBox.shrink();
                                   }
 
                                   final List<dynamic> followingListRaw = _dataController.user.value['user']?['following'] as List<dynamic>? ?? [];
@@ -383,35 +365,32 @@ class _PostContentState extends State<PostContent> {
                                   return TextButton(
                                     onPressed: _isProcessingFollow ? null : () async {
                                       setState(() => _isProcessingFollow = true);
-                                      if (isFollowing) {
-                                        await _dataController.unfollowUser(authorId);
-                                      } else {
-                                        await _dataController.followUser(authorId);
-                                      }
+                                      if (isFollowing) { await _dataController.unfollowUser(authorId); }
+                                      else { await _dataController.followUser(authorId); }
                                       if(mounted) setState(() => _isProcessingFollow = false);
-                                      // DataController's refresh should trigger Obx to rebuild this.
-                                      // Also, ProfilePage relies on a fresh fetch, this button doesn't need to update counts here.
                                     },
                                     style: TextButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                      minimumSize: Size.zero,
-                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                      visualDensity: VisualDensity.compact,
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), minimumSize: Size.zero,
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap, visualDensity: VisualDensity.compact,
                                       side: BorderSide(color: isFollowing ? Colors.grey[600]! : Colors.tealAccent, width: 1),
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                                       backgroundColor: _isProcessingFollow ? Colors.grey[700] : (isFollowing ? Colors.transparent : Colors.tealAccent.withOpacity(0.1)),
                                     ),
-                                    child: Text(
-                                      _isProcessingFollow ? '...' : (isFollowing ? 'Unfollow' : 'Follow'),
-                                      style: GoogleFonts.roboto(
-                                        color: isFollowing ? Colors.grey[300] : Colors.tealAccent,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
+                                    child: Text( _isProcessingFollow ? '...' : (isFollowing ? 'Unfollow' : 'Follow'),
+                                      style: GoogleFonts.roboto( color: isFollowing ? Colors.grey[300] : Colors.tealAccent, fontSize: 10, fontWeight: FontWeight.w500)),
                                   );
                                 }),
                               ),
+                            Expanded( // Timestamp takes remaining space
+                              child: Text(
+                                '${DateFormat('h:mm a').format(timestamp.toLocal())} · ${timeago.format(timestamp)} · ${DateFormat('MMM d, yyyy').format(timestamp.toLocal())}',
+                                style: GoogleFonts.roboto(
+                                  fontSize: widget.isReply ? 11 : 12,
+                                  color: Colors.grey[400],
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 6),

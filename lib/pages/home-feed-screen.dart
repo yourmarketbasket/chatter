@@ -496,22 +496,20 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
 
 
   Widget _buildPostContent(Map<String, dynamic> post, {required bool isReply}) {
-    final String postId = post['_id'] as String? ?? post.hashCode.toString(); // Ensure postId is unique
+    final String postId = post['_id'] as String? ?? post.hashCode.toString();
     final String username = post['username'] as String? ?? 'Unknown User';
-    final String content = post['content'] as String? ?? '';
+    final String contentTextData = post['content'] as String? ?? '';
     final String? userAvatar = post['useravatar'] as String?;
     final String avatarInitial = (username.isNotEmpty ? username[0].toUpperCase() : '?');
     final DateTime timestamp = post['createdAt'] is String
-    ? DateTime.parse(post['createdAt'] as String).toUtc()
-    : DateTime.now().toUtc();
+        ? DateTime.parse(post['createdAt'] as String).toUtc()
+        : DateTime.now().toUtc();
 
-    // Likes processing
     final List<dynamic> likesList = post['likes'] as List<dynamic>? ?? [];
     final int likesCount = likesList.length;
     final String currentUserId = dataController.user.value['user']?['_id'] ?? '';
     final bool isLikedByCurrentUser = likesList.any((like) => (like is Map ? like['_id'] == currentUserId : like.toString() == currentUserId));
 
-    // Reposts processing
     final List<dynamic> repostsDynamicList = post['reposts'] as List<dynamic>? ?? [];
     final List<String> repostsList = repostsDynamicList.map((e) => e.toString()).toList();
     final int repostsCount = repostsList.length;
@@ -523,20 +521,17 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     } else if (post.containsKey('views') && post['views'] is List) {
       views = (post['views'] as List<dynamic>).length;
     } else {
-      views = 0; // Default if neither field is valid
+      views = 0;
     }
 
     List<Map<String, dynamic>> attachments = (post['attachments'] as List<dynamic>?)?.map((e) => e as Map<String, dynamic>).toList() ?? [];
     int replyCount = (post['replies'] as List<dynamic>?)?.length ?? post['replyCount'] as int? ?? 0;
 
-    // Initialize queue for this post if it's a new grid of videos
     List<Map<String, dynamic>> videoAttachmentsInGrid = attachments.where((att) => att['type'] == 'video').toList();
     if (videoAttachmentsInGrid.length > 1 && !_postVideoIds.containsKey(postId)) {
         _postVideoIds[postId] = videoAttachmentsInGrid.map((v) => v['url'] as String? ?? v.hashCode.toString()).toList();
-        _postVideoQueueIndex[postId] = 0; // Start with the first video
-        print("[HomeFeedScreen] Initialized video queue for post $postId with ${_postVideoIds[postId]!.length} videos.");
+        _postVideoQueueIndex[postId] = 0;
     }
-
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -550,25 +545,16 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
               GestureDetector(
                 onTap: () {
                   String? authorUserId;
-                  if (post['user'] is Map && (post['user'] as Map).containsKey('_id')) {
-                    authorUserId = post['user']['_id'] as String?;
-                  } else if (post['userId'] is String) {
-                    authorUserId = post['userId'] as String?;
-                  } else if (post['userId'] is Map && (post['userId'] as Map).containsKey('_id')) {
-                    // Less common, but handle if userId itself is an object
-                    authorUserId = post['userId']['_id'] as String?;
-                  }
-                  authorUserId ??= postId; // Fallback to postId if no proper userId found
-
+                  if (post['user'] is Map && (post['user'] as Map).containsKey('_id')) { authorUserId = post['user']['_id'] as String?; }
+                  else if (post['userId'] is String) { authorUserId = post['userId'] as String?; }
+                  else if (post['userId'] is Map && (post['userId'] as Map).containsKey('_id')) { authorUserId = post['userId']['_id'] as String?; }
+                  authorUserId ??= postId;
                   _navigateToProfilePage(context, authorUserId, username, userAvatar);
                 },
                 child: CircleAvatar(
-                  radius: isReply ? 16 : 20,
-                  backgroundColor: Colors.tealAccent.withOpacity(0.2),
+                  radius: isReply ? 16 : 20, backgroundColor: Colors.tealAccent.withOpacity(0.2),
                   backgroundImage: userAvatar != null && userAvatar.isNotEmpty ? NetworkImage(userAvatar) : null,
-                  child: userAvatar == null || userAvatar.isEmpty
-                      ? Text(avatarInitial, style: GoogleFonts.poppins(color: Colors.tealAccent, fontWeight: FontWeight.w600, fontSize: isReply ? 14 : 16))
-                      : null,
+                  child: userAvatar == null || userAvatar.isEmpty ? Text(avatarInitial, style: GoogleFonts.poppins(color: Colors.tealAccent, fontWeight: FontWeight.w600, fontSize: isReply ? 14 : 16)) : null,
                 ),
               ),
               const SizedBox(width: 8),
@@ -576,50 +562,21 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // User info Row (username, timestamp)
+                    // New Header Row Structure for Home Feed
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Flexible(
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Text(username, style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: isReply ? 14 : 16, color: Colors.white), overflow: TextOverflow.ellipsis),
-                              const SizedBox(width: 4.0),
-                              Icon(Icons.verified, color: Colors.amber, size: isReply ? 13 : 15),
-                              const SizedBox(width: 4.0),
-                              // Display @username · relativeTime using new widget
-                              Text(
-                                '· @$username · ', // Text before the real-time part
-                                style: GoogleFonts.poppins(fontSize: isReply ? 10 : 12, color: Colors.white70),
-                                // overflow: TextOverflow.ellipsis, // Apply to Row or outer Flexible if needed
-                              ),
-                              RealtimeTimeagoText(
-                                timestamp: timestamp,
-                                style: GoogleFonts.poppins(fontSize: isReply ? 10 : 12, color: Colors.white70),
-                              ),
-                            ],
-                          ),
-                        ),
-                        // Display absoluteDate on the far right
-                        // Text(
-                        //   DateFormat('MMM d, yyyy').format(timestamp.toLocal()), // Use toLocal for display
-                        //   style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 12)
-                        // ),
-                        // Follow/Unfollow Button
-                        Obx(() {
+                        // Part 1: Username, Verified Icon, Follow Button (takes as much space as needed)
+                        Text(username, style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: isReply ? 14 : 16, color: Colors.white), overflow: TextOverflow.ellipsis),
+                        const SizedBox(width: 4.0),
+                        Icon(Icons.verified, color: Colors.amber, size: isReply ? 13 : 15),
+                        const SizedBox(width: 6.0),
+                        Obx(() { // Follow/Unfollow Button
                           final loggedInUserId = dataController.user.value['user']?['_id'];
-
                           String? extractAuthorId(Map<String, dynamic> postMap) {
-                            if (postMap['user'] is Map && (postMap['user'] as Map).containsKey('_id')) {
-                              return postMap['user']['_id'] as String?;
-                            }
-                            if (postMap['userId'] is String) {
-                              return postMap['userId'] as String?;
-                            }
-                            if (postMap['userId'] is Map && (postMap['userId'] as Map).containsKey('_id')) {
-                              return postMap['userId']['_id'] as String?;
-                            }
+                            if (postMap['user'] is Map && (postMap['user'] as Map).containsKey('_id')) { return postMap['user']['_id'] as String?; }
+                            if (postMap['userId'] is String) { return postMap['userId'] as String?; }
+                            if (postMap['userId'] is Map && (postMap['userId'] as Map).containsKey('_id')) { return postMap['userId']['_id'] as String?; }
                             return null;
                           }
                           final String? postAuthorUserId = extractAuthorId(post);
@@ -629,100 +586,73 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                             final List<String> followingList = followingListRaw.map((e) => e.toString()).toList();
                             final bool isFollowing = followingList.contains(postAuthorUserId);
                             final bool isProcessing = _processingFollowForPostId.value == postId;
-
-                            return TextButton(
-                              onPressed: isProcessing ? null : () async {
-                                _processingFollowForPostId.value = postId;
-                                if (isFollowing) {
-                                  await dataController.unfollowUser(postAuthorUserId);
-                                } else {
-                                  await dataController.followUser(postAuthorUserId);
-                                }
-                                _processingFollowForPostId.value = ''; // Clear processing state
-                                // dataController.user.refresh(); // Already called in follow/unfollow methods
-                              },
-                              style: TextButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                minimumSize: Size.zero,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                visualDensity: VisualDensity.compact,
-                                side: BorderSide(color: isFollowing ? Colors.grey[600]! : Colors.tealAccent, width: 1),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                                backgroundColor: isProcessing ? Colors.grey[700] : (isFollowing ? Colors.transparent : Colors.tealAccent.withOpacity(0.1)),
-                              ),
-                              child: Text(
-                                isProcessing ? '...' : (isFollowing ? 'Unfollow' : 'Follow'),
-                                style: GoogleFonts.roboto(
-                                  color: isFollowing ? Colors.grey[300] : Colors.tealAccent,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w500,
+                            return Container(
+                              margin: const EdgeInsets.only(right: 8.0),
+                              child: TextButton(
+                                onPressed: isProcessing ? null : () async {
+                                  _processingFollowForPostId.value = postId;
+                                  if (isFollowing) { await dataController.unfollowUser(postAuthorUserId); } else { await dataController.followUser(postAuthorUserId); }
+                                  _processingFollowForPostId.value = '';
+                                },
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap, visualDensity: VisualDensity.compact,
+                                  side: BorderSide(color: isFollowing ? Colors.grey[600]! : Colors.tealAccent, width: 1),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                                  backgroundColor: isProcessing ? Colors.grey[700] : (isFollowing ? Colors.transparent : Colors.tealAccent.withOpacity(0.1)),
                                 ),
+                                child: Text(isProcessing ? '...' : (isFollowing ? 'Unfollow' : 'Follow'),
+                                  style: GoogleFonts.roboto(color: isFollowing ? Colors.grey[300] : Colors.tealAccent, fontSize: 10, fontWeight: FontWeight.w500)),
                               ),
                             );
                           }
-                          return const SizedBox.shrink(); // No button for own post or if IDs are missing
+                          return const SizedBox.shrink();
                         }),
+                        // Part 2: Date, @username, Time, Timeago (takes remaining flexible space)
+                        Flexible(
+                          child: Align(
+                            alignment: Alignment.centerRight, // Align this to the right of available space
+                            child: Wrap( // Use Wrap to allow text to flow and prevent overflow if too long
+                              alignment: WrapAlignment.end, // Align items within Wrap to the end
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 4.0,
+                              runSpacing: 0,
+                              children: [
+                                Text(DateFormat('MMM d, yyyy').format(timestamp.toLocal()), style: GoogleFonts.poppins(fontSize: isReply ? 10 : 11, color: Colors.white70)),
+                                Text('· @$username', style: GoogleFonts.poppins(fontSize: isReply ? 10 : 11, color: Colors.white70), overflow: TextOverflow.ellipsis),
+                                Text('· ${DateFormat('h:mm a').format(timestamp.toLocal())}', style: GoogleFonts.poppins(fontSize: isReply ? 10 : 11, color: Colors.white70)),
+                                Text('·', style: GoogleFonts.poppins(fontSize: isReply ? 10 : 11, color: Colors.white70)),
+                                RealtimeTimeagoText(timestamp: timestamp, style: GoogleFonts.poppins(fontSize: isReply ? 10 : 11, color: Colors.white70)),
+                              ],
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 6),
-                    // Text for post content
-                    if (content.isNotEmpty)
+                    if (contentTextData.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.only(left: 15),
                         child: RichText(
                           text: TextSpan(
-                            style: GoogleFonts.roboto(
-                              fontSize: isReply ? 13 : 14,
-                              color: const Color.fromARGB(255, 255, 255, 255),
-                              height: 1.5,
-                            ),
-                            children: _buildTextSpans(content, isReply: isReply),
+                            style: GoogleFonts.roboto(fontSize: isReply ? 13 : 14, color: const Color.fromARGB(255, 255, 255, 255), height: 1.5),
+                            children: _buildTextSpans(contentTextData, isReply: isReply),
                           ),
                         ),
                       ),
-                    // Spacer if content is empty but attachments exist, to maintain some tappable area
-                    if (content.isEmpty && attachments.isNotEmpty)
-                       const SizedBox(height: 6),
-
-                    // Attachment Grid - Taps on individual attachments are handled by _buildAttachmentWidget
+                    if (contentTextData.isEmpty && attachments.isNotEmpty) const SizedBox(height: 6),
                     if (attachments.isNotEmpty) ...[
                       const SizedBox(height: 6),
-                      // Need to ensure _buildAttachmentGrid does not absorb taps meant for the parent ReplyPage navigation
-                      // if the tap is on grid padding. Individual items *should* capture their own taps.
                       _buildAttachmentGrid(attachments, post, postId),
                     ],
-                    // Action buttons - These have their own tap handlers and should take precedence.
-                    Row(
+                    Row( // Action Buttons
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        _buildActionButton(
-                          isLikedByCurrentUser ? Icons.favorite : FeatherIcons.heart,
-                          '$likesCount',
-                          () => _toggleLikeStatus(postId, isLikedByCurrentUser),
-                          isLiked: isLikedByCurrentUser
-                        ),
+                        _buildActionButton(isLikedByCurrentUser ? Icons.favorite : FeatherIcons.heart, '$likesCount', () => _toggleLikeStatus(postId, isLikedByCurrentUser), isLiked: isLikedByCurrentUser),
                         _buildActionButton(FeatherIcons.messageCircle, '$replyCount', () => _navigateToReplyPage(post)),
-                        _buildActionButton(
-                          FeatherIcons.repeat,
-                          '$repostsCount',
-                          () => _handleRepostAction(post), // Changed to direct action
-                          isReposted: isRepostedByCurrentUser,
-                        ),
-                        _buildActionButton(FeatherIcons.eye, '$views', () {
-                          // Placeholder for view action
-                          print("View action triggered for post $postId");
-                        }),
-                        _buildActionButton(
-                          FeatherIcons.bookmark, // Bookmark Icon
-                          '', // No text for bookmark
-                          () {
-                            // Placeholder for bookmark action
-                            print("Bookmark action triggered for post $postId (UI only)");
-                            // Add actual bookmark logic here, e.g., calling dataController
-                          },
-                          // Optionally, add isBookmarked: post['isBookmarkedByCurrentUser'] ?? false
-                          // and adjust iconColor in _buildActionButton accordingly
-                        ),
+                        _buildActionButton(FeatherIcons.repeat, '$repostsCount', () => _handleRepostAction(post), isReposted: isRepostedByCurrentUser),
+                        _buildActionButton(FeatherIcons.eye, '$views', () { print("View action triggered for post $postId"); }),
+                        _buildActionButton(FeatherIcons.bookmark, '', () { print("Bookmark action triggered for post $postId (UI only)"); }),
                       ],
                     ),
                   ],
