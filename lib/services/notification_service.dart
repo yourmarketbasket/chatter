@@ -106,12 +106,12 @@ class NotificationService {
     );
 
     try {
-      await _flutterLocalNotificationsPlugin.show(
-        0,
-        'Test Notification',
-        'This is a test notification from Chatter!',
-        platformChannelSpecifics,
-      );
+      // await _flutterLocalNotificationsPlugin.show(
+      //   0,
+      //   'Test Notification',
+      //   'This is a test notification from Chatter!',
+      //   platformChannelSpecifics,
+      // );
       if (kDebugMode) {
         print("Test notification shown successfully.");
       }

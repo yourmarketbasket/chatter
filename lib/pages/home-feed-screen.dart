@@ -206,12 +206,14 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
 
     final result = await dataController.repostPost(postId);
     if (result['success'] == true) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result['message'] ?? 'Reposted successfully!', style: GoogleFonts.roboto(color: Colors.white)),
-          backgroundColor: Colors.teal[700],
-        ),
-      );
+      // Success snackbar removed
+      // ScaffoldMessenger.of(context).showSnackBar(
+      //   SnackBar(
+      //     content: Text(result['message'] ?? 'Reposted successfully!', style: GoogleFonts.roboto(color: Colors.white)),
+      //     backgroundColor: Colors.teal[700],
+      //   ),
+      // );
+      print("Post reposted successfully (no snackbar). Message: ${result['message']}");
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -226,16 +228,17 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     // Reset progress at the very beginning of the process
     dataController.uploadProgress.value = 0.0;
 
-    // Show persistent snackbar
+    // Show persistent snackbar for progress and errors only
     Get.showSnackbar(
       GetSnackBar(
         titleText: Obx(() {
           String title = "Creating Post...";
-          if (dataController.uploadProgress.value >= 1.0) {
-            title = "Success!";
-          } else if (dataController.uploadProgress.value < 0) { // Using negative to indicate error
+          if (dataController.uploadProgress.value < 0) { // Error state
             title = "Error";
+          } else if (dataController.uploadProgress.value >= 1.0) { // Success state
+            title = "Success!";
           }
+          // For in-progress states, title remains "Creating Post..."
           return Text(title, style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold));
         }),
         messageText: Obx(() {
@@ -245,13 +248,14 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
              message = "Failed to create post. Please try again.";
           } else if (progress == 0) {
             message = "Preparing...";
-          } else if (progress < 0.8) { // Assuming 0.0 to <0.8 is upload phase
-            // Calculate percentage of the upload phase itself
+          } else if (progress < 0.8) { // Upload phase (using literal 0.8)
             double uploadPhaseProgress = progress / 0.8;
             message = "Uploading attachments: ${(uploadPhaseProgress * 100).toStringAsFixed(0)}%";
-          } else if (progress < 1.0) { // Assuming 0.8 to <1.0 is save phase
-            message = "Saving post...";
-          } else {
+          } else if (progress < 1.0) { // Save phase (using literal 0.2 for calculation)
+            // Calculate progress within the save phase
+            double savePhaseProgress = (progress - 0.8) / 0.2; // (currentProgress - uploadPortion) / savePortion
+            message = "Saving post: ${(savePhaseProgress * 100).toStringAsFixed(0)}%";
+          } else { // Success state (progress >= 1.0)
             message = "Your chatter is live!";
           }
           return Column(
@@ -275,11 +279,29 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         borderWidth: 1,
         borderRadius: 8,
         margin: const EdgeInsets.all(10),
-        isDismissible: false, // User cannot dismiss it manually initially
-        duration: null, // Stays indefinitely until programmatically closed or progress completes
-        showProgressIndicator: false, // We use our own LinearProgressIndicator
+        isDismissible: dataController.uploadProgress.value < 0 || dataController.uploadProgress.value >=1.0, // Dismissible on error or completion
+        duration: dataController.uploadProgress.value >= 0 && dataController.uploadProgress.value < 1.0
+                  ? null // Indefinite while processing
+                  : const Duration(seconds: 3), // Auto-dismiss after 3s for error/completion messages
+        showProgressIndicator: false,
       ),
     );
+
+    // Watch for completion or error to dismiss the snackbar programmatically
+    // Only auto-dismiss for errors. Success message will persist for the GetSnackBar's duration.
+    ever(dataController.uploadProgress, (double progress) {
+      if (progress < 0) { // Error
+        // Snackbar duration is already set to 3s for error, so it will auto-dismiss.
+        // If we wanted immediate dismissal on error:
+        // Future.delayed(const Duration(milliseconds: 100), () {
+        //   if (Get.isSnackbarOpen) Get.back();
+        // });
+      } else if (progress >= 1.0) { // Success
+        // The snackbar's own duration (3 seconds) will handle dismissal for success.
+        // No need to programmatically Get.back() here unless we want to override that.
+      }
+    });
+
 
     List<Map<String, dynamic>> uploadedAttachmentsInfo = [];
     bool anyUploadFailed = false;
