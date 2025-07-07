@@ -9,6 +9,7 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import 'package:chatter/pages/profile_page.dart'; // Import ProfilePage
 
 class PostContent extends StatefulWidget {
   final Map<String, dynamic> postData;
@@ -53,6 +54,10 @@ class _PostContentState extends State<PostContent> {
     super.initState();
     _dataController = Get.find<DataController>();
     _initializePostData();
+  }
+
+  void _navigateToProfilePage(BuildContext context, String userId, String username, String? userAvatarUrl) {
+    Get.to(() => ProfilePage(userId: userId, username: username, userAvatarUrl: userAvatarUrl));
   }
 
   void _initializePostData() {
@@ -237,37 +242,53 @@ class _PostContentState extends State<PostContent> {
                       painter: _VerticalLinePainter(avatarRadius: avatarRadius, avatarLeftPadding: 0),
                       child: Padding(
                         padding: EdgeInsets.only(left: avatarRadius + 6),
-                        child: CircleAvatar(
-                          radius: avatarRadius,
-                          backgroundColor: Colors.tealAccent.withOpacity(0.2),
-                          backgroundImage: userAvatar != null && userAvatar.isNotEmpty ? NetworkImage(userAvatar) : null,
-                          child: userAvatar == null || userAvatar.isEmpty
-                              ? Text(
-                                  avatarInitial,
-                                  style: GoogleFonts.poppins(
-                                    color: Colors.tealAccent,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: widget.isReply ? 12 : 14,
-                                  ),
-                                )
-                              : null,
+                        child: GestureDetector(
+                          onTap: () {
+                            String authorUserId = _currentPostData['userId'] as String? ??
+                                                (_currentPostData['user'] is Map ? _currentPostData['user']['_id'] as String? : null) ??
+                                                currentEntryId; // Fallback, not ideal for profile
+                            _navigateToProfilePage(context, authorUserId, username, userAvatar);
+                          },
+                          child: CircleAvatar(
+                            radius: avatarRadius,
+                            backgroundColor: Colors.tealAccent.withOpacity(0.2),
+                            backgroundImage: userAvatar != null && userAvatar.isNotEmpty ? NetworkImage(userAvatar) : null,
+                            child: userAvatar == null || userAvatar.isEmpty
+                                ? Text(
+                                    avatarInitial,
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.tealAccent,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: widget.isReply ? 12 : 14,
+                                    ),
+                                  )
+                                : null,
+                          ),
                         ),
                       ),
                     )
-                  : CircleAvatar(
-                      radius: avatarRadius,
-                      backgroundColor: Colors.tealAccent.withOpacity(0.2),
-                      backgroundImage: userAvatar != null && userAvatar.isNotEmpty ? NetworkImage(userAvatar) : null,
-                      child: userAvatar == null || userAvatar.isEmpty
-                          ? Text(
-                              avatarInitial,
-                              style: GoogleFonts.poppins(
-                                color: Colors.tealAccent,
-                                fontWeight: FontWeight.w600,
-                                fontSize: widget.isReply ? 12 : 14,
-                              ),
-                            )
-                          : null,
+                  : GestureDetector(
+                      onTap: () {
+                        String authorUserId = _currentPostData['userId'] as String? ??
+                                            (_currentPostData['user'] is Map ? _currentPostData['user']['_id'] as String? : null) ??
+                                            currentEntryId; // Fallback
+                        _navigateToProfilePage(context, authorUserId, username, userAvatar);
+                      },
+                      child: CircleAvatar(
+                        radius: avatarRadius,
+                        backgroundColor: Colors.tealAccent.withOpacity(0.2),
+                        backgroundImage: userAvatar != null && userAvatar.isNotEmpty ? NetworkImage(userAvatar) : null,
+                        child: userAvatar == null || userAvatar.isEmpty
+                            ? Text(
+                                avatarInitial,
+                                style: GoogleFonts.poppins(
+                                  color: Colors.tealAccent,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: widget.isReply ? 12 : 14,
+                                ),
+                              )
+                            : null,
+                      ),
                     ),
             ),
             Expanded(

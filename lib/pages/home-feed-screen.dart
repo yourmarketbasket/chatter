@@ -30,6 +30,7 @@ import 'package:chatter/widgets/audio_attachment_widget.dart';
 import 'package:chatter/widgets/realtime_timeago_text.dart'; // Import the new widget
 import 'package:flutter_expandable_fab/flutter_expandable_fab.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import 'package:chatter/pages/profile_page.dart'; // Import ProfilePage
 
 class HomeFeedScreen extends StatefulWidget {
   const HomeFeedScreen({Key? key}) : super(key: key);
@@ -53,6 +54,10 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     super.initState();
     // Potentially initialize _postVideoQueueIndex if posts are already loaded
     // and any of them have video grids. Or do it in buildPostContent.
+  }
+
+  void _navigateToProfilePage(BuildContext context, String userId, String username, String? userAvatarUrl) {
+    Get.to(() => ProfilePage(userId: userId, username: username, userAvatarUrl: userAvatarUrl));
   }
 
   List<TextSpan> _buildTextSpans(String text, {required bool isReply}) {
@@ -541,13 +546,23 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                radius: isReply ? 16 : 20,
-                backgroundColor: Colors.tealAccent.withOpacity(0.2),
-                backgroundImage: userAvatar != null && userAvatar.isNotEmpty ? NetworkImage(userAvatar) : null,
-                child: userAvatar == null || userAvatar.isEmpty
-                    ? Text(avatarInitial, style: GoogleFonts.poppins(color: Colors.tealAccent, fontWeight: FontWeight.w600, fontSize: isReply ? 14 : 16))
-                    : null,
+              GestureDetector(
+                onTap: () {
+                  // Extract or determine userId. Assuming 'userId' is a field in the 'post' map.
+                  // If 'userId' is not directly on post, this needs adjustment (e.g. post['user']['_id'])
+                  String authorUserId = post['userId'] as String? ??
+                                        (post['user'] is Map ? post['user']['_id'] as String? : null) ??
+                                        postId; // Fallback to postId if no specific userId, though not ideal for profiles.
+                  _navigateToProfilePage(context, authorUserId, username, userAvatar);
+                },
+                child: CircleAvatar(
+                  radius: isReply ? 16 : 20,
+                  backgroundColor: Colors.tealAccent.withOpacity(0.2),
+                  backgroundImage: userAvatar != null && userAvatar.isNotEmpty ? NetworkImage(userAvatar) : null,
+                  child: userAvatar == null || userAvatar.isEmpty
+                      ? Text(avatarInitial, style: GoogleFonts.poppins(color: Colors.tealAccent, fontWeight: FontWeight.w600, fontSize: isReply ? 14 : 16))
+                      : null,
+                ),
               ),
               const SizedBox(width: 8),
               Expanded(
