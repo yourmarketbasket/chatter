@@ -307,7 +307,7 @@ class _PostContentState extends State<PostContent> {
                             Expanded(
                               child: Text(
                                 // Format: HH:mm AM/PM · {timeago} · MMM d, yyyy
-                                '${DateFormat('h:mm a').format(timestamp.toLocalTime())} · ${timeago.format(timestamp)} · ${DateFormat('MMM d, yyyy').format(timestamp.toLocalTime())}',
+                                '${DateFormat('h:mm a').format(timestamp.toLocal())} · ${timeago.format(timestamp)} · ${DateFormat('MMM d, yyyy').format(timestamp.toLocal())}',
                                 style: GoogleFonts.roboto(
                                   fontSize: widget.isReply ? 11 : 12,
                                   color: Colors.grey[400],
