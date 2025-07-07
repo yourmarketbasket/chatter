@@ -12,10 +12,95 @@ import 'package:chatter/controllers/data-controller.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:feather_icons/feather_icons.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:chatter/pages/edit_about_page.dart'; // Import the new page
+// import 'package:chatter/pages/edit_about_page.dart'; // No longer needed
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({Key? key}) : super(key: key);
+
+  void _showEditAboutDialog(BuildContext context) {
+    final DataController dataController = Get.find<DataController>();
+    final TextEditingController aboutController = TextEditingController(
+      text: dataController.user.value['user']?['about'] as String? ?? '',
+    );
+    bool isSaving = false; // Local state for the dialog's save button
+
+    Get.dialog(
+      AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: Text('Edit Your "About" Info', style: GoogleFonts.poppins(color: Colors.white)),
+        content: StatefulBuilder( // Use StatefulBuilder to manage isSaving state within the dialog
+          builder: (BuildContext context, StateSetter setDialogState) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: aboutController,
+                  style: GoogleFonts.roboto(color: Colors.white),
+                  maxLines: 4,
+                  maxLength: 280,
+                  decoration: InputDecoration(
+                    hintText: 'Tell us about yourself...',
+                    hintStyle: GoogleFonts.roboto(color: Colors.grey[600]),
+                    filled: true,
+                    fillColor: Colors.grey[850],
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8.0),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8.0),
+                      borderSide: const BorderSide(color: Colors.tealAccent, width: 1.5),
+                    ),
+                     counterStyle: GoogleFonts.roboto(color: Colors.grey[500]),
+                  ),
+                ),
+                if (isSaving) const Padding(
+                  padding: EdgeInsets.only(top: 10.0),
+                  child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent)),
+                )
+              ],
+            );
+          }
+        ),
+        actions: <Widget>[
+          TextButton(
+            child: Text('Cancel', style: GoogleFonts.roboto(color: Colors.grey[400])),
+            onPressed: () => Get.back(),
+          ),
+          StatefulBuilder( // StatefulBuilder for the Save button's loading state
+             builder: (BuildContext context, StateSetter setDialogState) {
+              return TextButton(
+                child: Text(isSaving ? 'Saving...' : 'Save', style: GoogleFonts.roboto(color: Colors.tealAccent, fontWeight: FontWeight.bold)),
+                onPressed: isSaving ? null : () async {
+                  setDialogState(() => isSaving = true);
+                  final result = await dataController.updateAboutInfo(aboutController.text.trim());
+                  if (Get.isDialogOpen ?? false) Get.back(); // Close dialog first
+
+                  if (result['success'] == true) {
+                    Get.snackbar(
+                      'Success',
+                      result['message'] ?? 'Your "About" information has been updated.',
+                      snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green, colorText: Colors.white,
+                    );
+                  } else {
+                    Get.snackbar(
+                      'Error',
+                       result['message'] ?? 'Failed to update "About" information.',
+                       snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white,
+                    );
+                  }
+                  // No need to set isSaving = false here if dialog is closed.
+                  // If dialog wasn't closed, you would: setDialogState(() => isSaving = false);
+                },
+              );
+            }
+          ),
+        ],
+      ),
+      barrierDismissible: !isSaving, // Prevent dismissing while saving
+    );
+  }
+
 
   void _showImageSourceActionSheet(BuildContext context) {
     showModalBottomSheet(
@@ -337,8 +422,8 @@ class AppDrawer extends StatelessWidget {
               style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16),
             ),
             onTap: () {
-              Get.back();
-              Get.to(() => const EditAboutPage()); // Navigate to EditAboutPage
+              Get.back(); // Close drawer first
+              _showEditAboutDialog(context); // Show the dialog
             },
           ),
           ListTile(

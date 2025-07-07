@@ -48,6 +48,7 @@ class PostContent extends StatefulWidget {
 class _PostContentState extends State<PostContent> {
   late DataController _dataController;
   late Map<String, dynamic> _currentPostData;
+  bool _isProcessingFollow = false; // Local state for follow button loading
 
   @override
   void initState() {
@@ -348,6 +349,51 @@ class _PostContentState extends State<PostContent> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
+                            // Follow/Unfollow Button for PostContent
+                            if (_dataController.user.value['user']?['_id'] != null &&
+                                _currentPostData['userId'] != null &&
+                                _dataController.user.value['user']['_id'] != _currentPostData['userId'])
+                              Padding(
+                                padding: const EdgeInsets.only(left: 8.0),
+                                child: Obx(() { // Use Obx to listen to changes in follow list
+                                  final loggedInUserId = _dataController.user.value['user']['_id'];
+                                  final authorId = _currentPostData['userId'] as String;
+                                  final List<dynamic> followingListRaw = _dataController.user.value['user']?['following'] as List<dynamic>? ?? [];
+                                  final List<String> followingList = followingListRaw.map((e) => e.toString()).toList();
+                                  final bool isFollowing = followingList.contains(authorId);
+
+                                  return TextButton(
+                                    onPressed: _isProcessingFollow ? null : () async {
+                                      setState(() => _isProcessingFollow = true);
+                                      if (isFollowing) {
+                                        await _dataController.unfollowUser(authorId);
+                                      } else {
+                                        await _dataController.followUser(authorId);
+                                      }
+                                      if(mounted) setState(() => _isProcessingFollow = false);
+                                      // DataController's refresh should trigger Obx to rebuild this.
+                                      // Also, ProfilePage relies on a fresh fetch, this button doesn't need to update counts here.
+                                    },
+                                    style: TextButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      visualDensity: VisualDensity.compact,
+                                      side: BorderSide(color: isFollowing ? Colors.grey[600]! : Colors.tealAccent, width: 1),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                                      backgroundColor: _isProcessingFollow ? Colors.grey[700] : (isFollowing ? Colors.transparent : Colors.tealAccent.withOpacity(0.1)),
+                                    ),
+                                    child: Text(
+                                      _isProcessingFollow ? '...' : (isFollowing ? 'Unfollow' : 'Follow'),
+                                      style: GoogleFonts.roboto(
+                                        color: isFollowing ? Colors.grey[300] : Colors.tealAccent,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  );
+                                }),
+                              ),
                           ],
                         ),
                         const SizedBox(height: 6),

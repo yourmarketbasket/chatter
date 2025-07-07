@@ -48,6 +48,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   // For managing video queues within posts
   final Map<String, int> _postVideoQueueIndex = {};
   final Map<String, List<String>> _postVideoIds = {}; // Stores video IDs for each post's grid
+  final RxString _processingFollowForPostId = ''.obs; // To track loading state for follow/unfollow buttons
 
   @override
   void initState() {
@@ -601,10 +602,53 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                           ),
                         ),
                         // Display absoluteDate on the far right
-                        Text(
-                          DateFormat('MMM d, yyyy').format(timestamp),
-                          style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 12)
-                        ),
+                        // Text(
+                        //   DateFormat('MMM d, yyyy').format(timestamp.toLocal()), // Use toLocal for display
+                        //   style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 12)
+                        // ),
+                        // Follow/Unfollow Button
+                        Obx(() {
+                          final loggedInUserId = dataController.user.value['user']?['_id'];
+                          final postAuthorUserId = post['userId'] as String? ?? (post['user'] is Map ? post['user']['_id'] as String? : null);
+
+                          if (loggedInUserId != null && postAuthorUserId != null && loggedInUserId != postAuthorUserId) {
+                            final List<dynamic> followingListRaw = dataController.user.value['user']?['following'] as List<dynamic>? ?? [];
+                            final List<String> followingList = followingListRaw.map((e) => e.toString()).toList();
+                            final bool isFollowing = followingList.contains(postAuthorUserId);
+                            final bool isProcessing = _processingFollowForPostId.value == postId;
+
+                            return TextButton(
+                              onPressed: isProcessing ? null : () async {
+                                _processingFollowForPostId.value = postId;
+                                if (isFollowing) {
+                                  await dataController.unfollowUser(postAuthorUserId);
+                                } else {
+                                  await dataController.followUser(postAuthorUserId);
+                                }
+                                _processingFollowForPostId.value = ''; // Clear processing state
+                                // dataController.user.refresh(); // Already called in follow/unfollow methods
+                              },
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                visualDensity: VisualDensity.compact,
+                                side: BorderSide(color: isFollowing ? Colors.grey[600]! : Colors.tealAccent, width: 1),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                                backgroundColor: isProcessing ? Colors.grey[700] : (isFollowing ? Colors.transparent : Colors.tealAccent.withOpacity(0.1)),
+                              ),
+                              child: Text(
+                                isProcessing ? '...' : (isFollowing ? 'Unfollow' : 'Follow'),
+                                style: GoogleFonts.roboto(
+                                  color: isFollowing ? Colors.grey[300] : Colors.tealAccent,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            );
+                          }
+                          return const SizedBox.shrink(); // No button for own post or if IDs are missing
+                        }),
                       ],
                     ),
                     const SizedBox(height: 6),

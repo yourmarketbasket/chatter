@@ -1468,6 +1468,22 @@ class DataController extends GetxController {
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
+        // Update local state
+        if (user.value['user'] is Map) {
+          var userDetail = Map<String, dynamic>.from(user.value['user']);
+          var followingList = List<String>.from((userDetail['following'] as List<dynamic>? ?? []).map((e) => e.toString()));
+          if (!followingList.contains(userIdToFollow)) {
+            followingList.add(userIdToFollow);
+          }
+          userDetail['following'] = followingList;
+
+          var mainUserMap = Map<String, dynamic>.from(user.value);
+          mainUserMap['user'] = userDetail;
+          user.value = mainUserMap;
+          await _storage.write(key: 'user', value: jsonEncode(user.value));
+          user.refresh(); // Notify listeners of the nested change
+          print('[DataController] User $currentUserId now following $userIdToFollow. Local state updated.');
+        }
         return {'success': true, 'message': response.data['message'] ?? 'Successfully followed user.'};
       } else {
         return {'success': false, 'message': response.data['message'] ?? 'Failed to follow user.'};
@@ -1505,6 +1521,22 @@ class DataController extends GetxController {
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
+        // Update local state
+        if (user.value['user'] is Map) {
+          var userDetail = Map<String, dynamic>.from(user.value['user']);
+          var followingList = List<String>.from((userDetail['following'] as List<dynamic>? ?? []).map((e) => e.toString()));
+          if (followingList.contains(userIdToUnfollow)) {
+            followingList.remove(userIdToUnfollow);
+          }
+          userDetail['following'] = followingList;
+
+          var mainUserMap = Map<String, dynamic>.from(user.value);
+          mainUserMap['user'] = userDetail;
+          user.value = mainUserMap;
+          await _storage.write(key: 'user', value: jsonEncode(user.value));
+          user.refresh(); // Notify listeners of the nested change
+          print('[DataController] User $currentUserId now unfollowed $userIdToUnfollow. Local state updated.');
+        }
         return {'success': true, 'message': response.data['message'] ?? 'Successfully unfollowed user.'};
       } else {
         return {'success': false, 'message': response.data['message'] ?? 'Failed to unfollow user.'};
