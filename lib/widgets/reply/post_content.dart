@@ -60,6 +60,25 @@ class _PostContentState extends State<PostContent> {
     _currentPostData['reposts'] = List<dynamic>.from(_currentPostData['reposts'] ?? []);
   }
 
+  List<TextSpan> _buildTextSpans(String text) {
+    final List<TextSpan> spans = [];
+    final RegExp hashtagRegExp = RegExp(r"(#\w+)");
+    final TextStyle hashtagStyle = GoogleFonts.roboto(color: Colors.tealAccent, fontWeight: FontWeight.bold); // Teal color for hashtags
+
+    text.splitMapJoin(
+      hashtagRegExp,
+      onMatch: (Match match) {
+        spans.add(TextSpan(text: match.group(0), style: hashtagStyle));
+        return ''; // Return empty string for matched part as it's handled by TextSpan
+      },
+      onNonMatch: (String nonMatch) {
+        spans.add(TextSpan(text: nonMatch));
+        return ''; // Return empty string for non-matched part
+      },
+    );
+    return spans;
+  }
+
   @override
   void didUpdateWidget(covariant PostContent oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -257,6 +276,7 @@ class _PostContentState extends State<PostContent> {
                             );
                           }
                         : null,
+                    behavior: HitTestBehavior.opaque, // Ensure empty areas are tappable
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -284,12 +304,14 @@ class _PostContentState extends State<PostContent> {
                           ],
                         ),
                         const SizedBox(height: 6),
-                        Text(
-                          contentText,
-                          style: GoogleFonts.roboto(
-                            fontSize: widget.isReply ? 13 : 14,
-                            color: Colors.white,
-                            height: 1.5,
+                        RichText(
+                          text: TextSpan(
+                            style: GoogleFonts.roboto(
+                              fontSize: widget.isReply ? 13 : 14,
+                              color: Colors.white,
+                              height: 1.5,
+                            ),
+                            children: _buildTextSpans(contentText),
                           ),
                         ),
                         if (attachments.isNotEmpty) ...[
@@ -337,17 +359,18 @@ class _PostContentState extends State<PostContent> {
                           color: isLikedByCurrentUser ? Colors.pinkAccent : Colors.pinkAccent.withOpacity(0.7),
                           onPressed: () => _handleLike(currentEntryId, threadOriginalPostId, isLikedByCurrentUser, currentUserId),
                         ),
-                        if (!widget.isReply)
-                          StatButton(
-                            icon: FeatherIcons.bookmark,
-                            text: '',
-                            color: Colors.white70,
-                            onPressed: () {
-                              print('Bookmark action triggered for @$username (UI only, no snackbar)');
-                            },
-                          )
-                        else
-                          const SizedBox(width: 24 + 8),
+                        // Common Bookmark Button for both reply and non-reply
+                        StatButton(
+                          icon: FeatherIcons.bookmark,
+                          text: '', // No text for bookmark
+                          color: Colors.white70, // Default color, can be changed based on state
+                          onPressed: () {
+                            // Placeholder for bookmark logic
+                            print('Bookmark action triggered for Post/Reply ID: $currentEntryId (UI only, no snackbar)');
+                            // In a real scenario, you would update bookmark state here
+                            // and potentially call widget.onReplyDataUpdated or a specific bookmark update callback
+                          },
+                        ),
                         StatButton(
                           icon: FeatherIcons.share2,
                           text: '',

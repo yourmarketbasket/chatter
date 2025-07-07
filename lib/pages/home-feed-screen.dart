@@ -55,6 +55,36 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     // and any of them have video grids. Or do it in buildPostContent.
   }
 
+  List<TextSpan> _buildTextSpans(String text, {required bool isReply}) {
+    final List<TextSpan> spans = [];
+    final RegExp hashtagRegExp = RegExp(r"(#\w+)");
+    // Define default and hashtag-specific styles
+    final TextStyle defaultStyle = GoogleFonts.roboto(
+      fontSize: isReply ? 13 : 14,
+      color: const Color.fromARGB(255, 255, 255, 255),
+      height: 1.5
+    );
+    final TextStyle hashtagStyle = GoogleFonts.roboto(
+      fontSize: isReply ? 13 : 14,
+      color: Colors.tealAccent, // Teal color for hashtags
+      fontWeight: FontWeight.bold,
+      height: 1.5
+    );
+
+    text.splitMapJoin(
+      hashtagRegExp,
+      onMatch: (Match match) {
+        spans.add(TextSpan(text: match.group(0), style: hashtagStyle));
+        return ''; // Return empty string for matched part
+      },
+      onNonMatch: (String nonMatch) {
+        spans.add(TextSpan(text: nonMatch, style: defaultStyle));
+        return ''; // Return empty string for non-matched part
+      },
+    );
+    return spans;
+  }
+
   // Helper method to navigate to MediaViewPage
   void _navigateToMediaViewPage(
       BuildContext context,
@@ -561,7 +591,16 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                     if (content.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.only(left: 15),
-                        child: Text(content, style: GoogleFonts.roboto(fontSize: isReply ? 13 : 14, color: const Color.fromARGB(255, 255, 255, 255), height: 1.5)),
+                        child: RichText(
+                          text: TextSpan(
+                            style: GoogleFonts.roboto(
+                              fontSize: isReply ? 13 : 14,
+                              color: const Color.fromARGB(255, 255, 255, 255),
+                              height: 1.5,
+                            ),
+                            children: _buildTextSpans(content, isReply: isReply),
+                          ),
+                        ),
                       ),
                     // Spacer if content is empty but attachments exist, to maintain some tappable area
                     if (content.isEmpty && attachments.isNotEmpty)
@@ -591,7 +630,21 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                           () => _handleRepostAction(post), // Changed to direct action
                           isReposted: isRepostedByCurrentUser,
                         ),
-                        _buildActionButton(FeatherIcons.eye, '$views', () {}),
+                        _buildActionButton(FeatherIcons.eye, '$views', () {
+                          // Placeholder for view action
+                          print("View action triggered for post $postId");
+                        }),
+                        _buildActionButton(
+                          FeatherIcons.bookmark, // Bookmark Icon
+                          '', // No text for bookmark
+                          () {
+                            // Placeholder for bookmark action
+                            print("Bookmark action triggered for post $postId (UI only)");
+                            // Add actual bookmark logic here, e.g., calling dataController
+                          },
+                          // Optionally, add isBookmarked: post['isBookmarkedByCurrentUser'] ?? false
+                          // and adjust iconColor in _buildActionButton accordingly
+                        ),
                       ],
                     ),
                   ],
@@ -630,11 +683,23 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           icon: Icon(
             icon,
             color: iconColor,
-            size: 15
+            size: 14, // Reduced icon size
           ),
-          onPressed: onPressed
+          constraints: const BoxConstraints(), // Remove IconButton default padding
+          padding: const EdgeInsets.only(right: 2.0, left: 5.0), // Minimal horizontal padding for the icon button itself
+          onPressed: onPressed,
         ),
-        Text(text, style: GoogleFonts.roboto(color: const Color.fromARGB(255, 255, 255, 255), fontSize: 14)),
+        if (text.isNotEmpty) // Conditionally display text
+          Padding(
+            padding: const EdgeInsets.only(right: 5.0), // Add some padding to the right of the text if it exists
+            child: Text(
+              text,
+              style: GoogleFonts.roboto(
+                color: const Color.fromARGB(255, 255, 255, 255),
+                fontSize: 12, // Reduced text size
+              ),
+            ),
+          ),
       ],
     );
   }

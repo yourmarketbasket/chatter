@@ -20,19 +20,20 @@ class StatButton extends StatelessWidget {
     return InkWell(
       onTap: onPressed,
       child: Row(
+        mainAxisSize: MainAxisSize.min, // Allow row to shrink to content
         children: [
-          Icon(icon, size: 18, color: color),
+          Icon(icon, size: 16, color: color), // Reduced icon size
           if (text.isNotEmpty) ...[
-            const SizedBox(width: 4),
+            const SizedBox(width: 3), // Slightly reduced spacing
             Text(
               text,
               style: GoogleFonts.roboto(
                 color: Colors.white70,
-                fontSize: 12,
+                fontSize: 11, // Slightly reduced font size for text next to icon
               ),
             ),
           ],
-          const SizedBox(width: 8), // Added to maintain original spacing if text is empty
+          const SizedBox(width: 4), // Reduced spacing at the end of the button
         ],
       ),
     );

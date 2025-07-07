@@ -636,7 +636,20 @@ class _ReplyPageState extends State<ReplyPage> {
                         _isLoadingReplies && _fetchRepliesError == null
                             ? Center(child: Padding(padding: EdgeInsets.symmetric(vertical: 20.0), child: CircularProgressIndicator(color: Colors.tealAccent, strokeWidth: 1.0, backgroundColor: Colors.grey[800])))
                             : _fetchRepliesError != null
-                                ? Center(child: Padding(padding: const EdgeInsets.symmetric(vertical: 20.0), child: Text("Couldn't load replies. Tap refresh to try again.", style: GoogleFonts.roboto(color: Colors.redAccent, fontSize: 14), textAlign: TextAlign.center)))
+                                ? GestureDetector(
+                                    onTap: () => _fetchPostReplies(showLoadingIndicator: true),
+                                    behavior: HitTestBehavior.opaque, // Make the entire area tappable
+                                    child: Center(
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 40.0, horizontal: 16.0), // Increased padding for larger tap area
+                                        child: Text(
+                                          "Couldn't load replies. Tap to try again.", // Modified text
+                                          style: GoogleFonts.roboto(color: Colors.redAccent, fontSize: 14),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ),
+                                    ),
+                                  )
                                 : _replies.isEmpty
                                     ? Center(child: Padding(padding: const EdgeInsets.symmetric(vertical: 20.0), child: Text("No replies yet.", style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 14))))
                                     : Column(children: _buildRepliesListWidgets()), // Use recursive builder - CORRECTED NAME
