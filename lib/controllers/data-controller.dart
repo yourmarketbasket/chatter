@@ -1397,4 +1397,53 @@ class DataController extends GetxController {
       throw Exception('An error occurred while fetching replies for reply: $e');
     }
   }
+
+  Future<Map<String, dynamic>> fetchUserProfile(String username) async {
+    isLoading.value = true; // Generic loading indicator, ProfilePage might have its own
+    try {
+      final String? token = user.value['token'];
+      if (token == null) {
+        isLoading.value = false;
+        return {'success': false, 'message': 'Authentication token not found.'};
+      }
+
+      final response = await _dio.get(
+        '/api/users/get-user/$username', // Constructing the URL with username
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+
+      isLoading.value = false;
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        if (response.data['user'] != null) {
+          return {'success': true, 'user': response.data['user']};
+        } else {
+          return {'success': false, 'message': 'User data not found in response.'};
+        }
+      } else {
+        return {
+          'success': false,
+          'message': response.data['message'] ?? 'Failed to fetch user profile. Status: ${response.statusCode}'
+        };
+      }
+    } catch (e) {
+      isLoading.value = false;
+      print('[DataController] Error fetching user profile for $username: $e');
+      String errorMessage = 'An error occurred while fetching the profile.';
+      if (e is dio.DioException) {
+        if (e.response?.statusCode == 404) {
+          errorMessage = 'User profile not found.';
+        } else if (e.response?.data != null && e.response!.data['message'] != null) {
+          errorMessage = e.response!.data['message'];
+        } else {
+          errorMessage = e.message ?? errorMessage;
+        }
+      }
+      return {'success': false, 'message': errorMessage};
+    }
+  }
 }
