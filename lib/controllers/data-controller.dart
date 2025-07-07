@@ -1457,10 +1457,10 @@ class DataController extends GetxController {
 
     try {
       final response = await _dio.post(
-        '/api/users/follow', // As per plan, backend needs this route
+        '/api/users/follow-user', // As per plan, backend needs this route
         data: {
-          'userId': currentUserId, // The user performing the action
-          'userIdToFollow': userIdToFollow // The user to be followed
+          'thisUserId': currentUserId, // The user performing the action
+          'UserToFollowId': userIdToFollow // The user to be followed
         },
         options: dio.Options(
           headers: {'Authorization': 'Bearer $token'},
@@ -1510,10 +1510,10 @@ class DataController extends GetxController {
 
     try {
       final response = await _dio.post(
-        '/api/users/unfollow', // As per plan, backend needs this route
+        '/api/users/unfollow-user', // As per plan, backend needs this route
         data: {
-          'userId': currentUserId, // The user performing the action
-          'userIdToUnfollow': userIdToUnfollow // The user to be unfollowed
+          'thisUserId': currentUserId, // The user performing the action
+          'UserToUnfollowId': userIdToUnfollow // The user to be unfollowed
         },
         options: dio.Options(
           headers: {'Authorization': 'Bearer $token'},
@@ -1563,8 +1563,8 @@ class DataController extends GetxController {
 
     try {
       final response = await _dio.put(
-        '/api/users/me/about', // Endpoint to update "about" for the logged-in user
-        data: {'about': aboutText},
+        '/api/users/update-about', // Endpoint to update "about" for the logged-in user
+        data: {'about': aboutText, 'userid': currentUserId},
         options: dio.Options(
           headers: {'Authorization': 'Bearer $token'},
         ),
