@@ -1399,11 +1399,11 @@ class DataController extends GetxController {
   }
 
   Future<Map<String, dynamic>> fetchUserProfile(String username) async {
-    isLoading.value = true; // Generic loading indicator, ProfilePage might have its own
+    // isLoading.value = true; // Removed: ProfilePage will manage its own loading state
     try {
       final String? token = user.value['token'];
       if (token == null) {
-        isLoading.value = false;
+        // isLoading.value = false; // Removed
         return {'success': false, 'message': 'Authentication token not found.'};
       }
 
@@ -1416,7 +1416,7 @@ class DataController extends GetxController {
         ),
       );
 
-      isLoading.value = false;
+      // isLoading.value = false; // Removed
 
       if (response.statusCode == 200 && response.data['success'] == true) {
         if (response.data['user'] != null) {
@@ -1431,7 +1431,7 @@ class DataController extends GetxController {
         };
       }
     } catch (e) {
-      isLoading.value = false;
+      // isLoading.value = false; // Removed
       print('[DataController] Error fetching user profile for $username: $e');
       String errorMessage = 'An error occurred while fetching the profile.';
       if (e is dio.DioException) {
