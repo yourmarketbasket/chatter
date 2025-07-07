@@ -21,6 +21,7 @@ class PostContent extends StatefulWidget {
   final Function() refreshReplies;
   final Function(Map<String, dynamic> updatedReplyData) onReplyDataUpdated;
   final bool drawInternalVerticalLine;
+  final int postDepth;
 
   const PostContent({
     Key? key,
@@ -35,6 +36,7 @@ class PostContent extends StatefulWidget {
     required this.refreshReplies,
     required this.onReplyDataUpdated,
     this.drawInternalVerticalLine = true,
+    required this.postDepth,
   }) : super(key: key);
 
   @override
@@ -249,6 +251,7 @@ class _PostContentState extends State<PostContent> {
                                 builder: (context) => ReplyPage(
                                   post: _currentPostData,
                                   originalPostId: threadOriginalPostId,
+                                   postDepth: widget.postDepth, // The ReplyPage displays this item, so it's at this depth
                                 ),
                               ),
                             );
@@ -300,7 +303,7 @@ class _PostContentState extends State<PostContent> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Paddingoser(
+                  Padding(
                     padding: const EdgeInsets.only(left: 0),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,

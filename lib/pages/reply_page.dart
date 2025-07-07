@@ -405,6 +405,7 @@ class _ReplyPageState extends State<ReplyPage> {
                   });
                 }
               },
+              postDepth: widget.postDepth + 2, // For sub-reply previews
             ),
           );
         }
@@ -414,7 +415,7 @@ class _ReplyPageState extends State<ReplyPage> {
               padding: const EdgeInsets.only(left: 20.0, top: 4.0, bottom: 8.0), // Indent "show more" slightly more
               child: TextButton(
                 onPressed: () {
-                   Navigator.push(context, MaterialPageRoute(builder: (context) => ReplyPage(post: firstLevelReply, originalPostId: widget.originalPostId ?? widget.post['_id'] as String)));
+                   Navigator.push(context, MaterialPageRoute(builder: (context) => ReplyPage(post: firstLevelReply, originalPostId: widget.originalPostId ?? widget.post['_id'] as String, postDepth: widget.postDepth + 1)));
                 },
                 child: Text('Show ${childrenReplies.length - 3} more replies', style: GoogleFonts.poppins(color: Colors.tealAccent, fontSize: 13)),
               ),
@@ -439,6 +440,7 @@ class _ReplyPageState extends State<ReplyPage> {
           onReplyToItem: (String itemId) { setState(() { _parentReplyId = itemId; _showReplyField = true; FocusScope.of(context).requestFocus(_replyFocusNode); }); },
           refreshReplies: () => _fetchPostReplies(showLoadingIndicator: false),
           onReplyDataUpdated: (updatedReply) { if (mounted) setState(() => _updateNestedReply(_replies, updatedReply)); },
+          postDepth: widget.postDepth + 1, // For first-level replies
         )
       );
 
@@ -606,6 +608,7 @@ class _ReplyPageState extends State<ReplyPage> {
                         onReplyDataUpdated: (updatedPost) {
                           if (mounted) setState(() { _mainPostData = updatedPost; });
                         },
+                        postDepth: widget.postDepth,
                       ),
                     ),
                   ),
