@@ -137,7 +137,7 @@ class _ReplyPageState extends State<ReplyPage> {
         fetchedRootReplies = await _dataController.fetchRepliesForReply(widget.originalPostId!, currentPostItemId);
       }
 
-      // Process replies and their children recursively, starting at depth 0 for direct replies
+      // Process replies and their children recursively, starting at depth 0 for direct replies/
       _replies = await _processFetchedReplies(fetchedRootReplies, threadOriginalPostId, 0);
 
       if (mounted) {
