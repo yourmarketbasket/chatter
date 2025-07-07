@@ -536,6 +536,8 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // top spacing
+        const SizedBox(height: 5),
         GestureDetector(
           onTap: () => _navigateToReplyPage(post),
           behavior: HitTestBehavior.opaque,
@@ -566,26 +568,23 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // Part 1: Display Name, Yellow Checkmark
+                        // Part 1: Display Name, Yellow Checkmark //
                         Text(
-                          username, // This is the display name
+                          '@'+username, // This is the display name
                           style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: isReply ? 14 : 16, color: Colors.white),
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(width: 4.0),
+                        
                         Icon(Icons.verified, color: Colors.amber, size: isReply ? 13 : 15), // Yellow checkmark
-                        const SizedBox(width: 8.0),
+                        
 
                         // Part 2: @username · Time · Time Ago · Date (dot separated)
                         // This part will no longer be Expanded.
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8.0), // Add some horizontal padding
-                          child: Text(
-                            '@$username · ${DateFormat('h:mm a').format(timestamp.toLocal())} · ${timeago.format(timestamp)} · ${DateFormat('MMM d, yyyy').format(timestamp.toLocal())}',
-                            style: GoogleFonts.poppins(fontSize: isReply ? 11 : 12, color: Colors.grey[500]),
-                            overflow: TextOverflow.ellipsis,
-                            softWrap: false, // Try to keep it on one line
-                          ),
+                        Text(
+                          '· ${DateFormat('h:mm a').format(timestamp.toLocal())} · ${timeago.format(timestamp)} · ${DateFormat('MMM d, yy').format(timestamp.toLocal())}',
+                          style: GoogleFonts.poppins(fontSize: isReply ? 11 : 12, color: Colors.grey[500]),
+                          overflow: TextOverflow.ellipsis,
+                          softWrap: false, // Try to keep it on one line
                         ),
                         // const Spacer(), // REMOVED: Spacer should not be here if follow button is not at far right
 
@@ -614,7 +613,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                                   _processingFollowForPostId.value = '';
                                 },
                                 style: TextButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), // Increased padding
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10), // Increased padding
                                   minimumSize: Size.zero,
                                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                   visualDensity: VisualDensity.compact,
@@ -637,13 +636,10 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                     ),
                     const SizedBox(height: 6),
                     if (contentTextData.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 15),
-                        child: RichText(
-                          text: TextSpan(
-                            style: GoogleFonts.roboto(fontSize: isReply ? 13 : 14, color: const Color.fromARGB(255, 255, 255, 255), height: 1.5),
-                            children: _buildTextSpans(contentTextData, isReply: isReply),
-                          ),
+                      RichText(
+                        text: TextSpan(
+                          style: GoogleFonts.roboto(fontSize: isReply ? 13 : 14, color: const Color.fromARGB(255, 255, 255, 255), height: 1.5),
+                          children: _buildTextSpans(contentTextData, isReply: isReply),
                         ),
                       ),
                     if (contentTextData.isEmpty && attachments.isNotEmpty) const SizedBox(height: 6),
@@ -1056,6 +1052,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
             );
         }
         return ListView.separated(
+          padding: EdgeInsets.symmetric(horizontal: 10),
           controller: _scrollController,
           itemCount: dataController.posts.length,
           separatorBuilder: (context, index) => Divider(color: Colors.grey[850], height: 1),

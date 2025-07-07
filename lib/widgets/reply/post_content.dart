@@ -332,7 +332,7 @@ class _PostContentState extends State<PostContent> {
                           children: [
                             // Display Name (using 'username' from postData, which might be the handle or a display name)
                             Text(
-                              username, // This is _currentPostData['username']
+                              '@'+username, // This is _currentPostData['username']
                               style: GoogleFonts.poppins(
                                 color: Colors.white,
                                 fontSize: widget.isReply ? 14 : 16, // Size based on context
@@ -350,20 +350,9 @@ class _PostContentState extends State<PostContent> {
                               size: widget.isReply ? 13 : 15, // Size based on context
                             ),
                             const SizedBox(width: 4.0),
-                            // @username handle
+                                                        // Expanded has been removed from the Text widget below
                             Text(
-                              '@$username', // Prepends '@' to the username
-                              style: GoogleFonts.poppins(
-                                color: Colors.grey[500], // Typically a lighter color for handles
-                                fontSize: widget.isReply ? 12 : 14,
-                                fontWeight: FontWeight.normal,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(width: 8.0), // Space before timestamp
-                            // Expanded has been removed from the Text widget below
-                            Text(
-                              '${DateFormat('h:mm a').format(timestamp.toLocal())} · ${timeago.format(timestamp)} · ${DateFormat('MMM d, yyyy').format(timestamp.toLocal())}',
+                              '· ${DateFormat('h:mm a').format(timestamp.toLocal())} · ${timeago.format(timestamp)} · ${DateFormat('MMM d, yy').format(timestamp.toLocal())}',
                               style: GoogleFonts.roboto(
                                 fontSize: widget.isReply ? 11 : 12,
                                 color: Colors.grey[400],
