@@ -335,7 +335,7 @@ class _PostContentState extends State<PostContent> {
                               '@'+username, // This is _currentPostData['username']
                               style: GoogleFonts.poppins(
                                 color: Colors.white,
-                                fontSize: widget.isReply ? 14 : 16, // Size based on context
+                                fontSize: widget.isReply ? 12 : 12, // Size based on context
                                 fontWeight: FontWeight.w600,
                               ),
                               overflow: TextOverflow.ellipsis,
@@ -354,7 +354,7 @@ class _PostContentState extends State<PostContent> {
                             Text(
                               '· ${DateFormat('h:mm a').format(timestamp.toLocal())} · ${timeago.format(timestamp)} · ${DateFormat('MMM d, yy').format(timestamp.toLocal())}',
                               style: GoogleFonts.roboto(
-                                fontSize: widget.isReply ? 11 : 12,
+                                fontSize: widget.isReply ? 10 : 10,
                                 color: Colors.grey[400],
                               ),
                               overflow: TextOverflow.ellipsis,

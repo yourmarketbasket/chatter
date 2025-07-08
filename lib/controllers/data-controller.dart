@@ -1562,7 +1562,7 @@ class DataController extends GetxController {
     }
 
     try {
-      final response = await _dio.put(
+      final response = await _dio.post(
         '/api/users/update-about', // Endpoint to update "about" for the logged-in user
         data: {'about': aboutText, 'userid': currentUserId},
         options: dio.Options(

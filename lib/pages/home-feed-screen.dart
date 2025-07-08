@@ -571,7 +571,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                         // Part 1: Display Name, Yellow Checkmark //
                         Text(
                           '@'+username, // This is the display name
-                          style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: isReply ? 14 : 16, color: Colors.white),
+                          style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: isReply ? 10 : 12, color: Colors.white),
                           overflow: TextOverflow.ellipsis,
                         ),
                         
@@ -582,7 +582,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                         // This part will no longer be Expanded.
                         Text(
                           '· ${DateFormat('h:mm a').format(timestamp.toLocal())} · ${timeago.format(timestamp)} · ${DateFormat('MMM d, yy').format(timestamp.toLocal())}',
-                          style: GoogleFonts.poppins(fontSize: isReply ? 11 : 12, color: Colors.grey[500]),
+                          style: GoogleFonts.poppins(fontSize: isReply ? 10 : 10, color: Colors.grey[500]),
                           overflow: TextOverflow.ellipsis,
                           softWrap: false, // Try to keep it on one line
                         ),
