@@ -51,19 +51,95 @@ class _ReplyPageState extends State<ReplyPage> {
     super.initState();
     _dataController = Get.find<DataController>();
     _mainPostData = Map<String, dynamic>.from(widget.post);
-    if (_mainPostData['likes'] != null && _mainPostData['likes'] is List) {
-      _mainPostData['likes'] = List<dynamic>.from(_mainPostData['likes'] as List);
-    }
-    if (_mainPostData['reposts'] != null && _mainPostData['reposts'] is List) {
-      _mainPostData['reposts'] = List<dynamic>.from(_mainPostData['reposts'] as List);
-    }
+    // Ensure crucial lists are mutable if they exist
+    _mainPostData['likes'] = List<dynamic>.from(_mainPostData['likes'] ?? []);
+    _mainPostData['reposts'] = List<dynamic>.from(_mainPostData['reposts'] ?? []);
+    _mainPostData['views'] = List<dynamic>.from(_currentPostData['views'] ?? []);
+    _mainPostData['replies'] = List<dynamic>.from(_mainPostData['replies'] ?? []);
+
 
     _fetchPostReplies();
 
-    final String currentPostId = _mainPostData['_id'] as String? ?? "";
-    if (currentPostId.isNotEmpty) {
-      if (widget.originalPostId == null) {
-        _dataController.viewPost(currentPostId);
+    final String pagePostId = _mainPostData['_id'] as String? ?? ""; // The ID of the post/reply this page is currently displaying
+
+    if (pagePostId.isNotEmpty) {
+      // Listener for changes in DataController.posts
+      ever(_dataController.posts, (_) {
+        if (!mounted) return;
+
+        Map<String, dynamic>? updatedGlobalDataForItemOnPage;
+
+        // Attempt to find the item this page is displaying within the global DataController.posts list
+        // This search needs to be potentially recursive if we want to find nested replies.
+        // For now, let's check top-level posts and their direct replies, as these are levels
+        // where DataController makes granular updates.
+
+        for (var globalPost in _dataController.posts) {
+          if (globalPost['_id'] == pagePostId) {
+            updatedGlobalDataForItemOnPage = globalPost;
+            break;
+          }
+          // Check direct replies of this globalPost
+          if (globalPost['replies'] is List) {
+            for (var globalReply in (globalPost['replies'] as List)) {
+              if (globalReply is Map<String, dynamic> && globalReply['_id'] == pagePostId) {
+                updatedGlobalDataForItemOnPage = globalReply;
+                break;
+              }
+            }
+          }
+          if (updatedGlobalDataForItemOnPage != null) break;
+        }
+
+        if (updatedGlobalDataForItemOnPage != null) {
+          // Compare current _mainPostData with updatedGlobalDataForItemOnPage
+          bool needsMainPostUpdate = false;
+          bool needsRepliesListRefresh = false;
+
+          // Check if display-relevant fields of _mainPostData have changed
+          if ((_mainPostData['likesCount'] ?? (_mainPostData['likes'] as List).length) != (updatedGlobalDataForItemOnPage['likesCount'] ?? (updatedGlobalDataForItemOnPage['likes'] as List).length) ||
+              (_mainPostData['repostsCount'] ?? (_mainPostData['reposts'] as List).length) != (updatedGlobalDataForItemOnPage['repostsCount'] ?? (updatedGlobalDataForItemOnPage['reposts'] as List).length) ||
+              (_mainPostData['viewsCount'] ?? (_mainPostData['views'] as List).length) != (updatedGlobalDataForItemOnPage['viewsCount'] ?? (updatedGlobalDataForItemOnPage['views'] as List).length) ||
+              (_mainPostData['content'] != updatedGlobalDataForItemOnPage['content']) // Example: content change
+          ) {
+            needsMainPostUpdate = true;
+          }
+
+          // Check if the number of replies to _mainPostData might have changed
+          final localDisplayReplyCount = _mainPostData['replyCount'] ?? (_mainPostData['replies'] as List?)?.length ?? 0;
+          final globalReplyCountForItemOnPage = updatedGlobalDataForItemOnPage['replyCount'] ?? (updatedGlobalDataForItemOnPage['replies'] as List?)?.length ?? 0;
+
+          if (localDisplayReplyCount != globalReplyCountForItemOnPage) {
+             needsMainPostUpdate = true; // because its own replyCount changed
+             needsRepliesListRefresh = true; // because its children list changed
+          }
+
+
+          if (needsMainPostUpdate) {
+            if(mounted) {
+              setState(() {
+                _mainPostData = Map<String, dynamic>.from(updatedGlobalDataForItemOnPage);
+                // Ensure lists are mutable for PostContent's local operations
+                _mainPostData['likes'] = List<dynamic>.from(_mainPostData['likes'] ?? []);
+                _mainPostData['reposts'] = List<dynamic>.from(_mainPostData['reposts'] ?? []);
+                _mainPostData['views'] = List<dynamic>.from(_mainPostData['views'] ?? []);
+                _mainPostData['replies'] = List<dynamic>.from(_mainPostData['replies'] ?? []); // For its own sub-replies
+              });
+            }
+          }
+
+          if (needsRepliesListRefresh) {
+            print("[ReplyPage] Changes detected for item $pagePostId or its direct reply count. Refreshing its replies list.");
+            _fetchPostReplies(showLoadingIndicator: false);
+          }
+        }
+      });
+    }
+
+    // Original view registration logic
+    if (pagePostId.isNotEmpty) {
+      if (widget.originalPostId == null) { // This page is for a top-level post
+        _dataController.viewPost(pagePostId);
       } else {
         _dataController.viewReply(widget.originalPostId!, currentPostId);
       }
