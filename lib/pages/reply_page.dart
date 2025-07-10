@@ -34,6 +34,26 @@ class ReplyPage extends StatefulWidget {
 class _ReplyPageState extends State<ReplyPage> {
   final TextEditingController _replyController = TextEditingController();
   final List<Map<String, dynamic>> _replyAttachments = [];
+
+  // Helper function to recursively find an item by ID in a list of posts/replies
+  Map<String, dynamic>? _findItemRecursive(List<dynamic> listToSearch, String targetId) {
+    for (var item in listToSearch) {
+      if (item is Map<String, dynamic>) {
+        if (item['_id'] == targetId) {
+          return item;
+        }
+        // Check if this item has nested replies and search within them
+        if (item['replies'] is List && (item['replies'] as List).isNotEmpty) {
+          final Map<String, dynamic>? foundInNested = _findItemRecursive(item['replies'] as List<dynamic>, targetId);
+          if (foundInNested != null) {
+            return foundInNested;
+          }
+        }
+      }
+    }
+    return null; // Not found in this list or its children
+  }
+
   late DataController _dataController;
   final DeviceInfoPlugin _deviceInfo = DeviceInfoPlugin();
 
@@ -67,29 +87,8 @@ class _ReplyPageState extends State<ReplyPage> {
       ever(_dataController.posts, (_) {
         if (!mounted) return;
 
-        Map<String, dynamic>? updatedGlobalDataForItemOnPage;
-
-        // Attempt to find the item this page is displaying within the global DataController.posts list
-        // This search needs to be potentially recursive if we want to find nested replies.
-        // For now, let's check top-level posts and their direct replies, as these are levels
-        // where DataController makes granular updates.
-
-        for (var globalPost in _dataController.posts) {
-          if (globalPost['_id'] == pagePostId) {
-            updatedGlobalDataForItemOnPage = globalPost;
-            break;
-          }
-          // Check direct replies of this globalPost
-          if (globalPost['replies'] is List) {
-            for (var globalReply in (globalPost['replies'] as List)) {
-              if (globalReply is Map<String, dynamic> && globalReply['_id'] == pagePostId) {
-                updatedGlobalDataForItemOnPage = globalReply;
-                break;
-              }
-            }
-          }
-          if (updatedGlobalDataForItemOnPage != null) break;
-        }
+        // Use the recursive helper to find the item this page is displaying
+        final Map<String, dynamic>? updatedGlobalDataForItemOnPage = _findItemRecursive(_dataController.posts, pagePostId);
 
         if (updatedGlobalDataForItemOnPage != null) { // Ensures updatedGlobalDataForItemOnPage is not null
           // Compare current _mainPostData with updatedGlobalDataForItemOnPage
