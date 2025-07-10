@@ -1231,14 +1231,22 @@ class DataController extends GetxController {
 
         posts[postIndex] = postToUpdate;
         posts.refresh();
-        print('[DataController] Post $postId updated from socket event. New data: $postToUpdate');
+        print('[DataController] Post $finalPostId updated from socket event. New data: $postToUpdate'); // Used finalPostId
       } else {
         // This is a new post not seen before, or an update for a post not yet in the list.
         // This could happen if another user creates a post and this client receives the socket event.
         // We should add it as a new post.
-        print('[DataController] updatePostFromSocket: Post with ID $postId not found. Assuming new post and adding.');
+        print('[DataController] updatePostFromSocket: Post with ID $finalPostId not found. Assuming new post and adding.'); // Used finalPostId
         // Process it like a new post, ensuring all counts are correctly initialized.
         Map<String, dynamic> newPostData = Map<String, dynamic>.from(updatedPostData);
+
+        // Ensure the ID is consistent, using finalPostId if _id is not already correct in newPostData
+        if (newPostData['_id'] == null && updatedPostData['postId'] == finalPostId) { // check original key 'postId' from updatedPostData
+            newPostData['_id'] = finalPostId;
+        } else if (newPostData['_id'] != finalPostId) {
+            newPostData['_id'] = finalPostId;
+        }
+
 
         newPostData['likesCount'] = (newPostData.containsKey('likesCount')) ? newPostData['likesCount'] : (newPostData['likes'] as List?)?.length ?? 0;
         newPostData['repostsCount'] = (newPostData.containsKey('repostsCount')) ? newPostData['repostsCount'] : (newPostData['reposts'] as List?)?.length ?? 0;
@@ -1261,7 +1269,7 @@ class DataController extends GetxController {
         addNewPost(newPostData); // addNewPost also handles duplicates and inserts at 0
       }
     } catch (e) {
-      print('[DataController] Error updating post $postId from socket: $e. Data: $updatedPostData');
+      print('[DataController] Error updating post $finalPostId from socket: $e. Data: $updatedPostData'); // Used finalPostId
     }
   }
 
