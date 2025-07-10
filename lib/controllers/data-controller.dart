@@ -353,24 +353,9 @@ class DataController extends GetxController {
       );
       // print(response.data);
       if (response.statusCode == 200 && response.data['success'] == true) {
-        // Update local post data
-        int postIndex = posts.indexWhere((p) => p['_id'] == postId);
-        if (postIndex != -1) {
-          var postToUpdate = Map<String, dynamic>.from(posts[postIndex]);
-          var likesList = List<dynamic>.from(postToUpdate['likes'] ?? []);
-
-          // Add user's ID to likes list if not already present
-          if (!likesList.any((like) => (like is Map ? like['_id'] == currentUserId : like == currentUserId))) {
-            // Assuming backend might store simple user IDs or objects with an _id.
-            // For simplicity, adding the ID. Adjust if backend returns full like objects.
-            likesList.add(currentUserId);
-          }
-          postToUpdate['likes'] = likesList;
-          postToUpdate['likesCount'] = likesList.length; // Update likesCount
-          posts[postIndex] = postToUpdate;
-          // posts.refresh(); // Usually not needed for item replacement if RxList is used correctly
-        }
-        return {'success': true, 'message': 'Post liked successfully'};
+        // Fetch the full post to ensure data consistency
+        await fetchSinglePost(postId);
+        return {'success': true, 'message': response.data['message'] ?? 'Post liked successfully'};
       } else {
         return {'success': false, 'message': response.data['message'] ?? 'Post like failed'};
       }
@@ -399,20 +384,9 @@ class DataController extends GetxController {
       );
       // print(response.data);
       if (response.statusCode == 200 && response.data['success'] == true) {
-        // Update local post data
-        int postIndex = posts.indexWhere((p) => p['_id'] == postId);
-        if (postIndex != -1) {
-          var postToUpdate = Map<String, dynamic>.from(posts[postIndex]);
-          var likesList = List<dynamic>.from(postToUpdate['likes'] ?? []);
-
-          // Remove user's ID from likes list
-          likesList.removeWhere((like) => (like is Map ? like['_id'] == currentUserId : like == currentUserId));
-          postToUpdate['likes'] = likesList;
-          postToUpdate['likesCount'] = likesList.length; // Update likesCount
-          posts[postIndex] = postToUpdate;
-          // posts.refresh(); // Usually not needed for item replacement
-        }
-        return {'success': true, 'message': 'Post unliked successfully'};
+        // Fetch the full post to ensure data consistency
+        await fetchSinglePost(postId);
+        return {'success': true, 'message': response.data['message'] ?? 'Post unliked successfully'};
       } else {
         return {'success': false, 'message': response.data['message'] ?? 'Post unlike failed'};
       }
@@ -555,23 +529,8 @@ class DataController extends GetxController {
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
-        // Optimistic UI Update
-        int postIndex = posts.indexWhere((p) => p['_id'] == postId);
-        if (postIndex != -1) {
-          var postToUpdate = Map<String, dynamic>.from(posts[postIndex]);
-          var repostsList = List<String>.from((postToUpdate['reposts'] as List<dynamic>? ?? []).map((e) => e.toString()));
-
-          if (!repostsList.contains(currentUserId)) {
-            repostsList.add(currentUserId);
-          }
-          postToUpdate['reposts'] = repostsList;
-          postToUpdate['repostsCount'] = repostsList.length;
-          posts[postIndex] = postToUpdate;
-          // posts.refresh(); // Usually not needed for item replacement if using Obx correctly
-          print('[DataController] Post $postId reposted optimistically by $currentUserId.');
-        }
-        // The actual full post update will come via socket event 'postReposted'
-        // and be handled by updatePostFromSocket, which is fine.
+        // Fetch the full post to ensure data consistency
+        await fetchSinglePost(postId);
         return {'success': true, 'message': response.data['message'] ?? 'Post reposted successfully'};
       } else {
         return {'success': false, 'message': response.data['message'] ?? 'Failed to repost post'};
@@ -1412,15 +1371,15 @@ class DataController extends GetxController {
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
-        // TODO: Update local state for the specific reply.
-        // This might involve finding the post in `posts` list, then finding the reply in its replies.
-        // Or, if ReplyPage manages its own list of replies, it will need to update that.
-        // The response might contain the updated reply object.
-        print('[DataController] Like reply successful: ${response.data}');
+        // Fetch the full root post to ensure data consistency for the entire thread
+        await fetchSinglePost(postId); // postId here is the root post ID
+        print('[DataController] Like reply successful, root post $postId fetched: ${response.data}');
         return {
           'success': true,
           'message': response.data['message'] ?? 'Reply liked successfully',
-          'updatedReply': response.data['updatedReply'] // Assuming updated reply is returned
+          // 'updatedReply' might still be useful for immediate UI feedback if the caller wants it,
+          // but the authoritative state comes from fetchSinglePost.
+          'likesCount': response.data['likesCount']
         };
       } else {
         return {'success': false, 'message': response.data['message'] ?? 'Failed to like reply'};
@@ -1453,12 +1412,13 @@ class DataController extends GetxController {
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
-        // TODO: Update local state for the specific reply.
-        print('[DataController] Unlike reply successful: ${response.data}');
+        // Fetch the full root post to ensure data consistency for the entire thread
+        await fetchSinglePost(postId); // postId here is the root post ID
+        print('[DataController] Unlike reply successful, root post $postId fetched: ${response.data}');
         return {
           'success': true,
           'message': response.data['message'] ?? 'Reply unliked successfully',
-          'updatedReply': response.data['updatedReply'] // Assuming updated reply is returned
+          'likesCount': response.data['likesCount']
         };
       } else {
         return {'success': false, 'message': response.data['message'] ?? 'Failed to unlike reply'};
@@ -1530,15 +1490,16 @@ class DataController extends GetxController {
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
-        // TODO: Update local state. A repost of a reply might create a new post on the user's feed.
-        // The main post's list of replies might also need its repost count updated for that specific reply.
-        print('[DataController] Repost reply successful: ${response.data}');
-        // The response might contain the newly created repost (as a Post object) or the updated reply.
+        // Fetch the full root post to ensure data consistency for the entire thread
+        await fetchSinglePost(postId); // postId here is the root post ID
+        print('[DataController] Repost reply successful, root post $postId fetched: ${response.data}');
+        // If reposting a reply creates a new top-level post for the reposter,
+        // that new post should arrive via a 'newPost' socket event or be handled by a subsequent feed refresh.
+        // The primary goal here is to update the state of the original thread.
         return {
           'success': true,
           'message': response.data['message'] ?? 'Reply reposted successfully',
-          'repost': response.data['repost'], // If a new post is created for the repost
-          'updatedReply': response.data['updatedReply'] // If the original reply is updated
+          'repostsCount': response.data['repostsCount']
         };
       } else {
         return {'success': false, 'message': response.data['message'] ?? 'Failed to repost reply'};

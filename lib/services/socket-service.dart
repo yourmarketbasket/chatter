@@ -117,33 +117,49 @@ class SocketService {
 
     // Listen for postLiked event
     _socket!.on('postLiked', (data) {
-      // print('postLiked event received: $data');
+      print('[SocketService] postLiked event received: $data');
       if (data is Map<String, dynamic>) {
-        // Assuming 'data' is the full updated post object
-        _dataController.updatePostFromSocket(data);
+        final String? postId = data['postId'] as String? ?? data['_id'] as String?;
+        if (postId != null) {
+          print('[SocketService] postLiked event for $postId. Triggering fetchSinglePost.');
+          _dataController.fetchSinglePost(postId);
+        } else {
+          print('[SocketService] Received postLiked event with missing postId or _id: $data');
+        }
       } else {
-        print('Received postLiked event with unexpected data type: ${data.runtimeType}. Expected Map<String, dynamic>.');
+        print('[SocketService] Received postLiked event with unexpected data type: ${data.runtimeType}. Expected Map<String, dynamic>.');
       }
     });
 
     // Listen for postUnliked event
     _socket!.on('postUnliked', (data) {
-      // print('postUnliked event received: $data');
+      print('[SocketService] postUnliked event received: $data');
       if (data is Map<String, dynamic>) {
-        // Assuming 'data' is the full updated post object
-        _dataController.updatePostFromSocket(data);
+        final String? postId = data['postId'] as String? ?? data['_id'] as String?;
+        if (postId != null) {
+          print('[SocketService] postUnliked event for $postId. Triggering fetchSinglePost.');
+          _dataController.fetchSinglePost(postId);
+        } else {
+          print('[SocketService] Received postUnliked event with missing postId or _id: $data');
+        }
       } else {
-        print('Received postUnliked event with unexpected data type: ${data.runtimeType}. Expected Map<String, dynamic>.');
+        print('[SocketService] Received postUnliked event with unexpected data type: ${data.runtimeType}. Expected Map<String, dynamic>.');
       }
     });
+
     // postReposted event
     _socket!.on('postReposted', (data) {
-      // print('postReposted event received: $data');
+      print('[SocketService] postReposted event received: $data');
       if (data is Map<String, dynamic>) {
-        // Assuming 'data' is the full updated post object
-        _dataController.updatePostFromSocket(data);
+        final String? postId = data['postId'] as String? ?? data['_id'] as String?;
+        if (postId != null) {
+          print('[SocketService] postReposted event for $postId. Triggering fetchSinglePost.');
+          _dataController.fetchSinglePost(postId);
+        } else {
+          print('[SocketService] Received postReposted event with missing postId or _id: $data');
+        }
       } else {
-        print('Received postReposted event with unexpected data type: ${data.runtimeType}. Expected Map<String, dynamic>.');
+        print('[SocketService] Received postReposted event with unexpected data type: ${data.runtimeType}. Expected Map<String, dynamic>.');
       }
     });
 
@@ -171,17 +187,12 @@ class SocketService {
     _socket!.on('replyLiked', (data) {
       print('[SocketService] replyLiked event received: $data');
       if (data is Map<String, dynamic>) {
-        final String? postId = data['postId'] as String?;
-        final String? replyId = data['replyId'] as String?;
-        // userId is also in data, but not directly needed for handleReplyUpdate if we pass counts
-        final int? likesCount = data['likesCount'] as int?;
-
-        if (postId != null && replyId != null && likesCount != null) {
-          _dataController.handleReplyUpdate(postId, replyId, {'likesCount': likesCount});
-          // If the backend also sends the full 'likes' array for the reply:
-          // _dataController.handleReplyUpdate(postId, replyId, {'likesCount': likesCount, 'likes': data['likes']});
+        final String? rootPostId = data['postId'] as String?; // This should be the root post ID
+        if (rootPostId != null) {
+          print('[SocketService] replyLiked event for a reply in root post $rootPostId. Triggering fetchSinglePost for root post.');
+          _dataController.fetchSinglePost(rootPostId);
         } else {
-          print('[SocketService] replyLiked event missing required fields (postId, replyId, likesCount). Data: $data');
+          print('[SocketService] Received replyLiked event with missing root postId. Data: $data');
         }
       } else {
         print('[SocketService] Received replyLiked event with unexpected data type: ${data.runtimeType}');
@@ -191,16 +202,12 @@ class SocketService {
     _socket!.on('replyUnliked', (data) {
       print('[SocketService] replyUnliked event received: $data');
       if (data is Map<String, dynamic>) {
-        final String? postId = data['postId'] as String?;
-        final String? replyId = data['replyId'] as String?;
-        final int? likesCount = data['likesCount'] as int?;
-
-        if (postId != null && replyId != null && likesCount != null) {
-          _dataController.handleReplyUpdate(postId, replyId, {'likesCount': likesCount});
-           // If the backend also sends the full 'likes' array for the reply:
-          // _dataController.handleReplyUpdate(postId, replyId, {'likesCount': likesCount, 'likes': data['likes']});
+        final String? rootPostId = data['postId'] as String?; // This should be the root post ID
+        if (rootPostId != null) {
+          print('[SocketService] replyUnliked event for a reply in root post $rootPostId. Triggering fetchSinglePost for root post.');
+          _dataController.fetchSinglePost(rootPostId);
         } else {
-          print('[SocketService] replyUnliked event missing required fields (postId, replyId, likesCount). Data: $data');
+          print('[SocketService] Received replyUnliked event with missing root postId. Data: $data');
         }
       } else {
         print('[SocketService] Received replyUnliked event with unexpected data type: ${data.runtimeType}');
@@ -210,16 +217,14 @@ class SocketService {
     _socket!.on('replyReposted', (data) {
       print('[SocketService] replyReposted event received: $data');
       if (data is Map<String, dynamic>) {
-        final String? postId = data['postId'] as String?;
-        final String? replyId = data['replyId'] as String?;
-        final int? repostsCount = data['repostsCount'] as int?;
-
-        if (postId != null && replyId != null && repostsCount != null) {
-          _dataController.handleReplyUpdate(postId, replyId, {'repostsCount': repostsCount});
-          // If the backend also sends the full 'reposts' array for the reply:
-          // _dataController.handleReplyUpdate(postId, replyId, {'repostsCount': repostsCount, 'reposts': data['reposts']});
+        final String? rootPostId = data['postId'] as String?; // This should be the root post ID
+        // final String? replyId = data['replyId'] as String?;
+        // final int? repostsCount = data['repostsCount'] as int?;
+        if (rootPostId != null) {
+          print('[SocketService] replyReposted event for a reply in root post $rootPostId. Triggering fetchSinglePost for root post.');
+          _dataController.fetchSinglePost(rootPostId);
         } else {
-          print('[SocketService] replyReposted event missing required fields (postId, replyId, repostsCount). Data: $data');
+          print('[SocketService] Received replyReposted event with missing root postId. Data: $data');
         }
       } else {
         print('[SocketService] Received replyReposted event with unexpected data type: ${data.runtimeType}');
@@ -229,16 +234,14 @@ class SocketService {
     _socket!.on('replyViewed', (data) {
       print('[SocketService] replyViewed event received: $data');
       if (data is Map<String, dynamic>) {
-        final String? postId = data['postId'] as String?;
-        final String? replyId = data['replyId'] as String?;
-        final int? viewsCount = data['viewsCount'] as int?;
-
-        if (postId != null && replyId != null && viewsCount != null) {
-          _dataController.handleReplyUpdate(postId, replyId, {'viewsCount': viewsCount});
-          // If the backend also sends the full 'views' array for the reply:
-          // _dataController.handleReplyUpdate(postId, replyId, {'viewsCount': viewsCount, 'views': data['views']});
+        final String? rootPostId = data['postId'] as String?; // This should be the root post ID
+        // final String? replyId = data['replyId'] as String?;
+        // final int? viewsCount = data['viewsCount'] as int?;
+        if (rootPostId != null) {
+          print('[SocketService] replyViewed event for a reply in root post $rootPostId. Triggering fetchSinglePost for root post.');
+          _dataController.fetchSinglePost(rootPostId);
         } else {
-          print('[SocketService] replyViewed event missing required fields (postId, replyId, viewsCount). Data: $data');
+          print('[SocketService] Received replyViewed event with missing root postId. Data: $data');
         }
       } else {
         print('[SocketService] Received replyViewed event with unexpected data type: ${data.runtimeType}');
