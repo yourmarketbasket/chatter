@@ -79,6 +79,23 @@ class SocketService {
       }
     });
 
+    _socket!.on('newReplyToReply', (data) {
+      print('[SocketService] newReplyToReply event received: $data');
+      if (data is Map<String, dynamic>) {
+        final String? postId = data['postId'] as String?;
+        final String? parentReplyId = data['parentReplyId'] as String?;
+        final Map<String, dynamic>? reply = data['reply'] as Map<String, dynamic>?;
+
+        if (postId != null && parentReplyId != null && reply != null) {
+          _dataController.handleNewReplyToReply(postId, parentReplyId, reply);
+        } else {
+          print('[SocketService] newReplyToReply event missing required data (postId, parentReplyId, or reply). Data: $data');
+        }
+      } else {
+        print('[SocketService] Received newReplyToReply event with unexpected data type: ${data.runtimeType}');
+      }
+    });
+
     // Listen for postViewed event
     _socket!.on('postViewed', (data) {
       print('postViewed event received by SocketService: $data');
@@ -141,14 +158,10 @@ class SocketService {
         final Map<String, dynamic>? reply = data['reply'] as Map<String, dynamic>?;
 
         if (parentPostId != null && reply != null) {
-          // This needs a more sophisticated way to update replies, potentially nested.
-          // For now, the simplest is to refresh the main post, which will trigger a re-fetch of its replies
-          // by ReplyPage if it's visible.
-          _dataController.fetchSinglePost(parentPostId);
-          // Alternatively, if ReplyPage is active and showing this post,
-          // it could listen for this event directly or DataController could provide a stream.
+          // Call the new method in DataController to handle the new reply directly
+          _dataController.handleNewReply(parentPostId, reply);
         } else {
-          print('[SocketService] newReply event missing parentPostId or reply data.');
+          print('[SocketService] newReply event missing parentPostId or reply data. Data: $data');
         }
       } else {
         print('[SocketService] Received newReply event with unexpected data type: ${data.runtimeType}');
@@ -158,13 +171,17 @@ class SocketService {
     _socket!.on('replyLiked', (data) {
       print('[SocketService] replyLiked event received: $data');
       if (data is Map<String, dynamic>) {
-        // Data should contain { parentPostId: "...", updatedReply: {...} }
-        final String? parentPostId = data['parentPostId'] as String?;
-        final Map<String, dynamic>? updatedReply = data['updatedReply'] as Map<String, dynamic>?;
-        if (parentPostId != null && updatedReply != null) {
-          // Again, refreshing the parent post is a straightforward way to update.
-          _dataController.fetchSinglePost(parentPostId);
-          // A more granular update would be to find the post, then find the reply and update it.
+        final String? postId = data['postId'] as String?;
+        final String? replyId = data['replyId'] as String?;
+        // userId is also in data, but not directly needed for handleReplyUpdate if we pass counts
+        final int? likesCount = data['likesCount'] as int?;
+
+        if (postId != null && replyId != null && likesCount != null) {
+          _dataController.handleReplyUpdate(postId, replyId, {'likesCount': likesCount});
+          // If the backend also sends the full 'likes' array for the reply:
+          // _dataController.handleReplyUpdate(postId, replyId, {'likesCount': likesCount, 'likes': data['likes']});
+        } else {
+          print('[SocketService] replyLiked event missing required fields (postId, replyId, likesCount). Data: $data');
         }
       } else {
         print('[SocketService] Received replyLiked event with unexpected data type: ${data.runtimeType}');
@@ -173,11 +190,17 @@ class SocketService {
 
     _socket!.on('replyUnliked', (data) {
       print('[SocketService] replyUnliked event received: $data');
-       if (data is Map<String, dynamic>) {
-        final String? parentPostId = data['parentPostId'] as String?;
-        final Map<String, dynamic>? updatedReply = data['updatedReply'] as Map<String, dynamic>?;
-        if (parentPostId != null && updatedReply != null) {
-          _dataController.fetchSinglePost(parentPostId);
+      if (data is Map<String, dynamic>) {
+        final String? postId = data['postId'] as String?;
+        final String? replyId = data['replyId'] as String?;
+        final int? likesCount = data['likesCount'] as int?;
+
+        if (postId != null && replyId != null && likesCount != null) {
+          _dataController.handleReplyUpdate(postId, replyId, {'likesCount': likesCount});
+           // If the backend also sends the full 'likes' array for the reply:
+          // _dataController.handleReplyUpdate(postId, replyId, {'likesCount': likesCount, 'likes': data['likes']});
+        } else {
+          print('[SocketService] replyUnliked event missing required fields (postId, replyId, likesCount). Data: $data');
         }
       } else {
         print('[SocketService] Received replyUnliked event with unexpected data type: ${data.runtimeType}');
@@ -187,17 +210,17 @@ class SocketService {
     _socket!.on('replyReposted', (data) {
       print('[SocketService] replyReposted event received: $data');
       if (data is Map<String, dynamic>) {
-        // Data could contain { parentPostId: "...", updatedReply: {...}, newRepostPost: {...} (optional) }
-        final String? parentPostId = data['parentPostId'] as String?;
-        // final Map<String, dynamic>? updatedReply = data['updatedReply'] as Map<String, dynamic>?;
-        // final Map<String, dynamic>? newRepostPost = data['newRepostPost'] as Map<String, dynamic>?;
+        final String? postId = data['postId'] as String?;
+        final String? replyId = data['replyId'] as String?;
+        final int? repostsCount = data['repostsCount'] as int?;
 
-        if (parentPostId != null) {
-           _dataController.fetchSinglePost(parentPostId); // Refresh original post thread
+        if (postId != null && replyId != null && repostsCount != null) {
+          _dataController.handleReplyUpdate(postId, replyId, {'repostsCount': repostsCount});
+          // If the backend also sends the full 'reposts' array for the reply:
+          // _dataController.handleReplyUpdate(postId, replyId, {'repostsCount': repostsCount, 'reposts': data['reposts']});
+        } else {
+          print('[SocketService] replyReposted event missing required fields (postId, replyId, repostsCount). Data: $data');
         }
-        // if (newRepostPost != null) { // If reposting a reply creates a new top-level post
-        //   _dataController.addNewPost(newRepostPost);
-        // }
       } else {
         print('[SocketService] Received replyReposted event with unexpected data type: ${data.runtimeType}');
       }
@@ -206,11 +229,16 @@ class SocketService {
     _socket!.on('replyViewed', (data) {
       print('[SocketService] replyViewed event received: $data');
       if (data is Map<String, dynamic>) {
-         // Data should contain { parentPostId: "...", updatedReply: {...} }
-        final String? parentPostId = data['parentPostId'] as String?;
-        final Map<String, dynamic>? updatedReply = data['updatedReply'] as Map<String, dynamic>?;
-        if (parentPostId != null && updatedReply != null) {
-          _dataController.fetchSinglePost(parentPostId);
+        final String? postId = data['postId'] as String?;
+        final String? replyId = data['replyId'] as String?;
+        final int? viewsCount = data['viewsCount'] as int?;
+
+        if (postId != null && replyId != null && viewsCount != null) {
+          _dataController.handleReplyUpdate(postId, replyId, {'viewsCount': viewsCount});
+          // If the backend also sends the full 'views' array for the reply:
+          // _dataController.handleReplyUpdate(postId, replyId, {'viewsCount': viewsCount, 'views': data['views']});
+        } else {
+          print('[SocketService] replyViewed event missing required fields (postId, replyId, viewsCount). Data: $data');
         }
       } else {
         print('[SocketService] Received replyViewed event with unexpected data type: ${data.runtimeType}');

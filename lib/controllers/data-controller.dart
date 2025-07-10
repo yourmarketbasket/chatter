@@ -165,6 +165,131 @@ class DataController extends GetxController {
     }
   }
 
+  // Recursive helper to find and update a specific reply's fields
+  bool _findAndUpdateNestedReply(List<dynamic> repliesList, String targetReplyId, Map<String, dynamic> updateData) {
+    for (int i = 0; i < repliesList.length; i++) {
+      Map<String, dynamic> currentReply = Map<String, dynamic>.from(repliesList[i]);
+      if (currentReply['_id'] == targetReplyId) {
+        // Found the target reply, update its fields
+        updateData.forEach((key, value) {
+          currentReply[key] = value;
+        });
+        // Ensure counts are updated if arrays were part of updateData
+        if (updateData.containsKey('likes') && updateData['likes'] is List) {
+          currentReply['likesCount'] = (updateData['likes'] as List).length;
+        }
+        if (updateData.containsKey('reposts') && updateData['reposts'] is List) {
+          currentReply['repostsCount'] = (updateData['reposts'] as List).length;
+        }
+        if (updateData.containsKey('views') && updateData['views'] is List) {
+          currentReply['viewsCount'] = (updateData['views'] as List).length;
+        }
+        // Note: 'replies' array changes and 'repliesCount' for nested replies are handled by _findAndAddNestedReply
+
+        repliesList[i] = currentReply; // Update the list with the modified reply
+        return true; // Reply updated
+      }
+      // If the current reply has its own replies, search deeper
+      if (currentReply.containsKey('replies') && currentReply['replies'] is List && (currentReply['replies'] as List).isNotEmpty) {
+        if (_findAndUpdateNestedReply(currentReply['replies'] as List<dynamic>, targetReplyId, updateData)) {
+          // If found and updated in a deeper level, we need to update the currentReply in its parent list
+          repliesList[i] = currentReply;
+          return true; // Propagate success
+        }
+      }
+    }
+    return false; // Target reply not found at this level
+  }
+
+  void handleReplyUpdate(String postId, String replyId, Map<String, dynamic> updateData) {
+    try {
+      int postIndex = posts.indexWhere((p) => p['_id'] == postId);
+      if (postIndex != -1) {
+        Map<String, dynamic> postToUpdate = Map<String, dynamic>.from(posts[postIndex]);
+        List<dynamic> topLevelReplies = List<dynamic>.from(postToUpdate['replies'] ?? []);
+
+        if (_findAndUpdateNestedReply(topLevelReplies, replyId, updateData)) {
+          postToUpdate['replies'] = topLevelReplies; // Assign the potentially modified list back
+          posts[postIndex] = postToUpdate;
+          posts.refresh();
+          print('[DataController] Reply $replyId in post $postId updated with data: $updateData.');
+        } else {
+          print('[DataController] handleReplyUpdate: Target reply $replyId not found in post $postId.');
+          // Optionally, fetch the post as a fallback
+          // fetchSinglePost(postId);
+        }
+      } else {
+        print('[DataController] handleReplyUpdate: Post $postId not found.');
+      }
+    } catch (e) {
+      print('[DataController] Error handling reply update for reply $replyId in post $postId: $e');
+    }
+  }
+
+  // Recursive helper to find and update a reply
+  bool _findAndAddNestedReply(List<dynamic> repliesList, String targetParentReplyId, Map<String, dynamic> newReplyDocument) {
+    for (int i = 0; i < repliesList.length; i++) {
+      Map<String, dynamic> currentReply = Map<String, dynamic>.from(repliesList[i]);
+      if (currentReply['_id'] == targetParentReplyId) {
+        // Found the parent reply, add the new reply to its 'replies' list
+        List<dynamic> nestedReplies = List<dynamic>.from(currentReply['replies'] ?? []);
+
+        // Process the newReplyDocument to ensure its own counts are initialized
+        Map<String, dynamic> processedNewReply = Map<String, dynamic>.from(newReplyDocument);
+        processedNewReply['likesCount'] = (processedNewReply['likes'] as List?)?.length ?? 0;
+        processedNewReply['repostsCount'] = (processedNewReply['reposts'] as List?)?.length ?? 0;
+        processedNewReply['viewsCount'] = (processedNewReply['views'] as List?)?.length ?? 0;
+        processedNewReply['repliesCount'] = (processedNewReply['replies'] as List?)?.length ?? 0;
+        // Ensure it has an empty 'replies' list for further nesting
+        processedNewReply['replies'] = processedNewReply['replies'] ?? [];
+
+
+        nestedReplies.add(processedNewReply);
+        currentReply['replies'] = nestedReplies;
+        currentReply['repliesCount'] = nestedReplies.length; // Update repliesCount of the parent reply
+        repliesList[i] = currentReply; // Update the list with the modified reply
+        return true; // Reply added
+      }
+      // If the current reply has its own replies, search deeper
+      if (currentReply.containsKey('replies') && currentReply['replies'] is List && (currentReply['replies'] as List).isNotEmpty) {
+        if (_findAndAddNestedReply(currentReply['replies'] as List<dynamic>, targetParentReplyId, newReplyDocument)) {
+          // If found and added in a deeper level, we need to update the currentReply in its parent list
+          repliesList[i] = currentReply;
+          return true; // Propagate success
+        }
+      }
+    }
+    return false; // Parent reply not found at this level
+  }
+
+  void handleNewReplyToReply(String postId, String parentReplyId, Map<String, dynamic> emittedReply) {
+    try {
+      int postIndex = posts.indexWhere((p) => p['_id'] == postId);
+      if (postIndex != -1) {
+        Map<String, dynamic> postToUpdate = Map<String, dynamic>.from(posts[postIndex]);
+        List<dynamic> topLevelReplies = List<dynamic>.from(postToUpdate['replies'] ?? []);
+
+        if (_findAndAddNestedReply(topLevelReplies, parentReplyId, emittedReply)) {
+          postToUpdate['replies'] = topLevelReplies; // Assign the potentially modified list back
+          // Note: The overall 'replyCount' of the main post might not change unless it counts all nested replies.
+          // The current 'replyCount' is based on top-level replies.
+          // If the UI shows nested replies, this update to the 'replies' list and subsequent refresh should be enough.
+          posts[postIndex] = postToUpdate;
+          posts.refresh();
+          print('[DataController] New nested reply added to reply $parentReplyId in post $postId.');
+        } else {
+          print('[DataController] handleNewReplyToReply: Parent reply $parentReplyId not found in post $postId.');
+          // Optionally, fetch the post as a fallback if consistency is critical
+          // fetchSinglePost(postId);
+        }
+      } else {
+        print('[DataController] handleNewReplyToReply: Post $postId not found.');
+      }
+    } catch (e) {
+      print('[DataController] Error handling new reply to reply for post $postId: $e');
+    }
+  }
+
   // view post - THIS IS THE ORIGINAL METHOD PROVIDED BY THE USER
   Future<Map<String, dynamic>> viewPost(String postId) async {
     if (_pendingViewRegistrations.contains(postId)) {
@@ -1027,27 +1152,107 @@ class DataController extends GetxController {
     try {
       int postIndex = posts.indexWhere((p) => p['_id'] == postId);
       if (postIndex != -1) {
-        Map<String, dynamic> processedPostData = Map<String, dynamic>.from(updatedPostData);
-        processedPostData['likesCount'] = (processedPostData['likes'] as List?)?.length ?? 0;
-        processedPostData['repostsCount'] = (processedPostData['reposts'] as List?)?.length ?? 0;
-        processedPostData['viewsCount'] = (processedPostData['views'] as List?)?.length ?? 0;
+        // Retrieve the existing post data
+        Map<String, dynamic> existingPost = Map<String, dynamic>.from(posts[postIndex]);
+        Map<String, dynamic> postToUpdate = Map<String, dynamic>.from(existingPost);
 
-        // Derive replyCount from the 'replies' array if present, otherwise use existing 'replyCount' or default to 0
-        if (processedPostData['replies'] is List) {
-          processedPostData['replyCount'] = (processedPostData['replies'] as List).length;
-        } else if (processedPostData['replyCount'] == null) {
-          processedPostData['replyCount'] = 0;
+        // Iterate through updatedPostData.keys and update corresponding fields
+        updatedPostData.forEach((key, value) {
+          // Skip count keys that will be handled specifically, unless they are the only source
+          if (key == 'likesCount' || key == 'repostsCount' || key == 'viewsCount' || key == 'replyCount' ||
+              key == 'likes' || key == 'reposts' || key == 'views' || key == 'replies') {
+            // These are handled below
+          } else {
+            postToUpdate[key] = value;
+          }
+        });
+
+        // Smart Count Updates
+        // Likes
+        if (updatedPostData.containsKey('likesCount')) {
+          postToUpdate['likesCount'] = updatedPostData['likesCount'];
+        } else if (updatedPostData.containsKey('likes') && updatedPostData['likes'] is List) {
+          postToUpdate['likesCount'] = (updatedPostData['likes'] as List).length;
+        }
+        // Update the likes array itself if provided
+        if (updatedPostData.containsKey('likes') && updatedPostData['likes'] is List) {
+          postToUpdate['likes'] = List<dynamic>.from(updatedPostData['likes']);
         }
 
-        posts[postIndex] = processedPostData;
+
+        // Reposts
+        if (updatedPostData.containsKey('repostsCount')) {
+          postToUpdate['repostsCount'] = updatedPostData['repostsCount'];
+        } else if (updatedPostData.containsKey('reposts') && updatedPostData['reposts'] is List) {
+          postToUpdate['repostsCount'] = (updatedPostData['reposts'] as List).length;
+        }
+        // Update the reposts array itself if provided
+        if (updatedPostData.containsKey('reposts') && updatedPostData['reposts'] is List) {
+          postToUpdate['reposts'] = List<dynamic>.from(updatedPostData['reposts']);
+        }
+
+        // Views
+        if (updatedPostData.containsKey('viewsCount')) {
+          postToUpdate['viewsCount'] = updatedPostData['viewsCount'];
+        } else if (updatedPostData.containsKey('views') && updatedPostData['views'] is List) {
+          postToUpdate['viewsCount'] = (updatedPostData['views'] as List).length;
+        }
+        // Update the views array itself if provided
+        if (updatedPostData.containsKey('views') && updatedPostData['views'] is List) {
+          postToUpdate['views'] = List<dynamic>.from(updatedPostData['views']);
+        }
+
+        // Replies
+        if (updatedPostData.containsKey('replyCount')) {
+          postToUpdate['replyCount'] = updatedPostData['replyCount'];
+        } else if (updatedPostData.containsKey('replies') && updatedPostData['replies'] is List) {
+          // If the full replies array is provided, update it and its count
+          postToUpdate['replies'] = List<dynamic>.from(updatedPostData['replies']);
+          postToUpdate['replyCount'] = (postToUpdate['replies'] as List).length;
+        }
+        // If only the 'replies' array is provided (e.g. in a full post update), ensure count is derived
+        else if (updatedPostData.containsKey('replies') && updatedPostData['replies'] is List) {
+           postToUpdate['replies'] = List<dynamic>.from(updatedPostData['replies']);
+           postToUpdate['replyCount'] = (postToUpdate['replies'] as List).length;
+        }
+        // If 'replies' array is NOT in updatedPostData, replyCount should remain as is from existingPost,
+        // unless 'replyCount' itself was in updatedPostData (handled above).
+
+        // Ensure essential fields are not accidentally removed if not in updatedPostData
+        // (e.g., if a socket event only sends counts, it shouldn't wipe the 'likes' array)
+        // The current logic of updating only present keys in updatedPostData and then specifically handling counts/arrays
+        // should manage this. If an array like 'likes' is not in updatedPostData, postToUpdate['likes'] remains from existingPost.
+
+        posts[postIndex] = postToUpdate;
         posts.refresh();
-        print('[DataController] Post $postId updated from socket event.');
+        print('[DataController] Post $postId updated from socket event. New data: $postToUpdate');
       } else {
-        print('[DataController] updatePostFromSocket: Post with ID $postId not found in local list. It might be a new post not yet added or an issue with ID matching.');
-        // If it's a new post from another user, it should be added via addNewPost after being processed.
-        // Consider if addNewPost should be called here or if a different socket event handles new posts.
-        // For now, if not found, it's logged. If it should be added, addNewPost would need similar processing.
-        // addNewPost(updatedPostData); // This would also need the same count processing.
+        // This is a new post not seen before, or an update for a post not yet in the list.
+        // This could happen if another user creates a post and this client receives the socket event.
+        // We should add it as a new post.
+        print('[DataController] updatePostFromSocket: Post with ID $postId not found. Assuming new post and adding.');
+        // Process it like a new post, ensuring all counts are correctly initialized.
+        Map<String, dynamic> newPostData = Map<String, dynamic>.from(updatedPostData);
+
+        newPostData['likesCount'] = (newPostData.containsKey('likesCount')) ? newPostData['likesCount'] : (newPostData['likes'] as List?)?.length ?? 0;
+        newPostData['repostsCount'] = (newPostData.containsKey('repostsCount')) ? newPostData['repostsCount'] : (newPostData['reposts'] as List?)?.length ?? 0;
+        newPostData['viewsCount'] = (newPostData.containsKey('viewsCount')) ? newPostData['viewsCount'] : (newPostData['views'] as List?)?.length ?? 0;
+
+        if (newPostData.containsKey('replyCount')) {
+            newPostData['replyCount'] = newPostData['replyCount'];
+        } else if (newPostData.containsKey('replies') && newPostData['replies'] is List) {
+            newPostData['replyCount'] = (newPostData['replies'] as List).length;
+        } else {
+            newPostData['replyCount'] = 0; // Default for a brand new post if no info
+        }
+
+        // Ensure arrays exist even if empty
+        newPostData['likes'] = newPostData.containsKey('likes') ? List<dynamic>.from(newPostData['likes']) : [];
+        newPostData['reposts'] = newPostData.containsKey('reposts') ? List<dynamic>.from(newPostData['reposts']) : [];
+        newPostData['views'] = newPostData.containsKey('views') ? List<dynamic>.from(newPostData['views']) : [];
+        newPostData['replies'] = newPostData.containsKey('replies') ? List<dynamic>.from(newPostData['replies']) : [];
+
+        addNewPost(newPostData); // addNewPost also handles duplicates and inserts at 0
       }
     } catch (e) {
       print('[DataController] Error updating post $postId from socket: $e. Data: $updatedPostData');
@@ -1058,6 +1263,41 @@ class DataController extends GetxController {
   // View updates are handled by the postViewed socket event triggering fetchSinglePost,
   // which then calls updatePostFromSocket with the full, authoritative post data.
 
+  void handleNewReply(String parentPostId, Map<String, dynamic> replyDocument) {
+    try {
+      int postIndex = posts.indexWhere((p) => p['_id'] == parentPostId);
+      if (postIndex != -1) {
+        Map<String, dynamic> postToUpdate = Map<String, dynamic>.from(posts[postIndex]);
+
+        // Ensure 'replies' list exists and is mutable
+        List<dynamic> repliesList = List<dynamic>.from(postToUpdate['replies'] ?? []);
+
+        // Add the new reply
+        // Process the replyDocument to ensure it has necessary counts if they are expected by UI
+        Map<String, dynamic> processedReply = Map<String, dynamic>.from(replyDocument);
+        processedReply['likesCount'] = (processedReply['likes'] as List?)?.length ?? 0;
+        processedReply['repostsCount'] = (processedReply['reposts'] as List?)?.length ?? 0;
+        processedReply['viewsCount'] = (processedReply['views'] as List?)?.length ?? 0;
+        processedReply['repliesCount'] = (processedReply['replies'] as List?)?.length ?? 0; // For nested replies under this one
+
+        repliesList.add(processedReply);
+        postToUpdate['replies'] = repliesList;
+
+        // Update replyCount for the parent post
+        postToUpdate['replyCount'] = repliesList.length;
+
+        posts[postIndex] = postToUpdate;
+        posts.refresh();
+        print('[DataController] New reply added to post $parentPostId. Post updated.');
+      } else {
+        print('[DataController] handleNewReply: Parent post with ID $parentPostId not found.');
+        // Optionally, fetch the post if it's critical that it should exist
+        // fetchSinglePost(parentPostId);
+      }
+    } catch (e) {
+      print('[DataController] Error handling new reply for post $parentPostId: $e');
+    }
+  }
 
   // Existing video transition methods - might need review if they conflict or overlap
   // For now, videoDidStartPlaying and videoDidStopPlaying are effectively replaced by the generic media methods.
