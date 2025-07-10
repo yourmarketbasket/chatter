@@ -54,7 +54,7 @@ class _ReplyPageState extends State<ReplyPage> {
     // Ensure crucial lists are mutable if they exist
     _mainPostData['likes'] = List<dynamic>.from(_mainPostData['likes'] ?? []);
     _mainPostData['reposts'] = List<dynamic>.from(_mainPostData['reposts'] ?? []);
-    _mainPostData['views'] = List<dynamic>.from(_currentPostData['views'] ?? []);
+    _mainPostData['views'] = List<dynamic>.from(_mainPostData['views'] ?? []); // Corrected: _mainPostData
     _mainPostData['replies'] = List<dynamic>.from(_mainPostData['replies'] ?? []);
 
 
@@ -91,7 +91,7 @@ class _ReplyPageState extends State<ReplyPage> {
           if (updatedGlobalDataForItemOnPage != null) break;
         }
 
-        if (updatedGlobalDataForItemOnPage != null) {
+        if (updatedGlobalDataForItemOnPage != null) { // Ensures updatedGlobalDataForItemOnPage is not null
           // Compare current _mainPostData with updatedGlobalDataForItemOnPage
           bool needsMainPostUpdate = false;
           bool needsRepliesListRefresh = false;
@@ -118,7 +118,8 @@ class _ReplyPageState extends State<ReplyPage> {
           if (needsMainPostUpdate) {
             if(mounted) {
               setState(() {
-                _mainPostData = Map<String, dynamic>.from(updatedGlobalDataForItemOnPage);
+                // The outer 'if (updatedGlobalDataForItemOnPage != null)' already ensures this.
+                _mainPostData = Map<String, dynamic>.from(updatedGlobalDataForItemOnPage!); // Added ! as it's checked
                 // Ensure lists are mutable for PostContent's local operations
                 _mainPostData['likes'] = List<dynamic>.from(_mainPostData['likes'] ?? []);
                 _mainPostData['reposts'] = List<dynamic>.from(_mainPostData['reposts'] ?? []);
@@ -141,7 +142,7 @@ class _ReplyPageState extends State<ReplyPage> {
       if (widget.originalPostId == null) { // This page is for a top-level post
         _dataController.viewPost(pagePostId);
       } else {
-        _dataController.viewReply(widget.originalPostId!, currentPostId);
+        _dataController.viewReply(widget.originalPostId!, pagePostId); // Corrected: Use pagePostId
       }
     } else {
       print("Error: Post ID is null in ReplyPage. Cannot record view.");

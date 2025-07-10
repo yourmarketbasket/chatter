@@ -100,15 +100,15 @@ class SocketService {
     _socket!.on('postViewed', (data) {
       print('postViewed event received by SocketService: $data');
       if (data is Map<String, dynamic>) {
-        final String? postId = data['_id'] as String?;
-        // final int? viewsCount = data['views'] as int?; // We no longer use viewsCount directly from here.
+        final String? eventPostId = data['postId'] as String?; // Correctly use 'postId'
 
-        if (postId != null) {
-          print('[SocketService] postViewed event for $postId. Triggering fetchSinglePost.');
+        if (eventPostId != null) {
+          print('[SocketService] postViewed event for $eventPostId. Triggering fetchSinglePost.');
           // Trigger fetching the full post to get the most up-to-date view count and other data.
-          _dataController.fetchSinglePost(postId);
+          // fetchSinglePost internally uses updatePostFromSocket which now handles both '_id' and 'postId'.
+          _dataController.fetchSinglePost(eventPostId);
         } else {
-          print('[SocketService] Received postViewed event with missing postId: $data');
+          print('[SocketService] Received postViewed event with missing postId field: $data');
         }
       } else {
         print('[SocketService] Received postViewed event with unexpected data type: ${data.runtimeType}');

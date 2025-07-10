@@ -1143,14 +1143,20 @@ class DataController extends GetxController {
 
   // Method to update a post in the local list with data from a socket event (e.g. like, unlike, view)
   void updatePostFromSocket(Map<String, dynamic> updatedPostData) {
-    final String? postId = updatedPostData['_id'] as String?;
-    if (postId == null) {
-      print('[DataController] updatePostFromSocket: Received post data without an ID. Cannot update. Data: $updatedPostData');
+    String? eventPostId = updatedPostData['_id'] as String?;
+    if (eventPostId == null) {
+      eventPostId = updatedPostData['postId'] as String?; // Check for 'postId'
+    }
+
+    if (eventPostId == null) {
+      print('[DataController] updatePostFromSocket: Received post data without a usable ID (_id or postId). Cannot update. Data: $updatedPostData');
       return;
     }
 
+    final String finalPostId = eventPostId; // Use a final variable for safety in closures/loops
+
     try {
-      int postIndex = posts.indexWhere((p) => p['_id'] == postId);
+      int postIndex = posts.indexWhere((p) => p['_id'] == finalPostId);
       if (postIndex != -1) {
         // Retrieve the existing post data
         Map<String, dynamic> existingPost = Map<String, dynamic>.from(posts[postIndex]);
