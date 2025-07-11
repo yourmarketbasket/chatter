@@ -65,7 +65,7 @@ class SocketService {
         // Assuming 'data' is the post object in the correct format
         _dataController.addNewPost(data);
       } else {
-        print('Received newPost event with unexpected data type: ${data.runtimeType}');
+        // print('Received newPost event with unexpected data type: ${data.runtimeType}');
         // Optionally, attempt to convert or log more details if the structure is known but different
         // For example, if it's a JSON string:
         // if (data is String) {
@@ -80,7 +80,7 @@ class SocketService {
     });
 
     _socket!.on('newReplyToReply', (data) {
-      print('[SocketService] newReplyToReply event received: $data');
+      // print('[SocketService] newReplyToReply event received: $data');
       if (data is Map<String, dynamic>) {
         final String? postId = data['postId'] as String?;
         final String? parentReplyId = data['parentReplyId'] as String?;
@@ -98,7 +98,7 @@ class SocketService {
 
     // Listen for postViewed event
     _socket!.on('postViewed', (data) {
-      print('postViewed event received by SocketService: $data');
+      // print('postViewed event received by SocketService: $data');
       if (data is Map<String, dynamic>) {
         final String? eventPostId = data['postId'] as String?; // Correctly use 'postId'
 
@@ -117,7 +117,7 @@ class SocketService {
 
     // Listen for postLiked event
     _socket!.on('postLiked', (data) {
-      print('[SocketService] postLiked event received: $data');
+      // print('[SocketService] postLiked event received: $data');
       if (data is Map<String, dynamic>) {
         final String? postId = data['postId'] as String? ?? data['_id'] as String?;
         if (postId != null) {
@@ -133,7 +133,7 @@ class SocketService {
 
     // Listen for postUnliked event
     _socket!.on('postUnliked', (data) {
-      print('[SocketService] postUnliked event received: $data');
+      // print('[SocketService] postUnliked event received: $data');
       if (data is Map<String, dynamic>) {
         final String? postId = data['postId'] as String? ?? data['_id'] as String?;
         if (postId != null) {
@@ -149,7 +149,7 @@ class SocketService {
 
     // postReposted event
     _socket!.on('postReposted', (data) {
-      print('[SocketService] postReposted event received: $data');
+      // print('[SocketService] postReposted event received: $data');
       if (data is Map<String, dynamic>) {
         final String? postId = data['postId'] as String? ?? data['_id'] as String?;
         if (postId != null) {
@@ -166,7 +166,7 @@ class SocketService {
     // --- Reply Specific Event Handlers ---
 
     _socket!.on('newReply', (data) {
-      print('[SocketService] newReply event received: $data');
+      // print('[SocketService] newReply event received: $data');
       if (data is Map<String, dynamic>) {
         // Data should contain { parentPostId: "...", parentReplyId: "..." (optional), reply: {...} }
         final String? parentPostId = data['parentPostId'] as String?;
@@ -185,7 +185,7 @@ class SocketService {
     });
 
     _socket!.on('replyLiked', (data) {
-      print('[SocketService] replyLiked event received: $data');
+      // print('[SocketService] replyLiked event received: $data');
       if (data is Map<String, dynamic>) {
         final String? rootPostId = data['postId'] as String?; // This should be the root post ID
         if (rootPostId != null) {
@@ -200,7 +200,7 @@ class SocketService {
     });
 
     _socket!.on('replyUnliked', (data) {
-      print('[SocketService] replyUnliked event received: $data');
+      // print('[SocketService] replyUnliked event received: $data');
       if (data is Map<String, dynamic>) {
         final String? rootPostId = data['postId'] as String?; // This should be the root post ID
         if (rootPostId != null) {
@@ -215,7 +215,7 @@ class SocketService {
     });
 
     _socket!.on('replyReposted', (data) {
-      print('[SocketService] replyReposted event received: $data');
+      // print('[SocketService] replyReposted event received: $data');
       if (data is Map<String, dynamic>) {
         final String? rootPostId = data['postId'] as String?; // This should be the root post ID
         // final String? replyId = data['replyId'] as String?;
@@ -232,7 +232,7 @@ class SocketService {
     });
 
     _socket!.on('replyViewed', (data) {
-      print('[SocketService] replyViewed event received: $data');
+      // print('[SocketService] replyViewed event received: $data');
       if (data is Map<String, dynamic>) {
         final String? rootPostId = data['postId'] as String?; // This should be the root post ID
         // final String? replyId = data['replyId'] as String?;
