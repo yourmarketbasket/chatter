@@ -271,7 +271,11 @@ class _UserPostsPageState extends State<UserPostsPage> {
                         StatButton(
                           icon: FeatherIcons.messageCircle,
                           count: repliesCount,
-                          onTap: () => Get.to(() => ReplyPage(post: post)),
+                          onTap: () => Get.to(() => ReplyPage(
+                            post: post,
+                            postDepth: 0, // This is a top-level post
+                            originalPostId: postId, // Pass the current post's ID as originalPostId
+                          )),
                           color: Colors.grey[600]!,
                         ),
                         StatButton(
