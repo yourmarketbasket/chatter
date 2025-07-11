@@ -1,3 +1,4 @@
+import 'package:chatter/pages/buy_me_a_coffee_page.dart';
 import 'package:chatter/pages/home-feed-screen.dart';
 import 'package:chatter/pages/landing-page.dart';
 import 'package:chatter/pages/login.dart';
@@ -116,6 +117,13 @@ class _ChatterAppState extends State<ChatterApp> {
         scaffoldBackgroundColor: Colors.white,
       ),
       home: const LandingPage(), // Show LandingPage while checking storage
+      getPages: [
+        GetPage(name: '/landing', page: () => const LandingPage()),
+        GetPage(name: '/login', page: () => const LoginPage()),
+        GetPage(name: '/register', page: () => const RegisterPage()),
+        GetPage(name: '/home', page: () => const HomeFeedScreen()),
+        GetPage(name: '/buy-me-a-coffee', page: () => const BuyMeACoffeePage()),
+      ],
     );
   }
 }

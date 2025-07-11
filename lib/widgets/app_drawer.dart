@@ -416,6 +416,17 @@ class AppDrawer extends StatelessWidget {
           ),
           const Divider(color: Color(0xFF303030)),
           ListTile(
+            leading: Icon(FeatherIcons.coffee, color: Colors.grey[300]), // Changed icon for Buy Me a Coffee
+            title: Text(
+              'Buy Me a Coffee', // Changed text for Buy Me a Coffee
+              style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16),
+            ),
+            onTap: () {
+              Get.back(); // Close drawer first
+              Get.toNamed('/buy-me-a-coffee'); // Navigate to Buy Me a Coffee page
+            },
+          ),
+          ListTile(
             leading: Icon(FeatherIcons.edit3, color: Colors.grey[300]), // Changed icon
             title: Text(
               'Edit About Info', // Changed text

@@ -1114,6 +1114,20 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
             tooltip: 'Search',
             child: const Icon(FeatherIcons.search, color: Colors.tealAccent),
           ),
+          FloatingActionButton.small(
+            heroTag: 'fab_buy_me_a_coffee',
+            backgroundColor: Colors.black,
+            shape: RoundedRectangleBorder(side: const BorderSide(color: Colors.tealAccent, width: 1), borderRadius: BorderRadius.circular(10)),
+            onPressed: () {
+              Get.toNamed('/buy-me-a-coffee');
+              final fabState = _fabKey.currentState;
+              if (fabState != null && fabState.isOpen) {
+                fabState.toggle();
+              }
+            },
+            tooltip: 'Buy Me a Coffee',
+            child: const Icon(FeatherIcons.coffee, color: Colors.tealAccent),
+          ),
         ],
       ),
     );
