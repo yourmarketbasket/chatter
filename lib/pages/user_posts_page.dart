@@ -233,59 +233,7 @@ class _UserPostsPageState extends State<UserPostsPage> {
             //   ),
 
             // Action buttons (StatButtons)
-            Padding(
-              padding: const EdgeInsets.only(top: 10.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: <Widget>[ // Explicitly typed for clarity
-                  StatButton(
-                    icon: FeatherIcons.messageCircle,
-                    text: repliesCount.toString(),
-                    onPressed: () { // Simplified, no async needed if Get.to is not awaited
-                      Get.to(() => ReplyPage(
-                        post: post,
-                        postDepth: 0,
-                        originalPostId: postId,
-                      ));
-                    },
-                    color: Colors.grey[600]!,
-                  ),
-                  StatButton(
-                    icon: FeatherIcons.repeat,
-                    text: repostsCount.toString(),
-                    onPressed: () async {
-                      final result = await _dataController.repostPost(postId);
-                      if (!mounted) return; // Check mounted after await
-                      if (result['success'] == false) {
-                          Get.snackbar('Error', result['message'] ?? 'Could not repost.', snackPosition: SnackPosition.BOTTOM);
-                      } else if (result['success'] == true) {
-                          Get.snackbar('Success', 'Reposted!', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green);
-                      }
-                    },
-                    color: Colors.grey[600]!,
-                  ),
-                  StatButton(
-                    icon: isLikedByCurrentUser ? Icons.favorite : FeatherIcons.heart,
-                    text: likesCount.toString(),
-                    onPressed: () async {
-                      if (isLikedByCurrentUser) {
-                          await _dataController.unlikePost(postId);
-                      } else {
-                          await _dataController.likePost(postId);
-                      }
-                      // No explicit mounted check needed here if not updating local state after await
-                    },
-                    color: isLikedByCurrentUser ? Colors.pinkAccent : Colors.grey[600]!,
-                  ),
-                  StatButton(
-                    icon: FeatherIcons.barChart2,
-                    text: viewsCount.toString(),
-                    onPressed: () { /* No action */ },
-                    color: Colors.grey[600]!,
-                  ),
-                ],
-              ),
-            ),
+            
           ],
         ),
       ),
