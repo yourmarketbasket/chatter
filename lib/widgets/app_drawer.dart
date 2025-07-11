@@ -3,6 +3,7 @@ import 'package:chatter/pages/users_list_page.dart';
 // import 'package:chatter/pages/direct_messages_page.dart'; // Removed
 import 'package:chatter/pages/followers_page.dart';
 import 'package:chatter/pages/login.dart';
+import 'package:chatter/pages/user_posts_page.dart'; // Import UserPostsPage
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
@@ -281,148 +282,136 @@ class AppDrawer extends StatelessWidget {
                   final String avatarInitial = username.isNotEmpty ? username[0].toUpperCase() : '?';
 
                   return Container(
-                    padding: const EdgeInsets.only(top: 40.0, left: 16.0, right: 16.0, bottom: 16.0),
+                    padding: const EdgeInsets.only(top: 50.0, left: 20.0, right: 20.0, bottom: 20.0), // Adjusted padding
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.center, // Center align the column's children horizontally
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        // Avatar Stack
+                        Stack(
+                          alignment: Alignment.center, // Center the edit icon relative to the avatar
                           children: [
-                            Stack(
-                              children: [
-                                CircleAvatar(
-                                  radius: 28, // Slightly smaller avatar
-                                  backgroundColor: Colors.tealAccent.withOpacity(0.3),
-                                  backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
-                                      ? CachedNetworkImageProvider(
-                                          avatarUrl,
-                                          maxWidth: 120,
-                                          maxHeight: 120,
-                                        )
-                                      : null,
-                                  child: (avatarUrl == null || avatarUrl.isEmpty)
-                                      ? Text(
-                                          avatarInitial,
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 24,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.tealAccent,
-                                          ),
-                                        )
-                                      : null,
-                                ),
-                                Positioned(
-                                  right: -2,
-                                  bottom: -2,
-                                  child: Material(
-                                    color: Colors.tealAccent,
-                                    shape: const CircleBorder(),
-                                    elevation: 1.0,
-                                    child: InkWell(
-                                      onTap: () {
-                                        _showImageSourceActionSheet(context);
-                                      },
-                                      customBorder: const CircleBorder(),
-                                      child: const Padding(
-                                        padding: EdgeInsets.all(5.0),
-                                        child: Icon(
-                                          FeatherIcons.edit2,
-                                          size: 14.0,
-                                          color: Colors.black,
-                                        ),
-                                      ),
-                                    ),
+                            CircleAvatar(
+                              radius: 36, // Increased avatar size
+                              backgroundColor: Colors.tealAccent.withOpacity(0.3),
+                              backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
+                                  ? CachedNetworkImageProvider(avatarUrl, maxWidth: 150, maxHeight: 150)
+                                  : null,
+                              child: (avatarUrl == null || avatarUrl.isEmpty)
+                                  ? Text(
+                                      avatarInitial,
+                                      style: GoogleFonts.poppins(fontSize: 30, fontWeight: FontWeight.bold, color: Colors.tealAccent),
+                                    )
+                                  : null,
+                            ),
+                            Positioned(
+                              right: 0, // Positioned relative to the CircleAvatar's bounds
+                              bottom: 0,
+                              child: Material(
+                                color: Colors.tealAccent,
+                                shape: const CircleBorder(),
+                                elevation: 2.0,
+                                child: InkWell(
+                                  onTap: () => _showImageSourceActionSheet(context),
+                                  customBorder: const CircleBorder(),
+                                  child: const Padding(
+                                    padding: EdgeInsets.all(6.0),
+                                    child: Icon(FeatherIcons.edit2, size: 16.0, color: Colors.black),
                                   ),
                                 ),
-                              ],
+                              ),
                             ),
-                             // Removed the edit icon for about me from here
                           ],
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 16), // Increased spacing
+
+                        // Username
                         Text(
-                          username,
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 19,
-                            color: Colors.white,
-                          ),
+                          username, // This is the display name
+                          style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 20, color: Colors.white),
+                          textAlign: TextAlign.center,
                         ),
+                        const SizedBox(height: 4),
+
+                        // Handle (ensure 'handle' is the actual username/handle field)
                         Text(
-                          "@$handle",
-                          style: GoogleFonts.roboto(
-                            fontSize: 14,
-                            color: Colors.grey[500],
-                          ),
+                          "@$handle", // 'handle' should be userMap['user']?['username']
+                          style: GoogleFonts.roboto(fontSize: 15, color: Colors.grey[500]),
+                          textAlign: TextAlign.center,
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 16), // Increased spacing
+
+                        // Followers/Following Row
                         Row(
+                          mainAxisAlignment: MainAxisAlignment.center, // Center this row
                           children: [
                             Text('$followingCount', style: GoogleFonts.roboto(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14)),
                             const SizedBox(width: 4),
                             Text('Following', style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 14)),
-                            const SizedBox(width: 16),
+                            const SizedBox(width: 20), // Increased spacing
                             Text('$followersCount', style: GoogleFonts.roboto(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14)),
                             const SizedBox(width: 4),
                             Text('Followers', style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 14)),
                           ],
                         ),
+                        const SizedBox(height: 16), // Increased spacing
+
+                        // About Me Section
                         if (aboutMe.isNotEmpty) ...[
-                          const SizedBox(height: 12),
-                           Row(
-                             crossAxisAlignment: CrossAxisAlignment.start,
-                             children: [
-                               Expanded(
-                                 child: Text(
-                                  aboutMe,
-                                  style: GoogleFonts.roboto(
-                                    fontSize: 14,
-                                    color: Colors.grey[300],
-                                    height: 1.4,
-                                  ),
-                                  maxLines: 3,
-                                  overflow: TextOverflow.ellipsis,
-                                                               ),
-                               ),
-                               IconButton(
-                                icon: Icon(FeatherIcons.edit3, color: Colors.grey[400], size: 18),
+                          SizedBox(
+                            width: double.infinity, // Allow text to take full width for centering
+                            child: Text(
+                              aboutMe,
+                              style: GoogleFonts.roboto(fontSize: 14, color: Colors.grey[300], height: 1.4),
+                              textAlign: TextAlign.center, // Center the about me text
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          IconButton(
+                            icon: Icon(FeatherIcons.edit3, color: Colors.grey[400], size: 20),
+                            onPressed: () => _showEditAboutDialog(context),
+                            tooltip: 'Edit About Info',
+                          ),
+                        ] else ...[
+                          Row( // Center the "No about info" and edit icon
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'No about information yet.',
+                                style: GoogleFonts.roboto(fontSize: 14, color: Colors.grey[500], fontStyle: FontStyle.italic),
+                              ),
+                              IconButton(
+                                icon: Icon(FeatherIcons.edit3, color: Colors.grey[400], size: 20),
                                 onPressed: () => _showEditAboutDialog(context),
                                 tooltip: 'Edit About Info',
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
                               ),
-                             ],
-                           ),
-                        ] else ...[
-                            const SizedBox(height: 12),
-                             Row(
-                               children: [
-                                 Text(
-                                    'No about information yet.',
-                                    style: GoogleFonts.roboto(fontSize: 14, color: Colors.grey[500], fontStyle: FontStyle.italic),
-                                  ),
-                                  IconButton(
-                                    icon: Icon(FeatherIcons.edit3, color: Colors.grey[400], size: 18),
-                                    onPressed: () => _showEditAboutDialog(context),
-                                    tooltip: 'Edit About Info',
-                                     padding: EdgeInsets.zero,
-                                     constraints: const BoxConstraints(),
-                                  ),
-                               ],
-                             ),
+                            ],
+                          ),
                         ],
                       ],
                     ),
                   );
                 }),
                 ListTile(
-                  leading: Icon(FeatherIcons.rss, color: Colors.grey[300]),
-                  title: Text('My Feeds', style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16)),
+                  leading: Icon(FeatherIcons.userCheck, color: Colors.grey[300]), // Changed icon
+                  title: Text('My Posts', style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16)), // Changed text
                   onTap: () {
-                    Get.back();
-                    if (Get.currentRoute != '/HomeFeedScreen') {
-                      Get.offAll(() => const HomeFeedScreen());
+                    Get.back(); // Close drawer
+                    final String? currentUserId = dataController.user.value['user']?['_id'] as String?;
+                    final String? currentUsername = dataController.user.value['user']?['username'] as String?;
+                    // Fallback for username if 'username' field isn't available but 'name' is.
+                    final String displayUsername = currentUsername ?? dataController.user.value['user']?['name'] as String? ?? 'My';
+
+                    if (currentUserId != null && displayUsername.isNotEmpty) {
+                      // Check if already on UserPostsPage for the current user to avoid redundant navigation
+                      if (Get.currentRoute == '/UserPostsPage' && (Get.arguments as Map?)?['userId'] == currentUserId) {
+                        return;
+                      }
+                      // Navigate to UserPostsPage, potentially replacing current view if it's not home
+                       Get.to(() => UserPostsPage(userId: currentUserId, username: displayUsername));
+                    } else {
+                      Get.snackbar('Error', 'Could not load your posts. User data missing.', snackPosition: SnackPosition.BOTTOM);
                     }
                   },
                 ),

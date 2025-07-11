@@ -27,15 +27,19 @@ class _UsersListPageState extends State<UsersListPage> {
     // No need to check if allUsers is empty here, as fetchAllUsers will be called
     // and the Obx widget will react to isLoading and allUsers list changes.
     _dataController.fetchAllUsers().catchError((error) {
-      print("Error initially fetching all users: $error");
-      if (mounted) { // Check if the widget is still in the tree
-        Get.snackbar(
-          'Error Loading Users',
-          'Failed to load users. Please try again later.',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red[700],
-          colorText: Colors.white,
-        );
+      print("Error initially fetching all users from initState: $error");
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) { // Re-check mounted as callback is asynchronous
+            Get.snackbar(
+              'Error Loading Users',
+              'Failed to load users. Please try again later.',
+              snackPosition: SnackPosition.BOTTOM,
+              backgroundColor: Colors.red[700],
+              colorText: Colors.white,
+            );
+          }
+        });
       }
     });
   }
