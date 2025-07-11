@@ -74,11 +74,20 @@ class _ReplyPageState extends State<ReplyPage> {
     // Ensure crucial lists are mutable if they exist
     _mainPostData['likes'] = List<dynamic>.from(_mainPostData['likes'] ?? []);
     _mainPostData['reposts'] = List<dynamic>.from(_mainPostData['reposts'] ?? []);
-    _mainPostData['views'] = List<dynamic>.from(_mainPostData['views'] ?? []); // Corrected: _mainPostData
-    _mainPostData['replies'] = List<dynamic>.from(_mainPostData['replies'] ?? []);
+    _mainPostData['views'] = List<dynamic>.from(_mainPostData['views'] ?? []);
+    _mainPostData['replies'] = List<Map<String, dynamic>>.from(
+        (_mainPostData['replies'] as List<dynamic>? ?? [])
+            .map((r) => r is Map<String, dynamic> ? r : Map<String, dynamic>.from(r as Map))
+    );
 
-
-    _fetchPostReplies();
+    // Check if replies are already populated by fetchFeeds
+    if (_mainPostData['replies'] != null && (_mainPostData['replies'] as List).isNotEmpty) {
+      print("[ReplyPage initState] Main post data already contains replies. Using them directly.");
+      _processAndSetRepliesFromLocalData((_mainPostData['replies'] as List).cast<Map<String, dynamic>>());
+    } else {
+      print("[ReplyPage initState] Main post data does not contain replies. Fetching them.");
+      _fetchPostReplies();
+    }
 
     final String pagePostId = _mainPostData['_id'] as String? ?? ""; // The ID of the post/reply this page is currently displaying
 
@@ -148,44 +157,91 @@ class _ReplyPageState extends State<ReplyPage> {
     }
   }
 
-  // Recursive function to process fetched replies and their children
-  Future<List<Map<String, dynamic>>> _processFetchedReplies(
-      List<Map<String, dynamic>> fetchedReplies,
+  // Recursive function to process reply data (either fetched or existing) and their children
+  Future<List<Map<String, dynamic>>> _processReplyDataRecursively(
+      List<Map<String, dynamic>> replyList,
       String currentOriginalPostId,
-      int currentDepth) async {
+      int currentDepth,
+      {bool fetchMissingChildren = true}) async { // Added flag
 
-    // Define max depth for initial recursive fetching, e.g., 1 level deep from direct replies
-    const int maxRecursiveFetchDepth = 1;
+    // Define max depth for initial recursive fetching if fetchMissingChildren is true
+    const int maxRecursiveFetchDepth = 1; // Only fetch 1 level deeper if children are missing
 
     List<Map<String, dynamic>> processed = [];
-    for (var reply in fetchedReplies) {
+    for (var reply in replyList) {
       Map<String, dynamic> processedReply = Map<String, dynamic>.from(reply);
-      processedReply['indentationLevel'] = currentDepth; // Set indent based on current depth
+      processedReply['indentationLevel'] = currentDepth;
 
-      // Check if this reply itself has children replies and we are within fetch depth
-      bool hasChildren = (reply['repliesCount'] as int? ?? 0) > 0 || (reply['replies'] as List?)?.isNotEmpty == true;
+      // Ensure 'replies' in the current reply object is a List<Map<String, dynamic>>
+      // This is important if data comes directly from _mainPostData['replies'] which was processed by DataController
+      List<Map<String, dynamic>> childrenRepliesData = [];
+      if (processedReply['replies'] is List) {
+        childrenRepliesData = (processedReply['replies'] as List)
+            .map((r) => r is Map<String, dynamic> ? r : Map<String, dynamic>.from(r as Map))
+            .toList();
+      }
 
-      if (hasChildren && currentDepth < maxRecursiveFetchDepth) {
+      bool hasPreloadedChildren = childrenRepliesData.isNotEmpty;
+      bool hasCountIndicatingChildren = (reply['repliesCount'] as int? ?? 0) > 0;
+
+      if (hasPreloadedChildren) {
+        // If children are already loaded (e.g., from fetchFeeds), process them
+        print("[ReplyPage _processReplyDataRecursively] Reply ${reply['_id']} has preloaded children. Processing them.");
+        processedReply['children_replies'] = await _processReplyDataRecursively(
+            childrenRepliesData, currentOriginalPostId, currentDepth + 1, fetchMissingChildren: fetchMissingChildren);
+      } else if (fetchMissingChildren && hasCountIndicatingChildren && currentDepth < maxRecursiveFetchDepth) {
+        // If no preloaded children, but count indicates they exist, and we are allowed to fetch, and within depth
         try {
-          print("[ReplyPage] Recursively fetching replies for reply ID: ${reply['_id']} at depth $currentDepth");
-          List<Map<String, dynamic>> children = await _dataController.fetchRepliesForReply(
-            currentOriginalPostId, // originalPostId of the root post of the thread
-            reply['_id'] as String,  // parentReplyId for this fetch is the current reply's ID
+          print("[ReplyPage _processReplyDataRecursively] Recursively fetching replies for reply ID: ${reply['_id']} at depth $currentDepth");
+          List<Map<String, dynamic>> fetchedChildren = await _dataController.fetchRepliesForReply(
+            currentOriginalPostId,
+            reply['_id'] as String,
           );
-          // Recursively process these children, incrementing depth
-          processedReply['children_replies'] = await _processFetchedReplies(children, currentOriginalPostId, currentDepth + 1);
+          processedReply['children_replies'] = await _processReplyDataRecursively(
+              fetchedChildren, currentOriginalPostId, currentDepth + 1, fetchMissingChildren: fetchMissingChildren);
         } catch (e) {
           print("Error fetching children for reply ${reply['_id']}: $e");
-          processedReply['children_replies'] = []; // Default to empty on error
+          processedReply['children_replies'] = [];
         }
       } else {
-        processedReply['children_replies'] = []; // No children or max depth reached
+        // No children to process or fetch (either no children, or already processed, or not fetching missing)
+        processedReply['children_replies'] = childrenRepliesData.isNotEmpty
+            ? await _processReplyDataRecursively(childrenRepliesData, currentOriginalPostId, currentDepth + 1, fetchMissingChildren: false) // Process existing if any, don't fetch more.
+            : [];
       }
       processed.add(processedReply);
     }
     return processed;
   }
 
+  Future<void> _processAndSetRepliesFromLocalData(List<Map<String, dynamic>> localReplies) async {
+    if (!mounted) return;
+    setState(() {
+      _isLoadingReplies = true; // Briefly true while processing
+      _fetchRepliesError = null;
+    });
+
+    final String currentPostItemId = _mainPostData['_id'] as String? ?? "";
+    final String threadOriginalPostId = widget.originalPostId ?? currentPostItemId;
+
+    try {
+      _replies = await _processReplyDataRecursively(localReplies, threadOriginalPostId, 0, fetchMissingChildren: false); // Don't fetch if using local
+      if (mounted) {
+        print("[ReplyPage _processAndSetRepliesFromLocalData] Processed ${_replies.length} local replies for item $currentPostItemId.");
+        setState(() {
+          _isLoadingReplies = false;
+        });
+      }
+    } catch (e) {
+      print("Error processing local replies in ReplyPage: $e");
+      if (mounted) {
+        setState(() {
+          _fetchRepliesError = 'Failed to process local replies.';
+          _isLoadingReplies = false;
+        });
+      }
+    }
+  }
 
   Future<void> _fetchPostReplies({bool showLoadingIndicator = true}) async {
     if (!mounted) return;
@@ -195,29 +251,25 @@ class _ReplyPageState extends State<ReplyPage> {
     });
 
     try {
-      final String currentPostItemId = widget.post['_id'] as String? ?? "";
+      final String currentPostItemId = _mainPostData['_id'] as String? ?? ""; // Changed from widget.post
       if (currentPostItemId.isEmpty) {
         if (mounted) setState(() { _fetchRepliesError = 'Cannot load replies: Current item ID is missing.'; _isLoadingReplies = false; });
         return;
       }
 
       List<Map<String, dynamic>> fetchedRootReplies;
-      // Determine the original post ID for the entire thread for recursive calls.
-      // If widget.originalPostId is null, it means widget.post is the root post.
-      // Otherwise, widget.originalPostId is the root post ID.
       final String threadOriginalPostId = widget.originalPostId ?? currentPostItemId;
 
-      if (widget.originalPostId == null) { // This page is for a top-level post
+      if (widget.originalPostId == null) {
         fetchedRootReplies = await _dataController.fetchReplies(currentPostItemId);
-      } else { // This page is for a reply (widget.post is a reply)
+      } else {
         fetchedRootReplies = await _dataController.fetchRepliesForReply(widget.originalPostId!, currentPostItemId);
       }
 
-      // Process replies and their children recursively, starting at depth 0 for direct replies/
-      _replies = await _processFetchedReplies(fetchedRootReplies, threadOriginalPostId, 0);
+      _replies = await _processReplyDataRecursively(fetchedRootReplies, threadOriginalPostId, 0, fetchMissingChildren: true); // Allow fetching for newly fetched
 
       if (mounted) {
-        print("[ReplyPage _fetchPostReplies] Setting state with ${fetchedRootReplies.length} replies for item $currentPostItemId.");
+        print("[ReplyPage _fetchPostReplies] Setting state with ${fetchedRootReplies.length} fetched replies for item $currentPostItemId.");
         setState(() {
           if (showLoadingIndicator) _isLoadingReplies = false;
         });

@@ -67,7 +67,7 @@ class Post {
   final List<String> views;   // Changed from num to List<String>
   final List<Attachment> attachments;
   final String? useravatar;
-  final List<String> replies; // Assuming list of Post IDs for replies
+  final List<Post> replies; // Changed to List<Post> for nested replies
   final String? originalPostId;
   final String? repostedBy;
   final bool isRepost;
@@ -100,11 +100,11 @@ class Post {
           .toList();
     }
 
-    var repliesList = <String>[];
-    if (json['replies'] != null) {
-      // Assuming replies are an array of strings (Post IDs)
-      // If they are populated Post objects, this needs adjustment
-      repliesList = List<String>.from(json['replies'] as List);
+    var repliesList = <Post>[];
+    if (json['replies'] != null && json['replies'] is List) {
+      repliesList = (json['replies'] as List)
+          .map((r) => Post.fromJson(r as Map<String, dynamic>))
+          .toList();
     }
 
     return Post(
@@ -137,7 +137,7 @@ class Post {
       'views': views,
       'attachments': attachments.map((a) => a.toJson()).toList(),
       'useravatar': useravatar,
-      'replies': replies,
+      'replies': replies.map((r) => r.toJson()).toList(),
       'originalPostId': originalPostId,
       'repostedBy': repostedBy,
       'isRepost': isRepost,
