@@ -12,6 +12,8 @@ class BuyMeACoffeePage extends StatelessWidget {
   final String btcLegacyAddress = '1EXu3QeiySmF7HqT7363VvPJawh7oBU6yK';
   final String legacyNetworkInfo = 'For use with wallets that only support legacy BTC addresses (starting with "1", "3", "bc1p" and "bc1q").';
 
+  // more test changes
+
 
   Widget _buildAddressSection(BuildContext context, String title, String address, String networkInfo, String heroTag) {
     // Use explicit colors for better contrast control on the dark background
