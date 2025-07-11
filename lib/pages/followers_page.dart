@@ -46,22 +46,25 @@ class _FollowersPageState extends State<FollowersPage> with SingleTickerProvider
     }
 
     // Fetch initial data for both tabs for the _targetUserId
-    // Clear previous lists if switching users or first load
-    _dataController.followers.clear();
-    _dataController.following.clear();
+    // Clear previous lists and fetch data after the first frame to avoid build errors
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) { // Ensure the widget is still in the tree
+        _dataController.followers.clear();
+        _dataController.following.clear();
 
-    _dataController.fetchFollowers(_targetUserId).catchError((e) {
-      if (mounted) {
-        Get.snackbar('Error', 'Could not load followers: ${e.toString()}',
-            backgroundColor: Colors.red, colorText: Colors.white);
+        _dataController.fetchFollowers(_targetUserId).catchError((e) {
+          if (mounted) {
+            Get.snackbar('Error', 'Could not load followers: ${e.toString()}',
+                backgroundColor: Colors.red, colorText: Colors.white);
+          }
+        });
+        _dataController.fetchFollowing(_targetUserId).catchError((e) {
+          if (mounted) {
+            Get.snackbar('Error', 'Could not load following list: ${e.toString()}',
+                backgroundColor: Colors.red, colorText: Colors.white);
+          }
+        });
       }
-    });
-    // fetchFollowing will be updated in the next step, but call it here for now
-    _dataController.fetchFollowing(_targetUserId).catchError((e) {
-       if (mounted) {
-        Get.snackbar('Error', 'Could not load following list: ${e.toString()}',
-            backgroundColor: Colors.red, colorText: Colors.white);
-       }
     });
   }
 

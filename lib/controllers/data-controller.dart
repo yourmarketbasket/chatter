@@ -126,9 +126,13 @@ class DataController extends GetxController {
         ),
       );
 
+      print('[DataController] fetchAllUsers API Response Status Code: ${response.statusCode}');
+      print('[DataController] fetchAllUsers API Response Data: ${response.data.toString()}');
+
       if (response.statusCode == 200 && response.data['success'] == true) {
         if (response.data['users'] != null && response.data['users'] is List) {
           List<dynamic> fetchedUsersDynamic = response.data['users'];
+          print('[DataController] fetchAllUsers: Successfully fetched ${fetchedUsersDynamic.length} raw user entries.');
           // Process users: ensure all necessary fields are present and correctly typed.
           // Add 'isFollowingCurrentUser' based on the main user's following list.
           final List<String> currentUserFollowingIds = List<String>.from(
@@ -173,9 +177,11 @@ class DataController extends GetxController {
       allUsers.clear(); // Clear on error
       print('[DataController] Error in fetchAllUsers: ${e.toString()}');
       // Optionally rethrow or handle as per UI requirements (e.g., show snackbar)
+      print('[DataController] fetchAllUsers caught error: ${e.toString()}');
       // For now, UsersListPage will show an error based on allUsers being empty + isLoading false.
     } finally {
       isLoading.value = false; // Reset loading state
+      print('[DataController] fetchAllUsers finally block. isLoading: ${isLoading.value}, allUsers count: ${allUsers.length}');
     }
   }
 
