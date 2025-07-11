@@ -204,7 +204,7 @@ class _UserPostsPageState extends State<UserPostsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[ // Explicitly typed for clarity
-            // Main post content using PostContent widget  lkffjjf
+            // Main post content using PostContent widget  more changes
             if (postContentText.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(bottom: 8.0),
