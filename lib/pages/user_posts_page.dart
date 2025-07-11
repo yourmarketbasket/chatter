@@ -220,17 +220,17 @@ class _UserPostsPageState extends State<UserPostsPage> {
                 ),
               ),
 
-            // Attachments display
-            if (attachments.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 4.0, bottom: 8.0),
-                child: attachments.length == 1
-                    ? _buildAttachmentView(attachments.first as Map<String, dynamic>, post)
-                    : ReplyAttachmentGrid(
-                        attachmentsArg: List<Map<String, dynamic>>.from(attachments.map((a) => a as Map<String, dynamic>)),
-                        postOrReplyData: post,
-                      ),
-              ),
+            // Attachments display - REMOVED as PostContent is assumed to handle this.
+            // if (attachments.isNotEmpty)
+            //   Padding(
+            //     padding: const EdgeInsets.only(top: 4.0, bottom: 8.0),
+            //     child: attachments.length == 1
+            //         ? _buildAttachmentView(attachments.first as Map<String, dynamic>, post)
+            //         : ReplyAttachmentGrid(
+            //             attachmentsArg: List<Map<String, dynamic>>.from(attachments.map((a) => a as Map<String, dynamic>)),
+            //             postOrReplyData: post,
+            //           ),
+            //   ),
 
             // Action buttons (StatButtons)
             Padding(
