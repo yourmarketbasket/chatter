@@ -197,7 +197,7 @@ class _UserPostsPageState extends State<UserPostsPage> {
         ));
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+        padding: const EdgeInsets.symmetric(horizontal: 1.0, vertical: 12.0),
         decoration: BoxDecoration(
           border: Border(bottom: BorderSide(color: Colors.grey[850]!, width: 0.5)),
         ),
