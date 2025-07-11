@@ -219,8 +219,8 @@ class _UsersListPageState extends State<UsersListPage> {
                 );
               }),
               onTap: () {
-                if (username.isNotEmpty) {
-                   Get.to(() => ProfilePage(username: username));
+                if (username.isNotEmpty && userId.isNotEmpty) {
+                   Get.to(() => ProfilePage(userId: userId, username: username, userAvatarUrl: avatarUrl));
                 } else {
                   Get.snackbar('Error', 'Cannot navigate to profile: User data incomplete.', snackPosition: SnackPosition.BOTTOM);
                 }

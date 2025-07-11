@@ -45,38 +45,52 @@ class _UserPostsPageState extends State<UserPostsPage> {
   }
 
   // Helper to build attachment widgets based on type (simplified)
-  Widget _buildAttachmentView(Map<String, dynamic> attachment) {
+  Widget _buildAttachmentView(Map<String, dynamic> attachment, Map<String, dynamic> postData) {
     String type = attachment['type'] ?? 'unknown';
     String url = attachment['url'] ?? '';
+    final BorderRadius defaultBorderRadius = BorderRadius.circular(12.0);
+
     // Add more specific widgets as needed, mirroring home_feed_screen.dart
     if (type.startsWith('image/')) {
       // For single images, directly use CachedNetworkImage or similar.
-      // For multiple, ReplyAttachmentGrid might be used if it's adaptable.
-      // This part needs to be expanded based on how home_feed_screen handles single vs multiple images.
-      return CachedNetworkImage(
-        imageUrl: url,
-        placeholder: (context, url) => Container(
-          height: 150,
-          color: Colors.grey[800],
-          child: Center(child: Icon(FeatherIcons.image, color: Colors.grey[600])),
+      return ClipRRect( // Ensure images also respect border radius if they are standalone
+        borderRadius: defaultBorderRadius,
+        child: CachedNetworkImage(
+          imageUrl: url,
+          placeholder: (context, url) => Container(
+            height: 150, // Example height, adjust as needed
+            decoration: BoxDecoration(
+              color: Colors.grey[800],
+              borderRadius: defaultBorderRadius,
+            ),
+            child: Center(child: Icon(FeatherIcons.image, color: Colors.grey[600])),
+          ),
+          errorWidget: (context, url, error) => Container(
+            height: 150, // Example height
+            decoration: BoxDecoration(
+              color: Colors.grey[800],
+              borderRadius: defaultBorderRadius,
+            ),
+            child: Center(child: Icon(FeatherIcons.alertCircle, color: Colors.red[400])),
+          ),
+          fit: BoxFit.cover,
         ),
-        errorWidget: (context, url, error) => Container(
-          height: 150,
-          color: Colors.grey[800],
-          child: Center(child: Icon(FeatherIcons.alertCircle, color: Colors.red[400])),
-        ),
-        fit: BoxFit.cover,
       );
     } else if (type.startsWith('video/')) {
-      // Assuming VideoAttachmentWidget can be used similarly
       return VideoAttachmentWidget(
-        attachmentData: attachment,
-        postId: attachment['postIdForVideo'] ?? GlobalKey().toString(), // Requires postId if VideoAttachmentWidget needs it
+        key: ValueKey(attachment['url'] ?? attachment['_id'] ?? UniqueKey().toString()), // Unique key
+        attachment: attachment,
+        post: postData, // Use postData parameter
+        borderRadius: defaultBorderRadius,
+        // isFeedContext can be true if you want feed-like constraints, or false for native aspect ratio
+        // enforceFeedConstraints might be relevant here if UserPostsPage should behave like a feed
       );
     } else if (type.startsWith('audio/')) {
       return AudioAttachmentWidget(
-         attachmentData: attachment,
-         postId: attachment['postIdForAudio'] ?? GlobalKey().toString(), // Requires postId if AudioAttachmentWidget needs it
+        key: ValueKey(attachment['url'] ?? attachment['_id'] ?? UniqueKey().toString()), // Unique key
+        attachment: attachment,
+        post: postData, // Use postData parameter
+        borderRadius: defaultBorderRadius,
       );
     } else if (type == 'application/pdf') {
       return Container(
@@ -110,7 +124,8 @@ class _UserPostsPageState extends State<UserPostsPage> {
     final String postUserDisplayName = post['user']?['name'] ?? 'User';
     final String postContent = post['content'] ?? '';
     final List<dynamic> attachments = post['attachments'] as List<dynamic>? ?? [];
-    final String createdAt = post['createdAt']?.toString() ?? DateTime.now().toIso8601String();
+    final String createdAtString = post['createdAt']?.toString() ?? DateTime.now().toIso8601String();
+    final DateTime createdAtDateTime = DateTime.tryParse(createdAtString) ?? DateTime.now();
     final String postId = post['_id'] ?? '';
 
     final int likesCount = post['likesCount'] ?? 0;
@@ -153,7 +168,7 @@ class _UserPostsPageState extends State<UserPostsPage> {
                       const SizedBox(width: 4),
                       Text('·', style: GoogleFonts.roboto(color: Colors.grey[600], fontSize: 14)),
                       const SizedBox(width: 4),
-                      RealtimeTimeagoText(isoTimeString: createdAt, textStyle: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 14)),
+                      RealtimeTimeagoText(timestamp: createdAtDateTime, style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 14)),
                     ],
                   ),
                   if (postContent.isNotEmpty)
@@ -168,10 +183,10 @@ class _UserPostsPageState extends State<UserPostsPage> {
                     Padding(
                       padding: const EdgeInsets.only(top: 8.0),
                       child: attachments.length == 1
-                          ? _buildAttachmentView(attachments.first as Map<String, dynamic>)
-                          : ReplyAttachmentGrid( // This might need adaptation or a new PostAttachmentGrid
-                              attachments: List<Map<String, dynamic>>.from(attachments.map((a) => a as Map<String, dynamic>)),
-                              // onAttachmentTap: (index) { /* Handle tap if needed, e.g., open full screen */ }
+                          ? _buildAttachmentView(attachments.first as Map<String, dynamic>, post)
+                          : ReplyAttachmentGrid(
+                              attachmentsArg: List<Map<String, dynamic>>.from(attachments.map((a) => a as Map<String, dynamic>)),
+                              postOrReplyData: post, // Pass the full post map here
                             ),
                     ),
 

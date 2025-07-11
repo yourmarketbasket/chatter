@@ -259,8 +259,10 @@ class _FollowersPageState extends State<FollowersPage> with SingleTickerProvider
                 })
               : null, // No button for self or if not logged in
             onTap: () {
-               if (username.isNotEmpty) {
-                 Get.to(() => ProfilePage(username: username));
+               if (username.isNotEmpty && listedUserId.isNotEmpty) {
+                 Get.to(() => ProfilePage(userId: listedUserId, username: username, userAvatarUrl: avatarUrl));
+               } else {
+                  Get.snackbar('Error', 'Cannot navigate to profile: User data incomplete.', snackPosition: SnackPosition.BOTTOM);
                }
             },
           );
