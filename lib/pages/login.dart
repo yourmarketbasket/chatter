@@ -23,6 +23,7 @@ class _LoginPageState extends State<LoginPage> {
   String? _passwordError;
   String? _generalMessage;
   bool _isSuccess = false;
+  bool _isLoading = false; // Added for progress indicator
 
   // In-memory user store (for demo purposes)
   static final Map<String, String> _users = {};
@@ -37,6 +38,7 @@ class _LoginPageState extends State<LoginPage> {
       _passwordError = null;
       _generalMessage = null;
       _isSuccess = false;
+      _isLoading = true; // Start loading
     });
 
     // Validation
@@ -61,30 +63,42 @@ class _LoginPageState extends State<LoginPage> {
       setState(() {
         _generalMessage = errors.length > 1 ? 'Fix the errors to proceed.' : errors.first;
         _isSuccess = false;
+        _isLoading = false; // Stop loading
       });
       return;
     }
 
-    // Send to server via the dataController
-    var response = await dataController.loginUser({
-      'username': username,
-      'password': password,
-    });
-
-    if (response['success']) {
-      setState(() {
-        _generalMessage = response['message'] ?? 'Login successful!';
-        _isSuccess = true;
+    try {
+      // Send to server via the dataController
+      var response = await dataController.loginUser({
+        'username': username,
+        'password': password,
       });
-      await Future.delayed(const Duration(seconds: 2)); // Show success message briefly
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const HomeFeedScreen()),
-      );
-    } else {
+
+      if (response['success']) {
+        setState(() {
+          _generalMessage = response['message'] ?? 'Login successful!';
+          _isSuccess = true;
+        });
+        await Future.delayed(const Duration(seconds: 2)); // Show success message briefly
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeFeedScreen()),
+        );
+      } else {
+        setState(() {
+          _generalMessage = response['message'] ?? 'Login failed. Please try again.';
+          _isSuccess = false;
+        });
+      }
+    } catch (e) {
       setState(() {
-        _generalMessage = response['message'] ?? 'Login failed. Please try again.';
+        _generalMessage = 'An unexpected error occurred. Please try again.';
         _isSuccess = false;
+      });
+    } finally {
+      setState(() {
+        _isLoading = false; // Stop loading
       });
     }
   }
@@ -253,14 +267,23 @@ class _LoginPageState extends State<LoginPage> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: Text(
-                      'Log In',
-                      style: GoogleFonts.poppins(
-                        color: Colors.black,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              color: Colors.black,
+                              strokeWidth: 3,
+                            ),
+                          )
+                        : Text(
+                            'Log In',
+                            style: GoogleFonts.poppins(
+                              color: Colors.black,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(height: 16),

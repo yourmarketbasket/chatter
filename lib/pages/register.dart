@@ -18,6 +18,7 @@ class _RegisterPageState extends State<RegisterPage> {
   DataController dataController = Get.put(DataController());
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final FocusNode _passwordFocusNode = FocusNode();
   final TextEditingController _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -27,9 +28,78 @@ class _RegisterPageState extends State<RegisterPage> {
   String? _confirmPasswordError;
   String? _generalMessage;
   bool _isSuccess = false;
+  bool _isLoading = false; // Added for progress indicator
+
+  // Password strength criteria
+  bool _hasMinLength = false;
+  bool _hasUppercase = false;
+  bool _hasLowercase = false;
+  bool _hasNumber = false;
+  bool _hasSymbol = false;
+  bool _isPasswordFocused = false;
+
 
   // In-memory user store (for demo purposes)
   static final Map<String, String> _users = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _passwordController.addListener(_updatePasswordCriteria);
+    _passwordFocusNode.addListener(() {
+      setState(() {
+        _isPasswordFocused = _passwordFocusNode.hasFocus;
+        // Trigger validation display when field is focused and not empty, or when it loses focus
+        if (_isPasswordFocused && _passwordController.text.isNotEmpty) {
+          _updatePasswordCriteria(); // Update criteria states
+        } else if (!_isPasswordFocused && _passwordController.text.isNotEmpty) {
+          // If focus is lost and field is not empty, ensure errors are shown if criteria not met
+           _updatePasswordCriteria();
+        } else if (_passwordController.text.isEmpty){
+          _passwordError = null; // Clear error if field is empty
+        }
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _passwordController.removeListener(_updatePasswordCriteria);
+    _passwordFocusNode.removeListener(() {
+      setState(() {
+        _isPasswordFocused = _passwordFocusNode.hasFocus;
+      });
+    });
+    _passwordController.dispose();
+    _passwordFocusNode.dispose();
+    _usernameController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  void _updatePasswordCriteria() {
+    final password = _passwordController.text;
+    setState(() {
+      _hasMinLength = password.length >= 8;
+      _hasUppercase = RegExp(r'[A-Z]').hasMatch(password);
+      _hasLowercase = RegExp(r'[a-z]').hasMatch(password);
+      _hasNumber = RegExp(r'\d').hasMatch(password);
+      _hasSymbol = RegExp(r'[!@#$%^&*()_+\-=\[\]{};'':"\\|,.<>\/?~`]').hasMatch(password);
+
+      // Validate password field immediately for error message
+      if (password.isNotEmpty && _isPasswordFocused) {
+        if (!(_hasMinLength && _hasUppercase && _hasLowercase && _hasNumber && _hasSymbol)) {
+          _passwordError = 'Password does not meet all criteria.';
+        } else {
+          _passwordError = null;
+        }
+      } else if (password.isEmpty && _isPasswordFocused) {
+        _passwordError = 'Password cannot be empty.';
+      } else {
+        _passwordError = null; // Clear error if not focused or becomes valid
+      }
+    });
+  }
 
   Future<void> _register() async {
     final username = _usernameController.text.trim();
@@ -43,6 +113,7 @@ class _RegisterPageState extends State<RegisterPage> {
       _confirmPasswordError = null;
       _generalMessage = null;
       _isSuccess = false;
+      _isLoading = true; // Start loading
     });
 
     // Validation
@@ -61,11 +132,8 @@ class _RegisterPageState extends State<RegisterPage> {
     if (password.isEmpty) {
       _passwordError = 'Password cannot be empty.';
       errors.add(_passwordError!);
-    } else if (password.length < 8) {
-      _passwordError = 'Password must be at least 8 characters.';
-      errors.add(_passwordError!);
-    } else if (!RegExp(r'^(?=.*[A-Z])(?=.*[!@#$%^&*])').hasMatch(password)) {
-      _passwordError = 'Password must have a capital letter and a symbol.';
+    } else if (!(_hasMinLength && _hasUppercase && _hasLowercase && _hasNumber && _hasSymbol)) {
+      _passwordError = 'Password does not meet all criteria.';
       errors.add(_passwordError!);
     }
 
@@ -85,27 +153,39 @@ class _RegisterPageState extends State<RegisterPage> {
       setState(() {
         _generalMessage = errors.length > 1 ? 'Fix the errors to proceed.' : errors.first;
         _isSuccess = false;
+        _isLoading = false; // Stop loading
       });
       return;
     }
 
-    // Send the data to the server
-    final response = await dataController.registerUser({
-      'username': username,
-      'password': password,
-    });
-
-    if (response['success'] == true) {
-      setState(() {
-        _generalMessage = 'Registration successful! You can now log in.';
-        _isSuccess = true;
+    try {
+      // Send the data to the server
+      final response = await dataController.registerUser({
+        'username': username,
+        'password': password,
       });
-      await Future.delayed(const Duration(seconds: 2)); // Show success message briefly
-      Get.to(() => const LoginPage());
-    } else {
+
+      if (response['success'] == true) {
+        setState(() {
+          _generalMessage = 'Registration successful! You can now log in.';
+          _isSuccess = true;
+        });
+        await Future.delayed(const Duration(seconds: 2)); // Show success message briefly
+        Get.to(() => const LoginPage());
+      } else {
+        setState(() {
+          _generalMessage = response['error'] ?? 'Registration failed. Please try again.';
+          _isSuccess = false;
+        });
+      }
+    } catch (e) {
       setState(() {
-        _generalMessage = response['error'] ?? 'Registration failed. Please try again.';
+        _generalMessage = 'An unexpected error occurred. Please try again.';
         _isSuccess = false;
+      });
+    } finally {
+      setState(() {
+        _isLoading = false; // Stop loading
       });
     }
   }
@@ -224,12 +304,14 @@ class _RegisterPageState extends State<RegisterPage> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                TextField(
-                  controller: _passwordController,
-                  obscureText: _obscurePassword,
-                  style: GoogleFonts.roboto(color: Colors.white, fontSize: 16),
-                  decoration: InputDecoration(
-                    labelText: 'Password',
+                Focus(
+                  focusNode: _passwordFocusNode,
+                  child: TextField(
+                    controller: _passwordController,
+                    obscureText: _obscurePassword,
+                    style: GoogleFonts.roboto(color: Colors.white, fontSize: 16),
+                    decoration: InputDecoration(
+                      labelText: 'Password',
                     labelStyle: GoogleFonts.roboto(color: Colors.grey[500]),
                     hintText: '8+ chars, 1 capital, 1 symbol',
                     hintStyle: GoogleFonts.roboto(color: Colors.grey[700]),
@@ -270,6 +352,18 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                   ),
                 ),
+                ),
+                if (_isPasswordFocused || _passwordController.text.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: PasswordCriteriaWidget(
+                      hasMinLength: _hasMinLength,
+                      hasUppercase: _hasUppercase,
+                      hasLowercase: _hasLowercase,
+                      hasNumber: _hasNumber,
+                      hasSymbol: _hasSymbol,
+                    ),
+                  ),
                 const SizedBox(height: 16),
                 TextField(
                   controller: _confirmPasswordController,
@@ -352,14 +446,23 @@ class _RegisterPageState extends State<RegisterPage> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: Text(
-                      'Register',
-                      style: GoogleFonts.poppins(
-                        color: Colors.black,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              color: Colors.black,
+                              strokeWidth: 3,
+                            ),
+                          )
+                        : Text(
+                            'Register',
+                            style: GoogleFonts.poppins(
+                              color: Colors.black,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -385,6 +488,61 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class PasswordCriteriaWidget extends StatelessWidget {
+  final bool hasMinLength;
+  final bool hasUppercase;
+  final bool hasLowercase;
+  final bool hasNumber;
+  final bool hasSymbol;
+
+  const PasswordCriteriaWidget({
+    Key? key,
+    required this.hasMinLength,
+    required this.hasUppercase,
+    required this.hasLowercase,
+    required this.hasNumber,
+    required this.hasSymbol,
+  }) : super(key: key);
+
+  Widget _buildCriteriaRow(String text, bool met) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2.0),
+      child: Row(
+        children: [
+          Icon(
+            met ? FeatherIcons.checkCircle : FeatherIcons.xCircle,
+            color: met ? Colors.greenAccent[400] : Colors.redAccent[400],
+            size: 18,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            text,
+            style: GoogleFonts.roboto(
+              color: met ? Colors.greenAccent[400] : Colors.redAccent[400],
+              fontSize: 13,
+              decoration: met ? TextDecoration.none : TextDecoration.lineThrough,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildCriteriaRow('At least 8 characters', hasMinLength),
+        _buildCriteriaRow('At least one uppercase letter (A-Z)', hasUppercase),
+        _buildCriteriaRow('At least one lowercase letter (a-z)', hasLowercase),
+        _buildCriteriaRow('At least one number (0-9)', hasNumber),
+        _buildCriteriaRow('At least one symbol (!@#\$%^&*...)', hasSymbol),
+      ],
     );
   }
 }
