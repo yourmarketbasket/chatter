@@ -176,69 +176,58 @@ class _UserPostsPageState extends State<UserPostsPage> {
   }
 
   Widget _buildPostItem(Map<String, dynamic> post) {
-    final String postUserAvatar = post['user']?['avatar'] ?? '';
-    final String postUsername = post['user']?['username'] ?? 'Unknown';
-    final String postUserDisplayName = post['user']?['name'] ?? 'User';
-    final String postContent = post['content'] ?? '';
+    // Removed per-post author details as per user request, AppBar provides context.
+    // final String postUserAvatar = post['user']?['avatar'] ?? '';
+    // final String postUsername = post['user']?['username'] ?? 'Unknown';
+    // final String postUserDisplayName = post['user']?['name'] ?? 'User';
+    // final String createdAtString = post['createdAt']?.toString() ?? DateTime.now().toIso8601String();
+    // final DateTime createdAtDateTime = DateTime.tryParse(createdAtString) ?? DateTime.now();
+
+    final String postContentText = post['content'] ?? '';
     final List<dynamic> attachments = post['attachments'] as List<dynamic>? ?? [];
-    final String createdAtString = post['createdAt']?.toString() ?? DateTime.now().toIso8601String();
-    final DateTime createdAtDateTime = DateTime.tryParse(createdAtString) ?? DateTime.now();
     final String postId = post['_id'] ?? '';
 
     final int likesCount = post['likesCount'] ?? 0;
-    final int repliesCount = post['replyCount'] ?? 0; // Assuming 'replyCount' from _processPostOrReply
+    final int repliesCount = post['replyCount'] ?? 0;
     final int repostsCount = post['repostsCount'] ?? 0;
     final int viewsCount = post['viewsCount'] ?? 0;
     final List<dynamic> likes = post['likes'] as List<dynamic>? ?? [];
     final String currentUserId = _dataController.user.value['user']?['_id'] ?? '';
     final bool isLikedByCurrentUser = likes.any((like) => (like is String ? like : like?['_id']) == currentUserId);
 
-
     return InkWell(
       onTap: () {
         Get.to(() => ReplyPage(
           post: post,
-          postDepth: 0, // This is a top-level post from UserPostsPage
-          originalPostId: post['_id'] as String?, // The post itself is the original post in this context
+          postDepth: 0,
+          originalPostId: postId,
         ));
       },
       child: Container(
-        padding: const EdgeInsets.all(12.0),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0), // Adjusted padding
         decoration: BoxDecoration(
           border: Border(bottom: BorderSide(color: Colors.grey[850]!, width: 0.5)),
         ),
-        child: Row(
+        child: Column( // Main content in a Column
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CircleAvatar(
-              radius: 22,
-              backgroundImage: postUserAvatar.isNotEmpty ? CachedNetworkImageProvider(postUserAvatar) : null,
-              child: postUserAvatar.isEmpty ? Text(postUserDisplayName.isNotEmpty ? postUserDisplayName[0].toUpperCase() : 'U', style: GoogleFonts.poppins(color: Colors.white)) : null,
-              backgroundColor: Colors.grey[700],
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(postUserDisplayName, style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 15)),
-                      const SizedBox(width: 4),
-                      Text('@$postUsername', style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 14)),
-                      const SizedBox(width: 4),
-                      Text('·', style: GoogleFonts.roboto(color: Colors.grey[600], fontSize: 14)),
-                      const SizedBox(width: 4),
-                      RealtimeTimeagoText(timestamp: createdAtDateTime, style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 14)),
-                    ],
-                  ),
-                  if (postContent.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4.0, bottom: 8.0),
-                      child: PostContent(
-                        postData: post, // Pass the full post map
-                        isReply: false, // These are main posts, not replies
-                        postDepth: 0,   // Top-level posts
+            // Per-post author/time row REMOVED
+            // if (postContentText.isNotEmpty) // Check for postContentText
+            //   Padding(
+            //     padding: const EdgeInsets.only(bottom: 8.0),
+            //     child: Text(postContentText, style: GoogleFonts.roboto(color: Colors.white, fontSize: 15, height: 1.4)),
+            //   ),
+
+            // Use PostContent for richer text rendering if available and desired
+            // If PostContent itself includes author details for depth 0, that might need adjustment in PostContent.
+            // For now, assuming PostContent at depth 0 is primarily for the text body.
+            if (postContentText.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: PostContent(
+                        postData: post,
+                        isReply: false,
+                        postDepth: 0,
                         showSnackBar: _showPostContentSnackBar,
                         onSharePost: _sharePostFromContent,
                         onReplyToItem: _handleReplyToItem, // Or a more specific handler if needed
