@@ -270,8 +270,8 @@ class _UserPostsPageState extends State<UserPostsPage> {
                       children: [
                         StatButton(
                           icon: FeatherIcons.messageCircle,
-                          count: repliesCount,
-                          onTap: () => Get.to(() => ReplyPage(
+                          text: repliesCount.toString(),
+                          onPressed: () => Get.to(() => ReplyPage(
                             post: post,
                             postDepth: 0, // This is a top-level post
                             originalPostId: postId, // Pass the current post's ID as originalPostId
@@ -280,8 +280,8 @@ class _UserPostsPageState extends State<UserPostsPage> {
                         ),
                         StatButton(
                           icon: FeatherIcons.repeat,
-                          count: repostsCount,
-                          onTap: () async {
+                          text: repostsCount.toString(),
+                          onPressed: () async {
                             final result = await _dataController.repostPost(postId);
                             if (mounted && result['success'] == false) {
                                 Get.snackbar('Error', result['message'] ?? 'Could not repost.', snackPosition: SnackPosition.BOTTOM);
@@ -290,27 +290,28 @@ class _UserPostsPageState extends State<UserPostsPage> {
                             }
                           },
                           color: Colors.grey[600]!,
-                          // isActivated: isRepostedByCurrentUser, // Add this logic if needed
                         ),
                         StatButton(
-                          icon: FeatherIcons.heart,
-                          count: likesCount,
-                          isActivated: isLikedByCurrentUser,
-                          activeColor: Colors.pinkAccent,
-                          onTap: () async {
+                          icon: isLikedByCurrentUser ? Icons.favorite : FeatherIcons.heart, // Conditional icon
+                          text: likesCount.toString(),
+                          onPressed: () async {
                             if (isLikedByCurrentUser) {
                                 await _dataController.unlikePost(postId);
                             } else {
                                 await _dataController.likePost(postId);
                             }
-                            // DataController should update the post list, triggering Obx rebuild
+                            // DataController's fetchSinglePost (called by like/unlike) should trigger
+                            // an update in the main 'posts' list. If UserPostsPage needs to reflect
+                            // this change immediately without a full page reload, the specific post
+                            // in '_dataController.userPosts' would need to be updated.
+                            // For now, relying on DataController's existing refresh mechanisms.
                           },
-                          color: Colors.grey[600]!,
+                          color: isLikedByCurrentUser ? Colors.pinkAccent : Colors.grey[600]!, // Conditional color
                         ),
                         StatButton(
                           icon: FeatherIcons.barChart2, // Using bar chart for views as an example
-                          count: viewsCount,
-                          onTap: () { /* Maybe do nothing on tap, or show who viewed */ },
+                          text: viewsCount.toString(),
+                          onPressed: () { /* Maybe do nothing on tap, or show who viewed */ },
                           color: Colors.grey[600]!,
                         ),
                         // Share button (optional)
