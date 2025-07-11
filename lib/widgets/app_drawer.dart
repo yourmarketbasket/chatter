@@ -1,6 +1,6 @@
 import 'package:chatter/pages/home-feed-screen.dart';
 import 'package:chatter/pages/users_list_page.dart';
-import 'package:chatter/pages/direct_messages_page.dart';
+// import 'package:chatter/pages/direct_messages_page.dart'; // Removed
 import 'package:chatter/pages/followers_page.dart';
 import 'package:chatter/pages/login.dart';
 import 'package:flutter/material.dart';
@@ -12,7 +12,7 @@ import 'package:chatter/controllers/data-controller.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:feather_icons/feather_icons.dart';
 import 'package:google_fonts/google_fonts.dart';
-// import 'package:chatter/pages/edit_about_page.dart'; // No longer needed
+import 'package:url_launcher/url_launcher.dart';
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({Key? key}) : super(key: key);
@@ -22,13 +22,13 @@ class AppDrawer extends StatelessWidget {
     final TextEditingController aboutController = TextEditingController(
       text: dataController.user.value['user']?['about'] as String? ?? '',
     );
-    bool isSaving = false; // Local state for the dialog's save button
+    bool isSaving = false;
 
     Get.dialog(
       AlertDialog(
         backgroundColor: const Color(0xFF1E1E1E),
         title: Text('Edit Your "About" Info', style: GoogleFonts.poppins(color: Colors.white)),
-        content: StatefulBuilder( // Use StatefulBuilder to manage isSaving state within the dialog
+        content: StatefulBuilder(
           builder: (BuildContext context, StateSetter setDialogState) {
             return Column(
               mainAxisSize: MainAxisSize.min,
@@ -51,7 +51,7 @@ class AppDrawer extends StatelessWidget {
                       borderRadius: BorderRadius.circular(8.0),
                       borderSide: const BorderSide(color: Colors.tealAccent, width: 1.5),
                     ),
-                     counterStyle: GoogleFonts.roboto(color: Colors.grey[500]),
+                    counterStyle: GoogleFonts.roboto(color: Colors.grey[500]),
                   ),
                 ),
                 if (isSaving) const Padding(
@@ -67,14 +67,14 @@ class AppDrawer extends StatelessWidget {
             child: Text('Cancel', style: GoogleFonts.roboto(color: Colors.grey[400])),
             onPressed: () => Get.back(),
           ),
-          StatefulBuilder( // StatefulBuilder for the Save button's loading state
+          StatefulBuilder(
              builder: (BuildContext context, StateSetter setDialogState) {
               return TextButton(
                 child: Text(isSaving ? 'Saving...' : 'Save', style: GoogleFonts.roboto(color: Colors.tealAccent, fontWeight: FontWeight.bold)),
                 onPressed: isSaving ? null : () async {
                   setDialogState(() => isSaving = true);
                   final result = await dataController.updateAboutInfo(aboutController.text.trim());
-                  if (Get.isDialogOpen ?? false) Get.back(); // Close dialog first
+                  if (Get.isDialogOpen ?? false) Get.back();
 
                   if (result['success'] == true) {
                     Get.snackbar(
@@ -89,18 +89,15 @@ class AppDrawer extends StatelessWidget {
                        snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white,
                     );
                   }
-                  // No need to set isSaving = false here if dialog is closed.
-                  // If dialog wasn't closed, you would: setDialogState(() => isSaving = false);
                 },
               );
             }
           ),
         ],
       ),
-      barrierDismissible: !isSaving, // Prevent dismissing while saving
+      barrierDismissible: !isSaving,
     );
   }
-
 
   void _showImageSourceActionSheet(BuildContext context) {
     showModalBottomSheet(
@@ -169,15 +166,12 @@ class AppDrawer extends StatelessWidget {
       );
 
       if (croppedFile != null) {
-        print('Cropped image path: ${croppedFile.path}');
         _handleImageUpload(File(croppedFile.path));
       } else {
-        print('Image cropping cancelled.');
         Get.snackbar('Cancelled', 'Image cropping was cancelled.',
             snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.orange[700], colorText: Colors.white);
       }
     } else {
-      print('Image picking cancelled.');
       Get.snackbar('Cancelled', 'Image selection was cancelled.',
           snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.orange[700], colorText: Colors.white);
     }
@@ -201,14 +195,10 @@ class AppDrawer extends StatelessWidget {
     try {
       List<Map<String, dynamic>> cloudinaryUploadResults = await dataController.uploadFiles([{'file': imageFile}]);
 
-      if (Get.isSnackbarOpen) {
-        Get.closeCurrentSnackbar();
-      }
+      if (Get.isSnackbarOpen) Get.closeCurrentSnackbar();
 
       if (cloudinaryUploadResults.isNotEmpty && cloudinaryUploadResults[0]['success'] == true) {
         String newCloudinaryAvatarUrl = cloudinaryUploadResults[0]['url'];
-        print('Avatar uploaded successfully to Cloudinary: $newCloudinaryAvatarUrl');
-
         Get.snackbar(
           'Updating Profile...',
           'Saving your new avatar. Please wait.',
@@ -224,51 +214,43 @@ class AppDrawer extends StatelessWidget {
 
         final Map<String, dynamic> backendUpdateResult = await dataController.updateUserAvatar(newCloudinaryAvatarUrl);
 
-        if (Get.isSnackbarOpen) {
-          Get.closeCurrentSnackbar();
-        }
+        if (Get.isSnackbarOpen) Get.closeCurrentSnackbar();
 
         if (backendUpdateResult['success'] == true) {
           Get.snackbar(
             'Avatar Updated!',
             backendUpdateResult['message'] ?? 'Your avatar has been successfully updated.',
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: Colors.green,
-            colorText: Colors.white,
+            snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green, colorText: Colors.white,
           );
         } else {
-          print('Backend failed to update avatar: ${backendUpdateResult['message']}');
           Get.snackbar(
             'Profile Update Failed',
             backendUpdateResult['message'] ?? 'Could not save your new avatar to your profile.',
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: Colors.red,
-            colorText: Colors.white,
+            snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white,
           );
         }
       } else {
         String errorMessage = cloudinaryUploadResults.isNotEmpty ? cloudinaryUploadResults[0]['message'] : 'Unknown Cloudinary upload error.';
-        print('Cloudinary avatar upload failed: $errorMessage');
         Get.snackbar(
           'Cloud Upload Failed',
           'Could not upload new avatar to cloud: $errorMessage',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
+          snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white,
         );
       }
     } catch (e) {
-      if (Get.isSnackbarOpen) {
-        Get.closeCurrentSnackbar();
-      }
-      print('Error during avatar upload process: ${e.toString()}');
+      if (Get.isSnackbarOpen) Get.closeCurrentSnackbar();
       Get.snackbar(
         'Upload Error',
         'An unexpected error occurred during the avatar update process: ${e.toString()}',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
+        snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white,
       );
+    }
+  }
+
+  Future<void> _launchURL(String urlString) async {
+    final Uri url = Uri.parse(urlString);
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      Get.snackbar('Error', 'Could not launch $urlString', snackPosition: SnackPosition.BOTTOM);
     }
   }
 
@@ -280,213 +262,251 @@ class AppDrawer extends StatelessWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.all(Radius.circular(0)),
       ),
-      backgroundColor: const Color(0xFF121212),
-      child: ListView(
-        padding: EdgeInsets.zero,
-        children: <Widget>[
-          Obx(() {
-            final userMap = dataController.user.value;
-            final String? avatarUrl = userMap['user']['avatar'];
-            final String username = userMap['user']['name'] ?? 'User';
-            final String avatarInitial = username.isNotEmpty ? username[0].toUpperCase() : '?';
+      backgroundColor: const Color(0xFF121212), // Twitter dark theme background
+      child: Column(
+        children: [
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: <Widget>[
+                Obx(() {
+                  final userMap = dataController.user.value;
+                  final String? avatarUrl = userMap['user']?['avatar'];
+                  final String username = userMap['user']?['name'] ?? 'User';
+                  final String handle = userMap['user']?['username'] ?? 'username'; // Assuming 'username' field for handle
+                  final String aboutMe = userMap['user']?['about'] as String? ?? '';
+                  // Dummy data for followers/following - replace with actual data from DataController
+                  final int followersCount = userMap['user']?['followersCount'] ?? 0;
+                  final int followingCount = userMap['user']?['followingCount'] ?? 0;
+                  final String avatarInitial = username.isNotEmpty ? username[0].toUpperCase() : '?';
 
-            return DrawerHeader(
-              decoration: BoxDecoration(
-                color: Colors.teal[700],
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      CircleAvatar(
-                        radius: 36,
-                        backgroundColor: Colors.tealAccent.withOpacity(0.3),
-                        backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
-                            ? CachedNetworkImageProvider(
-                                avatarUrl,
-                                maxWidth: 150, // Optimize memory for drawer avatar
-                                maxHeight: 150,
-                              )
-                            : null,
-                        child: (avatarUrl == null || avatarUrl.isEmpty)
-                            ? Text(
-                                avatarInitial,
-                                style: GoogleFonts.poppins(
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.tealAccent,
+                  return Container(
+                    padding: const EdgeInsets.only(top: 40.0, left: 16.0, right: 16.0, bottom: 16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Stack(
+                              children: [
+                                CircleAvatar(
+                                  radius: 28, // Slightly smaller avatar
+                                  backgroundColor: Colors.tealAccent.withOpacity(0.3),
+                                  backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
+                                      ? CachedNetworkImageProvider(
+                                          avatarUrl,
+                                          maxWidth: 120,
+                                          maxHeight: 120,
+                                        )
+                                      : null,
+                                  child: (avatarUrl == null || avatarUrl.isEmpty)
+                                      ? Text(
+                                          avatarInitial,
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.tealAccent,
+                                          ),
+                                        )
+                                      : null,
                                 ),
-                              )
-                            : null,
-                      ),
-                      Positioned(
-                        right: 0,
-                        bottom: 0,
-                        child: Material(
-                          color: Colors.tealAccent,
-                          shape: const CircleBorder(),
-                          elevation: 2.0,
-                          child: InkWell(
-                            onTap: () {
-                              _showImageSourceActionSheet(context);
-                            },
-                            customBorder: const CircleBorder(),
-                            child: const Padding(
-                              padding: EdgeInsets.all(6.0),
-                              child: Icon(
-                                FeatherIcons.edit2,
-                                size: 16.0,
-                                color: Colors.black,
-                              ),
+                                Positioned(
+                                  right: -2,
+                                  bottom: -2,
+                                  child: Material(
+                                    color: Colors.tealAccent,
+                                    shape: const CircleBorder(),
+                                    elevation: 1.0,
+                                    child: InkWell(
+                                      onTap: () {
+                                        _showImageSourceActionSheet(context);
+                                      },
+                                      customBorder: const CircleBorder(),
+                                      child: const Padding(
+                                        padding: EdgeInsets.all(5.0),
+                                        child: Icon(
+                                          FeatherIcons.edit2,
+                                          size: 14.0,
+                                          color: Colors.black,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
+                             // Removed the edit icon for about me from here
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          username,
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 19,
+                            color: Colors.white,
                           ),
                         ),
+                        Text(
+                          "@$handle",
+                          style: GoogleFonts.roboto(
+                            fontSize: 14,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Text('$followingCount', style: GoogleFonts.roboto(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14)),
+                            const SizedBox(width: 4),
+                            Text('Following', style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 14)),
+                            const SizedBox(width: 16),
+                            Text('$followersCount', style: GoogleFonts.roboto(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14)),
+                            const SizedBox(width: 4),
+                            Text('Followers', style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 14)),
+                          ],
+                        ),
+                        if (aboutMe.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                           Row(
+                             crossAxisAlignment: CrossAxisAlignment.start,
+                             children: [
+                               Expanded(
+                                 child: Text(
+                                  aboutMe,
+                                  style: GoogleFonts.roboto(
+                                    fontSize: 14,
+                                    color: Colors.grey[300],
+                                    height: 1.4,
+                                  ),
+                                  maxLines: 3,
+                                  overflow: TextOverflow.ellipsis,
+                                                               ),
+                               ),
+                               IconButton(
+                                icon: Icon(FeatherIcons.edit3, color: Colors.grey[400], size: 18),
+                                onPressed: () => _showEditAboutDialog(context),
+                                tooltip: 'Edit About Info',
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                              ),
+                             ],
+                           ),
+                        ] else ...[
+                            const SizedBox(height: 12),
+                             Row(
+                               children: [
+                                 Text(
+                                    'No about information yet.',
+                                    style: GoogleFonts.roboto(fontSize: 14, color: Colors.grey[500], fontStyle: FontStyle.italic),
+                                  ),
+                                  IconButton(
+                                    icon: Icon(FeatherIcons.edit3, color: Colors.grey[400], size: 18),
+                                    onPressed: () => _showEditAboutDialog(context),
+                                    tooltip: 'Edit About Info',
+                                     padding: EdgeInsets.zero,
+                                     constraints: const BoxConstraints(),
+                                  ),
+                               ],
+                             ),
+                        ],
+                      ],
+                    ),
+                  );
+                }),
+                ListTile(
+                  leading: Icon(FeatherIcons.rss, color: Colors.grey[300]),
+                  title: Text('My Feeds', style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16)),
+                  onTap: () {
+                    Get.back();
+                    if (Get.currentRoute != '/HomeFeedScreen') {
+                      Get.offAll(() => const HomeFeedScreen());
+                    }
+                  },
+                ),
+                ListTile(
+                  leading: Icon(FeatherIcons.users, color: Colors.grey[300]),
+                  title: Text('Browse Users', style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16)),
+                  onTap: () {
+                    Get.back();
+                    Get.to(() => const UsersListPage());
+                  },
+                ),
+                // ListTile for Direct Messages removed
+                ListTile(
+                  leading: Icon(FeatherIcons.gitMerge, color: Colors.grey[300]),
+                  title: Text('Network', style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16)),
+                  onTap: () {
+                    Get.back();
+                    Get.to(() => const FollowersPage()); // Assuming this page handles both followers and following
+                  },
+                ),
+                const Divider(color: Color(0xFF303030)),
+                ListTile(
+                  leading: Icon(FeatherIcons.coffee, color: Colors.grey[300]),
+                  title: Text('Buy Me a Coffee', style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16)),
+                  onTap: () {
+                    Get.back();
+                    Get.toNamed('/buy-me-a-coffee');
+                  },
+                ),
+                // Edit About Info ListTile removed
+                // Settings ListTile removed
+                ListTile(
+                  leading: Icon(FeatherIcons.logOut, color: Colors.grey[300]),
+                  title: Text('Logout', style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16)),
+                  onTap: () async {
+                    Get.back();
+                    bool? confirmLogout = await Get.dialog<bool>(
+                      AlertDialog(
+                        backgroundColor: const Color(0xFF1F1F1F),
+                        title: Text('Confirm Logout', style: GoogleFonts.poppins(color: Colors.white)),
+                        content: Text('Are you sure you want to log out?', style: GoogleFonts.roboto(color: Colors.grey[300])),
+                        actions: <Widget>[
+                          TextButton(
+                            child: Text('Cancel', style: GoogleFonts.roboto(color: Colors.grey[400])),
+                            onPressed: () => Get.back(result: false),
+                          ),
+                          TextButton(
+                            child: Text('Logout', style: GoogleFonts.roboto(color: Colors.redAccent)),
+                            onPressed: () => Get.back(result: true),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    username,
-                    style: GoogleFonts.poppins(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 18,
-                      color: Colors.white,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  Text(
-                    "@$username",
-                    style: GoogleFonts.roboto(
-                      fontSize: 14,
-                      color: Colors.grey[300],
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            );
-          }),
-          ListTile(
-            leading: Icon(FeatherIcons.rss, color: Colors.grey[300]),
-            title: Text(
-              'My Feeds',
-              style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16),
-            ),
-            onTap: () {
-              Get.back();
-              if (Get.currentRoute != '/HomeFeedScreen') {
-                Get.offAll(() => const HomeFeedScreen());
-              }
-            },
-          ),
-          ListTile(
-            leading: Icon(FeatherIcons.users, color: Colors.grey[300]),
-            title: Text(
-              'Browse Users',
-              style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16),
-            ),
-            onTap: () {
-              Get.back();
-              Get.to(() => const UsersListPage());
-            },
-          ),
-          ListTile(
-            leading: Icon(FeatherIcons.messageSquare, color: Colors.grey[300]),
-            title: Text(
-              'Direct Messages',
-              style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16),
-            ),
-            onTap: () {
-              Get.back();
-              Get.to(() => const DirectMessagesPage());
-            },
-          ),
-          ListTile(
-            leading: Icon(FeatherIcons.gitMerge, color: Colors.grey[300]),
-            title: Text(
-              'Network',
-              style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16),
-            ),
-            onTap: () {
-              Get.back();
-              Get.to(() => const FollowersPage());
-            },
-          ),
-          const Divider(color: Color(0xFF303030)),
-          ListTile(
-            leading: Icon(FeatherIcons.coffee, color: Colors.grey[300]), // Changed icon for Buy Me a Coffee
-            title: Text(
-              'Buy Me a Coffee', // Changed text for Buy Me a Coffee
-              style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16),
-            ),
-            onTap: () {
-              Get.back(); // Close drawer first
-              Get.toNamed('/buy-me-a-coffee'); // Navigate to Buy Me a Coffee page
-            },
-          ),
-          ListTile(
-            leading: Icon(FeatherIcons.edit3, color: Colors.grey[300]), // Changed icon
-            title: Text(
-              'Edit About Info', // Changed text
-              style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16),
-            ),
-            onTap: () {
-              Get.back(); // Close drawer first
-              _showEditAboutDialog(context); // Show the dialog
-            },
-          ),
-          ListTile(
-            leading: Icon(FeatherIcons.settings, color: Colors.grey[300]),
-            title: Text(
-              'Settings',
-              style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16),
-            ),
-            onTap: () {
-              Get.back();
-              Get.snackbar('Coming Soon!', 'Settings page is under development.',
-                  snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.amber[700], colorText: Colors.black);
-            },
-          ),
-          ListTile(
-            leading: Icon(FeatherIcons.logOut, color: Colors.grey[300]),
-            title: Text(
-              'Logout',
-              style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16),
-            ),
-            onTap: () async {
-              Get.back();
+                      barrierDismissible: false,
+                    );
 
-              bool? confirmLogout = await Get.dialog<bool>(
-                AlertDialog(
-                  backgroundColor: const Color(0xFF1F1F1F),
-                  title: Text('Confirm Logout', style: GoogleFonts.poppins(color: Colors.white)),
-                  content: Text('Are you sure you want to log out?', style: GoogleFonts.roboto(color: Colors.grey[300])),
-                  actions: <Widget>[
-                    TextButton(
-                      child: Text('Cancel', style: GoogleFonts.roboto(color: Colors.grey[400])),
-                      onPressed: () {
-                        Get.back(result: false);
-                      },
+                    if (confirmLogout == true) {
+                      await dataController.logoutUser();
+                      Get.offAll(() => const LoginPage());
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+          const Divider(color: Color(0xFF303030), height: 1),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
+            child: InkWell(
+              onTap: () => _launchURL('https://codethelabs.com/#downloads'),
+              child: RichText(
+                textAlign: TextAlign.center,
+                text: TextSpan(
+                  style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 13),
+                  children: <TextSpan>[
+                    const TextSpan(text: 'To update to the latest version of the app, '),
+                    TextSpan(
+                      text: 'click here',
+                      style: TextStyle(color: Colors.tealAccent[100], decoration: TextDecoration.underline),
                     ),
-                    TextButton(
-                      child: Text('Logout', style: GoogleFonts.roboto(color: Colors.redAccent)),
-                      onPressed: () {
-                        Get.back(result: true);
-                      },
-                    ),
+                    const TextSpan(text: '.'),
                   ],
                 ),
-                barrierDismissible: false,
-              );
-
-              if (confirmLogout == true) {
-                final DataController dataController = Get.find<DataController>();
-                await dataController.logoutUser();
-                Get.offAll(() => const LoginPage());
-              }
-            },
+              ),
+            ),
           ),
         ],
       ),
