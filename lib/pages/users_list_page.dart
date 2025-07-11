@@ -67,11 +67,11 @@ class _UsersListPageState extends State<UsersListPage> {
          if (userIndex != -1) {
            var userToUpdate = Map<String, dynamic>.from(_dataController.allUsers[userIndex]);
            userToUpdate['isFollowingCurrentUser'] = !currentFollowStatus;
+           // Assigning to an index of an RxList will automatically trigger updates
+           // for Obx widgets listening to this list. Explicit .refresh() is often
+           // unnecessary here and can sometimes cause issues if called mid-build.
            _dataController.allUsers[userIndex] = userToUpdate;
-           // No need to call _dataController.allUsers.refresh() if individual item assignment triggers Obx.
-           // However, if the list itself needs to signal a change for Obx, then refresh() is needed.
-           // For safety, especially with nested changes, a refresh can be good.
-           _dataController.allUsers.refresh();
+           // _dataController.allUsers.refresh(); // Removed this line
          }
 
       } else if (mounted) {

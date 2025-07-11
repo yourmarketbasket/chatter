@@ -1802,113 +1802,185 @@ class DataController extends GetxController {
     }
   }
 
-  Future<Map<String, dynamic>> followUser(String userIdToFollow) async {
-    final String? token = user.value['token'];
-    final String? currentUserId = user.value['user']?['_id'];
-
-    if (token == null || currentUserId == null) {
-      return {'success': false, 'message': 'User not authenticated.'};
+// Helper to update a user's follow status and counts in a list
+void _updateUserInList(RxList<Map<String, dynamic>> list, String userId, {bool? isFollowing, int? followersDelta, int? followingDelta}) {
+  int index = list.indexWhere((u) => u['_id'] == userId);
+  if (index != -1) {
+    var userToUpdate = Map<String, dynamic>.from(list[index]);
+    if (isFollowing != null) {
+      userToUpdate['isFollowingCurrentUser'] = isFollowing;
     }
-
-    try {
-      final response = await _dio.post(
-        '/api/users/follow-user', // As per plan, backend needs this route
-        data: {
-          'thisUserId': currentUserId, // The user performing the action
-          'UserToFollowId': userIdToFollow // The user to be followed
-        },
-        options: dio.Options(
-          headers: {'Authorization': 'Bearer $token'},
-        ),
-      );
-
-      if (response.statusCode == 200 && response.data['success'] == true) {
-        // Update local state
-        if (user.value['user'] is Map) {
-          var userDetail = Map<String, dynamic>.from(user.value['user']);
-          var followingList = List<String>.from((userDetail['following'] as List<dynamic>? ?? []).map((e) => e.toString()));
-          if (!followingList.contains(userIdToFollow)) {
-            followingList.add(userIdToFollow);
-          }
-          userDetail['following'] = followingList;
-
-          var mainUserMap = Map<String, dynamic>.from(user.value);
-          mainUserMap['user'] = userDetail;
-          user.value = mainUserMap;
-          await _storage.write(key: 'user', value: jsonEncode(user.value));
-          user.refresh(); // Notify listeners of the nested change
-          print('[DataController] User $currentUserId now following $userIdToFollow. Local state updated.');
-        }
-        return {'success': true, 'message': response.data['message'] ?? 'Successfully followed user.'};
-      } else {
-        return {'success': false, 'message': response.data['message'] ?? 'Failed to follow user.'};
-      }
-    } catch (e) {
-      print('[DataController] Error following user $userIdToFollow: $e');
-      String errorMessage = 'An error occurred while trying to follow.';
-      if (e is dio.DioException && e.response?.data != null && e.response!.data['message'] != null) {
-        errorMessage = e.response!.data['message'];
-      } else if (e is dio.DioException) {
-        errorMessage = e.message ?? errorMessage;
-      }
-      return {'success': false, 'message': errorMessage};
+    if (followersDelta != null) {
+      userToUpdate['followersCount'] = (userToUpdate['followersCount'] ?? 0) + followersDelta;
     }
+    if (followingDelta != null) {
+      userToUpdate['followingCount'] = (userToUpdate['followingCount'] ?? 0) + followingDelta;
+    }
+    list[index] = userToUpdate; // This should trigger Obx if the list item itself is observed or list is part of Obx
+  }
+}
+
+Future<Map<String, dynamic>> followUser(String userIdToFollow) async {
+  final String? token = user.value['token'];
+  final String? currentUserId = user.value['user']?['_id'];
+
+  if (token == null || currentUserId == null) {
+    return {'success': false, 'message': 'User not authenticated.'};
+  }
+  if (currentUserId == userIdToFollow) {
+    return {'success': false, 'message': 'Cannot follow yourself.'};
   }
 
-  Future<Map<String, dynamic>> unfollowUser(String userIdToUnfollow) async {
-    final String? token = user.value['token'];
-    final String? currentUserId = user.value['user']?['_id'];
+  try {
+    final response = await _dio.post(
+      '/api/users/follow-user',
+      data: {
+        'thisUserId': currentUserId,
+        'UserToFollowId': userIdToFollow
+      },
+      options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
+    );
 
-    if (token == null || currentUserId == null) {
-      return {'success': false, 'message': 'User not authenticated.'};
-    }
-
-    try {
-      final response = await _dio.post(
-        '/api/users/unfollow-user', // As per plan, backend needs this route
-        data: {
-          'thisUserId': currentUserId, // The user performing the action
-          'UserToUnfollowId': userIdToUnfollow // The user to be unfollowed
-        },
-        options: dio.Options(
-          headers: {'Authorization': 'Bearer $token'},
-        ),
-      );
-
-      if (response.statusCode == 200 && response.data['success'] == true) {
-        // Update local state
-        if (user.value['user'] is Map) {
-          var userDetail = Map<String, dynamic>.from(user.value['user']);
-          var followingList = List<String>.from((userDetail['following'] as List<dynamic>? ?? []).map((e) => e.toString()));
-          if (followingList.contains(userIdToUnfollow)) {
-            followingList.remove(userIdToUnfollow);
-          }
-          userDetail['following'] = followingList;
-
-          var mainUserMap = Map<String, dynamic>.from(user.value);
-          mainUserMap['user'] = userDetail;
-          user.value = mainUserMap;
-          await _storage.write(key: 'user', value: jsonEncode(user.value));
-          user.refresh(); // Notify listeners of the nested change
-          print('[DataController] User $currentUserId now unfollowed $userIdToUnfollow. Local state updated.');
+    if (response.statusCode == 200 && response.data['success'] == true) {
+      // 1. Update current user's main data (user.value)
+      if (user.value['user'] is Map) {
+        var userDetail = Map<String, dynamic>.from(user.value['user']);
+        var localFollowingList = List<String>.from((userDetail['following'] as List<dynamic>? ?? []).map((e) => e.toString()));
+        if (!localFollowingList.contains(userIdToFollow)) {
+          localFollowingList.add(userIdToFollow);
         }
-        return {'success': true, 'message': response.data['message'] ?? 'Successfully unfollowed user.'};
+        userDetail['following'] = localFollowingList;
+        // If 'followingCount' is a direct field on user.user, update it here.
+        // userDetail['followingCount'] = localFollowingList.length;
+
+        var mainUserMap = Map<String, dynamic>.from(user.value);
+        mainUserMap['user'] = userDetail;
+        user.value = mainUserMap; // This triggers Obx for AppDrawer
+        await _storage.write(key: 'user', value: jsonEncode(user.value));
+      }
+
+      // 2. Update target user in allUsers list
+      _updateUserInList(allUsers, userIdToFollow, isFollowing: true, followersDelta: 1);
+      // Update current user in allUsers list (their followingCount)
+      _updateUserInList(allUsers, currentUserId, followingDelta: 1);
+      // allUsers.refresh(); // Not usually needed if item assignment works for Obx
+
+      // 3. Update current user's 'following' list (for Network Page / FollowersPage)
+      //    This optimistically adds the followed user to the local 'following' RxList.
+      var userFromAllUsers = allUsers.firstWhereOrNull((u) => u['_id'] == userIdToFollow);
+      if (userFromAllUsers != null) {
+        int targetInFollowingListIdx = following.indexWhere((u) => u['_id'] == userIdToFollow);
+        if (targetInFollowingListIdx == -1) { // If not already in the list
+          var newFollowingEntry = Map<String, dynamic>.from(userFromAllUsers);
+          // Ensure 'isFollowingCurrentUser' is true from the perspective of the current user
+          newFollowingEntry['isFollowingCurrentUser'] = true;
+          following.add(newFollowingEntry);
+        } else { // If already in list (e.g. due to quick succession of follow/unfollow), ensure state is correct
+            var userToUpdate = Map<String, dynamic>.from(following[targetInFollowingListIdx]);
+            userToUpdate['isFollowingCurrentUser'] = true;
+            // Update counts if backend provides them, or use optimistic ones from _updateUserInList on allUsers
+            userToUpdate['followersCount'] = userFromAllUsers['followersCount'];
+            following[targetInFollowingListIdx] = userToUpdate;
+        }
       } else {
-        return {'success': false, 'message': response.data['message'] ?? 'Failed to unfollow user.'};
+        // Fallback: If user data isn't in allUsers, and if FollowersPage is active for current user, refresh its 'following' tab.
+        // This situation should be rare if allUsers is comprehensive.
+        if (Get.currentRoute == '/FollowersPage') { // Check if FollowersPage is current route
+             final FollowersPage? currentPageWidget = Get.isRegistered<FollowersPage>() ? Get.find<FollowersPage>() : null;
+             final bool isViewingOwnNetwork = currentPageWidget?.viewUserId == null || currentPageWidget?.viewUserId == currentUserId;
+             if(isViewingOwnNetwork) {
+                fetchFollowing(currentUserId); // Re-fetch the 'following' list for the current user
+             }
+        }
       }
-    } catch (e) {
-      print('[DataController] Error unfollowing user $userIdToUnfollow: $e');
-      String errorMessage = 'An error occurred while trying to unfollow.';
-      if (e is dio.DioException && e.response?.data != null && e.response!.data['message'] != null) {
-        errorMessage = e.response!.data['message'];
-      } else if (e is dio.DioException) {
-        errorMessage = e.message ?? errorMessage;
-      }
-      return {'success': false, 'message': errorMessage};
+
+      // If the `followers` list is for `userIdToFollow` (i.e., viewing their profile's followers tab),
+      // then `currentUserId` should be added to it. This is complex to manage centrally.
+      // Better to have ProfilePage/FollowersPage refresh its specific view if needed.
+
+      print('[DataController] User $currentUserId successfully followed $userIdToFollow.');
+      return {'success': true, 'message': response.data['message'] ?? 'Successfully followed user.'};
+    } else {
+      return {'success': false, 'message': response.data['message'] ?? 'Failed to follow user.'};
     }
+  } catch (e) {
+    print('[DataController] Error following user $userIdToFollow: $e');
+    String errorMessage = 'An error occurred while trying to follow.';
+    if (e is dio.DioException && e.response?.data != null && e.response!.data['message'] != null) {
+      errorMessage = e.response!.data['message'];
+    } else if (e is dio.DioException) {
+      errorMessage = e.message ?? errorMessage;
+    }
+    return {'success': false, 'message': errorMessage};
+  }
+}
+
+Future<Map<String, dynamic>> unfollowUser(String userIdToUnfollow) async {
+  final String? token = user.value['token'];
+  final String? currentUserId = user.value['user']?['_id'];
+
+  if (token == null || currentUserId == null) {
+    return {'success': false, 'message': 'User not authenticated.'};
+  }
+   if (currentUserId == userIdToUnfollow) {
+    return {'success': false, 'message': 'Cannot unfollow yourself.'};
   }
 
-  void clearUserPosts() {
+  try {
+    final response = await _dio.post(
+      '/api/users/unfollow-user',
+      data: {
+        'thisUserId': currentUserId,
+        'UserToUnfollowId': userIdToUnfollow
+      },
+      options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
+    );
+
+    if (response.statusCode == 200 && response.data['success'] == true) {
+      // 1. Update current user's main data (user.value)
+      if (user.value['user'] is Map) {
+        var userDetail = Map<String, dynamic>.from(user.value['user']);
+        var localFollowingList = List<String>.from((userDetail['following'] as List<dynamic>? ?? []).map((e) => e.toString()));
+        if (localFollowingList.contains(userIdToUnfollow)) {
+          localFollowingList.remove(userIdToUnfollow);
+        }
+        userDetail['following'] = localFollowingList;
+        // userDetail['followingCount'] = localFollowingList.length;
+
+        var mainUserMap = Map<String, dynamic>.from(user.value);
+        mainUserMap['user'] = userDetail;
+        user.value = mainUserMap;
+        await _storage.write(key: 'user', value: jsonEncode(user.value));
+      }
+
+      // 2. Update target user in allUsers list
+      _updateUserInList(allUsers, userIdToUnfollow, isFollowing: false, followersDelta: -1);
+      // Update current user in allUsers list (their followingCount)
+      _updateUserInList(allUsers, currentUserId, followingDelta: -1);
+      // allUsers.refresh();
+
+      // 3. Update current user's 'following' list (for Network Page / FollowersPage)
+      //    Remove userIdToUnfollow from _dataController.following if present
+      following.removeWhere((u) => u['_id'] == userIdToUnfollow);
+
+      print('[DataController] User $currentUserId successfully unfollowed $userIdToUnfollow.');
+      return {'success': true, 'message': response.data['message'] ?? 'Successfully unfollowed user.'};
+    } else {
+      return {'success': false, 'message': response.data['message'] ?? 'Failed to unfollow user.'};
+    }
+  } catch (e) {
+    print('[DataController] Error unfollowing user $userIdToUnfollow: $e');
+    String errorMessage = 'An error occurred while trying to unfollow.';
+    if (e is dio.DioException && e.response?.data != null && e.response!.data['message'] != null) {
+      errorMessage = e.response!.data['message'];
+    } else if (e is dio.DioException) {
+      errorMessage = e.message ?? errorMessage;
+    }
+    return {'success': false, 'message': errorMessage};
+  }
+}
+
+void clearUserPosts() {
     userPosts.clear();
     // isLoadingUserPosts.value = false; // Optionally reset loading state too
   }
