@@ -82,16 +82,24 @@ class DataController extends GetxController {
     String? userJson = await _storage.read(key: 'user');
     if (userJson != null) {
       user.value = jsonDecode(userJson);
+      final String? currentUserId = user.value['user']?['_id'];
+      if (currentUserId != null && currentUserId.isNotEmpty) {
+        print('[DataController.init] User loaded from storage. Fetching initial network data for $currentUserId');
+        fetchFollowers(currentUserId).catchError((e) => print('Error fetching followers in init: $e'));
+        fetchFollowing(currentUserId).catchError((e) => print('Error fetching following in init: $e'));
+      }
     }
     // fetch initial feeds
     try {
-      await fetchFeeds();
+      // Only fetch feeds if user is actually logged in (token exists)
+      if (user.value['token'] != null) {
+        await fetchFeeds();
+      }
     } catch (e) {
       print('Error fetching initial feeds: $e');
       posts.clear(); // Clear posts on error
     }
-    // Fetch all users (placeholder)
-    // We will call this from UsersListPage for now to avoid startup delays
+    // Fetch all users (placeholder) - This is typically called on demand by UsersListPage
     // fetchAllUsers();
   }
 
@@ -857,13 +865,20 @@ class DataController extends GetxController {
           // Now, fetch feeds
           try {
             print('[DataController] Login successful. Fetching initial feeds...');
-            await fetchFeeds();
+            await fetchFeeds(); // Fetches main content feed
             print('[DataController] Initial feeds fetched successfully after login.');
+
+            // Fetch user's network data (followers/following) for AppDrawer and Network page
+            final String? currentUserId = user.value['user']?['_id'];
+            if (currentUserId != null && currentUserId.isNotEmpty) {
+              print('[DataController.loginUser] Fetching initial network data for $currentUserId');
+              fetchFollowers(currentUserId).catchError((e) => print('Error fetching followers post-login: $e'));
+              fetchFollowing(currentUserId).catchError((e) => print('Error fetching following post-login: $e'));
+            }
+
           } catch (feedError) {
-            print('[DataController] Error fetching feeds immediately after login: ${feedError.toString()}. Login itself is still considered successful. Feeds can be fetched later.');
-            // Optionally, you could set a flag here to indicate feeds failed to load,
-            // so HomeFeedScreen could show a specific message or retry option.
-            // For now, HomeFeedScreen will show its default empty/loading state for posts.
+            print('[DataController] Error fetching feeds/network data immediately after login: ${feedError.toString()}. Login itself is still considered successful.');
+            // Optionally, you could set a flag here to indicate feeds/network failed to load.
           }
 
           return {'success': true, 'message': 'User logged in successfully'};
@@ -1863,7 +1878,13 @@ Future<Map<String, dynamic>> followUser(String userIdToFollow) async {
       _updateUserInList(allUsers, userIdToFollow, isFollowing: true, followersDelta: 1);
       // Update current user in allUsers list (their followingCount)
       _updateUserInList(allUsers, currentUserId, followingDelta: 1);
-      // allUsers.refresh(); // Not usually needed if item assignment works for Obx
+
+      // Update the status of userIdToFollow if they exist in the current user's loaded followers list
+      _updateUserInList(followers, userIdToFollow, isFollowing: true, followersDelta: 1);
+      // Ensure if userIdToFollow was already in the 'following' list for some reason, its state is also updated.
+      // The main add logic below handles adding it if it's not there.
+      _updateUserInList(following, userIdToFollow, isFollowing: true, followersDelta: 1);
+
 
       // 3. Update current user's 'following' list (for Network Page / FollowersPage)
       //    This optimistically adds the followed user to the local 'following' RxList.
@@ -1882,17 +1903,12 @@ Future<Map<String, dynamic>> followUser(String userIdToFollow) async {
             userToUpdate['followersCount'] = userFromAllUsers['followersCount'];
             following[targetInFollowingListIdx] = userToUpdate;
         }
-      } else {
-        // Fallback: If user data isn't in allUsers, and if FollowersPage is active for current user, refresh its 'following' tab.
-        // This situation should be rare if allUsers is comprehensive.
-        if (Get.currentRoute == '/FollowersPage') { // Check if FollowersPage is current route
-             final FollowersPage? currentPageWidget = Get.isRegistered<FollowersPage>() ? Get.find<FollowersPage>() : null;
-             final bool isViewingOwnNetwork = currentPageWidget?.viewUserId == null || currentPageWidget?.viewUserId == currentUserId;
-             if(isViewingOwnNetwork) {
-                fetchFollowing(currentUserId); // Re-fetch the 'following' list for the current user
-             }
-        }
       }
+      // else {
+      // Fallback logic removed for now to prevent type error with FollowersPage.
+      // If FollowersPage is active for the current user and needs immediate refresh
+      // after a follow action, it should handle its own refresh, or listen to a more specific event.
+      // }
 
       // If the `followers` list is for `userIdToFollow` (i.e., viewing their profile's followers tab),
       // then `currentUserId` should be added to it. This is complex to manage centrally.
@@ -1957,7 +1973,11 @@ Future<Map<String, dynamic>> unfollowUser(String userIdToUnfollow) async {
       _updateUserInList(allUsers, userIdToUnfollow, isFollowing: false, followersDelta: -1);
       // Update current user in allUsers list (their followingCount)
       _updateUserInList(allUsers, currentUserId, followingDelta: -1);
-      // allUsers.refresh();
+
+      // Update the status of userIdToUnfollow if they exist in the current user's loaded followers list
+      _updateUserInList(followers, userIdToUnfollow, isFollowing: false, followersDelta: -1);
+      // No need to call _updateUserInList for 'following' list with userIdToUnfollow,
+      // as it's explicitly removed below.
 
       // 3. Update current user's 'following' list (for Network Page / FollowersPage)
       //    Remove userIdToUnfollow from _dataController.following if present

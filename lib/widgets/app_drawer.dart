@@ -273,12 +273,14 @@ class AppDrawer extends StatelessWidget {
                   final userMap = dataController.user.value;
                   final String? avatarUrl = userMap['user']?['avatar'];
                   final String username = userMap['user']?['name'] ?? 'User';
-                  final String handle = userMap['user']?['name'] ?? 'username';
+                  final String handle = userMap['user']?['name'] ?? 'username'; // Should likely be userMap['user']?['username']
                   final String aboutMe = userMap['user']?['about'] as String? ?? '';
-                  final int followersCount = userMap['user']?['followers'].length ?? 0;
-                  final int followingCount = userMap['user']?['following'].length ?? 0;
+                  // Use the DataController's dedicated RxLists for followers and following counts
+                  final int followersCount = dataController.followers.length;
+                  final int followingCount = dataController.following.length;
                   final String avatarInitial = username.isNotEmpty ? username[0].toUpperCase() : '?';
                   // print(userMap);
+                  // print("[AppDrawer] Followers: ${dataController.followers.length}, Following: ${dataController.following.length}");
 
                   return Container(
                     padding: const EdgeInsets.only(top: 50.0, left: 20.0, right: 20.0, bottom: 20.0),
