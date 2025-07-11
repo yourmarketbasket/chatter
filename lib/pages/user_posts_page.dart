@@ -176,13 +176,6 @@ class _UserPostsPageState extends State<UserPostsPage> {
   }
 
   Widget _buildPostItem(Map<String, dynamic> post) {
-    // Removed per-post author details as per user request, AppBar provides context.
-    // final String postUserAvatar = post['user']?['avatar'] ?? '';
-    // final String postUsername = post['user']?['username'] ?? 'Unknown';
-    // final String postUserDisplayName = post['user']?['name'] ?? 'User';
-    // final String createdAtString = post['createdAt']?.toString() ?? DateTime.now().toIso8601String();
-    // final DateTime createdAtDateTime = DateTime.tryParse(createdAtString) ?? DateTime.now();
-
     final String postContentText = post['content'] ?? '';
     final List<dynamic> attachments = post['attachments'] as List<dynamic>? ?? [];
     final String postId = post['_id'] ?? '';
@@ -204,109 +197,91 @@ class _UserPostsPageState extends State<UserPostsPage> {
         ));
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0), // Adjusted padding
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
         decoration: BoxDecoration(
           border: Border(bottom: BorderSide(color: Colors.grey[850]!, width: 0.5)),
         ),
-        child: Column( // Main content in a Column
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Per-post author/time row REMOVED
-            // if (postContentText.isNotEmpty) // Check for postContentText
-            //   Padding(
-            //     padding: const EdgeInsets.only(bottom: 8.0),
-            //     child: Text(postContentText, style: GoogleFonts.roboto(color: Colors.white, fontSize: 15, height: 1.4)),
-            //   ),
-
-            // Use PostContent for richer text rendering if available and desired
-            // If PostContent itself includes author details for depth 0, that might need adjustment in PostContent.
-            // For now, assuming PostContent at depth 0 is primarily for the text body.
+          children: <Widget>[ // Explicitly typed for clarity
+            // Main post content using PostContent widget
             if (postContentText.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(bottom: 8.0),
                 child: PostContent(
-                        postData: post,
-                        isReply: false,
-                        postDepth: 0,
-                        showSnackBar: _showPostContentSnackBar,
-                        onSharePost: _sharePostFromContent,
-                        onReplyToItem: _handleReplyToItem, // Or a more specific handler if needed
-                        refreshReplies: _handleRefreshReplies, // Or a more specific handler
-                        onReplyDataUpdated: _handleReplyDataUpdated, // Or a more specific handler
-                        // indentationLevel, isPreview, pageOriginalPostId, drawInternalVerticalLine can use defaults or be set if needed
-                        // For UserPostsPage, these are main posts, so isReply=false, postDepth=0.
-                        // Callbacks are stubbed or point to general handlers.
+                  postData: post,
+                  isReply: false,
+                  postDepth: 0,
+                  showSnackBar: _showPostContentSnackBar,
+                  onSharePost: _sharePostFromContent,
+                  onReplyToItem: _handleReplyToItem,
+                  refreshReplies: _handleRefreshReplies,
+                  onReplyDataUpdated: _handleReplyDataUpdated,
+                ),
+              ),
+
+            // Attachments display
+            if (attachments.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4.0, bottom: 8.0),
+                child: attachments.length == 1
+                    ? _buildAttachmentView(attachments.first as Map<String, dynamic>, post)
+                    : ReplyAttachmentGrid(
+                        attachmentsArg: List<Map<String, dynamic>>.from(attachments.map((a) => a as Map<String, dynamic>)),
+                        postOrReplyData: post,
                       ),
-                    ),
+              ),
 
-                  // Attachments display
-                  if (attachments.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8.0),
-                      child: attachments.length == 1
-                          ? _buildAttachmentView(attachments.first as Map<String, dynamic>, post)
-                          : ReplyAttachmentGrid(
-                              attachmentsArg: List<Map<String, dynamic>>.from(attachments.map((a) => a as Map<String, dynamic>)),
-                              postOrReplyData: post, // Pass the full post map here
-                            ),
-                    ),
-
-                  // Action buttons
-                  Padding(
-                    padding: const EdgeInsets.only(top: 10.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        StatButton(
-                          icon: FeatherIcons.messageCircle,
-                          text: repliesCount.toString(),
-                          onPressed: () => Get.to(() => ReplyPage(
-                            post: post,
-                            postDepth: 0, // This is a top-level post
-                            originalPostId: postId, // Pass the current post's ID as originalPostId
-                          )),
-                          color: Colors.grey[600]!,
-                        ),
-                        StatButton(
-                          icon: FeatherIcons.repeat,
-                          text: repostsCount.toString(),
-                          onPressed: () async {
-                            final result = await _dataController.repostPost(postId);
-                            if (mounted && result['success'] == false) {
-                                Get.snackbar('Error', result['message'] ?? 'Could not repost.', snackPosition: SnackPosition.BOTTOM);
-                            } else if (mounted && result['success'] == true) {
-                                Get.snackbar('Success', 'Reposted!', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green);
-                            }
-                          },
-                          color: Colors.grey[600]!,
-                        ),
-                        StatButton(
-                          icon: isLikedByCurrentUser ? Icons.favorite : FeatherIcons.heart, // Conditional icon
-                          text: likesCount.toString(),
-                          onPressed: () async {
-                            if (isLikedByCurrentUser) {
-                                await _dataController.unlikePost(postId);
-                            } else {
-                                await _dataController.likePost(postId);
-                            }
-                            // DataController's fetchSinglePost (called by like/unlike) should trigger
-                            // an update in the main 'posts' list. If UserPostsPage needs to reflect
-                            // this change immediately without a full page reload, the specific post
-                            // in '_dataController.userPosts' would need to be updated.
-                            // For now, relying on DataController's existing refresh mechanisms.
-                          },
-                          color: isLikedByCurrentUser ? Colors.pinkAccent : Colors.grey[600]!, // Conditional color
-                        ),
-                        StatButton(
-                          icon: FeatherIcons.barChart2, // Using bar chart for views as an example
-                          text: viewsCount.toString(),
-                          onPressed: () { /* Maybe do nothing on tap, or show who viewed */ },
-                          color: Colors.grey[600]!,
-                        ),
-                        // Share button (optional)
-                        // IconButton(icon: Icon(FeatherIcons.share, color: Colors.grey[600], size: 18), onPressed: () {})
-                      ],
-                    ),
+            // Action buttons (StatButtons)
+            Padding(
+              padding: const EdgeInsets.only(top: 10.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: <Widget>[ // Explicitly typed for clarity
+                  StatButton(
+                    icon: FeatherIcons.messageCircle,
+                    text: repliesCount.toString(),
+                    onPressed: () { // Simplified, no async needed if Get.to is not awaited
+                      Get.to(() => ReplyPage(
+                        post: post,
+                        postDepth: 0,
+                        originalPostId: postId,
+                      ));
+                    },
+                    color: Colors.grey[600]!,
+                  ),
+                  StatButton(
+                    icon: FeatherIcons.repeat,
+                    text: repostsCount.toString(),
+                    onPressed: () async {
+                      final result = await _dataController.repostPost(postId);
+                      if (!mounted) return; // Check mounted after await
+                      if (result['success'] == false) {
+                          Get.snackbar('Error', result['message'] ?? 'Could not repost.', snackPosition: SnackPosition.BOTTOM);
+                      } else if (result['success'] == true) {
+                          Get.snackbar('Success', 'Reposted!', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green);
+                      }
+                    },
+                    color: Colors.grey[600]!,
+                  ),
+                  StatButton(
+                    icon: isLikedByCurrentUser ? Icons.favorite : FeatherIcons.heart,
+                    text: likesCount.toString(),
+                    onPressed: () async {
+                      if (isLikedByCurrentUser) {
+                          await _dataController.unlikePost(postId);
+                      } else {
+                          await _dataController.likePost(postId);
+                      }
+                      // No explicit mounted check needed here if not updating local state after await
+                    },
+                    color: isLikedByCurrentUser ? Colors.pinkAccent : Colors.grey[600]!,
+                  ),
+                  StatButton(
+                    icon: FeatherIcons.barChart2,
+                    text: viewsCount.toString(),
+                    onPressed: () { /* No action */ },
+                    color: Colors.grey[600]!,
                   ),
                 ],
               ),
@@ -316,7 +291,6 @@ class _UserPostsPageState extends State<UserPostsPage> {
       ),
     );
   }
-
 
   @override
   Widget build(BuildContext context) {
