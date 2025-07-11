@@ -271,8 +271,8 @@ class _ReplyInputAreaState extends State<ReplyInputArea> {
   Widget build(BuildContext context) {
     final currentUserData = _dataController.user.value['user'] as Map<String, dynamic>?;
     final String? currentUserAvatar = currentUserData?['avatar'] as String?;
-    final String currentUserInitial = currentUserData?['username'] != null && (currentUserData!['username'] as String).isNotEmpty
-        ? (currentUserData['username'] as String)[0].toUpperCase()
+    final String currentUserInitial = currentUserData?['name'] != null && (currentUserData!['name'] as String).isNotEmpty
+        ? (currentUserData['name'] as String)[0].toUpperCase()
         : '?';
 
     String hintText = "Post your reply...";
