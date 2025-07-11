@@ -473,7 +473,7 @@ class AppDrawer extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
             child: InkWell(
-              onTap: () => _launchURL('https://codethelabs.com/#downloads'),
+              onTap: () => _launchURL('https://codethelabs.com/assets/files/chatter.apk'),
               child: RichText(
                 textAlign: TextAlign.center,
                 text: TextSpan(
