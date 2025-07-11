@@ -212,7 +212,7 @@ class DataController extends GetxController {
           postToUpdate['replies'] = topLevelReplies; // Assign the potentially modified list back
           posts[postIndex] = postToUpdate;
           posts.refresh();
-          print('[DataController] Reply $replyId in post $postId updated with data: $updateData.');
+          // print('[DataController] Reply $replyId in post $postId updated with data: $updateData.');
         } else {
           print('[DataController] handleReplyUpdate: Target reply $replyId not found in post $postId.');
           // Optionally, fetch the post as a fallback
@@ -597,13 +597,13 @@ class DataController extends GetxController {
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
-        print("[DataController] Raw replies data from API for post $postId: ${response.data}");
+        // print("[DataController] Raw replies data from API for post $postId: ${response.data}");
         final List<dynamic> repliesData = response.data['replies'];
         List<Map<String, dynamic>> processedReplies = [];
 
         for (var replyData in repliesData) {
           if (replyData == null || replyData is! Map<String,dynamic>) {
-            print("[DataController] Skipping invalid reply data item: $replyData");
+            // print("[DataController] Skipping invalid reply data item: $replyData");
             continue;
           }
           Map<String,dynamic> currentReply = Map<String,dynamic>.from(replyData);
@@ -651,7 +651,7 @@ class DataController extends GetxController {
             'userId': currentReply['userId']?.toString(),
           });
         }
-        print("[DataController] Processed replies for post $postId: $processedReplies");
+        // print("[DataController] Processed replies for post $postId: $processedReplies");
         return processedReplies;
       } else {
         print('[DataController] Error fetching replies for post $postId: ${response.statusCode} - ${response.data?['message']}');
@@ -680,7 +680,7 @@ class DataController extends GetxController {
     final String? newPostId = processedNewPost['_id'] as String?;
 
     if (newPostId == null) {
-      print("Warning: Adding a new post without an '_id'. Cannot check for duplicates by ID. Post data: $processedNewPost");
+      // print("Warning: Adding a new post without an '_id'. Cannot check for duplicates by ID. Post data: $processedNewPost");
       posts.insert(0, processedNewPost);
       return;
     }
@@ -1190,7 +1190,7 @@ class DataController extends GetxController {
 
         posts[postIndex] = postToUpdate;
         posts.refresh();
-        print('[DataController] Post $finalPostId updated from socket event. New data: $postToUpdate'); // Used finalPostId
+        // print('[DataController] Post $finalPostId updated from socket event. New data: $postToUpdate'); 
       } else {
         // This is a new post not seen before, or an update for a post not yet in the list.
         // This could happen if another user creates a post and this client receives the socket event.
@@ -1373,7 +1373,7 @@ class DataController extends GetxController {
       if (response.statusCode == 200 && response.data['success'] == true) {
         // Fetch the full root post to ensure data consistency for the entire thread
         await fetchSinglePost(postId); // postId here is the root post ID
-        print('[DataController] Like reply successful, root post $postId fetched: ${response.data}');
+        // print('[DataController] Like reply successful, root post $postId fetched: ${response.data}');
         return {
           'success': true,
           'message': response.data['message'] ?? 'Reply liked successfully',
@@ -1414,7 +1414,7 @@ class DataController extends GetxController {
       if (response.statusCode == 200 && response.data['success'] == true) {
         // Fetch the full root post to ensure data consistency for the entire thread
         await fetchSinglePost(postId); // postId here is the root post ID
-        print('[DataController] Unlike reply successful, root post $postId fetched: ${response.data}');
+        // print('[DataController] Unlike reply successful, root post $postId fetched: ${response.data}');
         return {
           'success': true,
           'message': response.data['message'] ?? 'Reply unliked successfully',
@@ -1456,7 +1456,7 @@ class DataController extends GetxController {
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
-        print('[DataController] View reply successful: ${response.data}');
+        // print('[DataController] View reply successful: ${response.data}');
         // Socket event 'replyViewed' or similar would ideally update counts if displayed.
         return {'success': true, 'message': response.data['message'] ?? 'Reply viewed successfully'};
       } else {
@@ -1492,7 +1492,7 @@ class DataController extends GetxController {
       if (response.statusCode == 200 && response.data['success'] == true) {
         // Fetch the full root post to ensure data consistency for the entire thread
         await fetchSinglePost(postId); // postId here is the root post ID
-        print('[DataController] Repost reply successful, root post $postId fetched: ${response.data}');
+        // print('[DataController] Repost reply successful, root post $postId fetched: ${response.data}');
         // If reposting a reply creates a new top-level post for the reposter,
         // that new post should arrive via a 'newPost' socket event or be handled by a subsequent feed refresh.
         // The primary goal here is to update the state of the original thread.
@@ -1534,13 +1534,13 @@ class DataController extends GetxController {
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
-        print("[DataController] Raw replies data from API for parent reply $parentReplyId: ${response.data}");
+        // print("[DataController] Raw replies data from API for parent reply $parentReplyId: ${response.data}");
         final List<dynamic> repliesData = response.data['replies'] ?? []; // Default to empty list if null
         List<Map<String, dynamic>> processedReplies = [];
 
         for (var replyData in repliesData) {
           if (replyData == null || replyData is! Map<String,dynamic>) {
-            print("[DataController] Skipping invalid reply data item for parent reply $parentReplyId: $replyData");
+            // print("[DataController] Skipping invalid reply data item for parent reply $parentReplyId: $replyData");
             continue;
           }
           Map<String,dynamic> currentReply = Map<String,dynamic>.from(replyData);
@@ -1601,7 +1601,7 @@ class DataController extends GetxController {
             // 'parentReplyId': parentReplyId, // The direct parent of these fetched replies
           });
         }
-        print("[DataController] Processed replies for parent reply $parentReplyId: $processedReplies");
+        // print("[DataController] Processed replies for parent reply $parentReplyId: $processedReplies");
         return processedReplies;
       } else {
         print('[DataController] Error fetching replies for parent reply $parentReplyId: ${response.statusCode} - ${response.data?['message']}');
