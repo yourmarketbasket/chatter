@@ -10,7 +10,7 @@ class BuyMeACoffeePage extends StatelessWidget {
   final String segwitNetworkInfo =
       'Supports deposits from all BTC addresses (Legacy, SegWit, Bech32, etc., starting with "1", "3", "bc1p" and "bc1q").';
   final String btcLegacyAddress = '1EXu3QeiySmF7HqT7363VvPJawh7oBU6yK';
-  final String legacyNetworkInfo = 'For use with wallets that only support legacy BTC addresses (starting with "1").';
+  final String legacyNetworkInfo = 'For use with wallets that only support legacy BTC addresses (starting with "1", "3", "bc1p" and "bc1q").';
 
 
   Widget _buildAddressSection(BuildContext context, String title, String address, String networkInfo, String heroTag) {
