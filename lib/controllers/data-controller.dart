@@ -110,7 +110,7 @@ class DataController extends GetxController {
       // The route is users/get-all-users, parameters: userid
       // Assuming userid is the current user's ID to contextualize follow status
       final response = await _dio.get(
-        'api/users/get-all-users/$currentUserId', // Appending currentUserId as per common REST practice for parameters in path
+        'api/users/get-all-users', // Appending currentUserId as per common REST practice for parameters in path
         options: dio.Options(
           headers: {
             'Authorization': 'Bearer $token',
@@ -138,7 +138,7 @@ class DataController extends GetxController {
               return {
                 '_id': userId,
                 'avatar': userData['avatar']?.toString() ?? '',
-                'username': userData['username']?.toString() ?? 'N/A',
+                'username': userData['name']?.toString(),
                 'name': userData['name']?.toString() ?? 'Unknown User', // Added name for consistency
                 'followersCount': userData['followersCount'] ?? 0,
                 'followingCount': userData['followingCount'] ?? 0,
@@ -1032,7 +1032,7 @@ class DataController extends GetxController {
               return {
                 '_id': followerId,
                 'avatar': followerData['avatar']?.toString() ?? '',
-                'username': followerData['username']?.toString() ?? 'N/A',
+                'username': followerData['name']!.toString(),
                 'name': followerData['name']?.toString() ?? 'Unknown User',
                 // The backend should ideally provide 'isFollowingCurrentUser' directly
                 // This field indicates if the *currently logged-in user* is following the person in this list item.

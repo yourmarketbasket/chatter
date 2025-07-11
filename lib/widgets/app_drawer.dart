@@ -1,9 +1,8 @@
 import 'package:chatter/pages/home-feed-screen.dart';
 import 'package:chatter/pages/users_list_page.dart';
-// import 'package:chatter/pages/direct_messages_page.dart'; // Removed
 import 'package:chatter/pages/followers_page.dart';
 import 'package:chatter/pages/login.dart';
-import 'package:chatter/pages/user_posts_page.dart'; // Import UserPostsPage
+import 'package:chatter/pages/user_posts_page.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
@@ -263,7 +262,7 @@ class AppDrawer extends StatelessWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.all(Radius.circular(0)),
       ),
-      backgroundColor: const Color(0xFF121212), // Twitter dark theme background
+      backgroundColor: const Color(0xFF121212),
       child: Column(
         children: [
           Expanded(
@@ -274,24 +273,23 @@ class AppDrawer extends StatelessWidget {
                   final userMap = dataController.user.value;
                   final String? avatarUrl = userMap['user']?['avatar'];
                   final String username = userMap['user']?['name'] ?? 'User';
-                  final String handle = userMap['user']?['username'] ?? 'username'; // Assuming 'username' field for handle
+                  final String handle = userMap['user']?['name'] ?? 'username';
                   final String aboutMe = userMap['user']?['about'] as String? ?? '';
-                  // Dummy data for followers/following - replace with actual data from DataController
-                  final int followersCount = userMap['user']?['followersCount'] ?? 0;
-                  final int followingCount = userMap['user']?['followingCount'] ?? 0;
+                  final int followersCount = userMap['user']?['followers'].length ?? 0;
+                  final int followingCount = userMap['user']?['following'].length ?? 0;
                   final String avatarInitial = username.isNotEmpty ? username[0].toUpperCase() : '?';
+                  // print(userMap);
 
                   return Container(
-                    padding: const EdgeInsets.only(top: 50.0, left: 20.0, right: 20.0, bottom: 20.0), // Adjusted padding
+                    padding: const EdgeInsets.only(top: 50.0, left: 20.0, right: 20.0, bottom: 20.0),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center, // Center align the column's children horizontally
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // Avatar Stack
                         Stack(
-                          alignment: Alignment.center, // Center the edit icon relative to the avatar
+                          alignment: Alignment.center,
                           children: [
                             CircleAvatar(
-                              radius: 36, // Increased avatar size
+                              radius: 36,
                               backgroundColor: Colors.tealAccent.withOpacity(0.3),
                               backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
                                   ? CachedNetworkImageProvider(avatarUrl, maxWidth: 150, maxHeight: 150)
@@ -304,7 +302,7 @@ class AppDrawer extends StatelessWidget {
                                   : null,
                             ),
                             Positioned(
-                              right: 0, // Positioned relative to the CircleAvatar's bounds
+                              right: 0,
                               bottom: 0,
                               child: Material(
                                 color: Colors.tealAccent,
@@ -322,59 +320,61 @@ class AppDrawer extends StatelessWidget {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16), // Increased spacing
-
-                        // Username
+                        const SizedBox(height: 16),
                         Text(
-                          username, // This is the display name
+                          username,
                           style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 20, color: Colors.white),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 4),
-
-                        // Handle (ensure 'handle' is the actual username/handle field)
                         Text(
-                          "@$handle", // 'handle' should be userMap['user']?['username']
+                          "@$handle",
                           style: GoogleFonts.roboto(fontSize: 15, color: Colors.grey[500]),
                           textAlign: TextAlign.center,
                         ),
-                        const SizedBox(height: 16), // Increased spacing
-
-                        // Followers/Following Row
+                        const SizedBox(height: 16),
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.center, // Center this row
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text('$followingCount', style: GoogleFonts.roboto(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14)),
                             const SizedBox(width: 4),
                             Text('Following', style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 14)),
-                            const SizedBox(width: 20), // Increased spacing
+                            const SizedBox(width: 20),
                             Text('$followersCount', style: GoogleFonts.roboto(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14)),
                             const SizedBox(width: 4),
                             Text('Followers', style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 14)),
                           ],
                         ),
-                        const SizedBox(height: 16), // Increased spacing
-
-                        // About Me Section
-                        if (aboutMe.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        if (aboutMe.isNotEmpty)
                           SizedBox(
-                            width: double.infinity, // Allow text to take full width for centering
-                            child: Text(
-                              aboutMe,
-                              style: GoogleFonts.roboto(fontSize: 14, color: Colors.grey[300], height: 1.4),
-                              textAlign: TextAlign.center, // Center the about me text
+                            width: double.infinity,
+                            child: RichText(
+                              textAlign: TextAlign.center,
+                              text: TextSpan(
+                                children: [
+                                  TextSpan(
+                                    text: aboutMe,
+                                    style: GoogleFonts.roboto(fontSize: 14, color: Colors.grey[300], height: 1.4),
+                                  ),
+                                  WidgetSpan(
+                                    alignment: PlaceholderAlignment.middle,
+                                    child: IconButton(
+                                      icon: Icon(FeatherIcons.edit3, color: Colors.grey[400], size: 15),
+                                      onPressed: () => _showEditAboutDialog(context),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                      tooltip: 'Edit About Info',
+                                    ),
+                                  ),
+                                ],
+                              ),
                               maxLines: 3,
                               overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                          const SizedBox(height: 8),
-                          IconButton(
-                            icon: Icon(FeatherIcons.edit3, color: Colors.grey[400], size: 20),
-                            onPressed: () => _showEditAboutDialog(context),
-                            tooltip: 'Edit About Info',
-                          ),
-                        ] else ...[
-                          Row( // Center the "No about info" and edit icon
+                          )
+                        else
+                          Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
@@ -388,28 +388,24 @@ class AppDrawer extends StatelessWidget {
                               ),
                             ],
                           ),
-                        ],
                       ],
                     ),
                   );
                 }),
                 ListTile(
-                  leading: Icon(FeatherIcons.userCheck, color: Colors.grey[300]), // Changed icon
-                  title: Text('My Posts', style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16)), // Changed text
+                  leading: Icon(FeatherIcons.userCheck, color: Colors.grey[300]),
+                  title: Text('My Posts', style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16)),
                   onTap: () {
-                    Get.back(); // Close drawer
+                    Get.back();
                     final String? currentUserId = dataController.user.value['user']?['_id'] as String?;
                     final String? currentUsername = dataController.user.value['user']?['username'] as String?;
-                    // Fallback for username if 'username' field isn't available but 'name' is.
                     final String displayUsername = currentUsername ?? dataController.user.value['user']?['name'] as String? ?? 'My';
 
                     if (currentUserId != null && displayUsername.isNotEmpty) {
-                      // Check if already on UserPostsPage for the current user to avoid redundant navigation
                       if (Get.currentRoute == '/UserPostsPage' && (Get.arguments as Map?)?['userId'] == currentUserId) {
                         return;
                       }
-                      // Navigate to UserPostsPage, potentially replacing current view if it's not home
-                       Get.to(() => UserPostsPage(userId: currentUserId, username: displayUsername));
+                      Get.to(() => UserPostsPage(userId: currentUserId, username: displayUsername));
                     } else {
                       Get.snackbar('Error', 'Could not load your posts. User data missing.', snackPosition: SnackPosition.BOTTOM);
                     }
@@ -423,13 +419,12 @@ class AppDrawer extends StatelessWidget {
                     Get.to(() => const UsersListPage());
                   },
                 ),
-                // ListTile for Direct Messages removed
                 ListTile(
                   leading: Icon(FeatherIcons.gitMerge, color: Colors.grey[300]),
                   title: Text('Network', style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16)),
                   onTap: () {
                     Get.back();
-                    Get.to(() => const FollowersPage()); // Assuming this page handles both followers and following
+                    Get.to(() => const FollowersPage());
                   },
                 ),
                 const Divider(color: Color(0xFF303030)),
@@ -441,8 +436,6 @@ class AppDrawer extends StatelessWidget {
                     Get.toNamed('/buy-me-a-coffee');
                   },
                 ),
-                // Edit About Info ListTile removed
-                // Settings ListTile removed
                 ListTile(
                   leading: Icon(FeatherIcons.logOut, color: Colors.grey[300]),
                   title: Text('Logout', style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16)),

@@ -3,10 +3,10 @@ import 'package:chatter/pages/reply_page.dart';
 import 'package:chatter/widgets/app_drawer.dart';
 import 'package:chatter/widgets/reply/post_content.dart'; // Assuming this can be reused/adapted
 import 'package:chatter/widgets/reply/reply_attachment_grid.dart'; // For image grids
+import 'package:chatter/widgets/reply/stat_button.dart';
 import 'package:chatter/widgets/video_attachment_widget.dart';
 import 'package:chatter/widgets/audio_attachment_widget.dart';
 import 'package:chatter/widgets/realtime_timeago_text.dart';
-import 'package:chatter/widgets/stat_button.dart'; // For like, reply, repost buttons
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
