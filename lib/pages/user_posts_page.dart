@@ -26,6 +26,63 @@ class UserPostsPage extends StatefulWidget {
 class _UserPostsPageState extends State<UserPostsPage> {
   final DataController _dataController = Get.find<DataController>();
 
+  // Define handlers for PostContent callbacks
+  void _handleReplyToItem(String parentItemId) {
+    // In UserPostsPage, tapping the post content or reply button navigates to ReplyPage
+    // This specific callback might be more for when PostContent itself has a direct reply action.
+    // For now, find the post and navigate.
+    final postToNavigate = _dataController.userPosts.firstWhereOrNull((p) => p['_id'] == parentItemId);
+    if (postToNavigate != null) {
+      Get.to(() => ReplyPage(post: postToNavigate, postDepth: 0, originalPostId: postToNavigate['_id']));
+    }
+    print("UserPostsPage: _handleReplyToItem called for $parentItemId");
+  }
+
+  void _handleRefreshReplies() {
+    // UserPostsPage doesn't display replies directly in a way that PostContent would refresh.
+    // This could trigger a refetch for the specific post if detailed reply counts were critical to update.
+    // For now, it's a no-op or could fetch all user posts again if necessary.
+    // _dataController.fetchUserPosts(widget.userId); // Example: refetch all
+    print("UserPostsPage: _handleRefreshReplies called. Currently a no-op in this context.");
+  }
+
+  void _handleReplyDataUpdated(Map<String, dynamic> updatedReplyData) {
+    // This is for when a reply *within* PostContent (if it were displaying replies) gets updated.
+    // In UserPostsPage, PostContent shows the main post. If the main post data (e.g. its own like count)
+    // is updated, DataController's listeners should handle it.
+    // This callback might be less relevant here unless PostContent is used for replies on this page.
+     int index = _dataController.userPosts.indexWhere((p) => p['_id'] == updatedReplyData['_id']);
+    if (index != -1) {
+      _dataController.userPosts[index] = updatedReplyData;
+      // _dataController.userPosts.refresh(); // If needed for Obx
+    }
+    print("UserPostsPage: _handleReplyDataUpdated called with data for ${updatedReplyData['_id']}");
+  }
+
+  void _showPostContentSnackBar(String title, String message, Color backgroundColor) {
+    Get.snackbar(
+      title,
+      message,
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: backgroundColor,
+      colorText: Colors.white,
+      margin: const EdgeInsets.all(8),
+      borderRadius: 8,
+    );
+  }
+
+  Future<void> _sharePostFromContent(Map<String, dynamic> postData) async {
+    // This is a simplified share functionality.
+    // For sharing files, you'd need to download them first if they are URLs.
+    // Share_plus package can handle text and files.
+    // For simplicity, sharing text content here.
+    final String content = postData['content'] as String? ?? "Check out this post!";
+    // In a real app, you might construct a URL to the post.
+    // await Share.share(content, subject: 'Shared from Chatter');
+     Get.snackbar("Share", "Share functionality for post ID: ${postData['_id']} (placeholder)", snackPosition: SnackPosition.BOTTOM);
+  }
+
+
   @override
   void initState() {
     super.initState();
@@ -139,7 +196,11 @@ class _UserPostsPageState extends State<UserPostsPage> {
 
     return InkWell(
       onTap: () {
-        Get.to(() => ReplyPage(post: post));
+        Get.to(() => ReplyPage(
+          post: post,
+          postDepth: 0, // This is a top-level post from UserPostsPage
+          originalPostId: post['_id'] as String?, // The post itself is the original post in this context
+        ));
       },
       child: Container(
         padding: const EdgeInsets.all(12.0),
@@ -174,8 +235,19 @@ class _UserPostsPageState extends State<UserPostsPage> {
                   if (postContent.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 4.0, bottom: 8.0),
-                      // Using PostContent widget if it's suitable for displaying main post text
-                      child: PostContent(content: postContent, buffer: post['buffer'], textStyle: GoogleFonts.roboto(color: Colors.white, fontSize: 15, height: 1.4)),
+                      child: PostContent(
+                        postData: post, // Pass the full post map
+                        isReply: false, // These are main posts, not replies
+                        postDepth: 0,   // Top-level posts
+                        showSnackBar: _showPostContentSnackBar,
+                        onSharePost: _sharePostFromContent,
+                        onReplyToItem: _handleReplyToItem, // Or a more specific handler if needed
+                        refreshReplies: _handleRefreshReplies, // Or a more specific handler
+                        onReplyDataUpdated: _handleReplyDataUpdated, // Or a more specific handler
+                        // indentationLevel, isPreview, pageOriginalPostId, drawInternalVerticalLine can use defaults or be set if needed
+                        // For UserPostsPage, these are main posts, so isReply=false, postDepth=0.
+                        // Callbacks are stubbed or point to general handlers.
+                      ),
                     ),
 
                   // Attachments display
