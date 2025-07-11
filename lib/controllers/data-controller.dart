@@ -2031,6 +2031,7 @@ void clearUserPosts() {
       if (response.statusCode == 200 && response.data['success'] == true) {
         if (response.data['posts'] != null && response.data['posts'] is List) {
           List<dynamic> fetchedPostsDynamic = response.data['posts'];
+          print('[DataController.fetchUserPosts] Raw response data for $targetUserId: ${response.data.toString()}');
           List<Map<String, dynamic>> processedPosts = fetchedPostsDynamic.map((postData) {
             if (postData is Map<String, dynamic>) {
               // Use the existing _processPostOrReply to ensure consistent data structure
@@ -2039,23 +2040,28 @@ void clearUserPosts() {
             return <String, dynamic>{};
           }).where((postMap) => postMap.isNotEmpty).toList();
 
+          print('[DataController.fetchUserPosts] Processed ${processedPosts.length} posts for user $targetUserId.');
           userPosts.assignAll(processedPosts);
-          print('[DataController] Fetched posts for user $targetUserId successfully. Count: ${userPosts.length}');
+          print('[DataController] Assigned posts to userPosts list. Final count for $targetUserId: ${userPosts.length}');
         } else {
-          print('[DataController] Fetched posts for user $targetUserId but the list is null or not a list.');
-          // Keep userPosts empty, UI will show empty message
+          print('[DataController.fetchUserPosts] Fetched posts for user $targetUserId but the list in response.data[\'posts\'] is null or not a list.');
+          userPosts.clear(); // Ensure it's cleared if backend gives bad structure
         }
       } else {
-        print('[DataController] Failed to fetch posts for user $targetUserId. Status: ${response.statusCode}, Message: ${response.data?['message']}');
+        print('[DataController.fetchUserPosts] Failed to fetch posts for user $targetUserId. Status: ${response.statusCode}, Message: ${response.data?['message']}');
+        print('[DataController.fetchUserPosts] Raw error response data: ${response.data.toString()}');
+        userPosts.clear(); // Clear on failure too
         throw Exception('Failed to fetch user posts: ${response.data?['message'] ?? "Unknown server error"}');
       }
     } catch (e) {
-      print('[DataController] Error in fetchUserPosts for user $targetUserId: ${e.toString()}');
+      print('[DataController.fetchUserPosts] Error in fetchUserPosts for user $targetUserId: ${e.toString()}');
+      userPosts.clear(); // Clear on any exception
       // userPosts remains empty, UI will show error/empty message.
       // Rethrow so the calling UI can catch it for specific error messages if needed.
       rethrow;
     } finally {
       isLoadingUserPosts.value = false;
+      print('[DataController.fetchUserPosts] Finally block. isLoadingUserPosts: ${isLoadingUserPosts.value}, userPosts count: ${userPosts.length}');
     }
   }
 
