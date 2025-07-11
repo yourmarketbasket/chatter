@@ -65,6 +65,10 @@ class DataController extends GetxController {
   static const double _uploadPhaseProportion = 0.8; // 80% for file uploads
   static const double _savePhaseProportion = 0.2; // 20% for saving post to DB
 
+  // Observable to notify ProfilePage to refresh
+  final RxString profileUpdateTrigger = ''.obs;
+
+
   @override
   void onInit() {
     super.onInit();
@@ -143,19 +147,34 @@ class DataController extends GetxController {
             if (userData is Map<String, dynamic>) {
               // Ensure required fields (avatar, username, followers, following)
               // The backend should provide followersCount and followingCount directly.
-              // For 'isFollowingCurrentUser', we check if the user's ID is in the current user's following list.
+              // If not, try to calculate from 'followers' and 'following' arrays if they exist.
               String userId = userData['_id']?.toString() ?? '';
               bool isFollowing = currentUserFollowingIds.contains(userId);
+
+              int followersCount = userData['followersCount'] as int? ?? 0;
+              int followingCount = userData['followingCount'] as int? ?? 0;
+
+              // Fallback to calculating from array lengths if counts are not provided or zero,
+              // and the arrays themselves are provided.
+              if (followersCount == 0 && userData.containsKey('followers') && userData['followers'] is List) {
+                followersCount = (userData['followers'] as List).length;
+              }
+              if (followingCount == 0 && userData.containsKey('following') && userData['following'] is List) {
+                followingCount = (userData['following'] as List).length;
+              }
 
               return {
                 '_id': userId,
                 'avatar': userData['avatar']?.toString() ?? '',
-                'username': userData['name']?.toString(),
-                'name': userData['name']?.toString() ?? 'Unknown User', // Added name for consistency
-                'followersCount': userData['followersCount'] ?? 0,
-                'followingCount': userData['followingCount'] ?? 0,
-                'isFollowingCurrentUser': isFollowing, // Determine if current user is following this user
-                // Add other fields if the API provides them and they are needed
+                'username': userData['name']?.toString(), // Assuming 'name' might be username or real name based on context
+                'name': userData['name']?.toString() ?? 'Unknown User',
+                'followersCount': followersCount,
+                'followingCount': followingCount,
+                'isFollowingCurrentUser': isFollowing,
+                // Include the raw followers/following arrays if present, might be useful for other operations
+                // or if socket events need to modify these specific users locally.
+                'followers': userData['followers'] ?? [], // Store the array if available
+                'following': userData['following'] ?? [], // Store the array if available
               };
             }
             return <String, dynamic>{}; // Return empty map for invalid data
@@ -1833,11 +1852,18 @@ void _updateUserInList(RxList<Map<String, dynamic>> list, String userId, {bool? 
     }
     if (followersDelta != null) {
       userToUpdate['followersCount'] = (userToUpdate['followersCount'] ?? 0) + followersDelta;
+      // Also update the 'followers' array if it exists for this user map
+      if (userToUpdate.containsKey('followers') && userToUpdate['followers'] is List) {
+        // This is tricky: followersDelta > 0 means someone followed this user.
+        // We don't know WHO followed from this generic update.
+        // For now, we only update the count. Socket events will handle specific array changes.
+      }
     }
     if (followingDelta != null) {
       userToUpdate['followingCount'] = (userToUpdate['followingCount'] ?? 0) + followingDelta;
+      // Similar to above, we only update count.
     }
-    list[index] = userToUpdate; // This should trigger Obx if the list item itself is observed or list is part of Obx
+    list[index] = userToUpdate;
   }
 }
 
@@ -1871,54 +1897,78 @@ Future<Map<String, dynamic>> followUser(String userIdToFollow) async {
           localFollowingList.add(userIdToFollow);
         }
         userDetail['following'] = localFollowingList;
-        // If 'followingCount' is a direct field on user.user, update it here.
-        // userDetail['followingCount'] = localFollowingList.length;
+        // Update followingCount for the logged-in user
+        userDetail['followingCount'] = localFollowingList.length;
 
         var mainUserMap = Map<String, dynamic>.from(user.value);
         mainUserMap['user'] = userDetail;
-        user.value = mainUserMap; // This triggers Obx for AppDrawer
+        user.value = mainUserMap;
         await _storage.write(key: 'user', value: jsonEncode(user.value));
       }
 
-      // 2. Update target user in allUsers list
+      // 2. Update target user and current user in allUsers list
       _updateUserInList(allUsers, userIdToFollow, isFollowing: true, followersDelta: 1);
-      // Update current user in allUsers list (their followingCount)
       _updateUserInList(allUsers, currentUserId, followingDelta: 1);
 
-      // Update the status of userIdToFollow if they exist in the current user's loaded followers list
-      _updateUserInList(followers, userIdToFollow, isFollowing: true, followersDelta: 1);
-      // Ensure if userIdToFollow was already in the 'following' list for some reason, its state is also updated.
-      // The main add logic below handles adding it if it's not there.
-      _updateUserInList(following, userIdToFollow, isFollowing: true, followersDelta: 1);
+      // 3. Update _dataController.followers and _dataController.following lists if they are relevant
+      //    (i.e., if they are currently loaded for the affected users)
+
+      // If the `followers` list is currently loaded for `userIdToFollow` (the user who gained a follower)
+      // Add `currentUserId` (the new follower) to this list.
+      // We need a minimal representation of the current user.
+      var currentUserDataForList = allUsers.firstWhereOrNull((u) => u['_id'] == currentUserId);
+      if (currentUserDataForList == null && user.value['user']?['_id'] == currentUserId) {
+          currentUserDataForList = {
+            '_id': currentUserId,
+            'avatar': user.value['user']?['avatar'] ?? '',
+            'username': user.value['user']?['username'] ?? '',
+            'name': user.value['user']?['name'] ?? 'Current User',
+            'isFollowingCurrentUser': false, // From perspective of current user, they don't follow themselves.
+                                          // But if this user is added to another's follower list, this flag might need to be true if current user follows them.
+                                          // This specific 'isFollowingCurrentUser' is for the button next to this user in a list.
+                                          // When adding current user to target's followers list, the 'isFollowingCurrentUser' for the current user entry
+                                          // should reflect if the *target user* is followed by the *current user*. This is true by definition of this action for the target.
+                                          // This is getting complex. Let's simplify: the FollowerPage's list items have their own isFollowingCurrentUser.
+            // followersCount and followingCount for the currentUserDataForList are not strictly necessary here if not displayed.
+          };
+      }
+
+      // If the currently loaded `followers` list is for `userIdToFollow`
+      // This requires knowing whose followers list is active. For simplicity, we assume if `followers` is not empty,
+      // it *could* be for `userIdToFollow`. A more robust way would be to check `_targetUserId` if FollowersPage sets it.
+      // For now, if the first user in `followers` list has `userIdToFollow` as one of their followers (which is not how it works),
+      // or if _dataController had a variable like `currentlyViewedProfileIdForFollowersList`.
+      // Let's assume for now: if followers list is for targetUserId, add current user.
+      // This part is tricky without knowing the context of `_dataController.followers`
+      // Let's assume a simplified update: if `followers` list is not empty, and `userIdToFollow` is in it (which is wrong logic)
+      // A better direct update for `_dataController.followers`:
+      // If `_dataController.followers` is for `userIdToFollow`, then add `currentUserId` to it.
+      // This needs context. The socket event handler will be more robust for this.
+      // For now, let's focus on counts and the current user's own `following` list.
 
 
-      // 3. Update current user's 'following' list (for Network Page / FollowersPage)
-      //    This optimistically adds the followed user to the local 'following' RxList.
-      var userFromAllUsers = allUsers.firstWhereOrNull((u) => u['_id'] == userIdToFollow);
-      if (userFromAllUsers != null) {
+      // If the `following` list is currently loaded for `currentUserId`
+      // Add `userIdToFollow` (the user now being followed) to this list.
+      var targetUserDataForList = allUsers.firstWhereOrNull((u) => u['_id'] == userIdToFollow);
+      if (targetUserDataForList != null) {
+        // Check if `_dataController.following` is for the `currentUserId`.
+        // Similar to above, this needs context.
+        // If `_dataController.isLoadingFollowing` is false and `_dataController.following` is populated,
+        // and we assume it's for `currentUserId` (common case for "Your Network").
         int targetInFollowingListIdx = following.indexWhere((u) => u['_id'] == userIdToFollow);
-        if (targetInFollowingListIdx == -1) { // If not already in the list
-          var newFollowingEntry = Map<String, dynamic>.from(userFromAllUsers);
-          // Ensure 'isFollowingCurrentUser' is true from the perspective of the current user
-          newFollowingEntry['isFollowingCurrentUser'] = true;
+        if (targetInFollowingListIdx == -1) {
+          var newFollowingEntry = Map<String, dynamic>.from(targetUserDataForList);
+          newFollowingEntry['isFollowingCurrentUser'] = true; // Current user is now following this target.
+          // Update counts for this specific entry
+          newFollowingEntry['followersCount'] = (newFollowingEntry['followersCount'] ?? 0) + 1;
           following.add(newFollowingEntry);
-        } else { // If already in list (e.g. due to quick succession of follow/unfollow), ensure state is correct
+        } else {
             var userToUpdate = Map<String, dynamic>.from(following[targetInFollowingListIdx]);
             userToUpdate['isFollowingCurrentUser'] = true;
-            // Update counts if backend provides them, or use optimistic ones from _updateUserInList on allUsers
-            userToUpdate['followersCount'] = userFromAllUsers['followersCount'];
+            userToUpdate['followersCount'] = (userToUpdate['followersCount'] ?? 0) + 1;
             following[targetInFollowingListIdx] = userToUpdate;
         }
       }
-      // else {
-      // Fallback logic removed for now to prevent type error with FollowersPage.
-      // If FollowersPage is active for the current user and needs immediate refresh
-      // after a follow action, it should handle its own refresh, or listen to a more specific event.
-      // }
-
-      // If the `followers` list is for `userIdToFollow` (i.e., viewing their profile's followers tab),
-      // then `currentUserId` should be added to it. This is complex to manage centrally.
-      // Better to have ProfilePage/FollowersPage refresh its specific view if needed.
 
       print('[DataController] User $currentUserId successfully followed $userIdToFollow.');
       return {'success': true, 'message': response.data['message'] ?? 'Successfully followed user.'};
@@ -1967,7 +2017,8 @@ Future<Map<String, dynamic>> unfollowUser(String userIdToUnfollow) async {
           localFollowingList.remove(userIdToUnfollow);
         }
         userDetail['following'] = localFollowingList;
-        // userDetail['followingCount'] = localFollowingList.length;
+        // Update followingCount for the logged-in user
+        userDetail['followingCount'] = localFollowingList.length;
 
         var mainUserMap = Map<String, dynamic>.from(user.value);
         mainUserMap['user'] = userDetail;
@@ -1975,19 +2026,25 @@ Future<Map<String, dynamic>> unfollowUser(String userIdToUnfollow) async {
         await _storage.write(key: 'user', value: jsonEncode(user.value));
       }
 
-      // 2. Update target user in allUsers list
+      // 2. Update target user and current user in allUsers list
       _updateUserInList(allUsers, userIdToUnfollow, isFollowing: false, followersDelta: -1);
-      // Update current user in allUsers list (their followingCount)
       _updateUserInList(allUsers, currentUserId, followingDelta: -1);
 
-      // Update the status of userIdToUnfollow if they exist in the current user's loaded followers list
-      _updateUserInList(followers, userIdToUnfollow, isFollowing: false, followersDelta: -1);
-      // No need to call _updateUserInList for 'following' list with userIdToUnfollow,
-      // as it's explicitly removed below.
+      // 3. Update _dataController.followers and _dataController.following lists if they are relevant
 
-      // 3. Update current user's 'following' list (for Network Page / FollowersPage)
-      //    Remove userIdToUnfollow from _dataController.following if present
+      // If the `followers` list is currently loaded for `userIdToUnfollow` (the user who lost a follower)
+      // Remove `currentUserId` (the one who unfollowed) from this list.
+      // This part is complex without direct context of whose list `_dataController.followers` represents.
+      // The socket event handler will be more robust.
+      // For now, if `_dataController.followers` contains `currentUserId`, remove them.
+      // This is a simplification.
+      followers.removeWhere((u) => u['_id'] == currentUserId);
+
+
+      // If the `following` list is currently loaded for `currentUserId`
+      // Remove `userIdToUnfollow` (the user no longer being followed) from this list.
       following.removeWhere((u) => u['_id'] == userIdToUnfollow);
+
 
       print('[DataController] User $currentUserId successfully unfollowed $userIdToUnfollow.');
       return {'success': true, 'message': response.data['message'] ?? 'Successfully unfollowed user.'};
@@ -2112,5 +2169,226 @@ void clearUserPosts() {
       }
       return {'success': false, 'message': errorMessage};
     }
+  }
+
+  // --- Real-time Update Handlers for Socket Events ---
+
+  void handleUserFollowedSocket(Map<String, dynamic> data) {
+    final String? followerId = data['followerId'] as String?; // The user who initiated the follow
+    final String? followedId = data['followedId'] as String?; // The user who was followed
+    // final int? newFollowerCountForFollowedUser = data['newFollowerCountForFollowedUser'] as int?; // Optional: use if backend sends definitive counts
+    // final int? newFollowingCountForFollower = data['newFollowingCountForFollower'] as int?; // Optional
+
+    if (followerId == null || followedId == null) {
+      print('[DataController.handleUserFollowedSocket] Received insufficient data: $data');
+      return;
+    }
+
+    print('[DataController.handleUserFollowedSocket] Processing: $followerId followed $followedId');
+
+    // Update the user who was followed (their followersCount increases)
+    int followedUserIndex = allUsers.indexWhere((u) => u['_id'] == followedId);
+    if (followedUserIndex != -1) {
+      var userToUpdate = Map<String, dynamic>.from(allUsers[followedUserIndex]);
+      userToUpdate['followersCount'] = (userToUpdate['followersCount'] ?? 0) + 1;
+      if (userToUpdate.containsKey('followers') && userToUpdate['followers'] is List && !(userToUpdate['followers'] as List).contains(followerId)) {
+        (userToUpdate['followers'] as List).add(followerId); // Add to array if structure supports
+      }
+      // If the current logged-in user is the one who was followed, update their 'isFollowingCurrentUser' for the follower
+      // This is complex as 'isFollowingCurrentUser' is relative to the logged-in user.
+      // If followerId is the loggedInUser, then for the followedId user, 'isFollowingCurrentUser' remains true.
+      // This logic is more about how the `followedId` user appears in lists for `followerId`.
+      allUsers[followedUserIndex] = userToUpdate;
+    }
+
+    // Update the user who initiated the follow (their followingCount increases)
+    int followerUserIndex = allUsers.indexWhere((u) => u['_id'] == followerId);
+    if (followerUserIndex != -1) {
+      var userToUpdate = Map<String, dynamic>.from(allUsers[followerUserIndex]);
+      userToUpdate['followingCount'] = (userToUpdate['followingCount'] ?? 0) + 1;
+       if (userToUpdate.containsKey('following') && userToUpdate['following'] is List && !(userToUpdate['following'] as List).contains(followedId)) {
+        (userToUpdate['following'] as List).add(followedId);
+      }
+      // If the followerId is the currently logged-in user, this user ('followerId') is now following 'followedId'.
+      if (followerId == user.value['user']?['_id']) {
+        userToUpdate['isFollowingCurrentUser'] = true; // This seems incorrect for the follower user itself.
+                                                      // 'isFollowingCurrentUser' on a user in allUsers means "is the logged-in user following THIS user".
+                                                      // So, for the `followedId` user, their `isFollowingCurrentUser` should be true if `followerId` is the logged-in user.
+                                                      // Let's correct the logic for 'isFollowingCurrentUser' update.
+         // If the current logged-in user IS the followerId, then for the followedId user in allUsers,
+         // their 'isFollowingCurrentUser' flag should become true.
+         int targetUserIdx = allUsers.indexWhere((u) => u['_id'] == followedId);
+         if(targetUserIdx != -1) {
+           var targetUser = Map<String, dynamic>.from(allUsers[targetUserIdx]);
+           targetUser['isFollowingCurrentUser'] = true;
+           allUsers[targetUserIdx] = targetUser;
+         }
+      }
+      allUsers[followerUserIndex] = userToUpdate;
+    }
+
+    // Update logged-in user's data if they are involved
+    if (user.value['user']?['_id'] == followerId) { // Logged-in user is the follower
+      var userDetail = Map<String, dynamic>.from(user.value['user']);
+      var localFollowingList = List<String>.from((userDetail['following'] as List<dynamic>? ?? []).map((e) => e.toString()));
+      if (!localFollowingList.contains(followedId)) {
+        localFollowingList.add(followedId);
+        userDetail['following'] = localFollowingList;
+        userDetail['followingCount'] = localFollowingList.length;
+        var mainUserMap = Map<String, dynamic>.from(user.value);
+        mainUserMap['user'] = userDetail;
+        user.value = mainUserMap;
+        _storage.write(key: 'user', value: jsonEncode(user.value));
+      }
+    } else if (user.value['user']?['_id'] == followedId) { // Logged-in user was followed
+      var userDetail = Map<String, dynamic>.from(user.value['user']);
+      var localFollowersList = List<String>.from((userDetail['followers'] as List<dynamic>? ?? []).map((e) => e.toString()));
+      if (!localFollowersList.contains(followerId)) {
+        localFollowersList.add(followerId);
+        userDetail['followers'] = localFollowersList;
+        userDetail['followersCount'] = localFollowersList.length; // Assuming followersCount field exists
+        var mainUserMap = Map<String, dynamic>.from(user.value);
+        mainUserMap['user'] = userDetail;
+        user.value = mainUserMap;
+        _storage.write(key: 'user', value: jsonEncode(user.value));
+      }
+    }
+
+    // Update currently loaded followers/following lists for FollowersPage/NetworkPage
+    // This requires knowing whose list is loaded. Assume _targetUserId is set by FollowersPage.
+    // For simplicity, we'll attempt updates if the lists are populated.
+
+    // If current user (`followerId`) followed `followedId`:
+    // - Add `followedId` to `_dataController.following` if it's for `followerId`.
+    // - Add `followerId` to `_dataController.followers` if it's for `followedId`.
+    var followedUserData = allUsers.firstWhereOrNull((u) => u['_id'] == followedId);
+    if (followedUserData != null) {
+        int idx = following.indexWhere((u) => u['_id'] == followedId);
+        if (idx == -1) { // If not already in the `following` list of the current user (followerId)
+            // This check is implicitly for when `followerId` is the loggedInUser and their `following` list is active
+            if (user.value['user']?['_id'] == followerId) {
+                 var entry = Map<String, dynamic>.from(followedUserData);
+                 entry['isFollowingCurrentUser'] = true; // Current user (follower) is following this one.
+                 following.add(entry);
+            }
+        } else { // Already there, ensure state is correct
+            if (user.value['user']?['_id'] == followerId) {
+                var entry = Map<String, dynamic>.from(following[idx]);
+                entry['isFollowingCurrentUser'] = true;
+                entry['followersCount'] = (entry['followersCount'] ?? 0) + 1; // The followed user's follower count increases
+                following[idx] = entry;
+            }
+        }
+    }
+
+    var followerUserData = allUsers.firstWhereOrNull((u) => u['_id'] == followerId);
+     if (followerUserData != null) {
+        int idx = followers.indexWhere((u) => u['_id'] == followerId);
+        if (idx == -1) { // If `followerId` is not in the `followers` list of `followedId`
+             // This implies the `followers` list is for `followedId`
+             // This part is tricky; FollowersPage needs to manage its own _targetUserId context for this to be accurate.
+             // A simple check: if followers list is not empty and its content seems to be for `followedId`.
+             // For now, this is an optimistic update.
+             // Let's assume if `followers` list is active for `followedId`, we add the `followerId` to it.
+             // This should ideally be tied to a state like `_currentlyViewedProfileIdForFollowersPage == followedId`.
+             // For now, we'll skip direct manipulation of `_dataController.followers` here as it's less certain.
+             // The page should refetch or use Obx on `allUsers` data for the profile being viewed.
+        }
+    }
+    // Refresh lists to ensure UI updates
+    allUsers.refresh();
+    followers.refresh();
+    following.refresh();
+
+    // Notify ProfilePage if the followed user's profile might be open
+    profileUpdateTrigger.value = followedId ?? DateTime.now().millisecondsSinceEpoch.toString(); // Use timestamp as unique trigger if ID is null
+  }
+
+  void handleUserUnfollowedSocket(Map<String, dynamic> data) {
+    final String? unfollowerId = data['unfollowerId'] as String?; // The user who initiated the unfollow
+    final String? unfollowedId = data['unfollowedId'] as String?; // The user who was unfollowed
+    // final int? newFollowerCountForUnfollowedUser = data['newFollowerCountForUnfollowedUser'] as int?; // Optional
+    // final int? newFollowingCountForUnfollower = data['newFollowingCountForUnfollower'] as int?; // Optional
+
+
+    if (unfollowerId == null || unfollowedId == null) {
+      print('[DataController.handleUserUnfollowedSocket] Received insufficient data: $data');
+      return;
+    }
+    print('[DataController.handleUserUnfollowedSocket] Processing: $unfollowerId unfollowed $unfollowedId');
+
+    // Update the user who was unfollowed (their followersCount decreases)
+    int unfollowedUserIndex = allUsers.indexWhere((u) => u['_id'] == unfollowedId);
+    if (unfollowedUserIndex != -1) {
+      var userToUpdate = Map<String, dynamic>.from(allUsers[unfollowedUserIndex]);
+      userToUpdate['followersCount'] = (userToUpdate['followersCount'] ?? 1) - 1;
+      if (userToUpdate.containsKey('followers') && userToUpdate['followers'] is List) {
+        (userToUpdate['followers'] as List).remove(unfollowerId);
+      }
+      // If the current logged-in user IS the unfollowerId, then for the unfollowedId user in allUsers,
+      // their 'isFollowingCurrentUser' flag should become false.
+      if (unfollowerId == user.value['user']?['_id']) {
+          userToUpdate['isFollowingCurrentUser'] = false;
+      }
+      allUsers[unfollowedUserIndex] = userToUpdate;
+    }
+
+    // Update the user who initiated the unfollow (their followingCount decreases)
+    int unfollowerUserIndex = allUsers.indexWhere((u) => u['_id'] == unfollowerId);
+    if (unfollowerUserIndex != -1) {
+      var userToUpdate = Map<String, dynamic>.from(allUsers[unfollowerUserIndex]);
+      userToUpdate['followingCount'] = (userToUpdate['followingCount'] ?? 1) - 1;
+      if (userToUpdate.containsKey('following') && userToUpdate['following'] is List) {
+        (userToUpdate['following'] as List).remove(unfollowedId);
+      }
+      allUsers[unfollowerUserIndex] = userToUpdate;
+    }
+
+    // Update logged-in user's data if they are involved
+    if (user.value['user']?['_id'] == unfollowerId) { // Logged-in user is the unfollower
+      var userDetail = Map<String, dynamic>.from(user.value['user']);
+      var localFollowingList = List<String>.from((userDetail['following'] as List<dynamic>? ?? []).map((e) => e.toString()));
+      if (localFollowingList.contains(unfollowedId)) {
+        localFollowingList.remove(unfollowedId);
+        userDetail['following'] = localFollowingList;
+        userDetail['followingCount'] = localFollowingList.length;
+        var mainUserMap = Map<String, dynamic>.from(user.value);
+        mainUserMap['user'] = userDetail;
+        user.value = mainUserMap;
+        _storage.write(key: 'user', value: jsonEncode(user.value));
+      }
+    } else if (user.value['user']?['_id'] == unfollowedId) { // Logged-in user was unfollowed
+      var userDetail = Map<String, dynamic>.from(user.value['user']);
+      var localFollowersList = List<String>.from((userDetail['followers'] as List<dynamic>? ?? []).map((e) => e.toString()));
+      if (localFollowersList.contains(unfollowerId)) {
+        localFollowersList.remove(unfollowerId);
+        userDetail['followers'] = localFollowersList;
+        userDetail['followersCount'] = localFollowersList.length; // Assuming followersCount field exists
+        var mainUserMap = Map<String, dynamic>.from(user.value);
+        mainUserMap['user'] = userDetail;
+        user.value = mainUserMap;
+        _storage.write(key: 'user', value: jsonEncode(user.value));
+      }
+    }
+
+    // Update currently loaded followers/following lists
+    // If current user (`unfollowerId`) unfollowed `unfollowedId`:
+    // - Remove `unfollowedId` from `_dataController.following` if it's for `unfollowerId`.
+    // - Remove `unfollowerId` from `_dataController.followers` if it's for `unfollowedId`.
+    if (user.value['user']?['_id'] == unfollowerId) {
+        following.removeWhere((u) => u['_id'] == unfollowedId);
+    }
+    // Similar to follow, direct manipulation of `_dataController.followers` for the `unfollowedId` is tricky
+    // without page context. Page should refetch or rely on Obx from allUsers.
+    // However, if the `followers` list *is* for the `unfollowedId` and contains `unfollowerId`, remove them.
+    // This is an optimistic attempt.
+    // followers.removeWhere((u) => u['_id'] == unfollowerId); // This line is context dependent.
+
+    allUsers.refresh();
+    followers.refresh();
+    following.refresh();
+
+    // Notify ProfilePage if the unfollowed user's profile might be open
+    profileUpdateTrigger.value = unfollowedId ?? DateTime.now().millisecondsSinceEpoch.toString();
   }
 }

@@ -280,4 +280,30 @@ class SocketService {
       _messageController.close();
     }
   }
+
+  // Method to add new listeners, e.g. from DataController if needed, though direct call is fine too.
+  void listen(String event, void Function(dynamic) handler) {
+    _socket?.on(event, handler);
+  }
+
+  // Call this method after DataController is initialized, or ensure DataController is found.
+  void setupUserEventListeners() {
+    _socket?.on('userFollowed', (data) {
+      print('[SocketService] userFollowed event received: $data');
+      if (data is Map<String, dynamic>) {
+        _dataController.handleUserFollowedSocket(data);
+      } else {
+        print('[SocketService] Received userFollowed event with unexpected data type: ${data.runtimeType}');
+      }
+    });
+
+    _socket?.on('userUnfollowed', (data) {
+      print('[SocketService] userUnfollowed event received: $data');
+      if (data is Map<String, dynamic>) {
+        _dataController.handleUserUnfollowedSocket(data);
+      } else {
+        print('[SocketService] Received userUnfollowed event with unexpected data type: ${data.runtimeType}');
+      }
+    });
+  }
 }

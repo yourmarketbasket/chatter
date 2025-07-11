@@ -30,10 +30,26 @@ class _ProfilePageState extends State<ProfilePage> {
   String? _error;
   bool _isFollowProcessing = false; // For Follow/Unfollow button loading state
 
+  late Worker _profileUpdateWorker;
+
   @override
   void initState() {
     super.initState();
     _loadProfileData();
+
+    // Listen to profileUpdateTrigger from DataController
+    _profileUpdateWorker = ever(_dataController.profileUpdateTrigger, (String? updatedUserId) {
+      if (updatedUserId != null && updatedUserId == widget.userId && mounted) {
+        print("[ProfilePage] Received profile update trigger for user ${widget.userId}. Refreshing profile.");
+        _loadProfileData(showLoading: false); // Refresh without showing full loading indicator
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _profileUpdateWorker.dispose(); // Dispose of the worker
+    super.dispose();
   }
 
   Future<void> _loadProfileData({bool showLoading = true}) async {
