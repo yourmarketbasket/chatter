@@ -1146,7 +1146,7 @@ class DataController extends GetxController {
               return {
                 '_id': followingUserId,
                 'avatar': followingUserData['avatar']?.toString() ?? '',
-                'username': followingUserData['username']?.toString() ?? 'N/A',
+                'username': followingUserData['name']?.toString() ?? 'N/A',
                 'name': followingUserData['name']?.toString() ?? 'Unknown User',
                 'isFollowingCurrentUser': isFollowingThisUser, // Critical for button state
                 'followersCount': followingUserData['followersCount'] ?? 0, // if available

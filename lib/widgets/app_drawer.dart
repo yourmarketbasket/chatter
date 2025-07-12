@@ -394,6 +394,15 @@ class AppDrawer extends StatelessWidget {
                     ),
                   );
                 }),
+                // navigate to home
+                ListTile(
+                  leading: Icon(FeatherIcons.home, color: Colors.grey[300]),
+                  title: Text('Home', style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16)),
+                  onTap: () {
+                    Get.back();
+                    Get.to(() => const HomeFeedScreen());
+                  },
+                ),
                 ListTile(
                   leading: Icon(FeatherIcons.userCheck, color: Colors.grey[300]),
                   title: Text('My Posts', style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16)),
@@ -481,11 +490,7 @@ class AppDrawer extends StatelessWidget {
                 text: TextSpan(
                   style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 13),
                   children: <TextSpan>[
-                    const TextSpan(text: 'To update to the latest version of the app, '),
-                    TextSpan(
-                      text: 'click here',
-                      style: TextStyle(color: Colors.tealAccent[100], decoration: TextDecoration.underline),
-                    ),
+                    const TextSpan(text: 'Tap to update to the latest version'),
                     const TextSpan(text: '.'),
                   ],
                 ),
