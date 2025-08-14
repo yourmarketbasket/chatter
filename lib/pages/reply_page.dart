@@ -669,8 +669,6 @@ class _ReplyPageState extends State<ReplyPage> {
           refreshReplies: () => _fetchPostReplies(showLoadingIndicator: false),
           onReplyDataUpdated: (updatedReply) { if (mounted) setState(() => _updateNestedReply(_replies, updatedReply)); },
           postDepth: widget.postDepth + 1, // For first-level replies
-          onEdit: () => _showEditReplyDialog(context, firstLevelReply),
-          onDelete: () => _showDeleteReplyDialog(context, firstLevelReply),
         )
       );
 
@@ -839,8 +837,6 @@ class _ReplyPageState extends State<ReplyPage> {
                           if (mounted) setState(() { _mainPostData = updatedPost; });
                         },
                         postDepth: widget.postDepth,
-                        onEdit: () => _showEditPostDialog(context, _mainPostData),
-                        onDelete: () => _showDeletePostDialog(context, _mainPostData),
                       ),
                     ),
                   ),

@@ -209,7 +209,6 @@ class _PostContentState extends State<PostContent> {
     final String contentText = _getContentText();
     final List<Map<String, dynamic>> attachments = _processAttachments();
 
-    final String currentUserId = _dataController.user.value['user']?['_id'] ?? '';
     final List<dynamic> likesList = _currentPostData['likes'] is List ? _currentPostData['likes'] as List<dynamic> : [];
     final bool isLikedByCurrentUser = likesList.any((like) => (like is Map ? like['_id'] == currentUserId : like.toString() == currentUserId));
 
