@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
 import 'package:chatter/controllers/data-controller.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:feather_icons/feather_icons.dart';
@@ -126,8 +127,17 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
                   ListTile(
                     leading: const Icon(FeatherIcons.userPlus, color: Colors.tealAccent),
                     title: Text('Add Members', style: GoogleFonts.roboto(color: Colors.tealAccent)),
-                    onTap: () {
-                      // Navigate to a new page to select users to add
+                    onTap: () async {
+                      final result = await Get.to(() => const UsersListPage(mode: UserListMode.SelectForGroup));
+                      if (result != null && result is Map<String, dynamic>) {
+                        final memberId = result['_id'];
+                        final addResult = await _dataController.addMembersToGroup(widget.chatId, [memberId]);
+                        if (addResult['success']) {
+                          _fetchGroupDetails();
+                        } else {
+                          Get.snackbar('Error', addResult['message'] ?? 'Failed to add member.');
+                        }
+                      }
                     },
                   ),
                   ListTile(
@@ -184,18 +194,27 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
               icon: const Icon(FeatherIcons.image),
               label: const Text('Change Avatar'),
               onPressed: () async {
-                // Re-use the image picking and uploading logic
                 final ImagePicker picker = ImagePicker();
                 final XFile? pickedFile = await picker.pickImage(source: ImageSource.gallery);
                 if (pickedFile != null) {
-                  final uploadResult = await _dataController.uploadFiles([
-                    {'type': 'image', 'file': File(pickedFile.path)}
-                  ]);
-                  if (uploadResult.isNotEmpty && uploadResult[0]['success']) {
-                    newAvatarUrl = uploadResult[0]['url'];
-                    Get.snackbar('Success', 'Avatar ready to be saved.');
-                  } else {
-                    Get.snackbar('Error', 'Avatar upload failed.');
+                  final CroppedFile? croppedFile = await ImageCropper().cropImage(
+                    sourcePath: pickedFile.path,
+                    aspectRatioPresets: [CropAspectRatioPreset.square],
+                    uiSettings: [
+                      AndroidUiSettings(toolbarTitle: 'Crop Group Avatar'),
+                      IOSUiSettings(title: 'Crop Group Avatar'),
+                    ],
+                  );
+                  if (croppedFile != null) {
+                    final uploadResult = await _dataController.uploadFiles([
+                      {'type': 'image', 'file': File(croppedFile.path)}
+                    ]);
+                    if (uploadResult.isNotEmpty && uploadResult[0]['success']) {
+                      newAvatarUrl = uploadResult[0]['url'];
+                      Get.snackbar('Success', 'Avatar ready to be saved.');
+                    } else {
+                      Get.snackbar('Error', 'Avatar upload failed.');
+                    }
                   }
                 }
               },

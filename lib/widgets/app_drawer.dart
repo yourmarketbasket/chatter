@@ -3,7 +3,6 @@ import 'package:chatter/pages/users_list_page.dart';
 import 'package:chatter/pages/followers_page.dart';
 import 'package:chatter/pages/login.dart';
 import 'package:chatter/pages/direct_messages_page.dart';
-import 'package:chatter/pages/groups_list_page.dart';
 import 'package:chatter/pages/user_posts_page.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -432,21 +431,65 @@ class AppDrawer extends StatelessWidget {
                     Get.to(() => const UsersListPage());
                   },
                 ),
-                ListTile(
+                ExpansionTile(
                   leading: Icon(FeatherIcons.messageSquare, color: Colors.grey[300]),
                   title: Text('Chats', style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16)),
-                  onTap: () {
-                    Get.back();
-                    Get.to(() => const DirectMessagesPage());
-                  },
-                ),
-                ListTile(
-                  leading: Icon(FeatherIcons.users, color: Colors.grey[300]),
-                  title: Text('Groups', style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16)),
-                  onTap: () {
-                    Get.back();
-                    Get.to(() => const GroupsListPage());
-                  },
+                  children: [
+                    Obx(() {
+                      if (dataController.isLoadingConversations.value) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      return Column(
+                        children: dataController.conversations.map((conversation) {
+                          final bool isGroupChat = conversation['isGroupChat'] ?? false;
+                          final String currentUserId = dataController.user.value['user']['_id'];
+                          String title = '';
+                          String avatarUrl = '';
+                          IconData icon = isGroupChat ? FeatherIcons.users : FeatherIcons.user;
+
+                          if (isGroupChat) {
+                            title = conversation['groupName'] ?? 'Group Chat';
+                            avatarUrl = conversation['groupAvatar'] ?? '';
+                          } else {
+                            final otherParticipant = (conversation['participants'] as List).firstWhere(
+                              (p) => p['_id'] != currentUserId,
+                              orElse: () => null,
+                            );
+                            if (otherParticipant != null) {
+                              title = otherParticipant['name'] ?? 'User';
+                              avatarUrl = otherParticipant['avatar'] ?? '';
+                            }
+                          }
+
+                          return ListTile(
+                            leading: CircleAvatar(
+                              radius: 18,
+                              backgroundColor: Colors.tealAccent.withOpacity(0.3),
+                              backgroundImage: avatarUrl.isNotEmpty ? CachedNetworkImageProvider(avatarUrl) : null,
+                              child: avatarUrl.isEmpty ? Text(title[0], style: GoogleFonts.poppins(color: Colors.tealAccent, fontWeight: FontWeight.bold)) : null,
+                            ),
+                            title: Text(title, style: GoogleFonts.roboto(color: Colors.white)),
+                            subtitle: Text(
+                              conversation['lastMessage']?['content'] ?? 'No messages yet',
+                              style: GoogleFonts.roboto(color: Colors.grey[500]),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            onTap: () {
+                              Get.back();
+                              Get.to(() => ConversationPage(
+                                    conversationId: conversation['_id'],
+                                    username: title,
+                                    userAvatar: avatarUrl,
+                                    receiverId: isGroupChat ? '' : (conversation['participants'] as List).firstWhere((p) => p['_id'] != currentUserId)['_id'],
+                                    isGroupChat: isGroupChat,
+                                  ));
+                            },
+                          );
+                        }).toList(),
+                      );
+                    }),
+                  ],
                 ),
                 ListTile(
                   leading: Icon(FeatherIcons.gitMerge, color: Colors.grey[300]),

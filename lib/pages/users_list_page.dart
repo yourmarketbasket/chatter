@@ -1,3 +1,4 @@
+import 'package:chatter/models/user_list_mode.dart';
 import 'package:chatter/pages/profile_page.dart';
 import 'package:chatter/pages/conversation_page.dart';
 import 'package:flutter/material.dart';
@@ -9,7 +10,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:chatter/widgets/app_drawer.dart';
 
 class UsersListPage extends StatefulWidget {
-  const UsersListPage({Key? key}) : super(key: key);
+  final UserListMode mode;
+  const UsersListPage({Key? key, this.mode = UserListMode.Browse}) : super(key: key);
 
   @override
   _UsersListPageState createState() => _UsersListPageState();
@@ -204,7 +206,7 @@ class _UsersListPageState extends State<UsersListPage> {
                   ),
                 ],
               ),
-              trailing: Obx(() {
+              trailing: widget.mode == UserListMode.Browse ? Obx(() {
                 // Listen to changes in the loading state for this specific user's button
                 final bool isLoadingFollowAction = _isUpdatingFollowStatus[userId] ?? false;
 
@@ -229,20 +231,24 @@ class _UsersListPageState extends State<UsersListPage> {
                         )
                       : Text(isFollowing ? 'Unfollow' : 'Follow', style: GoogleFonts.roboto(fontWeight: FontWeight.bold, fontSize: 13)),
                 );
-              }),
+              }) : null,
               onTap: () async {
-                final result = await _dataController.createNewChat(userId);
-                if (result['success']) {
-                  final chat = result['chat'];
-                  Get.to(() => ConversationPage(
-                        conversationId: chat['_id'],
-                        username: name,
-                        userAvatar: avatarUrl,
-                        receiverId: userId,
-                        isGroupChat: false,
-                      ));
+                if (widget.mode == UserListMode.Browse) {
+                  final result = await _dataController.createNewChat(userId);
+                  if (result['success']) {
+                    final chat = result['chat'];
+                    Get.to(() => ConversationPage(
+                          conversationId: chat['_id'],
+                          username: name,
+                          userAvatar: avatarUrl,
+                          receiverId: userId,
+                          isGroupChat: false,
+                        ));
+                  } else {
+                    Get.snackbar('Error', result['message'] ?? 'Could not start chat.');
+                  }
                 } else {
-                  Get.snackbar('Error', result['message'] ?? 'Could not start chat.');
+                  Get.back(result: user);
                 }
               },
             );
