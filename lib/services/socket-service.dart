@@ -262,11 +262,35 @@ class SocketService {
     }
   }
 
-  void sendMessage(String message) {
-    if (_socket != null && _socket!.connected && message.isNotEmpty) {
-      _socket!.emit('message', message);
+  void sendMessage(Map<String, dynamic> payload) {
+    if (_socket != null && _socket!.connected) {
+      _socket!.emit('send-message', payload);
     } else {
-      print('Cannot send message: Socket is not connected or message is empty');
+      print('Cannot send message: Socket is not connected.');
+    }
+  }
+
+  void joinChat(String chatId) {
+    if (_socket != null && _socket!.connected) {
+      _socket!.emit('join-chat', chatId);
+    }
+  }
+
+  void sendTyping(String chatId, String userId) {
+    if (_socket != null && _socket!.connected) {
+      _socket!.emit('typing', {'chatId': chatId, 'user': userId});
+    }
+  }
+
+  void sendStopTyping(String chatId, String userId) {
+    if (_socket != null && _socket!.connected) {
+      _socket!.emit('stop-typing', {'chatId': chatId, 'user': userId});
+    }
+  }
+
+  void markAsRead(String messageId, String chatId, String userId) {
+    if (_socket != null && _socket!.connected) {
+      _socket!.emit('mark-as-read', {'messageId': messageId, 'chatId': chatId, 'userId': userId});
     }
   }
 
@@ -304,6 +328,38 @@ class SocketService {
       } else {
         print('[SocketService] Received userUnfollowed event with unexpected data type: ${data.runtimeType}');
       }
+    });
+
+    // --- Chat Event Handlers ---
+
+    _socket!.on('receive-message', (data) {
+      print('[SocketService] receive-message event received: $data');
+      _dataController.handleNewMessage(data);
+    });
+
+    _socket!.on('message-edited', (data) {
+      print('[SocketService] message-edited event received: $data');
+      _dataController.handleMessageEdited(data);
+    });
+
+    _socket!.on('message-deleted', (data) {
+      print('[SocketService] message-deleted event received: $data');
+      _dataController.handleMessageDeleted(data);
+    });
+
+    _socket!.on('typing', (data) {
+      print('[SocketService] typing event received: $data');
+      _dataController.handleTyping(data);
+    });
+
+    _socket!.on('stop-typing', (data) {
+      print('[SocketService] stop-typing event received: $data');
+      _dataController.handleStopTyping(data);
+    });
+
+    _socket!.on('message-read', (data) {
+      print('[SocketService] message-read event received: $data');
+      _dataController.handleMessageRead(data);
     });
   }
 }

@@ -1,4 +1,5 @@
 import 'package:chatter/controllers/data-controller.dart';
+import 'package:chatter/services/socket-service.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -9,12 +10,16 @@ class ConversationPage extends StatefulWidget {
   final String conversationId;
   final String username;
   final String userAvatar;
+  final String receiverId;
+  final bool isGroupChat;
 
   const ConversationPage({
     Key? key,
     required this.conversationId,
     required this.username,
     required this.userAvatar,
+    required this.receiverId,
+    required this.isGroupChat,
   }) : super(key: key);
 
   @override
@@ -23,24 +28,69 @@ class ConversationPage extends StatefulWidget {
 
 class _ConversationPageState extends State<ConversationPage> {
   final DataController _dataController = Get.find<DataController>();
+  final SocketService _socketService = Get.find<SocketService>();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final AudioRecorder _audioRecorder = AudioRecorder();
+  bool _isRecording = false;
 
   @override
   void initState() {
     super.initState();
     // Fetch messages for this conversation
-    _dataController.fetchMessages(widget.conversationId).catchError((e) {
+    _dataController.getMessagesForChat(widget.conversationId).catchError((e) {
       Get.snackbar('Error', 'Could not load messages: ${e.toString()}',
           backgroundColor: Colors.red, colorText: Colors.white);
     });
+    _socketService.joinChat(widget.conversationId);
+  }
+
+  List<Map<String, dynamic>> _attachments = [];
+  Map<String, dynamic>? _replyingToMessage;
+
+  void _pickAndUploadFile() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles();
+
+    if (result != null) {
+      File file = File(result.files.single.path!);
+      // This is a simplified version. In a real app, you would show a loading indicator
+      // and handle errors from the upload service.
+      final uploadResult = await _dataController.uploadFiles([
+        {'type': 'file', 'file': file}
+      ]);
+
+      if (uploadResult.isNotEmpty && uploadResult[0]['success']) {
+        setState(() {
+          _attachments.add({
+            'type': 'file', // Or determine from file type
+            'url': uploadResult[0]['url'],
+            'filename': result.files.single.name,
+          });
+        });
+      } else {
+        Get.snackbar('Error', 'File upload failed.');
+      }
+    }
   }
 
   void _sendMessage() {
-    if (_messageController.text.trim().isEmpty) return;
-    // Placeholder: Use DataController to send message
-    _dataController.sendMessage(widget.conversationId, _messageController.text.trim());
+    if (_messageController.text.trim().isEmpty && _attachments.isEmpty) return;
+
+    final messagePayload = {
+      'sender': _dataController.user.value['user']['_id'],
+      'receiver': widget.receiverId,
+      'chat': widget.conversationId,
+      'content': _messageController.text.trim(),
+      'attachments': _attachments,
+      'replyTo': _replyingToMessage?['_id'],
+    };
+    _socketService.sendMessage(messagePayload);
+
     _messageController.clear();
+    setState(() {
+      _attachments = [];
+      _replyingToMessage = null;
+    });
     // Scroll to bottom after sending
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -55,9 +105,8 @@ class _ConversationPageState extends State<ConversationPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Determine current user ID for message alignment (assuming it's available in dataController.user)
-    final String currentUserId = _dataController.user.value['id']?.toString() ?? 'currentUser';
-
+    // Determine current user ID for message alignment
+    final String currentUserId = _dataController.user.value['user']['_id'];
 
     return Scaffold(
       backgroundColor: const Color(0xFF000000),
@@ -81,12 +130,20 @@ class _ConversationPageState extends State<ConversationPage> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(FeatherIcons.moreVertical, color: Colors.white),
-            onPressed: () {
-              // TODO: Implement more options (e.g., view profile, block)
-            },
-          )
+          if (widget.isGroupChat)
+            IconButton(
+              icon: const Icon(FeatherIcons.info, color: Colors.white),
+              onPressed: () {
+                Get.to(() => GroupDetailsPage(chatId: widget.conversationId));
+              },
+            )
+          else
+            IconButton(
+              icon: const Icon(FeatherIcons.moreVertical, color: Colors.white),
+              onPressed: () {
+                // TODO: Implement more options for one-on-one chat (e.g., view profile, block)
+              },
+            )
         ],
       ),
       body: Column(
@@ -117,20 +174,62 @@ class _ConversationPageState extends State<ConversationPage> {
                 itemCount: messages.length,
                 itemBuilder: (context, index) {
                   final message = messages[index];
-                  final bool isMe = message['senderId'] == currentUserId;
-                  // Basic message bubble
-                  return Align(
-                    alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(vertical: 4.0),
-                      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-                      decoration: BoxDecoration(
-                        color: isMe ? Colors.tealAccent.withOpacity(0.8) : Colors.grey[800],
-                        borderRadius: BorderRadius.circular(12.0),
-                      ),
-                      child: Text(
-                        message['text'] ?? '',
-                        style: GoogleFonts.roboto(color: isMe ? Colors.black : Colors.white, fontSize: 15),
+                  final bool isMe = message['sender']['_id'] == currentUserId;
+
+                  return Dismissible(
+                    key: Key(message['_id']),
+                    direction: DismissDirection.startToEnd,
+                    onDismissed: (direction) {
+                      setState(() {
+                        _replyingToMessage = message;
+                      });
+                    },
+                    background: Container(
+                      color: Colors.blue,
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      alignment: Alignment.centerLeft,
+                      child: const Icon(Icons.reply, color: Colors.white),
+                    ),
+                    child: GestureDetector(
+                      onLongPress: () {
+                        if (isMe) {
+                          _showMessageOptions(context, message);
+                        }
+                      },
+                      child: Align(
+                        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(vertical: 4.0),
+                          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                          decoration: BoxDecoration(
+                            color: isMe ? Colors.tealAccent.withOpacity(0.8) : Colors.grey[800],
+                            borderRadius: BorderRadius.circular(12.0),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (message['content'] != null && message['content'].isNotEmpty)
+                                Text(
+                                  message['content'],
+                                  style: GoogleFonts.roboto(color: isMe ? Colors.black : Colors.white, fontSize: 15),
+                                ),
+                              if (message['attachments'] != null && (message['attachments'] as List).isNotEmpty)
+                                ... (message['attachments'] as List).map((attachment) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(top: 8.0),
+                                    child: Text(
+                                      attachment['filename'] ?? 'Attachment',
+                                      style: GoogleFonts.roboto(
+                                        color: isMe ? Colors.black : Colors.white,
+                                        fontSize: 12,
+                                        decoration: TextDecoration.underline,
+                                      ),
+                                  ),
+                                  );
+                                }).toList(),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   );
@@ -138,9 +237,115 @@ class _ConversationPageState extends State<ConversationPage> {
               );
             }),
           ),
+          if (_replyingToMessage != null) _buildReplyContext(),
           _buildMessageInputField(),
         ],
       ),
+    );
+  }
+
+  Widget _buildReplyContext() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+      color: Colors.grey[800],
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Replying to ${_replyingToMessage!['sender']['name']}',
+                  style: GoogleFonts.roboto(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  _replyingToMessage!['content'],
+                  style: GoogleFonts.roboto(color: Colors.grey[400]),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, color: Colors.white),
+            onPressed: () {
+              setState(() {
+                _replyingToMessage = null;
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showMessageOptions(BuildContext context, Map<String, dynamic> message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.grey[900],
+          title: Text('Message Options', style: GoogleFonts.poppins(color: Colors.white)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(FeatherIcons.edit, color: Colors.white),
+                title: Text('Edit Message', style: GoogleFonts.roboto(color: Colors.white)),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _showEditMessageDialog(context, message);
+                },
+              ),
+              ListTile(
+                leading: const Icon(FeatherIcons.trash2, color: Colors.redAccent),
+                title: Text('Delete Message', style: GoogleFonts.roboto(color: Colors.redAccent)),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _dataController.deleteMessage(widget.conversationId, message['_id']);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showEditMessageDialog(BuildContext context, Map<String, dynamic> message) {
+    final TextEditingController editController = TextEditingController(text: message['content']);
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.grey[900],
+          title: Text('Edit Message', style: GoogleFonts.poppins(color: Colors.white)),
+          content: TextField(
+            controller: editController,
+            style: GoogleFonts.roboto(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: 'Enter new message',
+              hintStyle: GoogleFonts.roboto(color: Colors.grey[500]),
+            ),
+          ),
+          actions: [
+            TextButton(
+              child: Text('Cancel', style: GoogleFonts.roboto(color: Colors.white)),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: Text('Save', style: GoogleFonts.roboto(color: Colors.tealAccent)),
+              onPressed: () {
+                _dataController.editMessage(widget.conversationId, message['_id'], editController.text);
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -155,9 +360,7 @@ class _ConversationPageState extends State<ConversationPage> {
         children: [
           IconButton(
             icon: Icon(FeatherIcons.paperclip, color: Colors.grey[400]),
-            onPressed: () {
-              // TODO: Implement attachment picking
-            },
+            onPressed: _pickAndUploadFile,
           ),
           Expanded(
             child: TextField(
@@ -184,10 +387,49 @@ class _ConversationPageState extends State<ConversationPage> {
             ),
           ),
           const SizedBox(width: 8),
-          IconButton(
-            icon: Icon(FeatherIcons.send, color: Colors.tealAccent),
-            onPressed: _sendMessage,
-          ),
+          Obx(() => IconButton(
+                icon: Icon(
+                  _messageController.text.isEmpty ? FeatherIcons.mic : FeatherIcons.send,
+                  color: Colors.tealAccent,
+                ),
+                onPressed: () async {
+                  if (_messageController.text.isEmpty) {
+                    if (_isRecording) {
+                      final path = await _audioRecorder.stop();
+                      if (path != null) {
+                        final file = File(path);
+                        final uploadResult = await _dataController.uploadFiles([
+                          {'type': 'audio', 'file': file}
+                        ]);
+
+                        if (uploadResult.isNotEmpty && uploadResult[0]['success']) {
+                          final attachment = {
+                            'type': 'audio',
+                            'url': uploadResult[0]['url'],
+                            'filename': 'voice_note.m4a',
+                          };
+                          _attachments.add(attachment);
+                          _sendMessage();
+                        } else {
+                          Get.snackbar('Error', 'Failed to upload voice note.');
+                        }
+                      }
+                      setState(() {
+                        _isRecording = false;
+                      });
+                    } else {
+                      if (await _audioRecorder.hasPermission()) {
+                        await _audioRecorder.start(const RecordConfig(), path: 'audio_record.m4a');
+                        setState(() {
+                          _isRecording = true;
+                        });
+                      }
+                    }
+                  } else {
+                    _sendMessage();
+                  }
+                },
+              )),
         ],
       ),
     );

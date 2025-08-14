@@ -43,6 +43,7 @@ class DataController extends GetxController {
   final RxBool isLoadingConversations = false.obs;
   final RxList<Map<String, dynamic>> currentConversationMessages = <Map<String, dynamic>>[].obs;
   final RxBool isLoadingMessages = false.obs;
+  final RxBool isTyping = false.obs;
 
   // Add these Rx variables inside DataController class
   final RxList<Map<String, dynamic>> followers = <Map<String, dynamic>>[].obs;
@@ -451,6 +452,157 @@ class DataController extends GetxController {
         return {'success': false, 'message': response.data['message'] ?? 'Post like failed'};
       }
     } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> updateGroupInfo(String chatId, String groupName, String groupAvatar) async {
+    try {
+      final String? token = user.value['token'];
+      if (token == null) throw Exception('User not authenticated.');
+
+      final response = await _dio.put(
+        'api/chats/groups/$chatId',
+        data: {'groupName': groupName, 'groupAvatar': groupAvatar},
+        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'group': response.data};
+      } else {
+        return {'success': false, 'message': response.data['message'] ?? 'Failed to update group info'};
+      }
+    } catch (e) {
+      print('[DataController] Error updating group info: $e');
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> addMembersToGroup(String chatId, List<String> memberIds) async {
+    try {
+      final String? token = user.value['token'];
+      if (token == null) throw Exception('User not authenticated.');
+
+      final response = await _dio.post(
+        'api/chats/groups/$chatId/members',
+        data: {'memberIds': memberIds},
+        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'group': response.data};
+      } else {
+        return {'success': false, 'message': response.data['message'] ?? 'Failed to add members'};
+      }
+    } catch (e) {
+      print('[DataController] Error adding members to group: $e');
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> removeMemberFromGroup(String chatId, String memberId) async {
+    try {
+      final String? token = user.value['token'];
+      if (token == null) throw Exception('User not authenticated.');
+
+      final response = await _dio.delete(
+        'api/chats/groups/$chatId/members/$memberId',
+        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'group': response.data};
+      } else {
+        return {'success': false, 'message': response.data['message'] ?? 'Failed to remove member'};
+      }
+    } catch (e) {
+      print('[DataController] Error removing member from group: $e');
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> promoteMemberToAdmin(String chatId, String memberId) async {
+    try {
+      final String? token = user.value['token'];
+      if (token == null) throw Exception('User not authenticated.');
+
+      final response = await _dio.put(
+        'api/chats/groups/$chatId/admins/$memberId',
+        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'group': response.data};
+      } else {
+        return {'success': false, 'message': response.data['message'] ?? 'Failed to promote member'};
+      }
+    } catch (e) {
+      print('[DataController] Error promoting member to admin: $e');
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> leaveGroup(String chatId) async {
+    try {
+      final String? token = user.value['token'];
+      if (token == null) throw Exception('User not authenticated.');
+
+      final response = await _dio.post(
+        'api/chats/groups/$chatId/leave',
+        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      if (response.statusCode == 200) {
+        await getAllChats(); // Refresh conversation list
+        return {'success': true, 'message': 'Successfully left the group'};
+      } else {
+        return {'success': false, 'message': response.data['message'] ?? 'Failed to leave group'};
+      }
+    } catch (e) {
+      print('[DataController] Error leaving group: $e');
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> createGroupInviteLink(String chatId) async {
+    try {
+      final String? token = user.value['token'];
+      if (token == null) throw Exception('User not authenticated.');
+
+      final response = await _dio.post(
+        'api/chats/groups/$chatId/invite-link',
+        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'inviteToken': response.data['inviteToken']};
+      } else {
+        return {'success': false, 'message': response.data['message'] ?? 'Failed to create invite link'};
+      }
+    } catch (e) {
+      print('[DataController] Error creating group invite link: $e');
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> joinGroupViaInviteLink(String token) async {
+    try {
+      final String? authToken = user.value['token'];
+      if (authToken == null) throw Exception('User not authenticated.');
+
+      final response = await _dio.post(
+        'api/chats/join-group/$token',
+        options: dio.Options(headers: {'Authorization': 'Bearer $authToken'}),
+      );
+
+      if (response.statusCode == 200) {
+        await getAllChats(); // Refresh conversation list
+        return {'success': true, 'chat': response.data};
+      } else {
+        return {'success': false, 'message': response.data['message'] ?? 'Failed to join group'};
+      }
+    } catch (e) {
+      print('[DataController] Error joining group via invite link: $e');
       return {'success': false, 'message': e.toString()};
     }
   }
@@ -968,67 +1120,123 @@ class DataController extends GetxController {
     return uploadResults;
   }
 
-  // Add these placeholder methods inside DataController class
+  // --- Chat Methods ---
 
-  Future<void> fetchConversations() async {
+  Future<void> getAllChats() async {
     isLoadingConversations.value = true;
-    await Future.delayed(const Duration(milliseconds: 800)); // Simulate network call
-    // Placeholder data
-    conversations.assignAll([
-      {'id': 'conv1', 'username': 'AliceWonder', 'userAvatar': 'https://i.pravatar.cc/150?u=alice', 'lastMessage': 'Hey, how are you?', 'timestamp': '10:30 AM'},
-      {'id': 'conv2', 'username': 'BobTheBuilder', 'userAvatar': 'https://i.pravatar.cc/150?u=bob', 'lastMessage': 'Project update is due.', 'timestamp': 'Yesterday'},
-      {'id': 'conv3', 'username': 'CharlieChap', 'userAvatar': 'https://i.pravatar.cc/150?u=charlie', 'lastMessage': 'Okay, sounds good!', 'timestamp': 'Mon'},
-    ]);
-    isLoadingConversations.value = false;
-    print('[DataController] Fetched conversations (placeholder).');
+    try {
+      final String? token = user.value['token'];
+      if (token == null) throw Exception('User not authenticated.');
+
+      final response = await _dio.get(
+        'api/chats',
+        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> chatData = response.data;
+        conversations.assignAll(chatData.map((data) => Map<String, dynamic>.from(data)).toList());
+      } else {
+        throw Exception('Failed to load chats: ${response.data['message']}');
+      }
+    } catch (e) {
+      print('[DataController] Error fetching chats: $e');
+      // Optionally show an error message to the user
+    } finally {
+      isLoadingConversations.value = false;
+    }
   }
 
-  Future<void> fetchMessages(String conversationId) async {
+  Future<void> getMessagesForChat(String chatId) async {
     isLoadingMessages.value = true;
-    currentConversationMessages.clear(); // Clear previous messages
-    await Future.delayed(const Duration(milliseconds: 500)); // Simulate network call
-    // Placeholder data - In real app, filter/fetch by conversationId
-    // Assuming 'currentUser' is the ID of the logged-in user.
-    // You should get this from your user object, e.g., user.value['id']
-    final String currentUserId = user.value['id']?.toString() ?? 'currentUser';
+    currentConversationMessages.clear();
+    try {
+      final String? token = user.value['token'];
+      if (token == null) throw Exception('User not authenticated.');
 
-    if (conversationId == 'conv1') {
-      currentConversationMessages.assignAll([
-        {'id': 'msg1', 'senderId': 'alice', 'text': 'Hey, how are you?', 'timestamp': '10:30 AM'},
-        {'id': 'msg2', 'senderId': currentUserId, 'text': 'I am good, thanks! You?', 'timestamp': '10:31 AM'},
-        {'id': 'msg3', 'senderId': 'alice', 'text': 'Doing well!', 'timestamp': '10:32 AM'},
-      ]);
-    } else if (conversationId == 'conv2') {
-       currentConversationMessages.assignAll([
-        {'id': 'msgA', 'senderId': 'bob', 'text': 'Project update is due.', 'timestamp': 'Yesterday'},
-        {'id': 'msgB', 'senderId': currentUserId, 'text': 'Working on it!', 'timestamp': 'Yesterday'},
-      ]);
-    } else {
-      // No messages for other convos in this placeholder
+      final response = await _dio.get(
+        'api/chats/$chatId/messages',
+        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> messageData = response.data;
+        currentConversationMessages.assignAll(messageData.map((data) => Map<String, dynamic>.from(data)).toList());
+      } else {
+        throw Exception('Failed to load messages: ${response.data['message']}');
+      }
+    } catch (e) {
+      print('[DataController] Error fetching messages for chat $chatId: $e');
+    } finally {
+      isLoadingMessages.value = false;
     }
-    isLoadingMessages.value = false;
-    print('[DataController] Fetched messages for $conversationId (placeholder).');
   }
 
-  // Placeholder for sending a message
-  void sendMessage(String conversationId, String text) {
-    // Simulate sending message and receiving it back
-    final String currentUserId = user.value['id']?.toString() ?? 'currentUser';
-    final newMessage = {
-      'id': DateTime.now().millisecondsSinceEpoch.toString(), // Temporary unique ID
-      'senderId': currentUserId,
-      'text': text,
-      'timestamp': 'Now', // Simple timestamp
-    };
-    currentConversationMessages.add(newMessage);
-    // In a real app, you'd also update the 'lastMessage' for the conversation in the conversations list
-    final convIndex = conversations.indexWhere((c) => c['id'] == conversationId);
-    if (convIndex != -1) {
-      conversations[convIndex]['lastMessage'] = text;
-      conversations[convIndex]['timestamp'] = 'Now';
-      conversations.refresh(); // Notify listeners of change in list item
+  Future<Map<String, dynamic>> createNewChat(String receiverId) async {
+    try {
+      final String? token = user.value['token'];
+      if (token == null) throw Exception('User not authenticated.');
+
+      final response = await _dio.post(
+        'api/chats',
+        data: {'receiverId': receiverId},
+        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        // If a new chat is created or an existing one is returned
+        await getAllChats(); // Refresh the conversation list
+        return {'success': true, 'chat': response.data};
+      } else {
+        return {'success': false, 'message': response.data['message'] ?? 'Failed to create chat'};
+      }
+    } catch (e) {
+      print('[DataController] Error creating new chat: $e');
+      return {'success': false, 'message': e.toString()};
     }
-    print('[DataController] Sent message "$text" to $conversationId (placeholder).');
+  }
+
+  Future<Map<String, dynamic>> editMessage(String chatId, String messageId, String content) async {
+    try {
+      final String? token = user.value['token'];
+      if (token == null) throw Exception('User not authenticated.');
+
+      final response = await _dio.put(
+        'api/chats/$chatId/messages/$messageId',
+        data: {'content': content},
+        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'message': 'Message edited successfully'};
+      } else {
+        return {'success': false, 'message': response.data['message'] ?? 'Failed to edit message'};
+      }
+    } catch (e) {
+      print('[DataController] Error editing message: $e');
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> deleteMessage(String chatId, String messageId) async {
+    try {
+      final String? token = user.value['token'];
+      if (token == null) throw Exception('User not authenticated.');
+
+      final response = await _dio.delete(
+        'api/chats/$chatId/messages/$messageId',
+        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'message': 'Message deleted successfully'};
+      } else {
+        return {'success': false, 'message': response.data['message'] ?? 'Failed to delete message'};
+      }
+    } catch (e) {
+      print('[DataController] Error deleting message: $e');
+      return {'success': false, 'message': e.toString()};
+    }
   }
 
   // Add these placeholder methods inside DataController class
@@ -2302,6 +2510,157 @@ void clearUserPosts() {
 
     // Notify ProfilePage if the followed user's profile might be open
     profileUpdateTrigger.value = followedId ?? DateTime.now().millisecondsSinceEpoch.toString(); // Use timestamp as unique trigger if ID is null
+  }
+
+  void handleNewMessage(Map<String, dynamic> message) {
+    currentConversationMessages.add(message);
+  }
+
+  void handleMessageEdited(Map<String, dynamic> message) {
+    final index = currentConversationMessages.indexWhere((m) => m['_id'] == message['_id']);
+    if (index != -1) {
+      currentConversationMessages[index] = message;
+    }
+  }
+
+  void handleMessageDeleted(Map<String, dynamic> message) {
+    final index = currentConversationMessages.indexWhere((m) => m['_id'] == message['_id']);
+    if (index != -1) {
+      currentConversationMessages[index]['content'] = 'This message was deleted.';
+      currentConversationMessages[index]['deleted'] = true;
+    }
+  }
+
+  void handleTyping(Map<String, dynamic> data) {
+    isTyping.value = true;
+  }
+
+  void handleStopTyping(Map<String, dynamic> data) {
+    isTyping.value = false;
+  }
+
+  void handleMessageRead(Map<String, dynamic> data) {
+    final index = currentConversationMessages.indexWhere((m) => m['_id'] == data['messageId']);
+    if (index != -1) {
+      currentConversationMessages[index]['isRead'] = true;
+    }
+  }
+
+  // --- Group Chat Methods ---
+
+  Future<Map<String, dynamic>> createGroupChat(String groupName, List<String> participantIds) async {
+    try {
+      final String? token = user.value['token'];
+      if (token == null) throw Exception('User not authenticated.');
+
+      final response = await _dio.post(
+        'api/chats/groups',
+        data: {
+          'groupName': groupName,
+          'participantIds': participantIds,
+        },
+        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      if (response.statusCode == 201) {
+        await getAllChats(); // Refresh conversation list
+        return {'success': true, 'chat': response.data};
+      } else {
+        return {'success': false, 'message': response.data['message'] ?? 'Failed to create group chat'};
+      }
+    } catch (e) {
+      print('[DataController] Error creating group chat: $e');
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> getGroupDetails(String chatId) async {
+    try {
+      final String? token = user.value['token'];
+      if (token == null) throw Exception('User not authenticated.');
+
+      final response = await _dio.get(
+        'api/chats/groups/$chatId',
+        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'group': response.data};
+      } else {
+        return {'success': false, 'message': response.data['message'] ?? 'Failed to get group details'};
+      }
+    } catch (e) {
+      print('[DataController] Error getting group details: $e');
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  // --- Post and Reply Edit/Delete Methods ---
+
+  Future<bool> editPost(String postId, String content) async {
+    try {
+      final String? token = user.value['token'];
+      if (token == null) throw Exception('User not authenticated.');
+
+      final response = await _dio.put(
+        'api/posts/$postId',
+        data: {'content': content},
+        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print('[DataController] Error editing post: $e');
+      return false;
+    }
+  }
+
+  Future<bool> deletePost(String postId) async {
+    try {
+      final String? token = user.value['token'];
+      if (token == null) throw Exception('User not authenticated.');
+
+      final response = await _dio.delete(
+        'api/posts/$postId',
+        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print('[DataController] Error deleting post: $e');
+      return false;
+    }
+  }
+
+  Future<bool> editReply(String postId, String replyId, String content) async {
+    try {
+      final String? token = user.value['token'];
+      if (token == null) throw Exception('User not authenticated.');
+
+      final response = await _dio.put(
+        'api/posts/$postId/replies/$replyId',
+        data: {'content': content},
+        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print('[DataController] Error editing reply: $e');
+      return false;
+    }
+  }
+
+  Future<bool> deleteReply(String postId, String replyId) async {
+    try {
+      final String? token = user.value['token'];
+      if (token == null) throw Exception('User not authenticated.');
+
+      final response = await _dio.delete(
+        'api/posts/$postId/replies/$replyId',
+        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print('[DataController] Error deleting reply: $e');
+      return false;
+    }
   }
 
   void handleUserUnfollowedSocket(Map<String, dynamic> data) {

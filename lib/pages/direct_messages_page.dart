@@ -87,10 +87,12 @@ class _DirectMessagesPageState extends State<DirectMessagesPage> {
               ),
               onTap: () {
                 Get.to(() => ConversationPage(
-                  conversationId: conversation['id'] ?? 'unknown_id',
-                  username: username,
-                  userAvatar: avatarUrl,
-                ));
+                      conversationId: conversation['_id'],
+                      username: username,
+                      userAvatar: avatarUrl,
+                      receiverId: otherParticipant['_id'],
+                      isGroupChat: conversation['isGroupChat'] ?? false,
+                    ));
               },
             );
           },
@@ -98,12 +100,10 @@ class _DirectMessagesPageState extends State<DirectMessagesPage> {
       }),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          // TODO: Implement start new conversation functionality
-          Get.snackbar('Coming Soon', 'Start new conversation will be implemented.',
-              backgroundColor: Colors.blueAccent, colorText: Colors.white);
+          Get.to(() => const CreateGroupPage());
         },
         backgroundColor: Colors.tealAccent,
-        child: const Icon(FeatherIcons.edit, color: Colors.black),
+        child: const Icon(FeatherIcons.plus, color: Colors.black),
       ),
     );
   }
