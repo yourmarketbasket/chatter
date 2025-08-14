@@ -1,4 +1,5 @@
 import 'package:chatter/pages/profile_page.dart';
+import 'package:chatter/pages/conversation_page.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:chatter/controllers/data-controller.dart';
