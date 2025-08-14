@@ -123,8 +123,9 @@ class _ConversationPageState extends State<ConversationPage> {
           children: [
             CircleAvatar(
               radius: 18,
-              backgroundImage: CachedNetworkImageProvider(widget.userAvatar),
-              backgroundColor: Colors.grey[800],
+              backgroundImage: widget.userAvatar.isNotEmpty ? CachedNetworkImageProvider(widget.userAvatar) : null,
+              backgroundColor: Colors.tealAccent.withOpacity(0.3),
+              child: widget.userAvatar.isEmpty ? Text(widget.username[0], style: GoogleFonts.poppins(color: Colors.tealAccent, fontWeight: FontWeight.bold)) : null,
             ),
             const SizedBox(width: 12),
             Text(

@@ -38,7 +38,7 @@ class _GroupsListPageState extends State<GroupsListPage> {
           return const Center(child: CircularProgressIndicator(color: Colors.tealAccent));
         }
 
-        final groupChats = _dataController.conversations.where((c) => c['isGroupChat'] == true).toList();
+        final groupChats = _dataController.groupConversations;
 
         if (groupChats.isEmpty) {
           return Center(
@@ -63,8 +63,9 @@ class _GroupsListPageState extends State<GroupsListPage> {
             return ListTile(
               leading: CircleAvatar(
                 radius: 28,
-                backgroundColor: Colors.grey[800],
-                backgroundImage: CachedNetworkImageProvider(avatarUrl),
+                backgroundColor: Colors.tealAccent.withOpacity(0.3),
+                backgroundImage: avatarUrl.isNotEmpty ? CachedNetworkImageProvider(avatarUrl) : null,
+                child: avatarUrl.isEmpty ? Text(groupName[0], style: GoogleFonts.poppins(color: Colors.tealAccent, fontWeight: FontWeight.bold)) : null,
               ),
               title: Text(
                 groupName,

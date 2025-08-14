@@ -62,22 +62,35 @@ class _DirectMessagesPageState extends State<DirectMessagesPage> {
           itemBuilder: (context, index) {
             final conversation = _dataController.conversations[index];
             final bool isGroupChat = conversation['isGroupChat'] ?? false;
-            String name = '';
+
+            String name = 'Unknown';
             String avatarUrl = '';
             String receiverId = '';
+            String initials = '?';
 
             if (isGroupChat) {
               name = conversation['groupName'] ?? 'Unnamed Group';
-              avatarUrl = conversation['groupAvatar'] ?? 'https://via.placeholder.com/150/green/white?text=G';
+              avatarUrl = conversation['groupAvatar'] ?? '';
+              initials = name.isNotEmpty ? name[0].toUpperCase() : 'G';
             } else {
-              final List<dynamic> participants = conversation['participants'];
+              final List<dynamic> participants = conversation['participants'] as List? ?? [];
               final otherParticipant = participants.firstWhere(
-                (p) => p['_id'] != currentUserId,
-                orElse: () => participants.first,
+                (p) => p is Map && p['_id'] != currentUserId,
+                orElse: () => null,
               );
-              name = otherParticipant['name'] ?? 'Unknown User';
-              avatarUrl = otherParticipant['avatar'] ?? 'https://via.placeholder.com/150/teal/white?text=U';
-              receiverId = otherParticipant['_id'];
+
+              if (otherParticipant != null) {
+                name = otherParticipant['name'] ?? 'Unknown User';
+                avatarUrl = otherParticipant['avatar'] ?? '';
+                receiverId = otherParticipant['_id'] ?? '';
+                initials = name.isNotEmpty ? name[0].toUpperCase() : '?';
+              } else {
+                // Handle case where other participant isn't found (e.g., chat with self)
+                name = 'Chat with Self';
+                avatarUrl = _dataController.user.value['user']?['avatar'] ?? '';
+                receiverId = currentUserId;
+                initials = name.isNotEmpty ? name[0].toUpperCase() : 'S';
+              }
             }
 
             final String lastMessageContent = conversation['lastMessage']?['content'] ?? 'No messages yet...';
@@ -88,8 +101,9 @@ class _DirectMessagesPageState extends State<DirectMessagesPage> {
             return ListTile(
               leading: CircleAvatar(
                 radius: 28,
-                backgroundColor: Colors.grey[800],
-                backgroundImage: CachedNetworkImageProvider(avatarUrl),
+                backgroundColor: Colors.tealAccent.withOpacity(0.3),
+                backgroundImage: avatarUrl.isNotEmpty ? CachedNetworkImageProvider(avatarUrl) : null,
+                child: avatarUrl.isEmpty ? Text(initials, style: GoogleFonts.poppins(color: Colors.tealAccent, fontWeight: FontWeight.bold)) : null,
               ),
               title: Text(
                 name,

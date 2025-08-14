@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 import 'package:chatter/controllers/data-controller.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:feather_icons/feather_icons.dart';
@@ -80,7 +82,8 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
                         children: [
                           CircleAvatar(
                             radius: 50,
-                            backgroundImage: CachedNetworkImageProvider(_groupDetails['groupAvatar']),
+                            backgroundImage: (_groupDetails['groupAvatar'] as String).isNotEmpty ? CachedNetworkImageProvider(_groupDetails['groupAvatar']) : null,
+                            child: (_groupDetails['groupAvatar'] as String).isEmpty ? Text(_groupDetails['groupName'][0], style: GoogleFonts.poppins(fontSize: 40, fontWeight: FontWeight.bold)) : null,
                           ),
                           const SizedBox(height: 12),
                           Text(
@@ -107,7 +110,8 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
                       final bool isAdmin = _groupDetails['admins'].any((admin) => admin['name'] == participant['name']);
                       return ListTile(
                         leading: CircleAvatar(
-                          backgroundImage: CachedNetworkImageProvider(participant['avatar']),
+                          backgroundImage: (participant['avatar'] as String).isNotEmpty ? CachedNetworkImageProvider(participant['avatar']) : null,
+                          child: (participant['avatar'] as String).isEmpty ? Text(participant['name'][0], style: GoogleFonts.poppins(fontWeight: FontWeight.bold)) : null,
                         ),
                         title: Text(participant['name'], style: GoogleFonts.roboto(color: Colors.white)),
                         trailing: isAdmin ? Text('Admin', style: GoogleFonts.roboto(color: Colors.tealAccent)) : null,
@@ -162,7 +166,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
 
   void _showEditGroupDialog(BuildContext context) {
     final TextEditingController nameController = TextEditingController(text: _groupDetails['groupName']);
-    final TextEditingController avatarController = TextEditingController(text: _groupDetails['groupAvatar']);
+    String newAvatarUrl = _groupDetails['groupAvatar'];
 
     showDialog(
       context: context,
@@ -175,9 +179,26 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
               controller: nameController,
               decoration: const InputDecoration(labelText: 'Group Name'),
             ),
-            TextField(
-              controller: avatarController,
-              decoration: const InputDecoration(labelText: 'Group Avatar URL'),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              icon: const Icon(FeatherIcons.image),
+              label: const Text('Change Avatar'),
+              onPressed: () async {
+                // Re-use the image picking and uploading logic
+                final ImagePicker picker = ImagePicker();
+                final XFile? pickedFile = await picker.pickImage(source: ImageSource.gallery);
+                if (pickedFile != null) {
+                  final uploadResult = await _dataController.uploadFiles([
+                    {'type': 'image', 'file': File(pickedFile.path)}
+                  ]);
+                  if (uploadResult.isNotEmpty && uploadResult[0]['success']) {
+                    newAvatarUrl = uploadResult[0]['url'];
+                    Get.snackbar('Success', 'Avatar ready to be saved.');
+                  } else {
+                    Get.snackbar('Error', 'Avatar upload failed.');
+                  }
+                }
+              },
             ),
           ],
         ),
@@ -191,7 +212,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
               final result = await _dataController.updateGroupInfo(
                 widget.chatId,
                 nameController.text,
-                avatarController.text,
+                newAvatarUrl,
               );
               Navigator.pop(context);
               if (result['success']) {

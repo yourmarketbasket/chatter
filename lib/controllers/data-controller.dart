@@ -40,6 +40,7 @@ class DataController extends GetxController {
 
   // Add these Rx variables inside DataController class
   final RxList<Map<String, dynamic>> conversations = <Map<String, dynamic>>[].obs;
+  final RxList<Map<String, dynamic>> groupConversations = <Map<String, dynamic>>[].obs;
   final RxBool isLoadingConversations = false.obs;
   final RxList<Map<String, dynamic>> currentConversationMessages = <Map<String, dynamic>>[].obs;
   final RxBool isLoadingMessages = false.obs;
@@ -1135,7 +1136,9 @@ class DataController extends GetxController {
 
       if (response.statusCode == 200) {
         final List<dynamic> chatData = response.data;
-        conversations.assignAll(chatData.map((data) => Map<String, dynamic>.from(data)).toList());
+        final allConvos = chatData.map((data) => Map<String, dynamic>.from(data)).toList();
+        conversations.assignAll(allConvos);
+        groupConversations.assignAll(allConvos.where((c) => c['isGroupChat'] == true).toList());
       } else {
         throw Exception('Failed to load chats: ${response.data['message']}');
       }
