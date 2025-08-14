@@ -38,7 +38,7 @@ class _GroupsListPageState extends State<GroupsListPage> {
           return const Center(child: CircularProgressIndicator(color: Colors.tealAccent));
         }
 
-        final groupChats = _dataController.conversations.where((c) => c['isGroupChat'] ?? false).toList();
+        final groupChats = _dataController.conversations.where((c) => c['isGroupChat'] == true).toList();
 
         if (groupChats.isEmpty) {
           return Center(

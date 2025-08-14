@@ -2519,7 +2519,9 @@ void clearUserPosts() {
   void handleMessageEdited(Map<String, dynamic> message) {
     final index = currentConversationMessages.indexWhere((m) => m['_id'] == message['_id']);
     if (index != -1) {
-      currentConversationMessages[index] = message;
+      currentConversationMessages[index]['content'] = message['content'];
+      currentConversationMessages[index]['edited'] = true;
+      currentConversationMessages.refresh();
     }
   }
 
@@ -2528,6 +2530,7 @@ void clearUserPosts() {
     if (index != -1) {
       currentConversationMessages[index]['content'] = 'This message was deleted.';
       currentConversationMessages[index]['deleted'] = true;
+      currentConversationMessages.refresh();
     }
   }
 
@@ -2660,6 +2663,44 @@ void clearUserPosts() {
     } catch (e) {
       print('[DataController] Error deleting reply: $e');
       return false;
+    }
+  }
+
+  // --- Post/Reply Real-time Handlers ---
+
+  void handlePostEdited(Map<String, dynamic> post) {
+    final index = posts.indexWhere((p) => p['_id'] == post['_id']);
+    if (index != -1) {
+      posts[index]['content'] = post['content'];
+      posts[index]['edited'] = true;
+      posts.refresh();
+    }
+  }
+
+  void handlePostDeleted(Map<String, dynamic> post) {
+    final index = posts.indexWhere((p) => p['_id'] == post['_id']);
+    if (index != -1) {
+      posts[index]['content'] = '[This post has been deleted]';
+      posts[index]['deleted'] = true;
+      posts.refresh();
+    }
+  }
+
+  void handleReplyEdited(Map<String, dynamic> reply) {
+    for (var post in posts) {
+      if (_findAndUpdateNestedReply(post['replies'], reply['_id'], {'content': reply['content'], 'edited': true})) {
+        posts.refresh();
+        break;
+      }
+    }
+  }
+
+  void handleReplyDeleted(Map<String, dynamic> reply) {
+    for (var post in posts) {
+      if (_findAndUpdateNestedReply(post['replies'], reply['_id'], {'content': '[This reply has been deleted]', 'deleted': true})) {
+        posts.refresh();
+        break;
+      }
     }
   }
 

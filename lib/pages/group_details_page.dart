@@ -62,7 +62,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
           IconButton(
             icon: const Icon(FeatherIcons.edit),
             onPressed: () {
-              // TODO: Implement edit group info
+              _showEditGroupDialog(context);
             },
           )
         ],
@@ -157,6 +157,53 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
                 ],
               ),
             ),
+    );
+  }
+
+  void _showEditGroupDialog(BuildContext context) {
+    final TextEditingController nameController = TextEditingController(text: _groupDetails['groupName']);
+    final TextEditingController avatarController = TextEditingController(text: _groupDetails['groupAvatar']);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Group Info'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(labelText: 'Group Name'),
+            ),
+            TextField(
+              controller: avatarController,
+              decoration: const InputDecoration(labelText: 'Group Avatar URL'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final result = await _dataController.updateGroupInfo(
+                widget.chatId,
+                nameController.text,
+                avatarController.text,
+              );
+              Navigator.pop(context);
+              if (result['success']) {
+                _fetchGroupDetails();
+              } else {
+                Get.snackbar('Error', result['message'] ?? 'Failed to update group info.');
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
     );
   }
 

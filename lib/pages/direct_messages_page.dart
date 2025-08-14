@@ -61,14 +61,25 @@ class _DirectMessagesPageState extends State<DirectMessagesPage> {
           separatorBuilder: (context, index) => Divider(color: Colors.grey[850], height: 1, indent: 80),
           itemBuilder: (context, index) {
             final conversation = _dataController.conversations[index];
-            final List<dynamic> participants = conversation['participants'];
-            final otherParticipant = participants.firstWhere(
-              (p) => p['_id'] != currentUserId,
-              orElse: () => participants.first, // Fallback for group chats or errors
-            );
+            final bool isGroupChat = conversation['isGroupChat'] ?? false;
+            String name = '';
+            String avatarUrl = '';
+            String receiverId = '';
 
-            final String avatarUrl = otherParticipant['avatar'] ?? 'https://via.placeholder.com/150/teal/white?text=U';
-            final String username = otherParticipant['name'] ?? 'Unknown User';
+            if (isGroupChat) {
+              name = conversation['groupName'] ?? 'Unnamed Group';
+              avatarUrl = conversation['groupAvatar'] ?? 'https://via.placeholder.com/150/green/white?text=G';
+            } else {
+              final List<dynamic> participants = conversation['participants'];
+              final otherParticipant = participants.firstWhere(
+                (p) => p['_id'] != currentUserId,
+                orElse: () => participants.first,
+              );
+              name = otherParticipant['name'] ?? 'Unknown User';
+              avatarUrl = otherParticipant['avatar'] ?? 'https://via.placeholder.com/150/teal/white?text=U';
+              receiverId = otherParticipant['_id'];
+            }
+
             final String lastMessageContent = conversation['lastMessage']?['content'] ?? 'No messages yet...';
             final String timestamp = conversation['lastMessage'] != null
                 ? TimeOfDay.fromDateTime(DateTime.parse(conversation['lastMessage']['createdAt'])).format(context)
@@ -81,7 +92,7 @@ class _DirectMessagesPageState extends State<DirectMessagesPage> {
                 backgroundImage: CachedNetworkImageProvider(avatarUrl),
               ),
               title: Text(
-                username,
+                name,
                 style: GoogleFonts.poppins(fontWeight: FontWeight.w500, color: Colors.white, fontSize: 16),
               ),
               subtitle: Text(
@@ -97,10 +108,10 @@ class _DirectMessagesPageState extends State<DirectMessagesPage> {
               onTap: () {
                 Get.to(() => ConversationPage(
                       conversationId: conversation['_id'],
-                      username: username,
+                      username: name,
                       userAvatar: avatarUrl,
-                      receiverId: otherParticipant['_id'],
-                      isGroupChat: conversation['isGroupChat'] ?? false,
+                      receiverId: receiverId,
+                      isGroupChat: isGroupChat,
                     ));
               },
             );

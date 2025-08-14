@@ -361,5 +361,11 @@ class SocketService {
       print('[SocketService] message-read event received: $data');
       _dataController.handleMessageRead(data);
     });
+
+    // --- Post/Reply Real-time Handlers ---
+    _socket!.on('postEdited', (data) => _dataController.handlePostEdited(data));
+    _socket!.on('postDeleted', (data) => _dataController.handlePostDeleted(data));
+    _socket!.on('replyEdited', (data) => _dataController.handleReplyEdited(data));
+    _socket!.on('replyDeleted', (data) => _dataController.handleReplyDeleted(data));
   }
 }
