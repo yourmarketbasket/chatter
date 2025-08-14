@@ -100,6 +100,7 @@ class DataController extends GetxController {
       // Only fetch feeds if user is actually logged in (token exists)
       if (user.value['token'] != null) {
         await fetchFeeds();
+        await getAllChats();
       }
     } catch (e) {
       print('Error fetching initial feeds: $e');

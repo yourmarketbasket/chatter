@@ -199,7 +199,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
                 if (pickedFile != null) {
                   final CroppedFile? croppedFile = await ImageCropper().cropImage(
                     sourcePath: pickedFile.path,
-                    aspectRatioPresets: [CropAspectRatioPreset.square],
+                    aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
                     uiSettings: [
                       AndroidUiSettings(toolbarTitle: 'Crop Group Avatar'),
                       IOSUiSettings(title: 'Crop Group Avatar'),

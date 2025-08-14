@@ -150,7 +150,6 @@ class AppDrawer extends StatelessWidget {
               toolbarTitle: 'Crop Your Avatar',
               toolbarColor: Colors.teal,
               toolbarWidgetColor: Colors.white,
-              initAspectRatio: CropAspectRatioPreset.square,
               lockAspectRatio: true,
               activeControlsWidgetColor: Colors.tealAccent),
           IOSUiSettings(
