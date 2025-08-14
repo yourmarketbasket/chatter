@@ -248,6 +248,54 @@ class SocketService {
       }
     });
 
+    // Chat event listeners
+    _socket!.on('online-users-changed', (data) {
+      if (data is Map<String, dynamic> && data.containsKey('onlineUsers')) {
+        _dataController.updateOnlineUsers(List<String>.from(data['onlineUsers']));
+      }
+    });
+
+    _socket!.on('receive-message', (data) {
+      if (data is Map<String, dynamic>) {
+        _dataController.handleNewMessage(data);
+      }
+    });
+
+    _socket!.on('new-message-notification', (data) {
+      if (data is Map<String, dynamic>) {
+        _dataController.showNewMessageNotification(data);
+      }
+    });
+
+    _socket!.on('typing', (data) {
+      if (data is Map<String, dynamic>) {
+        _dataController.handleTyping(data);
+      }
+    });
+
+    _socket!.on('stop-typing', (data) {
+      if (data is Map<String, dynamic>) {
+        _dataController.handleStopTyping(data);
+      }
+    });
+
+    _socket!.on('message-read', (data) {
+      if (data is Map<String, dynamic>) {
+        _dataController.handleMessageRead(data);
+      }
+    });
+
+    _socket!.on('message-edited', (data) {
+      if (data is Map<String, dynamic>) {
+        _dataController.handleMessageEdited(data);
+      }
+    });
+
+    _socket!.on('message-deleted', (data) {
+      if (data is Map<String, dynamic>) {
+        _dataController.handleMessageDeleted(data);
+      }
+    });
   }
 
   void connect() {
@@ -258,7 +306,60 @@ class SocketService {
 
   void disconnect() {
     if (_socket != null && _socket!.connected) {
+      final String? userId = _dataController.user.value['user']?['_id'];
+      if (userId != null) {
+        userOffline(userId);
+      }
       _socket!.disconnect();
+    }
+  }
+
+  // Emitter for when a user comes online
+  void userOnline(String userId) {
+    if (_socket != null && _socket!.connected) {
+      _socket!.emit('user-online', userId);
+    }
+  }
+
+  // Emitter for when a user goes offline
+  void userOffline(String userId) {
+    if (_socket != null && _socket!.connected) {
+      _socket!.emit('user-offline', userId);
+    }
+  }
+
+  // Emitter for joining a chat room
+  void joinChat(String chatId) {
+    if (_socket != null && _socket!.connected) {
+      _socket!.emit('join-chat', chatId);
+    }
+  }
+
+  // Emitter for sending a message
+  void sendChatMessage(Map<String, dynamic> messageData) {
+    if (_socket != null && _socket!.connected) {
+      _socket!.emit('send-message', messageData);
+    }
+  }
+
+  // Emitter for when a user starts typing
+  void typing(String chatId, Map<String, dynamic> user) {
+    if (_socket != null && _socket!.connected) {
+      _socket!.emit('typing', {'chatId': chatId, 'user': user});
+    }
+  }
+
+  // Emitter for when a user stops typing
+  void stopTyping(String chatId, Map<String, dynamic> user) {
+    if (_socket != null && _socket!.connected) {
+      _socket!.emit('stop-typing', {'chatId': chatId, 'user': user});
+    }
+  }
+
+  // Emitter for marking a message as read
+  void markAsRead(String messageId, String chatId, String userId) {
+    if (_socket != null && _socket!.connected) {
+      _socket!.emit('mark-as-read', {'messageId': messageId, 'chatId': chatId, 'userId': userId});
     }
   }
 

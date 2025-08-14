@@ -1,4 +1,10 @@
 import 'dart:io';
+import 'package:chatter/models/chat_model.dart';
+import 'package:chatter/models/message_model.dart';
+import 'package:chatter/models/user_model.dart';
+import 'package:chatter/services/chat_service.dart';
+import 'package:chatter/services/notification_service.dart';
+import 'package:chatter/services/socket-service.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -10,6 +16,7 @@ import '../services/upload_service.dart'; // Import the UploadService
 
 class DataController extends GetxController {
   final UploadService _uploadService = UploadService(); // Instantiate UploadService
+  final ChatService _chatService = ChatService();
 
   final RxBool isLoading = false.obs;
   final FlutterSecureStorage _storage = const FlutterSecureStorage(
@@ -38,11 +45,14 @@ class DataController extends GetxController {
   // Placeholder for all users
   final RxList<Map<String, dynamic>> allUsers = <Map<String, dynamic>>[].obs;
 
-  // Add these Rx variables inside DataController class
-  final RxList<Map<String, dynamic>> conversations = <Map<String, dynamic>>[].obs;
-  final RxBool isLoadingConversations = false.obs;
-  final RxList<Map<String, dynamic>> currentConversationMessages = <Map<String, dynamic>>[].obs;
+  // Chat-related state
+  final RxList<ChatModel> chats = <ChatModel>[].obs;
+  final RxBool isLoadingChats = false.obs;
+  final RxString currentChatId = ''.obs;
+  final RxList<MessageModel> messages = <MessageModel>[].obs;
   final RxBool isLoadingMessages = false.obs;
+  final RxList<String> onlineUsers = <String>[].obs;
+  final RxMap<String, bool> typingUsers = <String, bool>{}.obs;
 
   // Add these Rx variables inside DataController class
   final RxList<Map<String, dynamic>> followers = <Map<String, dynamic>>[].obs;
@@ -89,8 +99,10 @@ class DataController extends GetxController {
       final String? currentUserId = user.value['user']?['_id'];
       if (currentUserId != null && currentUserId.isNotEmpty) {
         print('[DataController.init] User loaded from storage. Fetching initial network data for $currentUserId');
+        Get.find<SocketService>().userOnline(currentUserId);
         fetchFollowers(currentUserId).catchError((e) => print('Error fetching followers in init: $e'));
         fetchFollowing(currentUserId).catchError((e) => print('Error fetching following in init: $e'));
+        fetchChats();
       }
     }
     // fetch initial feeds
@@ -885,6 +897,7 @@ class DataController extends GetxController {
 
           // Update the in-memory user state immediately
           user.value = jsonDecode(userJson);
+          Get.find<SocketService>().userOnline(user.value['user']['_id']);
           print('[DataController] User data saved to storage and in-memory state updated.');
 
           // Now, fetch feeds
@@ -968,67 +981,155 @@ class DataController extends GetxController {
     return uploadResults;
   }
 
-  // Add these placeholder methods inside DataController class
-
-  Future<void> fetchConversations() async {
-    isLoadingConversations.value = true;
-    await Future.delayed(const Duration(milliseconds: 800)); // Simulate network call
-    // Placeholder data
-    conversations.assignAll([
-      {'id': 'conv1', 'username': 'AliceWonder', 'userAvatar': 'https://i.pravatar.cc/150?u=alice', 'lastMessage': 'Hey, how are you?', 'timestamp': '10:30 AM'},
-      {'id': 'conv2', 'username': 'BobTheBuilder', 'userAvatar': 'https://i.pravatar.cc/150?u=bob', 'lastMessage': 'Project update is due.', 'timestamp': 'Yesterday'},
-      {'id': 'conv3', 'username': 'CharlieChap', 'userAvatar': 'https://i.pravatar.cc/150?u=charlie', 'lastMessage': 'Okay, sounds good!', 'timestamp': 'Mon'},
-    ]);
-    isLoadingConversations.value = false;
-    print('[DataController] Fetched conversations (placeholder).');
+  // Chat Methods
+  Future<void> fetchChats() async {
+    isLoadingChats.value = true;
+    try {
+      final chatList = await _chatService.getChats();
+      chats.assignAll(chatList);
+    } catch (e) {
+      print('Error fetching chats: $e');
+      Get.snackbar('Error', 'Could not load chats: ${e.toString()}',
+          backgroundColor: Colors.red, colorText: Colors.white);
+    } finally {
+      isLoadingChats.value = false;
+    }
   }
 
-  Future<void> fetchMessages(String conversationId) async {
+  Future<void> createChat(String receiverId) async {
+    try {
+      final chat = await _chatService.createChat(receiverId);
+      if (!chats.any((c) => c.id == chat.id)) {
+        chats.insert(0, chat);
+      }
+      final otherParticipant = chat.participants.firstWhere((p) => p.id == receiverId, orElse: () => chat.participants.first);
+      // Navigate to conversation page
+      Get.to(() => ConversationPage(
+            chatId: chat.id,
+            receiver: otherParticipant,
+          ));
+    } catch (e) {
+      print('Error creating chat: $e');
+      Get.snackbar('Error', 'Could not create chat: ${e.toString()}',
+          backgroundColor: Colors.red, colorText: Colors.white);
+    }
+  }
+
+  Future<void> fetchMessages(String chatId) async {
     isLoadingMessages.value = true;
-    currentConversationMessages.clear(); // Clear previous messages
-    await Future.delayed(const Duration(milliseconds: 500)); // Simulate network call
-    // Placeholder data - In real app, filter/fetch by conversationId
-    // Assuming 'currentUser' is the ID of the logged-in user.
-    // You should get this from your user object, e.g., user.value['id']
-    final String currentUserId = user.value['id']?.toString() ?? 'currentUser';
-
-    if (conversationId == 'conv1') {
-      currentConversationMessages.assignAll([
-        {'id': 'msg1', 'senderId': 'alice', 'text': 'Hey, how are you?', 'timestamp': '10:30 AM'},
-        {'id': 'msg2', 'senderId': currentUserId, 'text': 'I am good, thanks! You?', 'timestamp': '10:31 AM'},
-        {'id': 'msg3', 'senderId': 'alice', 'text': 'Doing well!', 'timestamp': '10:32 AM'},
-      ]);
-    } else if (conversationId == 'conv2') {
-       currentConversationMessages.assignAll([
-        {'id': 'msgA', 'senderId': 'bob', 'text': 'Project update is due.', 'timestamp': 'Yesterday'},
-        {'id': 'msgB', 'senderId': currentUserId, 'text': 'Working on it!', 'timestamp': 'Yesterday'},
-      ]);
-    } else {
-      // No messages for other convos in this placeholder
+    messages.clear();
+    currentChatId.value = chatId;
+    try {
+      final messageList = await _chatService.getMessages(chatId);
+      messages.assignAll(messageList);
+      Get.find<SocketService>().joinChat(chatId);
+    } catch (e) {
+      print('Error fetching messages: $e');
+      Get.snackbar('Error', 'Could not load messages: ${e.toString()}',
+          backgroundColor: Colors.red, colorText: Colors.white);
+    } finally {
+      isLoadingMessages.value = false;
     }
-    isLoadingMessages.value = false;
-    print('[DataController] Fetched messages for $conversationId (placeholder).');
   }
 
-  // Placeholder for sending a message
-  void sendMessage(String conversationId, String text) {
-    // Simulate sending message and receiving it back
-    final String currentUserId = user.value['id']?.toString() ?? 'currentUser';
-    final newMessage = {
-      'id': DateTime.now().millisecondsSinceEpoch.toString(), // Temporary unique ID
-      'senderId': currentUserId,
-      'text': text,
-      'timestamp': 'Now', // Simple timestamp
+  void sendChatMessage(String content, String chatId, String receiverId) {
+    final String senderId = user.value['user']['_id'];
+    final sender = UserModel(id: senderId, name: user.value['user']['name'], avatar: user.value['user']['avatar']);
+    final messageData = {
+      'sender': sender.toJson(),
+      'receiver': receiverId,
+      'chat': chatId,
+      'content': content,
     };
-    currentConversationMessages.add(newMessage);
-    // In a real app, you'd also update the 'lastMessage' for the conversation in the conversations list
-    final convIndex = conversations.indexWhere((c) => c['id'] == conversationId);
-    if (convIndex != -1) {
-      conversations[convIndex]['lastMessage'] = text;
-      conversations[convIndex]['timestamp'] = 'Now';
-      conversations.refresh(); // Notify listeners of change in list item
+    Get.find<SocketService>().sendChatMessage(messageData);
+
+    // Optimistic UI update
+    final newMessage = MessageModel(
+      id: DateTime.now().millisecondsSinceEpoch.toString(), // temp id
+      sender: sender,
+      content: content,
+      isRead: false,
+      edited: false,
+      deleted: false,
+      createdAt: DateTime.now(),
+    );
+    messages.add(newMessage);
+  }
+
+  // Socket event handlers
+  void updateOnlineUsers(List<String> userIds) {
+    onlineUsers.assignAll(userIds);
+  }
+
+  void handleNewMessage(Map<String, dynamic> messageData) {
+    final newMessage = MessageModel.fromJson(messageData);
+    final String chatId = messageData['chat']; // Assuming chat id is in the message data
+    if (chatId == currentChatId.value) {
+      messages.add(newMessage);
     }
-    print('[DataController] Sent message "$text" to $conversationId (placeholder).');
+    final chatIndex = chats.indexWhere((c) => c.id == chatId);
+    if (chatIndex != -1) {
+      final oldChat = chats[chatIndex];
+      final newChat = ChatModel(
+        id: oldChat.id,
+        participants: oldChat.participants,
+        lastMessage: newMessage,
+        createdAt: oldChat.createdAt,
+        updatedAt: newMessage.createdAt,
+      );
+      chats[chatIndex] = newChat;
+      chats.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    }
+  }
+
+  void showNewMessageNotification(Map<String, dynamic> messageData) {
+    final message = MessageModel.fromJson(messageData);
+    Get.find<NotificationService>().showTestNotification(); // Using test notification for now
+  }
+
+  void handleTyping(Map<String, dynamic> data) {
+    final String chatId = data['chatId'];
+    final String userId = data['user']['_id'];
+    typingUsers['$chatId-$userId'] = true;
+  }
+
+  void handleStopTyping(Map<String, dynamic> data) {
+    final String chatId = data['chatId'];
+    final String userId = data['user']['_id'];
+    typingUsers.remove('$chatId-$userId');
+  }
+
+  void handleMessageRead(Map<String, dynamic> data) {
+    final String messageId = data['messageId'];
+    final messageIndex = messages.indexWhere((m) => m.id == messageId);
+    if (messageIndex != -1) {
+      final oldMessage = messages[messageIndex];
+      final newMessage = MessageModel(
+          id: oldMessage.id,
+          sender: oldMessage.sender,
+          content: oldMessage.content,
+          isRead: true,
+          edited: oldMessage.edited,
+          deleted: oldMessage.deleted,
+          createdAt: oldMessage.createdAt);
+      messages[messageIndex] = newMessage;
+    }
+  }
+
+  void handleMessageEdited(Map<String, dynamic> messageData) {
+    final updatedMessage = MessageModel.fromJson(messageData);
+    final messageIndex = messages.indexWhere((m) => m.id == updatedMessage.id);
+    if (messageIndex != -1) {
+      messages[messageIndex] = updatedMessage;
+    }
+  }
+
+  void handleMessageDeleted(Map<String, dynamic> messageData) {
+    final updatedMessage = MessageModel.fromJson(messageData);
+    final messageIndex = messages.indexWhere((m) => m.id == updatedMessage.id);
+    if (messageIndex != -1) {
+      messages[messageIndex] = updatedMessage;
+    }
   }
 
   // Add these placeholder methods inside DataController class
@@ -1271,6 +1372,126 @@ class DataController extends GetxController {
       followers.clear();
       following.clear();
       // Potentially rethrow or handle error in a way that UI can respond if needed
+    }
+  }
+
+  // Post and Reply Edit/Delete Methods
+  Future<Map<String, dynamic>> updatePost(String postId, String content) async {
+    try {
+      String? token = user.value['token'];
+      if (token == null) {
+        return {'success': false, 'message': 'User not logged in'};
+      }
+
+      var response = await _dio.put(
+        'api/posts/$postId',
+        data: {'content': content},
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        updatePostFromSocket(response.data);
+        return {'success': true, 'message': 'Post updated successfully'};
+      } else {
+        return {'success': false, 'message': response.data['message'] ?? 'Post update failed'};
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> deletePost(String postId) async {
+    try {
+      String? token = user.value['token'];
+      if (token == null) {
+        return {'success': false, 'message': 'User not logged in'};
+      }
+
+      var response = await _dio.delete(
+        'api/posts/$postId',
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final index = posts.indexWhere((p) => p['_id'] == postId);
+        if (index != -1) {
+          final post = posts[index];
+          post['content'] = '[This post has been deleted]';
+          post['likes'] = [];
+          post['reposts'] = [];
+          post['updatedAt'] = DateTime.now().toIso8601String();
+          posts[index] = post;
+          posts.refresh();
+        }
+        return {'success': true, 'message': 'Post deleted successfully'};
+      } else {
+        return {'success': false, 'message': response.data['message'] ?? 'Post deletion failed'};
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> updateReply(String postId, String replyId, String content) async {
+    try {
+      String? token = user.value['token'];
+      if (token == null) {
+        return {'success': false, 'message': 'User not logged in'};
+      }
+
+      var response = await _dio.put(
+        'api/posts/$postId/replies/$replyId',
+        data: {'content': content},
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        await fetchSinglePost(postId);
+        return {'success': true, 'message': 'Reply updated successfully'};
+      } else {
+        return {'success': false, 'message': response.data['message'] ?? 'Reply update failed'};
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> deleteReply(String postId, String replyId) async {
+    try {
+      String? token = user.value['token'];
+      if (token == null) {
+        return {'success': false, 'message': 'User not logged in'};
+      }
+
+      var response = await _dio.delete(
+        'api/posts/$postId/replies/$replyId',
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        await fetchSinglePost(postId);
+        return {'success': true, 'message': 'Reply deleted successfully'};
+      } else {
+        return {'success': false, 'message': response.data['message'] ?? 'Reply deletion failed'};
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
     }
   }
 

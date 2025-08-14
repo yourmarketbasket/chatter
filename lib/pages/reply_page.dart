@@ -293,6 +293,104 @@ class _ReplyPageState extends State<ReplyPage> {
     super.dispose();
   }
 
+  void _showEditReplyDialog(BuildContext context, Map<String, dynamic> reply) {
+    final TextEditingController textController = TextEditingController(text: reply['content']);
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Edit Reply'),
+        content: TextField(
+          controller: textController,
+          autofocus: true,
+          maxLines: null,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Get.back();
+              await _dataController.updateReply(widget.originalPostId ?? widget.post['_id'] as String, reply['_id'] as String, textController.text);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteReplyDialog(BuildContext context, Map<String, dynamic> reply) {
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Delete Reply'),
+        content: const Text('Are you sure you want to delete this reply?'),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Get.back();
+              await _dataController.deleteReply(widget.originalPostId ?? widget.post['_id'] as String, reply['_id'] as String);
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditPostDialog(BuildContext context, Map<String, dynamic> post) {
+    final TextEditingController textController = TextEditingController(text: post['content']);
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Edit Post'),
+        content: TextField(
+          controller: textController,
+          autofocus: true,
+          maxLines: null,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Get.back();
+              await _dataController.updatePost(post['_id'] as String, textController.text);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeletePostDialog(BuildContext context, Map<String, dynamic> post) {
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Delete Post'),
+        content: const Text('Are you sure you want to delete this post?'),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Get.back();
+              await _dataController.deletePost(post['_id'] as String);
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<File?> _downloadFile(String url, String filename, String type) async {
     try {
       final response = await http.get(Uri.parse(url));
@@ -374,6 +472,8 @@ class _ReplyPageState extends State<ReplyPage> {
         return ActionsBottomSheetContent(
           post: _mainPostData,
           showSnackBar: (title, message, color) => _showSnackBar(title, message, color), // Pass non-success version
+          onEdit: () => _showEditPostDialog(context, _mainPostData),
+          onDelete: () => _showDeletePostDialog(context, _mainPostData),
         );
       },
     );
@@ -569,6 +669,8 @@ class _ReplyPageState extends State<ReplyPage> {
           refreshReplies: () => _fetchPostReplies(showLoadingIndicator: false),
           onReplyDataUpdated: (updatedReply) { if (mounted) setState(() => _updateNestedReply(_replies, updatedReply)); },
           postDepth: widget.postDepth + 1, // For first-level replies
+          onEdit: () => _showEditReplyDialog(context, firstLevelReply),
+          onDelete: () => _showDeleteReplyDialog(context, firstLevelReply),
         )
       );
 
@@ -737,6 +839,8 @@ class _ReplyPageState extends State<ReplyPage> {
                           if (mounted) setState(() { _mainPostData = updatedPost; });
                         },
                         postDepth: widget.postDepth,
+                        onEdit: () => _showEditPostDialog(context, _mainPostData),
+                        onDelete: () => _showDeletePostDialog(context, _mainPostData),
                       ),
                     ),
                   ),

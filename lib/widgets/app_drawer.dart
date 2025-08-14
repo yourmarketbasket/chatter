@@ -1,3 +1,4 @@
+import 'package:chatter/pages/chat_list_page.dart';
 import 'package:chatter/pages/home-feed-screen.dart';
 import 'package:chatter/pages/users_list_page.dart';
 import 'package:chatter/pages/followers_page.dart';
@@ -428,6 +429,14 @@ class AppDrawer extends StatelessWidget {
                   onTap: () {
                     Get.back();
                     Get.to(() => const UsersListPage());
+                  },
+                ),
+                ListTile(
+                  leading: Icon(FeatherIcons.messageSquare, color: Colors.grey[300]),
+                  title: Text('Messages', style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16)),
+                  onTap: () {
+                    Get.back();
+                    Get.to(() => const ChatListPage());
                   },
                 ),
                 ListTile(

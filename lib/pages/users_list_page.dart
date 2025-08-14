@@ -207,26 +207,37 @@ class _UsersListPageState extends State<UsersListPage> {
                 // Listen to changes in the loading state for this specific user's button
                 final bool isLoadingFollowAction = _isUpdatingFollowStatus[userId] ?? false;
 
-                return ElevatedButton(
-                  onPressed: isLoadingFollowAction ? null : () => _toggleFollow(userId, isFollowing),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isFollowing ? Colors.transparent : Colors.white,
-                    foregroundColor: isFollowing ? Colors.white : Colors.black,
-                    side: isFollowing ? BorderSide(color: Colors.grey[700]!) : null,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    minimumSize: const Size(90, 36), // Ensure button has a decent size
-                  ),
-                  child: isLoadingFollowAction
-                      ? SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(isFollowing ? Colors.white : Colors.black),
-                          ),
-                        )
-                      : Text(isFollowing ? 'Unfollow' : 'Follow', style: GoogleFonts.roboto(fontWeight: FontWeight.bold, fontSize: 13)),
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ElevatedButton(
+                      onPressed: isLoadingFollowAction ? null : () => _toggleFollow(userId, isFollowing),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isFollowing ? Colors.transparent : Colors.white,
+                        foregroundColor: isFollowing ? Colors.white : Colors.black,
+                        side: isFollowing ? BorderSide(color: Colors.grey[700]!) : null,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        minimumSize: const Size(90, 36), // Ensure button has a decent size
+                      ),
+                      child: isLoadingFollowAction
+                          ? SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(isFollowing ? Colors.white : Colors.black),
+                              ),
+                            )
+                          : Text(isFollowing ? 'Unfollow' : 'Follow', style: GoogleFonts.roboto(fontWeight: FontWeight.bold, fontSize: 13)),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(FeatherIcons.messageCircle),
+                      onPressed: () => _dataController.createChat(userId),
+                      color: Colors.white,
+                    ),
+                  ],
                 );
               }),
               onTap: () {
