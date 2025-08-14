@@ -2,6 +2,8 @@ import 'package:chatter/pages/home-feed-screen.dart';
 import 'package:chatter/pages/users_list_page.dart';
 import 'package:chatter/pages/followers_page.dart';
 import 'package:chatter/pages/login.dart';
+import 'package:chatter/pages/direct_messages_page.dart';
+import 'package:chatter/pages/groups_list_page.dart';
 import 'package:chatter/pages/user_posts_page.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -428,6 +430,22 @@ class AppDrawer extends StatelessWidget {
                   onTap: () {
                     Get.back();
                     Get.to(() => const UsersListPage());
+                  },
+                ),
+                ListTile(
+                  leading: Icon(FeatherIcons.messageSquare, color: Colors.grey[300]),
+                  title: Text('Chats', style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16)),
+                  onTap: () {
+                    Get.back();
+                    Get.to(() => const DirectMessagesPage());
+                  },
+                ),
+                ListTile(
+                  leading: Icon(FeatherIcons.users, color: Colors.grey[300]),
+                  title: Text('Groups', style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16)),
+                  onTap: () {
+                    Get.back();
+                    Get.to(() => const GroupsListPage());
                   },
                 ),
                 ListTile(

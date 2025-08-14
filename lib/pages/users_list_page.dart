@@ -229,11 +229,19 @@ class _UsersListPageState extends State<UsersListPage> {
                       : Text(isFollowing ? 'Unfollow' : 'Follow', style: GoogleFonts.roboto(fontWeight: FontWeight.bold, fontSize: 13)),
                 );
               }),
-              onTap: () {
-                if (username.isNotEmpty && userId.isNotEmpty) {
-                   Get.to(() => ProfilePage(userId: userId, username: username, userAvatarUrl: avatarUrl));
+              onTap: () async {
+                final result = await _dataController.createNewChat(userId);
+                if (result['success']) {
+                  final chat = result['chat'];
+                  Get.to(() => ConversationPage(
+                        conversationId: chat['_id'],
+                        username: name,
+                        userAvatar: avatarUrl,
+                        receiverId: userId,
+                        isGroupChat: false,
+                      ));
                 } else {
-                  Get.snackbar('Error', 'Cannot navigate to profile: User data incomplete.', snackPosition: SnackPosition.BOTTOM);
+                  Get.snackbar('Error', result['message'] ?? 'Could not start chat.');
                 }
               },
             );
