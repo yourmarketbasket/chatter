@@ -1,5 +1,6 @@
 import 'package:chatter/controllers/data-controller.dart';
 import 'package:chatter/pages/conversation_page.dart';
+import 'package:chatter/pages/create_group_page.dart';
 import 'package:chatter/widgets/app_drawer.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -20,17 +21,17 @@ class _DirectMessagesPageState extends State<DirectMessagesPage> {
   @override
   void initState() {
     super.initState();
-    // Call placeholder fetch method if conversations are empty
-    if (_dataController.conversations.isEmpty) {
-      _dataController.fetchConversations().catchError((e) {
-        Get.snackbar('Error', 'Could not load conversations: ${e.toString()}',
-            backgroundColor: Colors.red, colorText: Colors.white);
-      });
-    }
+    // Call the new method to fetch real chat data
+    _dataController.getAllChats().catchError((e) {
+      Get.snackbar('Error', 'Could not load conversations: ${e.toString()}',
+          backgroundColor: Colors.red, colorText: Colors.white);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final String currentUserId = _dataController.user.value['user']['_id'];
+
     return Scaffold(
       backgroundColor: const Color(0xFF000000),
       appBar: AppBar(
@@ -60,10 +61,18 @@ class _DirectMessagesPageState extends State<DirectMessagesPage> {
           separatorBuilder: (context, index) => Divider(color: Colors.grey[850], height: 1, indent: 80),
           itemBuilder: (context, index) {
             final conversation = _dataController.conversations[index];
-            final String avatarUrl = conversation['userAvatar'] ?? 'https://via.placeholder.com/150/teal/white?text=U';
-            final String username = conversation['username'] ?? 'Unknown User';
-            final String lastMessage = conversation['lastMessage'] ?? 'No messages yet...';
-            final String timestamp = conversation['timestamp'] ?? ''; // Should be formatted date/time
+            final List<dynamic> participants = conversation['participants'];
+            final otherParticipant = participants.firstWhere(
+              (p) => p['_id'] != currentUserId,
+              orElse: () => participants.first, // Fallback for group chats or errors
+            );
+
+            final String avatarUrl = otherParticipant['avatar'] ?? 'https://via.placeholder.com/150/teal/white?text=U';
+            final String username = otherParticipant['name'] ?? 'Unknown User';
+            final String lastMessageContent = conversation['lastMessage']?['content'] ?? 'No messages yet...';
+            final String timestamp = conversation['lastMessage'] != null
+                ? TimeOfDay.fromDateTime(DateTime.parse(conversation['lastMessage']['createdAt'])).format(context)
+                : '';
 
             return ListTile(
               leading: CircleAvatar(
@@ -76,13 +85,13 @@ class _DirectMessagesPageState extends State<DirectMessagesPage> {
                 style: GoogleFonts.poppins(fontWeight: FontWeight.w500, color: Colors.white, fontSize: 16),
               ),
               subtitle: Text(
-                lastMessage,
+                lastMessageContent,
                 style: GoogleFonts.roboto(color: Colors.grey[400], fontSize: 14),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
               trailing: Text(
-                timestamp, // e.g., "10:30 AM" or "Yesterday"
+                timestamp,
                 style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 12),
               ),
               onTap: () {

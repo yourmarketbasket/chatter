@@ -1,4 +1,8 @@
 import 'package:chatter/controllers/data-controller.dart';
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
+import 'package:record/record.dart';
+import 'package:chatter/pages/group_details_page.dart';
 import 'package:chatter/services/socket-service.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';

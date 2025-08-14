@@ -372,7 +372,7 @@ class _ReplyPageState extends State<ReplyPage> {
       backgroundColor: const Color(0xFF2C2C2C),
       builder: (BuildContext context) {
         return ActionsBottomSheetContent(
-          post: _mainPostD ata,
+          post: _mainPostData,
           showSnackBar: (title, message, color) => _showSnackBar(title, message, color),
           isReply: widget.postDepth > 0,
           originalPostId: widget.originalPostId,
