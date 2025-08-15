@@ -1,4 +1,6 @@
-import 'package:chatter/pages/group_conversation_page.dart';
+import 'package:chatter/models/chat_models.dart';
+import 'package:chatter/models/feed_models.dart';
+import 'package:chatter/pages/chat_screen_page.dart';
 import 'package:flutter/material.dart';
 
 class GroupsPage extends StatefulWidget {
@@ -9,9 +11,6 @@ class GroupsPage extends StatefulWidget {
 }
 
 class _GroupsPageState extends State<GroupsPage> {
-  bool _isSearching = false;
-  final TextEditingController _searchController = TextEditingController();
-
   final List<Map<String, dynamic>> _dummyGroups = [
     {
       'name': 'Family Group',
@@ -51,12 +50,6 @@ class _GroupsPageState extends State<GroupsPage> {
     },
     // Add more dummy data as needed
   ];
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -140,10 +133,20 @@ class _GroupsPageState extends State<GroupsPage> {
               ],
             ),
             onTap: () {
+              final chat = Chat(
+                id: 'group_$index', // Dummy ID
+                isGroup: true,
+                groupName: group['name'],
+                groupAvatar: null, // No avatar in dummy data
+                participants: (group['participants'] as List<String>)
+                    .map((name) => User(id: name.toLowerCase(), name: name))
+                    .toList(),
+              );
+
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => GroupChatScreen(groupChat: _dummyGroups[index]),
+                  builder: (context) => ChatScreen(chat: chat),
                 ),
               );
             },

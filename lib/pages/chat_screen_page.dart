@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:chatter/controllers/data-controller.dart';
 import 'package:chatter/models/chat_models.dart';
+import 'package:chatter/models/feed_models.dart';
 import 'package:chatter/widgets/message_input_area.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';

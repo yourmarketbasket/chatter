@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:audioplayers/audioplayers.dart';
+import 'package:audioplayers/audioplayers.dart' as ap;
 import 'package:audio_waveforms/audio_waveforms.dart';
 
 class VoiceNotePreviewDialog extends StatefulWidget {
@@ -18,7 +18,7 @@ class VoiceNotePreviewDialog extends StatefulWidget {
 }
 
 class _VoiceNotePreviewDialogState extends State<VoiceNotePreviewDialog> {
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  final ap.AudioPlayer _audioPlayer = ap.AudioPlayer();
   late final WaveformController _waveformController;
   bool _isPlaying = false;
   Duration _duration = Duration.zero;
@@ -29,13 +29,12 @@ class _VoiceNotePreviewDialogState extends State<VoiceNotePreviewDialog> {
     _waveformController = WaveformController(
       initialWaveform: [],
       sampleRate: 44100,
-      waveformType: WaveformType.live,
     )..extractWaveformData(widget.audioPath).then((_) {
       if (mounted) setState(() {});
     });
 
     _audioPlayer.onPlayerStateChanged.listen((state) {
-      if (mounted) setState(() => _isPlaying = state == PlayerState.playing);
+      if (mounted) setState(() => _isPlaying = state == ap.PlayerState.playing);
     });
 
     _audioPlayer.onDurationChanged.listen((duration) {
@@ -59,7 +58,7 @@ class _VoiceNotePreviewDialogState extends State<VoiceNotePreviewDialog> {
         children: [
           AudioWaveforms(
             size: Size(MediaQuery.of(context).size.width * 0.5, 50),
-            controller: _waveformController,
+            waveformController: _waveformController,
             enableGesture: true,
             waveStyle: const WaveStyle(
               waveColor: Colors.white,
@@ -76,7 +75,7 @@ class _VoiceNotePreviewDialogState extends State<VoiceNotePreviewDialog> {
               if (_isPlaying) {
                 _audioPlayer.pause();
               } else {
-                _audioPlayer.play(DeviceFileSource(widget.audioPath));
+                _audioPlayer.play(ap.DeviceFileSource(widget.audioPath));
               }
             },
           ),
