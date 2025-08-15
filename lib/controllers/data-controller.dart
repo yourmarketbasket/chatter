@@ -1041,6 +1041,50 @@ class DataController extends GetxController {
     }
   }
 
+  Future<void> editChatMessage(String messageId, String newText) async {
+    final int index = currentConversationMessages.indexWhere((m) => m.id == messageId);
+    if (index != -1) {
+      final originalMessage = currentConversationMessages[index];
+      final editedMessage = ChatMessage(
+        id: originalMessage.id,
+        chatId: originalMessage.chatId,
+        senderId: originalMessage.senderId,
+        text: newText,
+        attachments: originalMessage.attachments,
+        voiceNote: originalMessage.voiceNote,
+        status: originalMessage.status,
+        createdAt: originalMessage.createdAt,
+        replyTo: originalMessage.replyTo,
+        edited: true,
+      );
+      currentConversationMessages[index] = editedMessage;
+
+      // TODO: API call to edit message on backend
+    }
+  }
+
+  Future<void> deleteChatMessage(String messageId) async {
+    final int index = currentConversationMessages.indexWhere((m) => m.id == messageId);
+    if (index != -1) {
+      final originalMessage = currentConversationMessages[index];
+      final deletedMessage = ChatMessage(
+        id: originalMessage.id,
+        chatId: originalMessage.chatId,
+        senderId: originalMessage.senderId,
+        text: 'Message deleted',
+        attachments: null,
+        voiceNote: null,
+        status: originalMessage.status,
+        createdAt: originalMessage.createdAt,
+        replyTo: originalMessage.replyTo,
+        deleted: true,
+      );
+      currentConversationMessages[index] = deletedMessage;
+
+      // TODO: API call to delete message on backend
+    }
+  }
+
   // Add these placeholder methods inside DataController class
 
   Future<void> fetchFollowers(String userId) async {

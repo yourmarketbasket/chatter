@@ -41,6 +41,8 @@ class ChatMessage {
   final MessageStatus status;
   final DateTime createdAt;
   final String? replyTo; // This will be the ID of the message being replied to
+  final bool edited;
+  final bool deleted;
 
   ChatMessage({
     String? id,
@@ -52,6 +54,8 @@ class ChatMessage {
     this.status = MessageStatus.sending,
     DateTime? createdAt,
     this.replyTo,
+    this.edited = false,
+    this.deleted = false,
   })  : id = id ?? ObjectId().hexString,
         createdAt = createdAt ?? DateTime.now();
 
@@ -73,6 +77,8 @@ class ChatMessage {
       ),
       createdAt: DateTime.parse(json['createdAt'] as String),
       replyTo: json['replyTo'] as String?,
+      edited: json['edited'] as bool? ?? false,
+      deleted: json['deleted'] as bool? ?? false,
     );
   }
 
@@ -87,6 +93,8 @@ class ChatMessage {
       'status': status.toString().split('.').last,
       'createdAt': createdAt.toIso8601String(),
       'replyTo': replyTo,
+      'edited': edited,
+      'deleted': deleted,
     };
   }
 }

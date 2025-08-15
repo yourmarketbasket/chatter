@@ -73,7 +73,9 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           TextButton(
             onPressed: () {
-              // TODO: Implement message editing logic in DataController
+              if (editController.text.trim().isNotEmpty) {
+                dataController.editChatMessage(message.id, editController.text.trim());
+              }
               Navigator.pop(context);
             },
             child: const Text('Save'),
@@ -84,7 +86,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _deleteMessage(ChatMessage message) {
-    // TODO: Implement message deletion logic in DataController
+    dataController.deleteChatMessage(message.id);
   }
 
   void _showMessageOptions(ChatMessage message) {
@@ -313,7 +315,15 @@ class _ChatScreenState extends State<ChatScreen> {
                 if (message.text != null && message.text!.isNotEmpty)
                   const SizedBox(height: 8),
               ],
-              if (message.text != null && message.text!.isNotEmpty)
+              if (message.deleted)
+                Text(
+                  'Message deleted',
+                  style: TextStyle(
+                    color: Colors.grey[400],
+                    fontStyle: FontStyle.italic,
+                  ),
+                )
+              else if (message.text != null && message.text!.isNotEmpty)
                 Text(
                   message.text!,
                   style: TextStyle(color: isYou ? Colors.white : Colors.grey[200]),
@@ -322,6 +332,15 @@ class _ChatScreenState extends State<ChatScreen> {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (message.edited)
+                    Text(
+                      '(edited) ',
+                      style: TextStyle(
+                        color: Colors.grey[400],
+                        fontSize: 10,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
                   Text(
                     '${message.createdAt.hour}:${message.createdAt.minute}',
                     style: TextStyle(
