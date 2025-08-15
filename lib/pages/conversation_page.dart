@@ -40,7 +40,8 @@ class ConversationPage extends StatefulWidget {
   _ConversationPageState createState() => _ConversationPageState();
 }
 
-class _ConversationPageState extends State<ConversationPage> with SingleTickerProviderStateMixin {
+class _ConversationPageState extends State<ConversationPage>
+    with SingleTickerProviderStateMixin {
   final DataController _dataController = Get.find<DataController>();
   final SocketService _socketService = Get.find<SocketService>();
   final TextEditingController _messageController = TextEditingController();
@@ -195,33 +196,18 @@ class _ConversationPageState extends State<ConversationPage> with SingleTickerPr
 
       // Check if all uploads were successful
       if (uploadResults.every((res) => res['success'] == true)) {
-        uploadedAttachments = uploadResults.asMap().entries.map((entry) {
-          final index = entry.key;
-          final res = entry.value;
-          // Use index to map to original attachment, avoiding filename mismatches
-          final originalAtt = attachments[index];
-          if (res['url'] == null || res['url'].isEmpty) {
-            // Log error and mark upload as failed for this file
-            print('Upload failed for file: ${originalAtt['filename']}');
-            return null;
-          }
+        uploadedAttachments = uploadResults.map((res) {
+          final originalAtt = attachments.firstWhere(
+            (att) => att['filename'] == res['originalFilename'],
+            orElse: () => null,
+          );
+          if (originalAtt == null) return null;
           return {
             'type': originalAtt['type'],
             'url': res['url'],
             'filename': originalAtt['filename'],
           };
-        }).where((att) => att != null).cast<Map<String, dynamic>>().toList();
-
-        // If no attachments were successfully uploaded, fail the message
-        if (uploadedAttachments.isEmpty && attachments.isNotEmpty) {
-          final index = _dataController.currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
-          if (index != -1) {
-            _dataController.currentConversationMessages[index]['status'] = 'failed';
-            _dataController.currentConversationMessages.refresh();
-          }
-          Get.snackbar('Error', 'All files failed to upload.');
-          return;
-        }
+        }).where((item) => item != null).cast<Map<String, dynamic>>().toList();
       } else {
         // Handle upload failure: update message status to 'failed'
         final index = _dataController.currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
@@ -330,7 +316,8 @@ class _ConversationPageState extends State<ConversationPage> with SingleTickerPr
             child: Obx(() {
               if (_dataController.isLoadingMessages.value) {
                 return const Center(
-                    child: CircularProgressIndicator(color: Colors.tealAccent));
+                    child:
+                        CircularProgressIndicator(color: Colors.tealAccent));
               }
               final messages = _dataController.currentConversationMessages;
               if (messages.isEmpty) {
@@ -357,17 +344,21 @@ class _ConversationPageState extends State<ConversationPage> with SingleTickerPr
                 itemCount: messages.length,
                 itemBuilder: (context, index) {
                   final message = messages[index];
-                  final bool isMe = message['sender']['_id'] == currentUserId;
+                  final bool isMe =
+                      message['sender']['_id'] == currentUserId;
 
                   // Pre-process attachments to separate media from others
                   final attachments = (message['attachments'] as List?) ?? [];
                   final mediaAttachments = attachments
-                      .where((att) => att['type'] == 'image' || att['type'] == 'video')
+                      .where((att) =>
+                          att['type'] == 'image' || att['type'] == 'video')
                       .toList();
                   final otherAttachments = attachments
-                      .where((att) => att['type'] != 'image' && att['type'] != 'video')
+                      .where((att) =>
+                          att['type'] != 'image' && att['type'] != 'video')
                       .toList();
-                  final hasContent = message['content'] != null && message['content'].isNotEmpty;
+                  final hasContent = message['content'] != null &&
+                      message['content'].isNotEmpty;
 
                   return Dismissible(
                       key: Key(message['_id']),
@@ -379,7 +370,8 @@ class _ConversationPageState extends State<ConversationPage> with SingleTickerPr
                       },
                       background: Container(
                         color: Colors.blue,
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 20),
                         alignment: Alignment.centerLeft,
                         child: const Icon(Icons.reply, color: Colors.white),
                       ),
@@ -390,40 +382,37 @@ class _ConversationPageState extends State<ConversationPage> with SingleTickerPr
                           }
                         },
                         child: Align(
-                          alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                          alignment: isMe
+                              ? Alignment.centerRight
+                              : Alignment.centerLeft,
                           child: Container(
-                            margin: const EdgeInsets.symmetric(vertical: 5.0),
+                            margin:
+                                const EdgeInsets.symmetric(vertical: 5.0),
                             padding: const EdgeInsets.all(8.0),
                             constraints: BoxConstraints(
-                              maxWidth: MediaQuery.of(context).size.width * 0.75,
+                              maxWidth:
+                                  MediaQuery.of(context).size.width *
+                                      0.75,
                             ),
                             decoration: BoxDecoration(
-                              color: isMe ? const Color(0xFF005C4B) : const Color(0xFF202C33),
+                              color: isMe
+                                  ? const Color(0xFF005C4B)
+                                  : const Color(0xFF202C33),
                               borderRadius: BorderRadius.circular(12.0),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                if (!isMe && widget.isGroupChat)
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 4.0),
-                                    child: Text(
-                                      message['sender']['name'],
-                                      style: GoogleFonts.roboto(
-                                        color: Colors.grey[400],
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
                                 // 1. Media Attachments
                                 if (mediaAttachments.isNotEmpty)
                                   ClipRRect(
                                     borderRadius: BorderRadius.circular(8.0),
                                     child: Column(
                                       children: mediaAttachments
-                                          .map((attachment) => _buildAttachment(attachment, isMe, message))
+                                          .map((attachment) =>
+                                              _buildAttachment(
+                                                  attachment, isMe, message))
                                           .toList(),
                                     ),
                                   ),
@@ -439,7 +428,8 @@ class _ConversationPageState extends State<ConversationPage> with SingleTickerPr
                                     ),
                                     child: Text(
                                       message['content'],
-                                      style: GoogleFonts.roboto(color: Colors.white, fontSize: 16),
+                                      style: GoogleFonts.roboto(
+                                          color: Colors.white, fontSize: 16),
                                     ),
                                   ),
 
@@ -448,7 +438,8 @@ class _ConversationPageState extends State<ConversationPage> with SingleTickerPr
                                   ...otherAttachments.map((attachment) {
                                     return Padding(
                                       padding: EdgeInsets.only(top: hasContent || mediaAttachments.isNotEmpty ? 8.0 : 0),
-                                      child: _buildAttachment(attachment, isMe, message),
+                                      child: _buildAttachment(
+                                          attachment, isMe, message),
                                     );
                                   }).toList(),
 
@@ -459,9 +450,11 @@ class _ConversationPageState extends State<ConversationPage> with SingleTickerPr
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Text(
-                                        _formatTimestamp(message['createdAt']),
+                                        _formatTimestamp(
+                                            message['createdAt']),
                                         style: GoogleFonts.roboto(
-                                          color: Colors.white.withOpacity(0.6),
+                                          color: Colors.white
+                                              .withOpacity(0.6),
                                           fontSize: 12,
                                         ),
                                       ),
@@ -656,7 +649,8 @@ class _ConversationPageState extends State<ConversationPage> with SingleTickerPr
 
     try {
       final directory = await getTemporaryDirectory();
-      final path = '${directory.path}/audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      final path =
+          '${directory.path}/audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
       await _audioRecorder.start(const RecordConfig(), path: path);
       _isRecording.value = true;
       _recordingDuration.value = 0;
@@ -665,7 +659,8 @@ class _ConversationPageState extends State<ConversationPage> with SingleTickerPr
       });
       _pulseController.forward();
     } catch (e) {
-      _showPermissionDialog('Recording Error', 'Failed to start audio recording: $e');
+      _showPermissionDialog(
+          'Recording Error', 'Failed to start audio recording: $e');
     }
   }
 
@@ -680,7 +675,8 @@ class _ConversationPageState extends State<ConversationPage> with SingleTickerPr
         });
       }
     } catch (e) {
-      _showPermissionDialog('Recording Error', 'Failed to stop audio recording: $e');
+      _showPermissionDialog(
+          'Recording Error', 'Failed to stop audio recording: $e');
     } finally {
       _isRecording.value = false;
       _pulseController.reset();
@@ -791,23 +787,28 @@ class _ConversationPageState extends State<ConversationPage> with SingleTickerPr
                     ? Row(
                         mainAxisAlignment: MainAxisAlignment.start,
                         children: [
-                          const Icon(FeatherIcons.mic, color: Colors.redAccent, size: 20),
+                          const Icon(FeatherIcons.mic,
+                              color: Colors.redAccent, size: 20),
                           const SizedBox(width: 8),
                           Text(
                             _formatDuration(_recordingDuration.value),
-                            style: GoogleFonts.roboto(color: Colors.white, fontSize: 16),
+                            style: GoogleFonts.roboto(
+                                color: Colors.white, fontSize: 16),
                           ),
                         ],
                       )
                     : TextField(
                         controller: _messageController,
-                        style: GoogleFonts.roboto(color: Colors.white, fontSize: 16),
+                        style: GoogleFonts.roboto(
+                            color: Colors.white, fontSize: 16),
                         decoration: InputDecoration(
                           hintText: 'Type a message...',
+                          hintStyle: GoogleFonts.roboto(color: Colors.grey[500]),
                           border: InputBorder.none,
                           filled: true,
                           fillColor: Colors.grey[850],
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16.0, vertical: 10.0),
                           isDense: true,
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(20.0),
@@ -815,7 +816,8 @@ class _ConversationPageState extends State<ConversationPage> with SingleTickerPr
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(20.0),
-                            borderSide: const BorderSide(color: Colors.tealAccent, width: 1.5),
+                            borderSide: const BorderSide(
+                                color: Colors.tealAccent, width: 1.5),
                           ),
                         ),
                         onSubmitted: (_) => _sendMessage(),
@@ -926,7 +928,7 @@ class _ConversationPageState extends State<ConversationPage> with SingleTickerPr
     final String type = attachment['type'] ?? 'document';
     final String? url = attachment['url'];
     final String? localPath = attachment['path'];
-    final bool isUploading = attachment['isUploading'] ?? false;
+    final bool isUploading = _pendingAttachments.any((att) => att['path'] == localPath);
     final String filename = attachment['filename'] ?? 'file';
 
     Widget placeholder(Widget? icon) {
