@@ -124,7 +124,7 @@ class _ConversationPageState extends State<ConversationPage> {
                 itemCount: messages.length,
                 itemBuilder: (context, index) {
                   final message = messages[index];
-                  final bool isMe = message['senderId'] == currentUserId;
+                  final bool isMe = message.senderId == currentUserId;
                   // Basic message bubble
                   return Align(
                     alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
@@ -136,7 +136,7 @@ class _ConversationPageState extends State<ConversationPage> {
                         borderRadius: BorderRadius.circular(12.0),
                       ),
                       child: Text(
-                        message['text'] ?? '',
+                        message.text ?? '',
                         style: GoogleFonts.roboto(color: isMe ? Colors.black : Colors.white, fontSize: 15),
                       ),
                     ),
