@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
@@ -36,6 +37,20 @@ class _AttachmentPreviewDialogState extends State<AttachmentPreviewDialog> {
     });
   }
 
+  Future<void> _addMoreFiles() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(allowMultiple: true);
+      if (result != null && result.files.isNotEmpty) {
+        setState(() {
+          _files.addAll(result.files);
+        });
+      }
+    } catch (e) {
+      // Handle exceptions
+      print('Error picking more files: $e');
+    }
+  }
+
   Widget _buildPreview(PlatformFile file) {
     final extension = file.extension?.toLowerCase() ?? '';
     Widget preview;
@@ -59,8 +74,7 @@ class _AttachmentPreviewDialogState extends State<AttachmentPreviewDialog> {
       case 'avi':
         preview = VideoPlayerWidget(
           file: file.path != null ? File(file.path!) : null,
-          displayPath: file.name,
-          isFeedContext: false,
+          url: file.path == null ? 'data:video/mp4;base64,${base64Encode(file.bytes!)}' : null,
         );
         break;
       case 'mp3':
@@ -109,8 +123,20 @@ class _AttachmentPreviewDialogState extends State<AttachmentPreviewDialog> {
                     crossAxisSpacing: 8,
                     mainAxisSpacing: 8,
                   ),
-                  itemCount: _files.length,
+                  itemCount: _files.length + 1,
                   itemBuilder: (context, index) {
+                    if (index == _files.length) {
+                      return InkWell(
+                        onTap: _addMoreFiles,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.grey[800],
+                            borderRadius: BorderRadius.circular(8.0),
+                          ),
+                          child: const Icon(Icons.add_photo_alternate, color: Colors.white, size: 40),
+                        ),
+                      );
+                    }
                     final file = _files[index];
                     return Stack(
                       alignment: Alignment.topRight,

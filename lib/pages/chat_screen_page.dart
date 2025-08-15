@@ -300,8 +300,6 @@ class _ChatScreenState extends State<ChatScreen> {
         content = VideoPlayerWidget(
           url: isLocalFile ? null : attachment.url,
           file: isLocalFile ? File(attachment.url) : null,
-          displayPath: attachment.filename,
-          isFeedContext: false,
         );
         break;
       case 'audio':
