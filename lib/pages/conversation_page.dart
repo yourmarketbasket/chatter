@@ -251,17 +251,23 @@ class _ConversationPageState extends State<ConversationPage> {
                       },
                       child: Align(
                         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(vertical: 4.0),
-                          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-                          decoration: BoxDecoration(
-                            color: Colors.transparent,
-                            border: Border.all(
-                              color: isMe ? Colors.tealAccent : Colors.grey[700]!,
-                              width: 1.5,
-                            ),
-                            borderRadius: BorderRadius.circular(12.0),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: MediaQuery.of(context).size.width * 0.75,
                           ),
+                          child: Container(
+                            margin: const EdgeInsets.symmetric(vertical: 4.0),
+                            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                            decoration: isMe
+                                ? BoxDecoration(
+                                    color: Colors.transparent,
+                                    border: Border.all(color: Colors.tealAccent, width: 1.5),
+                                    borderRadius: BorderRadius.circular(12.0),
+                                  )
+                                : BoxDecoration(
+                                    color: Colors.pink[300],
+                                    borderRadius: BorderRadius.circular(12.0),
+                                  ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -286,7 +292,7 @@ class _ConversationPageState extends State<ConversationPage> {
                                     Text(
                                       DateFormat('h:mm a').format(DateTime.parse(message['createdAt']).toLocal()),
                                       style: GoogleFonts.roboto(
-                                        color: isMe ? Colors.black.withOpacity(0.7) : Colors.white.withOpacity(0.7),
+                                        color: Colors.white.withOpacity(0.7),
                                         fontSize: 10,
                                       ),
                                     ),
@@ -511,11 +517,11 @@ class _ConversationPageState extends State<ConversationPage> {
       case 'read':
         return const Icon(Icons.done_all, color: Colors.blue, size: 16);
       case 'delivered':
-        return const Icon(Icons.done_all, color: Colors.grey, size: 16);
+        return const Icon(Icons.done_all, color: Colors.white, size: 16);
       case 'sent':
-        return const Icon(Icons.done, color: Colors.grey, size: 16);
+        return const Icon(Icons.done, color: Colors.white, size: 16);
       case 'sending':
-        return const Icon(Icons.watch_later_outlined, color: Colors.grey, size: 16);
+        return const Icon(Icons.watch_later_outlined, color: Colors.white, size: 16);
       default:
         return const SizedBox.shrink();
     }
