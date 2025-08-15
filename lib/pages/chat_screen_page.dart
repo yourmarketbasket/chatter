@@ -1,13 +1,12 @@
-import 'dart:io';
 import 'package:chatter/controllers/data-controller.dart';
 import 'package:chatter/models/chat_models.dart';
 import 'package:chatter/models/feed_models.dart';
-import 'package:chatter/widgets/message_input_area.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:chatter/pages/media_view_page.dart';
+import 'package:chatter/widgets/message_input_area.dart';
 import 'package:video_player/video_player.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -21,6 +20,8 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final DataController dataController = Get.find<DataController>();
+  final TextEditingController _messageController = TextEditingController();
+  final GlobalKey<AnimatedListState> _listKey = GlobalKey<AnimatedListState>();
   ChatMessage? _replyingTo;
 
   @override
@@ -32,9 +33,26 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    _messageController.dispose();
     // Clear the messages for the current conversation when leaving the screen
     dataController.currentConversationMessages.clear();
     super.dispose();
+  }
+
+  void _sendMessage() {
+    if (_messageController.text.trim().isNotEmpty) {
+      final message = ChatMessage(
+        chatId: widget.chat.id,
+        senderId: dataController.user.value['user']['_id'],
+        text: _messageController.text.trim(),
+        replyTo: _replyingTo?.id,
+      );
+      dataController.sendChatMessage(message);
+      _messageController.clear();
+      setState(() {
+        _replyingTo = null;
+      });
+    }
   }
 
   void _editMessage(ChatMessage message) {
@@ -257,19 +275,6 @@ class _ChatScreenState extends State<ChatScreen> {
           child: Column(
             crossAxisAlignment: isYou ? CrossAxisAlignment.end : CrossAxisAlignment.start,
             children: [
-              if (widget.chat.isGroup && !isYou)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4.0),
-                  child: Text(
-                    // TODO: Resolve sender name from ID
-                    message.senderId,
-                    style: const TextStyle(
-                      color: Colors.tealAccent,
-                      fontWeight: FontWeight.w500,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
               if (message.voiceNote != null)
                 AudioPlayerWidget(
                   audioUrl: message.voiceNote!.url,
@@ -341,12 +346,11 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Determine the user to display for a 1-on-1 chat
     final otherUser = widget.chat.isGroup
         ? null
         : widget.chat.participants.firstWhere(
             (p) => p.id != dataController.user.value['user']['_id'],
-            orElse: () => widget.chat.participants.first, // Fallback
+            orElse: () => widget.chat.participants.first,
           );
 
     return Scaffold(
@@ -359,23 +363,12 @@ class _ChatScreenState extends State<ChatScreen> {
               children: [
                 CircleAvatar(
                   backgroundColor: Colors.tealAccent,
-                  // Use group avatar or other user's avatar
-                  backgroundImage: (widget.chat.isGroup
-                          ? widget.chat.groupAvatar
-                          : otherUser?.avatar) !=
-                      null
-                      ? NetworkImage((widget.chat.isGroup
-                          ? widget.chat.groupAvatar
-                          : otherUser!.avatar)!)
+                  backgroundImage: (widget.chat.isGroup ? widget.chat.groupAvatar : otherUser?.avatar) != null
+                      ? NetworkImage((widget.chat.isGroup ? widget.chat.groupAvatar : otherUser!.avatar)!)
                       : null,
-                  child: (widget.chat.isGroup
-                              ? widget.chat.groupAvatar
-                              : otherUser?.avatar) ==
-                          null
+                  child: (widget.chat.isGroup ? widget.chat.groupAvatar : otherUser?.avatar) == null
                       ? Text(
-                          widget.chat.isGroup
-                              ? (widget.chat.groupName?[0] ?? '?')
-                              : (otherUser?.name[0] ?? '?'),
+                          widget.chat.isGroup ? (widget.chat.groupName?[0] ?? '?') : (otherUser?.name[0] ?? '?'),
                           style: const TextStyle(color: Colors.black),
                         )
                       : null,
@@ -412,9 +405,6 @@ class _ChatScreenState extends State<ChatScreen> {
         children: [
           Expanded(
             child: Obx(() {
-              if (dataController.isLoadingMessages.value) {
-                return const Center(child: CircularProgressIndicator());
-              }
               return ListView.builder(
                 reverse: true,
                 padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
@@ -434,7 +424,6 @@ class _ChatScreenState extends State<ChatScreen> {
           if (_replyingTo != null) _buildReplyPreview(_replyingTo!),
           MessageInputArea(
             onSend: (text, files) {
-              // Create a list of Attachment objects from the PlatformFile list
               final attachments = files
                   .map((file) => Attachment(
                         filename: file.name,
@@ -444,7 +433,6 @@ class _ChatScreenState extends State<ChatScreen> {
                       ))
                   .toList();
 
-              // Check if it's a voice note (by extension, for now)
               final isVoiceNote = attachments.isNotEmpty && (attachments.first.type == 'm4a');
 
               final message = ChatMessage(
@@ -452,7 +440,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 senderId: dataController.user.value['user']['_id'],
                 text: text,
                 attachments: isVoiceNote ? null : attachments,
-                voiceNote: isVoiceNote ? VoiceNote(url: attachments.first.url, duration: Duration.zero) : null, // duration is not available here
+                voiceNote: isVoiceNote ? VoiceNote(url: attachments.first.url, duration: Duration.zero) : null,
                 replyTo: _replyingTo?.id,
               );
 
