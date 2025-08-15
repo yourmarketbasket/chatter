@@ -137,6 +137,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
       floatingActionButton: FloatingActionButton(
         onPressed: _createGroup,
         backgroundColor: Colors.tealAccent,
+        heroTag: 'createGroupPageFAB',
         child: const Icon(Icons.check, color: Colors.black),
       ),
     );

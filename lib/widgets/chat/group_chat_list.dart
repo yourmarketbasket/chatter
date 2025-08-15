@@ -81,6 +81,7 @@ class GroupChatList extends StatelessWidget {
         );
       }),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'groupChatListFAB',
         onPressed: () {
           Get.to(() => const CreateGroupPage());
         },

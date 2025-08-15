@@ -1073,9 +1073,11 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         );
       }),
       floatingActionButtonLocation: ExpandableFab.location,
-      floatingActionButton: ExpandableFab(
-        key: _fabKey, // Assign the key here
-        distance: 65.0,
+      floatingActionButton: Hero(
+        tag: 'homeFeedPageFAB',
+        child: ExpandableFab(
+          key: _fabKey, // Assign the key here
+          distance: 65.0,
         type: ExpandableFabType.up,
         overlayStyle: ExpandableFabOverlayStyle(color: Colors.black.withOpacity(0.5)),
         openButtonBuilder: RotateFloatingActionButtonBuilder(backgroundColor: Colors.tealAccent, foregroundColor: Colors.black, child: const Icon(FeatherIcons.menu)),
@@ -1139,6 +1141,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
             child: const Icon(FeatherIcons.coffee, color: Colors.tealAccent),
           ),
         ],
+      ),
       ),
     );
   }

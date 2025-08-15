@@ -94,6 +94,7 @@ class OneToOneChatList extends StatelessWidget {
       );
     }),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'oneToOneChatListFAB',
         onPressed: () {
           Get.to(() => const UsersListPage(mode: UserListMode.SelectForChat));
         },

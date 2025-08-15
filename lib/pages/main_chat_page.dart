@@ -79,6 +79,7 @@ class _MainChatPageState extends State<MainChatPage>
         onPressed: _onFabPressed,
         backgroundColor: Colors.tealAccent,
         foregroundColor: Colors.black,
+        heroTag: 'mainChatPageFAB',
         child: const Icon(FeatherIcons.plus),
       ),
     );
