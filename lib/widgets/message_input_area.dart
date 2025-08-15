@@ -107,19 +107,22 @@ class _MessageInputAreaState extends State<MessageInputArea> {
   Future<void> _pickAttachments() async {
     try {
       final result = await FilePicker.platform.pickFiles(allowMultiple: true);
-      if (result != null && result.files.isNotEmpty) {
-        // Show the dialog as a general dialog, not a full-screen page route
-        showDialog(
-          context: context,
-          builder: (context) => AttachmentPreviewDialog(
-            files: result.files,
-            initialText: _messageController.text.trim(),
-            onSend: (text, files) {
-              widget.onSend(text, files);
-              _messageController.clear();
-            },
-          ),
-        );
+      if (result == null || result.files.isEmpty) return;
+
+      final dialogResult = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (context) => AttachmentPreviewDialog(
+          files: result.files,
+        ),
+      );
+
+      if (dialogResult != null) {
+        final List<PlatformFile> files = dialogResult['files'];
+        final String caption = dialogResult['caption'];
+        if (files.isNotEmpty || caption.isNotEmpty) {
+          widget.onSend(caption, files);
+          _messageController.clear();
+        }
       }
     } catch (e) {
       // Handle exceptions
