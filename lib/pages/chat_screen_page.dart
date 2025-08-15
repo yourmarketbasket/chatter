@@ -2,11 +2,12 @@ import 'package:chatter/controllers/data-controller.dart';
 import 'package:chatter/models/chat_models.dart';
 import 'package:chatter/models/feed_models.dart';
 import 'package:flutter/material.dart';
+import 'dart:io';
+import 'package:chatter/pages/media_view_page.dart';
 import 'package:get/get.dart';
 import 'package:chatter/widgets/message_input_area.dart';
 import 'package:video_player/video_player.dart';
 import 'package:audioplayers/audioplayers.dart';
-import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class ChatScreen extends StatefulWidget {
