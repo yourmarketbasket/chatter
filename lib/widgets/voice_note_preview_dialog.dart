@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:audioplayers/audioplayers.dart';
 import 'package:audio_waveforms/audio_waveforms.dart';
 
 class VoiceNotePreviewDialog extends StatefulWidget {
@@ -19,18 +18,25 @@ class VoiceNotePreviewDialog extends StatefulWidget {
 
 class _VoiceNotePreviewDialogState extends State<VoiceNotePreviewDialog> {
   final PlayerController _playerController = PlayerController();
-  late final AudioPlayer _audioPlayer;
   bool _isPlaying = false;
   Duration _duration = Duration.zero;
 
   @override
   void initState() {
     super.initState();
-    _audioPlayer = AudioPlayer();
     _playerController.preparePlayer(
       path: widget.audioPath,
       shouldExtractWaveform: true,
-    );
+    ).then((_) {
+      _playerController.getDuration(DurationType.max).then((duration) {
+        if (mounted) {
+          setState(() {
+            _duration = Duration(milliseconds: duration);
+          });
+        }
+      });
+    });
+
     _playerController.onPlayerStateChanged.listen((state) {
       if (mounted) {
         setState(() {
@@ -38,24 +44,11 @@ class _VoiceNotePreviewDialogState extends State<VoiceNotePreviewDialog> {
         });
       }
     });
-    _getDuration();
-  }
-
-  void _getDuration() async {
-    final duration = await _audioPlayer.getDuration(DeviceFileSource(widget.audioPath));
-    if (duration != null) {
-      if(mounted){
-        setState(() {
-          _duration = duration;
-        });
-      }
-    }
   }
 
   @override
   void dispose() {
     _playerController.dispose();
-    _audioPlayer.dispose();
     super.dispose();
   }
 
