@@ -1,10 +1,11 @@
+import 'package:chatter/pages/users_list_page.dart';
 import 'package:chatter/widgets/chat/group_chat_list.dart';
 import 'package:chatter/widgets/chat/one_to_one_chat_list.dart';
 import 'package:chatter/pages/create_group_page.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:feather_icons/feather_icons.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class MainChatPage extends StatefulWidget {
   const MainChatPage({Key? key}) : super(key: key);
@@ -13,53 +14,72 @@ class MainChatPage extends StatefulWidget {
   _MainChatPageState createState() => _MainChatPageState();
 }
 
-class _MainChatPageState extends State<MainChatPage> {
-  int _selectedIndex = 0;
+class _MainChatPageState extends State<MainChatPage>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
 
-  final List<Widget> _pages = const [
-    OneToOneChatList(),
-    GroupChatList(),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
 
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _onFabPressed() {
+    if (_tabController.index == 0) {
+      // Navigate to a page to start a new one-on-one chat
+      Get.to(() => const UsersListPage());
+    } else {
+      // Navigate to the create group page
+      Get.to(() => const CreateGroupPage());
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF000000),
-      body: _pages[_selectedIndex],
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Get.to(() => const CreateGroupPage());
-        },
-        child: const Icon(FeatherIcons.plus),
-        backgroundColor: Colors.tealAccent,
-        foregroundColor: Colors.black,
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      bottomNavigationBar: BottomAppBar(
-        shape: const CircularNotchedRectangle(),
-        notchMargin: 6.0,
-        color: const Color(0xFF121212),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: <Widget>[
-            IconButton(
-              icon: Icon(FeatherIcons.user, color: _selectedIndex == 0 ? Colors.tealAccent : Colors.grey[500]),
-              onPressed: () => _onItemTapped(0),
-              tooltip: 'Chats',
-            ),
-            IconButton(
-              icon: Icon(FeatherIcons.users, color: _selectedIndex == 1 ? Colors.tealAccent : Colors.grey[500]),
-              onPressed: () => _onItemTapped(1),
-              tooltip: 'Groups',
-            ),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF121212),
+        elevation: 0,
+        title: Text(
+          'Dig In',
+          style: GoogleFonts.poppins(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 24,
+          ),
+        ),
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: Colors.tealAccent,
+          labelColor: Colors.tealAccent,
+          unselectedLabelColor: Colors.grey[500],
+          labelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+          unselectedLabelStyle: GoogleFonts.poppins(),
+          tabs: const [
+            Tab(text: 'Chats'),
+            Tab(text: 'Groups'),
           ],
         ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: const [
+          OneToOneChatList(),
+          GroupChatList(),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _onFabPressed,
+        backgroundColor: Colors.tealAccent,
+        foregroundColor: Colors.black,
+        child: const Icon(FeatherIcons.plus),
       ),
     );
   }

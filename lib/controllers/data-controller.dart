@@ -72,6 +72,9 @@ class DataController extends GetxController {
   // Observable to notify ProfilePage to refresh
   final RxString profileUpdateTrigger = ''.obs;
 
+  // For user presence
+  final RxMap<String, dynamic> userPresence = <String, dynamic>{}.obs;
+
 
   @override
   void onInit() {
@@ -2523,36 +2526,61 @@ void clearUserPosts() {
   }
 
   void handleNewMessage(Map<String, dynamic> message) {
-    final messageId = message['_id'] as String?;
+    final serverMessageId = message['_id'] as String?;
+    final clientMessageId = message['clientMessageId'] as String?; // Expecting the server to send this back
     final chatId = message['chat'];
     final senderId = (message['sender'] is Map ? message['sender']['_id'] : message['sender']) as String?;
     final currentUserId = user.value['user']['_id'];
 
-    if (messageId == null || chatId == null || senderId == null || senderId == currentUserId) {
-      // This handler is only for messages from other users.
-      // The user's own messages are updated via message-status-update.
-      return;
+    if (serverMessageId == null || chatId == null || senderId == null) {
+      print('[DataController] handleNewMessage: Received invalid message data. Ignoring.');
+      return; // Ignore invalid messages
     }
 
-    // This is a new message from someone else.
-    // Add it to the list if the user is in the correct chat.
-    if (chatId == _currentlyOpenChatId) {
-      currentConversationMessages.add(message);
-      // Acknowledge delivery
-      final socketService = Get.find<SocketService>();
-      socketService.sendMessageDeliveredReceipt(messageId, chatId);
+    bool messageHandled = false;
+
+    // This is the confirmation for a message sent by the current user
+    if (senderId == currentUserId && clientMessageId != null) {
+      final index = currentConversationMessages.indexWhere((m) => m['_id'] == clientMessageId && m['status'] == 'sending');
+      if (index != -1) {
+        // Replace the optimistic message with the confirmed one from the server
+        currentConversationMessages[index] = message;
+        currentConversationMessages.refresh();
+        messageHandled = true;
+        print('[DataController] Optimistic message $clientMessageId replaced with server message $serverMessageId.');
+      }
     }
 
-    // Update the main conversation list
+    // This is a new message from another user, or a message from the current user
+    // that couldn't be matched to an optimistic one (e.g., sent from another device).
+    if (!messageHandled && chatId == _currentlyOpenChatId) {
+      // Avoid adding duplicates
+      final isAlreadyPresent = currentConversationMessages.any((m) => m['_id'] == serverMessageId);
+      if (!isAlreadyPresent) {
+        currentConversationMessages.add(message);
+        print('[DataController] New message $serverMessageId added to conversation $chatId.');
+        // If the message is from someone else, acknowledge delivery
+        if (senderId != currentUserId) {
+          final socketService = Get.find<SocketService>();
+          socketService.sendMessageDeliveredReceipt(serverMessageId, chatId);
+        }
+      }
+    }
+
+    // Update the main conversation list preview
     final convoIndex = conversations.indexWhere((c) => c['_id'] == chatId);
     if (convoIndex != -1) {
       final conversation = conversations[convoIndex];
       conversation['lastMessage'] = message;
+      // Only increment unread count if the message is from someone else AND the chat is not currently open
+      if (senderId != currentUserId && chatId != _currentlyOpenChatId) {
+        conversation['unreadCount'] = (conversation['unreadCount'] ?? 0) + 1;
+      }
       conversations.removeAt(convoIndex);
-      conversations.insert(0, conversation);
+      conversations.insert(0, conversation); // Move to top
     } else {
-      // If we receive a message for a chat that's not in our list,
-      // it could be a new chat initiated by someone else. Refresh the list.
+      // If a message arrives for a chat not in the local list, it's a new chat. Refresh all chats.
+      print('[DataController] Received message for an unknown chat $chatId. Refreshing chat list.');
       getAllChats();
     }
   }
@@ -2881,5 +2909,27 @@ void clearUserPosts() {
 
     // Notify ProfilePage if the unfollowed user's profile might be open
     profileUpdateTrigger.value = unfollowedId ?? DateTime.now().millisecondsSinceEpoch.toString();
+  }
+
+  void handleUserPresenceUpdate(dynamic data) {
+    print('[DataController] handleUserPresenceUpdate received data: $data');
+    if (data is Map<String, dynamic>) {
+      // The server sends a map of users and their presence status.
+      // We can replace the whole map or update it key by key.
+      // Updating key by key is generally safer and more efficient if the map is large.
+      data.forEach((userId, status) {
+        if (userId is String && status is Map<String, dynamic>) {
+          // Check if the status for this user has actually changed to avoid unnecessary rebuilds.
+          if (userPresence[userId] != status) {
+            userPresence[userId] = status;
+            print('[DataController] Updated presence for user $userId: $status');
+          }
+        }
+      });
+      // We can call refresh on the map if direct key assignment doesn't trigger updates in some cases.
+      userPresence.refresh();
+    } else {
+      print('[DataController] Received presence update with unexpected data type: ${data.runtimeType}');
+    }
   }
 }

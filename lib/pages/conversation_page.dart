@@ -1,6 +1,7 @@
 import 'package:chatter/controllers/data-controller.dart';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:record/record.dart';
 import 'package:chatter/pages/group_details_page.dart';
 import 'package:chatter/services/socket-service.dart';
@@ -11,6 +12,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:feather_icons/feather_icons.dart';
 import 'package:intl/intl.dart';
 import 'package:objectid/objectid.dart';
+import 'package:path/path.dart' as p;
+import 'package:timeago/timeago.dart' as timeago;
 
 class ConversationPage extends StatefulWidget {
   final String conversationId;
@@ -47,7 +50,6 @@ class _ConversationPageState extends State<ConversationPage> {
     _messageController.addListener(() {
       _isMessageEmpty.value = _messageController.text.isEmpty;
     });
-    // Fetch messages for this conversation
     _dataController.getMessagesForChat(widget.conversationId).catchError((e) {
       Get.snackbar('Error', 'Could not load messages: ${e.toString()}',
           backgroundColor: Colors.red, colorText: Colors.white);
@@ -65,42 +67,53 @@ class _ConversationPageState extends State<ConversationPage> {
     super.dispose();
   }
 
-  List<Map<String, dynamic>> _attachments = [];
+  List<Map<String, dynamic>> _pendingAttachments = [];
   Map<String, dynamic>? _replyingToMessage;
 
-  void _pickAndUploadFile() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles();
+  String _getAttachmentType(String extension) {
+    if (['jpg', 'jpeg', 'png', 'gif'].contains(extension)) {
+      return 'image';
+    } else if (['mp4', 'mov', 'avi'].contains(extension)) {
+      return 'video';
+    } else if (['mp3', 'wav', 'm4a'].contains(extension)) {
+      return 'audio';
+    } else {
+      return 'document';
+    }
+  }
+
+  void _pickFiles() async {
+    final result = await FilePicker.platform.pickFiles(
+      allowMultiple: true,
+      type: FileType.any,
+    );
 
     if (result != null) {
-      File file = File(result.files.single.path!);
-      // This is a simplified version. In a real app, you would show a loading indicator
-      // and handle errors from the upload service.
-      final uploadResult = await _dataController.uploadFiles([
-        {'type': 'file', 'file': file}
-      ]);
-
-      if (uploadResult.isNotEmpty && uploadResult[0]['success']) {
-        setState(() {
-          _attachments.add({
-            'type': 'file', // Or determine from file type
-            'url': uploadResult[0]['url'],
-            'filename': result.files.single.name,
-          });
-        });
-      } else {
-        Get.snackbar('Error', 'File upload failed.');
-      }
+      setState(() {
+        for (var file in result.files) {
+          if (file.path != null) {
+            final fileExtension = p.extension(file.path!).toLowerCase().substring(1);
+            _pendingAttachments.add({
+              'type': _getAttachmentType(fileExtension),
+              'path': file.path,
+              'file': File(file.path!),
+              'filename': file.name,
+              'isUploading': true,
+            });
+          }
+        }
+      });
     }
   }
 
   void _sendMessage() {
-    if (_messageController.text.trim().isEmpty && _attachments.isEmpty) return;
+    if (_messageController.text.trim().isEmpty && _pendingAttachments.isEmpty) return;
 
     final String content = _messageController.text.trim();
     final String messageId = ObjectId().hexString;
     final currentUser = _dataController.user.value['user'];
 
-    // Create optimistic message for instant UI update
+    // Create the optimistic message with local attachment paths
     final Map<String, dynamic> optimisticMessage = {
       '_id': messageId,
       'content': content,
@@ -112,34 +125,27 @@ class _ConversationPageState extends State<ConversationPage> {
       'chat': widget.conversationId,
       'createdAt': DateTime.now().toUtc().toIso8601String(),
       'status': 'sending',
-      'attachments': _attachments,
+      'attachments': _pendingAttachments.map((att) => {
+        'type': att['type'],
+        'path': att['path'], // Local path for immediate display
+        'filename': att['filename'],
+        'isUploading': true,
+      }).toList(),
       'replyTo': _replyingToMessage?['_id'],
     };
 
     // Add to UI immediately
     _dataController.currentConversationMessages.add(optimisticMessage);
+    _uploadAndSend(messageId, content, List.from(_pendingAttachments));
 
-    // Prepare payload for the server
-    final Map<String, dynamic> messagePayload = {
-      '_id': messageId,
-      'sender': currentUser['_id'],
-      'chat': widget.conversationId,
-      'content': content,
-      'attachments': _attachments,
-    };
-
-    if (!widget.isGroupChat) {
-      messagePayload['receiver'] = widget.receiverId;
-    }
-
-    _socketService.sendMessage(messagePayload);
-
+    // Clear input fields
     _messageController.clear();
     setState(() {
-      _attachments = [];
+      _pendingAttachments = [];
       _replyingToMessage = null;
     });
-    // Scroll to bottom after sending
+
+    // Scroll to bottom
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
@@ -149,6 +155,72 @@ class _ConversationPageState extends State<ConversationPage> {
         );
       }
     });
+  }
+
+  void _uploadAndSend(String messageId, String content, List<Map<String, dynamic>> attachments) async {
+    List<Map<String, dynamic>> uploadedAttachments = [];
+    if (attachments.isNotEmpty) {
+      // Prepare files for upload service
+      List<Map<String, dynamic>> filesToUpload = attachments.map((att) {
+        return {'type': att['type'], 'file': att['file']};
+      }).toList();
+
+      // Upload files
+      final uploadResults = await _dataController.uploadFiles(filesToUpload);
+
+      // Check if all uploads were successful
+      if (uploadResults.every((res) => res['success'] == true)) {
+        uploadedAttachments = uploadResults.map((res) {
+          final originalAtt = attachments.firstWhere((att) => p.basename(att['path']) == res['originalFilename']);
+          return {
+            'type': originalAtt['type'],
+            'url': res['url'],
+            'filename': originalAtt['filename'],
+          };
+        }).toList();
+      } else {
+        // Handle upload failure: update message status to 'failed'
+        final index = _dataController.currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
+        if (index != -1) {
+          _dataController.currentConversationMessages[index]['status'] = 'failed';
+          _dataController.currentConversationMessages.refresh();
+        }
+        Get.snackbar('Error', 'Some files failed to upload.');
+        return;
+      }
+    }
+
+    // Prepare final payload for the server
+    final Map<String, dynamic> messagePayload = {
+      'clientMessageId': messageId, // Use the optimistic ID for matching
+      'sender': _dataController.user.value['user']['_id'],
+      'chat': widget.conversationId,
+      'content': content,
+      'attachments': uploadedAttachments,
+      'replyTo': _replyingToMessage?['_id'],
+    };
+
+    if (!widget.isGroupChat) {
+      messagePayload['receiver'] = widget.receiverId;
+    }
+
+    _socketService.sendMessage(messagePayload);
+  }
+
+  String _buildPresenceText(Map<String, dynamic>? presence) {
+    if (presence == null) {
+      return '';
+    }
+    if (presence['isOnline'] == true) {
+      return 'Online';
+    }
+    if (presence['lastSeen'] != null) {
+      final lastSeenTime = DateTime.tryParse(presence['lastSeen']);
+      if (lastSeenTime != null) {
+        return 'Last seen ${timeago.format(lastSeenTime)}';
+      }
+    }
+    return '';
   }
 
   @override
@@ -172,9 +244,23 @@ class _ConversationPageState extends State<ConversationPage> {
               child: widget.userAvatar.isEmpty ? Text(widget.username[0], style: GoogleFonts.poppins(color: Colors.tealAccent, fontWeight: FontWeight.bold)) : null,
             ),
             const SizedBox(width: 12),
-            Text(
-              widget.username,
-              style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: Colors.white, fontSize: 18),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  widget.username,
+                  style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: Colors.white, fontSize: 18),
+                ),
+                if (!widget.isGroupChat)
+                  Obx(() {
+                    final presence = _dataController.userPresence[widget.receiverId];
+                    return Text(
+                      _buildPresenceText(presence),
+                      style: GoogleFonts.roboto(color: Colors.grey[400], fontSize: 12),
+                    );
+                  }),
+              ],
             ),
           ],
         ),
@@ -251,60 +337,50 @@ class _ConversationPageState extends State<ConversationPage> {
                       },
                       child: Align(
                         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                        child: ConstrainedBox(
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(vertical: 5.0),
+                          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
                           constraints: BoxConstraints(
                             maxWidth: MediaQuery.of(context).size.width * 0.75,
                           ),
-                          child: Container(
-                            margin: const EdgeInsets.symmetric(vertical: 4.0),
-                            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-                            decoration: isMe
-                                ? BoxDecoration(
-                                    color: Colors.transparent,
-                                    border: Border.all(color: Colors.tealAccent, width: 1.5),
-                                    borderRadius: BorderRadius.circular(12.0),
-                                  )
-                                : BoxDecoration(
-                                    color: Colors.pink[300],
-                                    borderRadius: BorderRadius.circular(12.0),
-                                  ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (message['content'] != null && message['content'].isNotEmpty)
-                                  Text(
-                                    message['content'],
-                                    style: GoogleFonts.roboto(color: isMe ? Colors.tealAccent : Colors.white, fontSize: 15),
-                                  ),
-                                if (message['attachments'] != null && (message['attachments'] as List).isNotEmpty)
-                                  ... (message['attachments'] as List).map((attachment) {
-                                    return Padding(
-                                      padding: const EdgeInsets.only(top: 8.0),
-                                      child: _buildAttachment(attachment),
-                                    );
-                                  }).toList(),
-                                const SizedBox(height: 4),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        DateFormat('h:mm a').format(DateTime.parse(message['createdAt']).toLocal()),
-                                        style: GoogleFonts.roboto(
-                                          color: Colors.white.withOpacity(0.7),
-                                          fontSize: 10,
-                                        ),
-                                      ),
-                                      if (isMe) ...[
-                                        const SizedBox(width: 4),
-                                        _buildStatusIcon(message),
-                                      ],
-                                    ],
-                                  ),
+                          decoration: BoxDecoration(
+                            color: isMe ? const Color(0xFF005C4B) : const Color(0xFF202C33),
+                            borderRadius: BorderRadius.circular(12.0),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (message['content'] != null && message['content'].isNotEmpty)
+                                Text(
+                                  message['content'],
+                                  style: GoogleFonts.roboto(color: Colors.white, fontSize: 16),
                                 ),
-                              ],
-                            ),
+                              if (message['attachments'] != null && (message['attachments'] as List).isNotEmpty)
+                                ... (message['attachments'] as List).map((attachment) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(top: 8.0),
+                                    child: _buildAttachment(attachment),
+                                  );
+                                }).toList(),
+                              const SizedBox(height: 5),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    _formatTimestamp(message['createdAt']),
+                                    style: GoogleFonts.roboto(
+                                      color: Colors.white.withOpacity(0.6),
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  if (isMe) ...[
+                                    const SizedBox(width: 5),
+                                    _buildStatusIcon(message),
+                                  ],
+                                ],
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -314,10 +390,22 @@ class _ConversationPageState extends State<ConversationPage> {
             }),
           ),
           if (_replyingToMessage != null) _buildReplyContext(),
+          if (_pendingAttachments.isNotEmpty) _buildPendingAttachments(),
           _buildMessageInputField(),
         ],
       ),
     );
+  }
+
+  String _formatTimestamp(String? isoString) {
+    if (isoString == null) {
+      return '';
+    }
+    final dateTime = DateTime.tryParse(isoString);
+    if (dateTime == null) {
+      return '';
+    }
+    return DateFormat('h:mm a').format(dateTime.toLocal());
   }
 
   Widget _buildReplyContext() {
@@ -436,7 +524,7 @@ class _ConversationPageState extends State<ConversationPage> {
         children: [
           IconButton(
             icon: Icon(FeatherIcons.paperclip, color: Colors.grey[400]),
-            onPressed: _pickAndUploadFile,
+            onPressed: _pickFiles,
           ),
           Expanded(
             child: TextField(
@@ -527,46 +615,131 @@ class _ConversationPageState extends State<ConversationPage> {
     }
   }
 
-  Widget _buildAttachment(Map<String, dynamic> attachment) {
-    final String type = attachment['type'] ?? 'file';
-    final String? url = attachment['url'];
+  Widget _buildPendingAttachments() {
+    return Container(
+      padding: const EdgeInsets.all(8.0),
+      color: Colors.black.withOpacity(0.3),
+      height: 100,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: _pendingAttachments.length,
+        itemBuilder: (context, index) {
+          final attachment = _pendingAttachments[index];
+          return Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 4.0),
+                width: 80,
+                height: 80,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8.0),
+                  child: Image.file(
+                    attachment['file'],
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 0,
+                right: 0,
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _pendingAttachments.removeAt(index);
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: const BoxDecoration(
+                      color: Colors.black54,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.close, color: Colors.white, size: 16),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
 
-    if (type == 'image' && url != null) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(12.0),
-        child: CachedNetworkImage(
-          imageUrl: url,
-          placeholder: (context, url) => Container(
-            height: 200,
-            color: Colors.grey[800],
-            child: const Center(child: CircularProgressIndicator(color: Colors.tealAccent)),
-          ),
-          errorWidget: (context, url, error) => const Icon(Icons.error),
+  Widget _buildAttachment(Map<String, dynamic> attachment) {
+    final String type = attachment['type'] ?? 'document';
+    final String? url = attachment['url'];
+    final String? localPath = attachment['path'];
+    final bool isUploading = _pendingAttachments.any((att) => att['path'] == localPath);
+    final String filename = attachment['filename'] ?? 'file';
+
+    Widget placeholder(Widget? icon) {
+      return Container(
+        height: isUploading ? 80 : 60,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            if (icon != null) ...[icon, const SizedBox(width: 12)],
+            Expanded(
+              child: Text(
+                filename,
+                style: GoogleFonts.roboto(color: Colors.white),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (isUploading) const SizedBox(width: 12),
+            if (isUploading) const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white)),
+          ],
         ),
       );
     }
 
-    // Fallback for non-image files or files without a URL yet
-    return Container(
-      padding: const EdgeInsets.all(8.0),
-      decoration: BoxDecoration(
-        color: Colors.grey[800],
-        borderRadius: BorderRadius.circular(8.0),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(FeatherIcons.file, color: Colors.white, size: 24),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              attachment['filename'] ?? 'Attachment',
-              style: GoogleFonts.roboto(color: Colors.white),
-              overflow: TextOverflow.ellipsis,
+    switch (type) {
+      case 'image':
+        if (localPath != null && isUploading) {
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(12.0),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Image.file(File(localPath), height: 250, width: double.infinity, fit: BoxFit.cover),
+                Container(
+                  height: 250,
+                  width: double.infinity,
+                  color: Colors.black.withOpacity(0.4),
+                  child: const Center(child: CircularProgressIndicator(color: Colors.white)),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
-    );
+          );
+        }
+        if (url != null) {
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(12.0),
+            child: CachedNetworkImage(
+              imageUrl: url,
+              fit: BoxFit.cover,
+              placeholder: (context, url) => Container(height: 250, color: Colors.grey[900], child: const Center(child: CircularProgressIndicator())),
+              errorWidget: (context, url, error) => placeholder(const Icon(FeatherIcons.alert_triangle, color: Colors.redAccent)),
+            ),
+          );
+        }
+        break;
+      case 'video':
+        // For now, videos, audio and documents will use the same placeholder.
+        // A future step would be to implement video thumbnails and players.
+        return placeholder(const Icon(FeatherIcons.video, color: Colors.white, size: 28));
+      case 'audio':
+        return placeholder(const Icon(FeatherIcons.mic, color: Colors.white, size: 28));
+      case 'document':
+      default:
+        return placeholder(const Icon(FeatherIcons.fileText, color: Colors.white, size: 28));
+    }
+    // Fallback for any unhandled case
+    return placeholder(const Icon(FeatherIcons.file, color: Colors.grey));
   }
 }

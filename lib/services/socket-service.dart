@@ -28,10 +28,18 @@ class SocketService {
 
     _socket!.onConnect((_) {
       print('Socket connected');
+      final String? currentUserId = _dataController.user.value['user']?['_id'];
+      if (currentUserId != null) {
+        _socket!.emit('user-online', {'userId': currentUserId});
+      }
     });
 
     _socket!.onDisconnect((_) {
       print('Socket disconnected');
+      final String? currentUserId = _dataController.user.value['user']?['_id'];
+      if (currentUserId != null) {
+        _socket!.emit('user-offline', {'userId': currentUserId});
+      }
     });
 
     _socket!.onConnectError((error) {
@@ -301,6 +309,18 @@ class SocketService {
     }
   }
 
+  void subscribeToPost(String postId) {
+    if (_socket != null && _socket!.connected) {
+      _socket!.emit('subscribe-to-post', postId);
+    }
+  }
+
+  void unsubscribeFromPost(String postId) {
+    if (_socket != null && _socket!.connected) {
+      _socket!.emit('unsubscribe-from-post', postId);
+    }
+  }
+
   Stream<String> get messages => _messageController.stream;
 
   void dispose() {
@@ -379,5 +399,11 @@ class SocketService {
     _socket!.on('postDeleted', (data) => _dataController.handlePostDeleted(data));
     _socket!.on('replyEdited', (data) => _dataController.handleReplyEdited(data));
     _socket!.on('replyDeleted', (data) => _dataController.handleReplyDeleted(data));
+
+    // --- User Presence Handler ---
+    _socket!.on('online-users-changed', (data) {
+      print('[SocketService] online-users-changed event received: $data');
+      _dataController.handleUserPresenceUpdate(data);
+    });
   }
 }

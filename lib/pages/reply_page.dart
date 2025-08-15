@@ -55,6 +55,7 @@ class _ReplyPageState extends State<ReplyPage> {
   }
 
   late DataController _dataController;
+  late SocketService _socketService;
   final DeviceInfoPlugin _deviceInfo = DeviceInfoPlugin();
 
   late Map<String, dynamic> _mainPostData;
@@ -70,7 +71,14 @@ class _ReplyPageState extends State<ReplyPage> {
   void initState() {
     super.initState();
     _dataController = Get.find<DataController>();
+    _socketService = Get.find<SocketService>();
     _mainPostData = Map<String, dynamic>.from(widget.post);
+
+    final String postId = _mainPostData['_id'] as String? ?? "";
+    if (postId.isNotEmpty) {
+      _socketService.subscribeToPost(postId);
+    }
+
     // Ensure crucial lists are mutable if they exist
     _mainPostData['likes'] = List<dynamic>.from(_mainPostData['likes'] ?? []);
     _mainPostData['reposts'] = List<dynamic>.from(_mainPostData['reposts'] ?? []);
@@ -288,6 +296,10 @@ class _ReplyPageState extends State<ReplyPage> {
 
   @override
   void dispose() {
+    final String postId = _mainPostData['_id'] as String? ?? "";
+    if (postId.isNotEmpty) {
+      _socketService.unsubscribeFromPost(postId);
+    }
     _replyController.dispose();
     _replyFocusNode.dispose();
     super.dispose();
