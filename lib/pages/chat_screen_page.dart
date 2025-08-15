@@ -11,6 +11,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:chatter/widgets/video_player_widget.dart';
 import 'package:chatter/widgets/audio_waveform_widget.dart';
+import 'package:chatter/widgets/all_attachments_dialog.dart';
 
 class ChatScreen extends StatefulWidget {
   final Chat chat;
@@ -129,24 +130,65 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildReplyPreview(ChatMessage replyTo) {
+    final sender = widget.chat.participants.firstWhere(
+      (p) => p.id == replyTo.senderId,
+      orElse: () => User(id: replyTo.senderId, name: 'Unknown User'),
+    );
+
+    String contentPreview;
+    if (replyTo.attachments != null && replyTo.attachments!.isNotEmpty) {
+      contentPreview = 'Attachment: ${replyTo.attachments!.first.filename}';
+    } else if (replyTo.voiceNote != null) {
+      contentPreview = 'Voice note';
+    } else {
+      contentPreview = replyTo.text ?? '';
+    }
+
     return Container(
-      padding: const EdgeInsets.all(8.0),
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
       color: Colors.grey[900],
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              'Replying to: ${replyTo.text}',
-              style: TextStyle(color: Colors.grey[400]),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+      child: Container(
+        padding: const EdgeInsets.all(8.0),
+        decoration: BoxDecoration(
+          color: Colors.grey[800]?.withOpacity(0.5),
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(12),
+            topRight: Radius.circular(12),
+          ),
+          border: const Border(
+            left: BorderSide(color: Colors.tealAccent, width: 4),
+          ),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    sender.name,
+                    style: const TextStyle(
+                      color: Colors.tealAccent,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    contentPreview,
+                    style: TextStyle(color: Colors.grey[300]),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.close, color: Colors.white),
-            onPressed: () => setState(() => _replyingTo = null),
-          ),
-        ],
+            IconButton(
+              icon: const Icon(Icons.close, color: Colors.white, size: 20),
+              onPressed: () => setState(() => _replyingTo = null),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -216,7 +258,15 @@ class _ChatScreenState extends State<ChatScreen> {
         if (hasMore && index == maxVisible - 1) {
           final remainingCount = attachments.length - maxVisible + 1;
           return GestureDetector(
-            onTap: () => _openMediaView(message, index),
+            onTap: () {
+              showDialog(
+                context: context,
+                builder: (context) => AllAttachmentsDialog(
+                  message: message,
+                  chat: widget.chat,
+                ),
+              );
+            },
             child: Stack(
               alignment: Alignment.center,
               fit: StackFit.expand,
@@ -241,18 +291,8 @@ class _ChatScreenState extends State<ChatScreen> {
         }
 
         // Regular attachment item
-        final attachmentType = attachment.type?.toLowerCase();
-        // Assuming 'file' is a generic type for other downloadable files
-        final isDownloadable = attachmentType == 'pdf' || attachmentType == 'file';
-
         return GestureDetector(
-          onTap: () {
-            if (isDownloadable && !attachment.isDownloading) {
-              dataController.handleFileAttachmentTap(message.id, attachment.id);
-            } else if (!isDownloadable) {
-              _openMediaView(message, index);
-            }
-          },
+          onTap: () => _openMediaView(message, index),
           child: _buildAttachmentContent(attachment, isLocalFile),
         );
       },
