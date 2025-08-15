@@ -581,7 +581,17 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                         // Part 2: @username · Time · Time Ago · Date (dot separated)
                         // This part will no longer be Expanded.
                         Text(
-                          '· ${DateFormat('h:mm a').format(timestamp.toLocal())} · ${timeago.format(timestamp)} · ${DateFormat('MMM d, yy').format(timestamp.toLocal())}',
+                          '· ${DateFormat('h:mm a').format(timestamp.toLocal())} · ',
+                          style: GoogleFonts.poppins(fontSize: isReply ? 10 : 10, color: Colors.grey[500]),
+                          overflow: TextOverflow.ellipsis,
+                          softWrap: false, // Try to keep it on one line
+                        ),
+                        RealtimeTimeagoText(
+                          timestamp: timestamp,
+                          style: GoogleFonts.poppins(fontSize: isReply ? 10 : 10, color: Colors.grey[500]),
+                        ),
+                        Text(
+                          ' · ${DateFormat('MMM d, yy').format(timestamp.toLocal())}',
                           style: GoogleFonts.poppins(fontSize: isReply ? 10 : 10, color: Colors.grey[500]),
                           overflow: TextOverflow.ellipsis,
                           softWrap: false, // Try to keep it on one line
