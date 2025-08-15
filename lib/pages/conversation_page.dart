@@ -52,6 +52,7 @@ class _ConversationPageState extends State<ConversationPage> {
           backgroundColor: Colors.red, colorText: Colors.white);
     });
     _socketService.joinChat(widget.conversationId);
+    _socketService.markChatAsSeen(widget.conversationId, _dataController.user.value['user']['_id']);
   }
 
   @override
@@ -94,12 +95,38 @@ class _ConversationPageState extends State<ConversationPage> {
   void _sendMessage() {
     if (_messageController.text.trim().isEmpty && _attachments.isEmpty) return;
 
-    final Map<String, dynamic> messagePayload = {
-      'sender': _dataController.user.value['user']['_id'],
+    final String content = _messageController.text.trim();
+    final String localId = DateTime.now().millisecondsSinceEpoch.toString();
+    final currentUser = _dataController.user.value['user'];
+
+    // Create optimistic message for instant UI update
+    final Map<String, dynamic> optimisticMessage = {
+      '_id': localId, // Use localId as a temporary ID
+      'localId': localId,
+      'content': content,
+      'sender': {
+        '_id': currentUser['_id'],
+        'name': currentUser['name'],
+        'avatar': currentUser['avatar'],
+      },
       'chat': widget.conversationId,
-      'content': _messageController.text.trim(),
+      'createdAt': DateTime.now().toUtc().toIso8601String(),
+      'status': 'sending',
       'attachments': _attachments,
       'replyTo': _replyingToMessage?['_id'],
+    };
+
+    // Add to UI immediately
+    _dataController.currentConversationMessages.add(optimisticMessage);
+
+    // Prepare payload for the server
+    final Map<String, dynamic> messagePayload = {
+      'sender': currentUser['_id'],
+      'chat': widget.conversationId,
+      'content': content,
+      'attachments': _attachments,
+      'replyTo': _replyingToMessage?['_id'],
+      'localId': localId,
     };
 
     if (!widget.isGroupChat) {
@@ -257,12 +284,21 @@ class _ConversationPageState extends State<ConversationPage> {
                               const SizedBox(height: 4),
                               Align(
                                 alignment: Alignment.centerRight,
-                                child: Text(
-                                  DateFormat('h:mm a').format(DateTime.parse(message['createdAt']).toLocal()),
-                                  style: GoogleFonts.roboto(
-                                    color: isMe ? Colors.black.withOpacity(0.7) : Colors.white.withOpacity(0.7),
-                                    fontSize: 10,
-                                  ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      DateFormat('h:mm a').format(DateTime.parse(message['createdAt']).toLocal()),
+                                      style: GoogleFonts.roboto(
+                                        color: isMe ? Colors.black.withOpacity(0.7) : Colors.white.withOpacity(0.7),
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                    if (isMe) ...[
+                                      const SizedBox(width: 4),
+                                      _buildStatusIcon(message),
+                                    ],
+                                  ],
                                 ),
                               ),
                             ],
@@ -471,5 +507,21 @@ class _ConversationPageState extends State<ConversationPage> {
         ],
       ),
     );
+  }
+
+  Widget _buildStatusIcon(Map<String, dynamic> message) {
+    final status = message['status'] as String?;
+    switch (status) {
+      case 'read':
+        return const Icon(Icons.done_all, color: Colors.blue, size: 16);
+      case 'delivered':
+        return const Icon(Icons.done_all, color: Colors.grey, size: 16);
+      case 'sent':
+        return const Icon(Icons.done, color: Colors.grey, size: 16);
+      case 'sending':
+        return const Icon(Icons.watch_later_outlined, color: Colors.grey, size: 16);
+      default:
+        return const SizedBox.shrink();
+    }
   }
 }

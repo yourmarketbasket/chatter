@@ -10,6 +10,7 @@ class SocketService {
 
   SocketService() {
     _initializeSocket();
+    setupUserEventListeners();
     connect(); // Automatically connect during initialization
   }
 
@@ -288,9 +289,15 @@ class SocketService {
     }
   }
 
-  void markAsRead(String messageId, String chatId, String userId) {
+  void markChatAsSeen(String chatId, String userId) {
     if (_socket != null && _socket!.connected) {
-      _socket!.emit('mark-as-read', {'messageId': messageId, 'chatId': chatId, 'userId': userId});
+      _socket!.emit('mark-as-seen', {'chatId': chatId, 'userId': userId});
+    }
+  }
+
+  void sendMessageDeliveredReceipt(String messageId, String chatId) {
+    if (_socket != null && _socket!.connected) {
+      _socket!.emit('message-delivered-receipt', {'messageId': messageId, 'chatId': chatId});
     }
   }
 
@@ -360,6 +367,11 @@ class SocketService {
     _socket!.on('message-read', (data) {
       print('[SocketService] message-read event received: $data');
       _dataController.handleMessageRead(data);
+    });
+
+    _socket!.on('message-status-update', (data) {
+      print('[SocketService] message-status-update event received: $data');
+      _dataController.handleMessageStatusUpdate(data);
     });
 
     // --- Post/Reply Real-time Handlers ---

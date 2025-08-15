@@ -2523,8 +2523,27 @@ void clearUserPosts() {
 
   void handleNewMessage(Map<String, dynamic> message) {
     final chatId = message['chat'];
+    final localId = message['localId'] as String?;
 
-    // Update conversation list
+    // If there's a localId, it's a confirmation of a message we sent.
+    // We need to find our optimistic message and replace it.
+    if (localId != null) {
+      final optimisticIndex = currentConversationMessages.indexWhere((m) => m['localId'] == localId);
+      if (optimisticIndex != -1) {
+        // Set status to 'sent' because it's now confirmed by the server.
+        message['status'] = 'sent';
+        currentConversationMessages[optimisticIndex] = message;
+      }
+    } else {
+      // This is a new message from someone else.
+      if (chatId != null && chatId == _currentlyOpenChatId) {
+        currentConversationMessages.add(message);
+        final socketService = Get.find<SocketService>();
+        socketService.sendMessageDeliveredReceipt(message['_id'], chatId);
+      }
+    }
+
+    // Update conversation list for both our own confirmed messages and new messages from others.
     if (chatId != null) {
       final index = conversations.indexWhere((c) => c['_id'] == chatId);
       if (index != -1) {
@@ -2533,14 +2552,8 @@ void clearUserPosts() {
         conversations.removeAt(index);
         conversations.insert(0, conversation);
       } else {
-        // If the chat is not in the list, refresh the list to fetch it.
         getAllChats();
       }
-    }
-
-    // Add message to the open conversation if it matches
-    if (chatId != null && chatId == _currentlyOpenChatId) {
-      currentConversationMessages.add(message);
     }
   }
 
@@ -2593,6 +2606,19 @@ void clearUserPosts() {
           conversation['lastMessage'] = message;
           conversations.refresh();
         }
+      }
+    }
+  }
+
+  void handleMessageStatusUpdate(Map<String, dynamic> data) {
+    final messageId = data['messageId'] as String?;
+    final status = data['status'] as String?;
+
+    if (messageId != null && status != null) {
+      final index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
+      if (index != -1) {
+        currentConversationMessages[index]['status'] = status;
+        currentConversationMessages.refresh();
       }
     }
   }
