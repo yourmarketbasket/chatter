@@ -10,6 +10,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:feather_icons/feather_icons.dart';
 import 'package:intl/intl.dart';
+import 'package:objectid/objectid.dart';
 
 class ConversationPage extends StatefulWidget {
   final String conversationId;
@@ -96,13 +97,12 @@ class _ConversationPageState extends State<ConversationPage> {
     if (_messageController.text.trim().isEmpty && _attachments.isEmpty) return;
 
     final String content = _messageController.text.trim();
-    final String localId = DateTime.now().millisecondsSinceEpoch.toString();
+    final String messageId = ObjectId().hexString;
     final currentUser = _dataController.user.value['user'];
 
     // Create optimistic message for instant UI update
     final Map<String, dynamic> optimisticMessage = {
-      '_id': localId, // Use localId as a temporary ID
-      'localId': localId,
+      '_id': messageId,
       'content': content,
       'sender': {
         '_id': currentUser['_id'],
@@ -121,12 +121,12 @@ class _ConversationPageState extends State<ConversationPage> {
 
     // Prepare payload for the server
     final Map<String, dynamic> messagePayload = {
+      '_id': messageId,
       'sender': currentUser['_id'],
       'chat': widget.conversationId,
       'content': content,
       'attachments': _attachments,
       'replyTo': _replyingToMessage?['_id'],
-      'localId': localId,
     };
 
     if (!widget.isGroupChat) {

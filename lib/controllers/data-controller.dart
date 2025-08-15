@@ -2523,38 +2523,47 @@ void clearUserPosts() {
   }
 
   void handleNewMessage(Map<String, dynamic> message) {
+    final messageId = message['_id'] as String?;
     final chatId = message['chat'];
-    final localId = message['localId'] as String?;
+    final senderId = (message['sender'] is Map ? message['sender']['_id'] : message['sender']) as String?;
+    final currentUserId = user.value['user']['_id'];
 
-    // If there's a localId, it's a confirmation of a message we sent.
-    // We need to find our optimistic message and replace it.
-    if (localId != null) {
-      final optimisticIndex = currentConversationMessages.indexWhere((m) => m['localId'] == localId);
+    if (messageId == null || chatId == null || senderId == null) return;
+
+    // Determine if the message is from the current user
+    final bool isMyMessage = senderId == currentUserId;
+
+    if (isMyMessage) {
+      // This is a confirmation of a message we sent.
+      // Find the optimistic message by its _id and update it.
+      final optimisticIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
       if (optimisticIndex != -1) {
-        // Set status to 'sent' because it's now confirmed by the server.
+        // Update status and potentially other fields from the server response
         message['status'] = 'sent';
         currentConversationMessages[optimisticIndex] = message;
       }
     } else {
       // This is a new message from someone else.
-      if (chatId != null && chatId == _currentlyOpenChatId) {
+      // Add it to the list if the user is in the correct chat.
+      if (chatId == _currentlyOpenChatId) {
         currentConversationMessages.add(message);
+        // Acknowledge delivery
         final socketService = Get.find<SocketService>();
-        socketService.sendMessageDeliveredReceipt(message['_id'], chatId);
+        socketService.sendMessageDeliveredReceipt(messageId, chatId);
       }
     }
 
-    // Update conversation list for both our own confirmed messages and new messages from others.
-    if (chatId != null) {
-      final index = conversations.indexWhere((c) => c['_id'] == chatId);
-      if (index != -1) {
-        final conversation = conversations[index];
-        conversation['lastMessage'] = message;
-        conversations.removeAt(index);
-        conversations.insert(0, conversation);
-      } else {
-        getAllChats();
-      }
+    // Update the main conversation list
+    final convoIndex = conversations.indexWhere((c) => c['_id'] == chatId);
+    if (convoIndex != -1) {
+      final conversation = conversations[convoIndex];
+      conversation['lastMessage'] = message;
+      conversations.removeAt(convoIndex);
+      conversations.insert(0, conversation);
+    } else {
+      // If we receive a message for a chat that's not in our list,
+      // it could be a new chat initiated by someone else. Refresh the list.
+      getAllChats();
     }
   }
 
