@@ -62,12 +62,12 @@ class UploadService {
       'avi': 'video',
       'mkv': 'video',
       'webm': 'video',
-      'm4a': 'video', // Often audio, but Cloudinary might class as video for processing
-      'mp3': 'video', // Same as above
-      'wav': 'video', // Same as above
-      'aac': 'video', // Same as above
-      'ogg': 'video', // Same as above
-      'pdf': 'raw',   // For documents
+      'm4a': 'raw',
+      'mp3': 'raw',
+      'wav': 'raw',
+      'aac': 'raw',
+      'ogg': 'raw',
+      'pdf': 'raw',
       'doc': 'raw',
       'docx': 'raw',
       'txt': 'raw',
