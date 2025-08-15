@@ -12,6 +12,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:chatter/widgets/video_player_widget.dart';
 import 'package:chatter/widgets/audio_waveform_widget.dart';
 import 'package:chatter/widgets/all_attachments_dialog.dart';
+import 'package:chatter/widgets/reply_message_snippet.dart';
 
 class ChatScreen extends StatefulWidget {
   final Chat chat;
@@ -474,6 +475,22 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 )
               else ...[
+                if (message.replyTo != null)
+                  Obx(() {
+                    final originalMessage = dataController.currentConversationMessages.firstWhere(
+                      (m) => m.id == message.replyTo,
+                      orElse: () => ChatMessage(chatId: '', senderId: '', text: 'Original message not found.'),
+                    );
+                    // A message with an empty ID is our signal that the original message wasn't found
+                    if (originalMessage.id.isEmpty) {
+                      return const SizedBox.shrink();
+                    }
+                    return ReplyMessageSnippet(
+                      originalMessage: originalMessage,
+                      chat: widget.chat,
+                      currentUserId: dataController.user.value['user']['_id'],
+                    );
+                  }),
                 if (message.voiceNote != null)
                   GestureDetector(
                     onTap: () {
