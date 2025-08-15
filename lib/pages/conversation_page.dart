@@ -700,11 +700,12 @@ class _ConversationPageState extends State<ConversationPage>
     if (_recordedAudioPath == null) return;
 
     final file = File(_recordedAudioPath!);
+    final String filename = p.basename(file.path);
     final attachment = {
       'type': 'audio',
       'path': _recordedAudioPath,
       'file': file,
-      'filename': 'voice_note.m4a',
+      'filename': filename,
       'isUploading': true,
     };
 
