@@ -1,6 +1,6 @@
 import 'package:chatter/controllers/data-controller.dart';
 import 'package:chatter/models/chat_models.dart';
-import 'package:chatter/models/feed_models.dart';
+import 'package:chatter/models/feed_models.dart' hide Attachment;
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:chatter/pages/media_view_page.dart';

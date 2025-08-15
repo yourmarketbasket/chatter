@@ -1,5 +1,5 @@
 import 'package:chatter/models/chat_models.dart';
-import 'package:chatter/models/feed_models.dart';
+import 'package:chatter/models/feed_models.dart' hide Attachment;
 import 'package:chatter/pages/chat_screen_page.dart';
 import 'package:flutter/material.dart';
 

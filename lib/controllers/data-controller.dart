@@ -6,9 +6,8 @@ import 'package:dio/dio.dart' as dio; // Use prefix for dio to avoid conflicts
 import 'dart:convert';
 // import 'package:path/path.dart' as path; // path is used by UploadService
 import 'package:path_provider/path_provider.dart';
-import 'package:open_file/open_file.dart';
 import '../models/chat_models.dart';
-import '../models/feed_models.dart'; // Added import for ChatterPost
+import '../models/feed_models.dart' hide Attachment; // Added import for ChatterPost
 import '../services/upload_service.dart'; // Import the UploadService
 
 class DataController extends GetxController {
@@ -1120,7 +1119,9 @@ class DataController extends GetxController {
     final file = await _localFile(attachment.filename);
 
     if (await file.exists()) {
-      OpenFile.open(file.path);
+      print('File already downloaded at: ${file.path}');
+      // On a real device, you might want to use a package like `open_file`
+      // to open the file, but for now, we just log the path.
     } else {
       downloadAttachment(messageId, attachmentId);
     }

@@ -60,34 +60,6 @@ class Attachment {
     );
   }
 
-  ChatMessage copyWith({
-    String? id,
-    String? chatId,
-    String? senderId,
-    String? text,
-    List<Attachment>? attachments,
-    VoiceNote? voiceNote,
-    MessageStatus? status,
-    DateTime? createdAt,
-    String? replyTo,
-    bool? edited,
-    bool? deleted,
-  }) {
-    return ChatMessage(
-      id: id ?? this.id,
-      chatId: chatId ?? this.chatId,
-      senderId: senderId ?? this.senderId,
-      text: text ?? this.text,
-      attachments: attachments ?? this.attachments,
-      voiceNote: voiceNote ?? this.voiceNote,
-      status: status ?? this.status,
-      createdAt: createdAt ?? this.createdAt,
-      replyTo: replyTo ?? this.replyTo,
-      edited: edited ?? this.edited,
-      deleted: deleted ?? this.deleted,
-    );
-  }
-
   Map<String, dynamic> toJson() {
     return {
       '_id': id,
@@ -154,6 +126,34 @@ class ChatMessage {
     this.deleted = false,
   })  : id = id ?? ObjectId().hexString,
         createdAt = createdAt ?? DateTime.now();
+
+  ChatMessage copyWith({
+    String? id,
+    String? chatId,
+    String? senderId,
+    String? text,
+    List<Attachment>? attachments,
+    VoiceNote? voiceNote,
+    MessageStatus? status,
+    DateTime? createdAt,
+    String? replyTo,
+    bool? edited,
+    bool? deleted,
+  }) {
+    return ChatMessage(
+      id: id ?? this.id,
+      chatId: chatId ?? this.chatId,
+      senderId: senderId ?? this.senderId,
+      text: text ?? this.text,
+      attachments: attachments ?? this.attachments,
+      voiceNote: voiceNote ?? this.voiceNote,
+      status: status ?? this.status,
+      createdAt: createdAt ?? this.createdAt,
+      replyTo: replyTo ?? this.replyTo,
+      edited: edited ?? this.edited,
+      deleted: deleted ?? this.deleted,
+    );
+  }
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
     return ChatMessage(
