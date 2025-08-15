@@ -7,6 +7,7 @@ import 'dart:convert';
 // import 'package:path/path.dart' as path; // path is used by UploadService
 import '../models/feed_models.dart'; // Added import for ChatterPost
 import '../services/upload_service.dart'; // Import the UploadService
+import '../services/socket-service.dart';
 
 class DataController extends GetxController {
   final UploadService _uploadService = UploadService(); // Instantiate UploadService
