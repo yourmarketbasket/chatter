@@ -161,7 +161,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final sender = widget.chat.participants.firstWhere(
       (p) => p.id == message.senderId,
       // Fallback for safety, though sender should always be in participants
-      orElse: () => ChatUser(id: message.senderId, name: 'Unknown User'),
+      orElse: () => User(id: message.senderId, name: 'Unknown User'),
     );
 
     Navigator.push(
