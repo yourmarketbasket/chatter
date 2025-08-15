@@ -43,7 +43,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
       return;
     }
 
-    final result = await _dataController.createGroupChat(
+    final result = await _dataController.createDummyGroupChat(
       _groupNameController.text.trim(),
       _selectedUserIds,
     );

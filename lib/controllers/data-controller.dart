@@ -1083,6 +1083,41 @@ class DataController extends GetxController {
     _currentlyOpenChatId = null;
   }
 
+  Future<Map<String, dynamic>> createDummyChat(String receiverId) async {
+    final existingChat = conversations.firstWhereOrNull((c) => c.participants.any((p) => p.id == receiverId));
+    if (existingChat != null) {
+      return {'success': true, 'chat': existingChat};
+    }
+
+    final receiver = dummy.users.firstWhereOrNull((u) => u.id == receiverId);
+    if (receiver == null) {
+      return {'success': false, 'message': 'User not found'};
+    }
+
+    final newChat = Chat(
+      id: ObjectId().hexString,
+      participants: [dummy.currentUser, receiver],
+      messages: [],
+    );
+    conversations.add(newChat);
+    return {'success': true, 'chat': newChat};
+  }
+
+  Future<Map<String, dynamic>> createDummyGroupChat(String groupName, List<String> participantIds) async {
+    final participants = dummy.users.where((u) => participantIds.contains(u.id)).toList();
+    participants.add(dummy.currentUser);
+
+    final newGroup = Group(
+      id: ObjectId().hexString,
+      name: groupName,
+      avatar: 'https://i.pravatar.cc/150?u=${ObjectId().hexString}',
+      participants: participants,
+      messages: [],
+    );
+    groupConversations.add(newGroup);
+    return {'success': true, 'chat': newGroup};
+  }
+
   // Add these placeholder methods inside DataController class
 
   Future<void> fetchFollowers(String userId) async {

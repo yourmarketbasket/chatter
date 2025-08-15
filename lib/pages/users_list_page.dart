@@ -208,11 +208,11 @@ class _UsersListPageState extends State<UsersListPage> {
               }) : null,
               onTap: () async {
                 if (widget.mode == UserListMode.Browse || widget.mode == UserListMode.SelectForChat) {
-                  final result = await _dataController.createNewChat(userId);
+                  final result = await _dataController.createDummyChat(userId);
                   if (result['success']) {
-                    final chat = result['chat'];
+                    final chat = result['chat'] as Chat;
                     Get.off(() => ConversationPage( // Use Get.off to replace the user list page
-                          conversationId: chat['_id'],
+                          conversationId: chat.id,
                           username: name,
                           userAvatar: avatarUrl,
                           receiverId: userId,

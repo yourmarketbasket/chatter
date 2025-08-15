@@ -6,7 +6,7 @@ import 'package:objectid/objectid.dart';
 
 // Dummy Users
 final User currentUser = User(
-  id: ObjectId().hexString,
+  id: 'you',
   name: 'You',
   avatar: 'https://i.pravatar.cc/150?u=a042581f4e29026704d',
 );
@@ -34,6 +34,8 @@ final User user4 = User(
   name: 'David',
   avatar: 'https://i.pravatar.cc/150?u=a042581f4e29026704b',
 );
+
+final List<User> users = [user1, user2, user3, user4];
 
 // Dummy Messages
 final List<Message> messages1 = [

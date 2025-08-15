@@ -357,44 +357,44 @@ class SocketService {
       }
     });
 
-    // --- Chat Event Handlers ---
+    // --- Chat Event Handlers (Commented out for dummy data) ---
 
-    _socket!.on('receive-message', (data) {
-      print('[SocketService] receive-message event received: $data');
-      print(data);
-      _dataController.handleNewMessage(data);
-    });
+    // _socket!.on('receive-message', (data) {
+    //   print('[SocketService] receive-message event received: $data');
+    //   print(data);
+    //   _dataController.handleNewMessage(data);
+    // });
 
-    _socket!.on('message-edited', (data) {
-      print('[SocketService] message-edited event received: $data');
-      _dataController.handleMessageEdited(data);
-    });
+    // _socket!.on('message-edited', (data) {
+    //   print('[SocketService] message-edited event received: $data');
+    //   _dataController.handleMessageEdited(data);
+    // });
 
-    _socket!.on('message-deleted', (data) {
-      print('[SocketService] message-deleted event received: $data');
-      _dataController.handleMessageDeleted(data);
-    });
+    // _socket!.on('message-deleted', (data) {
+    //   print('[SocketService] message-deleted event received: $data');
+    //   _dataController.handleMessageDeleted(data);
+    // });
 
-    _socket!.on('typing', (data) {
-      print('[SocketService] typing event received: $data');
-      _dataController.handleTyping(data);
-    });
+    // _socket!.on('typing', (data) {
+    //   print('[SocketService] typing event received: $data');
+    //   _dataController.handleTyping(data);
+    // });
 
-    _socket!.on('stop-typing', (data) {
-      print('[SocketService] stop-typing event received: $data');
-      _dataController.handleStopTyping(data);
-    });
+    // _socket!.on('stop-typing', (data) {
+    //   print('[SocketService] stop-typing event received: $data');
+    //   _dataController.handleStopTyping(data);
+    // });
 
-    _socket!.on('message-read', (data) {
-      print('[SocketService] message-read event received: $data');
-      _dataController.handleMessageRead(data);
-    });
+    // _socket!.on('message-read', (data) {
+    //   print('[SocketService] message-read event received: $data');
+    //   _dataController.handleMessageRead(data);
+    // });
 
-    _socket!.on('message-status-update', (data) {
-      print('[SocketService] message-status-update event received: $data');
-      print(data);
-      _dataController.handleMessageStatusUpdate(data);
-    });
+    // _socket!.on('message-status-update', (data) {
+    //   print('[SocketService] message-status-update event received: $data');
+    //   print(data);
+    //   _dataController.handleMessageStatusUpdate(data);
+    // });
 
     // --- Post/Reply Real-time Handlers ---
     _socket!.on('postEdited', (data) => _dataController.handlePostEdited(data));

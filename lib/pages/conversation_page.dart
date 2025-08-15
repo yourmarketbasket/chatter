@@ -484,7 +484,12 @@ class _ConversationPageState extends State<ConversationPage> with SingleTickerPr
               if (_isRecording.value)
                 IconButton(
                   icon: const Icon(FeatherIcons.trash2, color: Colors.redAccent),
-                  onPressed: _cancelAudioRecording,
+                  onPressed: () {
+                    _stopAudioRecording();
+                    setState(() {
+                      _recordedAudioPath = null;
+                    });
+                  },
                 )
               else
                 IconButton(
