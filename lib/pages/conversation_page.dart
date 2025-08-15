@@ -197,17 +197,24 @@ class _ConversationPageState extends State<ConversationPage>
       // Check if all uploads were successful
       if (uploadResults.every((res) => res['success'] == true)) {
         uploadedAttachments = uploadResults.map((res) {
-          final originalAtt = attachments.firstWhere(
-            (att) => att['filename'] == res['originalFilename'],
-            orElse: () => null,
-          );
+          Map<String, dynamic>? originalAtt;
+          try {
+            originalAtt = attachments.firstWhere(
+              (att) => att['filename'] == res['originalFilename']
+            );
+          } on StateError {
+            print('Could not find matching attachment for uploaded file: ${res['originalFilename']}');
+            originalAtt = null;
+          }
+
           if (originalAtt == null) return null;
+
           return {
             'type': originalAtt['type'],
             'url': res['url'],
             'filename': originalAtt['filename'],
           };
-        }).where((item) => item != null).cast<Map<String, dynamic>>().toList();
+        }).whereType<Map<String, dynamic>>().toList();
       } else {
         // Handle upload failure: update message status to 'failed'
         final index = _dataController.currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
