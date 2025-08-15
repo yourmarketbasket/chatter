@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:dio/dio.dart' as dio; // Use prefix for dio to avoid conflicts
 import 'dart:convert';
 // import 'package:path/path.dart' as path; // path is used by UploadService
+import '../models/chat_models.dart';
 import '../models/feed_models.dart'; // Added import for ChatterPost
 import '../services/upload_service.dart'; // Import the UploadService
 
@@ -39,9 +40,9 @@ class DataController extends GetxController {
   final RxList<Map<String, dynamic>> allUsers = <Map<String, dynamic>>[].obs;
 
   // Add these Rx variables inside DataController class
-  final RxList<Map<String, dynamic>> conversations = <Map<String, dynamic>>[].obs;
+  final RxList<Chat> conversations = <Chat>[].obs;
   final RxBool isLoadingConversations = false.obs;
-  final RxList<Map<String, dynamic>> currentConversationMessages = <Map<String, dynamic>>[].obs;
+  final RxList<ChatMessage> currentConversationMessages = <ChatMessage>[].obs;
   final RxBool isLoadingMessages = false.obs;
 
   // Add these Rx variables inside DataController class
@@ -971,64 +972,73 @@ class DataController extends GetxController {
   // Add these placeholder methods inside DataController class
 
   Future<void> fetchConversations() async {
+    // This method will be updated later to fetch real conversation data.
+    // For now, it's a placeholder.
     isLoadingConversations.value = true;
-    await Future.delayed(const Duration(milliseconds: 800)); // Simulate network call
-    // Placeholder data
-    conversations.assignAll([
-      {'id': 'conv1', 'username': 'AliceWonder', 'userAvatar': 'https://i.pravatar.cc/150?u=alice', 'lastMessage': 'Hey, how are you?', 'timestamp': '10:30 AM'},
-      {'id': 'conv2', 'username': 'BobTheBuilder', 'userAvatar': 'https://i.pravatar.cc/150?u=bob', 'lastMessage': 'Project update is due.', 'timestamp': 'Yesterday'},
-      {'id': 'conv3', 'username': 'CharlieChap', 'userAvatar': 'https://i.pravatar.cc/150?u=charlie', 'lastMessage': 'Okay, sounds good!', 'timestamp': 'Mon'},
-    ]);
+    await Future.delayed(const Duration(seconds: 1));
     isLoadingConversations.value = false;
-    print('[DataController] Fetched conversations (placeholder).');
   }
 
   Future<void> fetchMessages(String conversationId) async {
+    // This method will be updated later to fetch real messages for a conversation.
+    // For now, it's a placeholder.
     isLoadingMessages.value = true;
-    currentConversationMessages.clear(); // Clear previous messages
-    await Future.delayed(const Duration(milliseconds: 500)); // Simulate network call
-    // Placeholder data - In real app, filter/fetch by conversationId
-    // Assuming 'currentUser' is the ID of the logged-in user.
-    // You should get this from your user object, e.g., user.value['id']
-    final String currentUserId = user.value['id']?.toString() ?? 'currentUser';
-
-    if (conversationId == 'conv1') {
-      currentConversationMessages.assignAll([
-        {'id': 'msg1', 'senderId': 'alice', 'text': 'Hey, how are you?', 'timestamp': '10:30 AM'},
-        {'id': 'msg2', 'senderId': currentUserId, 'text': 'I am good, thanks! You?', 'timestamp': '10:31 AM'},
-        {'id': 'msg3', 'senderId': 'alice', 'text': 'Doing well!', 'timestamp': '10:32 AM'},
-      ]);
-    } else if (conversationId == 'conv2') {
-       currentConversationMessages.assignAll([
-        {'id': 'msgA', 'senderId': 'bob', 'text': 'Project update is due.', 'timestamp': 'Yesterday'},
-        {'id': 'msgB', 'senderId': currentUserId, 'text': 'Working on it!', 'timestamp': 'Yesterday'},
-      ]);
-    } else {
-      // No messages for other convos in this placeholder
-    }
+    await Future.delayed(const Duration(seconds: 1));
     isLoadingMessages.value = false;
-    print('[DataController] Fetched messages for $conversationId (placeholder).');
   }
 
-  // Placeholder for sending a message
-  void sendMessage(String conversationId, String text) {
-    // Simulate sending message and receiving it back
-    final String currentUserId = user.value['id']?.toString() ?? 'currentUser';
-    final newMessage = {
-      'id': DateTime.now().millisecondsSinceEpoch.toString(), // Temporary unique ID
-      'senderId': currentUserId,
-      'text': text,
-      'timestamp': 'Now', // Simple timestamp
-    };
-    currentConversationMessages.add(newMessage);
-    // In a real app, you'd also update the 'lastMessage' for the conversation in the conversations list
-    final convIndex = conversations.indexWhere((c) => c['id'] == conversationId);
-    if (convIndex != -1) {
-      conversations[convIndex]['lastMessage'] = text;
-      conversations[convIndex]['timestamp'] = 'Now';
-      conversations.refresh(); // Notify listeners of change in list item
+  // Send a new chat message
+  Future<void> sendChatMessage(ChatMessage message) async {
+    // Optimistic UI update: add message to the list with 'sending' status
+    currentConversationMessages.insert(0, message);
+
+    try {
+      // Simulate network call
+      await Future.delayed(const Duration(seconds: 1));
+
+      // TODO: Replace with actual API call
+      // final response = await _dio.post('api/chats/messages', data: message.toJson());
+
+      // On successful API call, update the message status to 'sent'
+      // The backend should return the confirmed message, possibly with an updated timestamp or ID.
+      final int index = currentConversationMessages.indexWhere((m) => m.id == message.id);
+      if (index != -1) {
+        // In a real scenario, you would update the message with data from the server response.
+        // For now, we just update the status.
+        final sentMessage = ChatMessage(
+          id: message.id,
+          chatId: message.chatId,
+          senderId: message.senderId,
+          text: message.text,
+          attachments: message.attachments,
+          voiceNote: message.voiceNote,
+          status: MessageStatus.sent, // Update status
+          createdAt: message.createdAt,
+          replyTo: message.replyTo,
+        );
+        currentConversationMessages[index] = sentMessage;
+      }
+
+      // TODO: Add socket event listener for real-time status updates (delivered, read)
+    } catch (e) {
+      print('Error sending message: $e');
+      // If the API call fails, update the message status to 'failed'
+      final int index = currentConversationMessages.indexWhere((m) => m.id == message.id);
+      if (index != -1) {
+        final failedMessage = ChatMessage(
+          id: message.id,
+          chatId: message.chatId,
+          senderId: message.senderId,
+          text: message.text,
+          attachments: message.attachments,
+          voiceNote: message.voiceNote,
+          status: MessageStatus.failed, // Update status
+          createdAt: message.createdAt,
+          replyTo: message.replyTo,
+        );
+        currentConversationMessages[index] = failedMessage;
+      }
     }
-    print('[DataController] Sent message "$text" to $conversationId (placeholder).');
   }
 
   // Add these placeholder methods inside DataController class
