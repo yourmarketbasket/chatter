@@ -55,6 +55,7 @@ class _ConversationPageState extends State<ConversationPage> {
 
   @override
   void dispose() {
+    _dataController.clearCurrentlyOpenChatId();
     _messageController.dispose();
     _scrollController.dispose();
     _audioRecorder.dispose();
@@ -92,14 +93,18 @@ class _ConversationPageState extends State<ConversationPage> {
   void _sendMessage() {
     if (_messageController.text.trim().isEmpty && _attachments.isEmpty) return;
 
-    final messagePayload = {
+    final Map<String, dynamic> messagePayload = {
       'sender': _dataController.user.value['user']['_id'],
-      'receiver': widget.receiverId,
       'chat': widget.conversationId,
       'content': _messageController.text.trim(),
       'attachments': _attachments,
       'replyTo': _replyingToMessage?['_id'],
     };
+
+    if (!widget.isGroupChat) {
+      messagePayload['receiver'] = widget.receiverId;
+    }
+
     _socketService.sendMessage(messagePayload);
 
     _messageController.clear();
@@ -182,7 +187,11 @@ class _ConversationPageState extends State<ConversationPage> {
               // Scroll to bottom when messages load for the first time or when new messages arrive
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (_scrollController.hasClients) {
-                   _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+                  _scrollController.animateTo(
+                    _scrollController.position.maxScrollExtent,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOut,
+                  );
                 }
               });
               return ListView.builder(

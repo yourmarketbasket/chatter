@@ -45,6 +45,7 @@ class DataController extends GetxController {
   final RxList<Map<String, dynamic>> currentConversationMessages = <Map<String, dynamic>>[].obs;
   final RxBool isLoadingMessages = false.obs;
   final RxBool isTyping = false.obs;
+  String? _currentlyOpenChatId;
 
   // Add these Rx variables inside DataController class
   final RxList<Map<String, dynamic>> followers = <Map<String, dynamic>>[].obs;
@@ -1151,6 +1152,7 @@ class DataController extends GetxController {
   }
 
   Future<void> getMessagesForChat(String chatId) async {
+    _currentlyOpenChatId = chatId;
     isLoadingMessages.value = true;
     currentConversationMessages.clear();
     try {
@@ -1173,6 +1175,10 @@ class DataController extends GetxController {
     } finally {
       isLoadingMessages.value = false;
     }
+  }
+
+  void clearCurrentlyOpenChatId() {
+    _currentlyOpenChatId = null;
   }
 
   Future<Map<String, dynamic>> createNewChat(String receiverId) async {
@@ -2516,7 +2522,26 @@ void clearUserPosts() {
   }
 
   void handleNewMessage(Map<String, dynamic> message) {
-    currentConversationMessages.add(message);
+    final chatId = message['chat'];
+
+    // Update conversation list
+    if (chatId != null) {
+      final index = conversations.indexWhere((c) => c['_id'] == chatId);
+      if (index != -1) {
+        final conversation = conversations[index];
+        conversation['lastMessage'] = message;
+        conversations.removeAt(index);
+        conversations.insert(0, conversation);
+      } else {
+        // If the chat is not in the list, refresh the list to fetch it.
+        getAllChats();
+      }
+    }
+
+    // Add message to the open conversation if it matches
+    if (chatId != null && chatId == _currentlyOpenChatId) {
+      currentConversationMessages.add(message);
+    }
   }
 
   void handleMessageEdited(Map<String, dynamic> message) {
