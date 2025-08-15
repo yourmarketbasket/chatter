@@ -2,6 +2,8 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:chatter/widgets/video_player_widget.dart';
+import 'package:chatter/widgets/audio_waveform_widget.dart';
 
 class AttachmentPreviewDialog extends StatefulWidget {
   final List<PlatformFile> files;
@@ -55,12 +57,19 @@ class _AttachmentPreviewDialogState extends State<AttachmentPreviewDialog> {
       case 'mp4':
       case 'mov':
       case 'avi':
-        preview = const Icon(Icons.videocam, size: 50, color: Colors.white);
+        preview = VideoPlayerWidget(
+          file: file.path != null ? File(file.path!) : null,
+          displayPath: file.name,
+          isFeedContext: false,
+        );
         break;
       case 'mp3':
       case 'wav':
       case 'm4a':
-        preview = const Icon(Icons.audiotrack, size: 50, color: Colors.white);
+        preview = AudioWaveformWidget(
+          audioPath: file.path!,
+          isLocal: true,
+        );
         break;
       case 'pdf':
         preview = const Icon(Icons.picture_as_pdf, size: 50, color: Colors.white);

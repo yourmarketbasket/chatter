@@ -9,6 +9,8 @@ import 'package:chatter/widgets/message_input_area.dart';
 import 'package:video_player/video_player.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:chatter/widgets/video_player_widget.dart';
+import 'package:chatter/widgets/audio_waveform_widget.dart';
 
 class ChatScreen extends StatefulWidget {
   final Chat chat;
@@ -295,10 +297,18 @@ class _ChatScreenState extends State<ChatScreen> {
         );
         break;
       case 'video':
-        content = VideoPlayerWidget(videoUrl: attachment.url, isLocal: isLocalFile);
+        content = VideoPlayerWidget(
+          url: isLocalFile ? null : attachment.url,
+          file: isLocalFile ? File(attachment.url) : null,
+          displayPath: attachment.filename,
+          isFeedContext: false,
+        );
         break;
       case 'audio':
-        content = AudioPlayerWidget(audioUrl: attachment.url, isLocal: isLocalFile);
+        content = AudioWaveformWidget(
+          audioPath: attachment.url,
+          isLocal: isLocalFile,
+        );
         break;
       case 'pdf':
         content = Container(
@@ -453,9 +463,9 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                       );
                     },
-                    child: AudioPlayerWidget(
-                      audioUrl: message.voiceNote!.url,
-                      isLocal: true, // Voice notes are always local initially
+                    child: AudioWaveformWidget(
+                      audioPath: message.voiceNote!.url,
+                      isLocal: true,
                     ),
                   ),
                 if (hasAttachment) ...[
@@ -660,177 +670,6 @@ class _ChatScreenState extends State<ChatScreen> {
                 _replyingTo = null;
               });
             },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class VideoPlayerWidget extends StatefulWidget {
-  final String videoUrl;
-  final bool isLocal;
-
-  const VideoPlayerWidget({super.key, required this.videoUrl, this.isLocal = false});
-
-  @override
-  _VideoPlayerWidgetState createState() => _VideoPlayerWidgetState();
-}
-
-class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
-  late VideoPlayerController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.isLocal) {
-      _controller = VideoPlayerController.file(File(widget.videoUrl));
-    } else {
-      _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl));
-    }
-    _controller.initialize().then((_) {
-      if (mounted) {
-        setState(() {});
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (!_controller.value.isInitialized) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(8.0),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          SizedBox.expand(
-            child: FittedBox(
-              fit: BoxFit.cover,
-              child: SizedBox(
-                width: _controller.value.size.width,
-                height: _controller.value.size.height,
-                child: VideoPlayer(_controller),
-              ),
-            ),
-          ),
-          IconButton(
-            icon: Icon(
-              _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
-              color: Colors.white,
-              size: 36,
-            ),
-            onPressed: () {
-              setState(() {
-                _controller.value.isPlaying ? _controller.pause() : _controller.play();
-              });
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class AudioPlayerWidget extends StatefulWidget {
-  final String audioUrl;
-  final bool isLocal;
-
-  const AudioPlayerWidget({super.key, required this.audioUrl, this.isLocal = false});
-
-  @override
-  _AudioPlayerWidgetState createState() => _AudioPlayerWidgetState();
-}
-
-class _AudioPlayerWidgetState extends State<AudioPlayerWidget> {
-  final AudioPlayer _audioPlayer = AudioPlayer();
-  bool _isPlaying = false;
-  Duration _duration = Duration.zero;
-  Duration _position = Duration.zero;
-
-  @override
-  void initState() {
-    super.initState();
-    _audioPlayer.onPlayerStateChanged.listen((state) {
-      if (mounted) {
-        setState(() {
-          _isPlaying = state == PlayerState.playing;
-        });
-      }
-    });
-
-    _audioPlayer.onDurationChanged.listen((newDuration) {
-      if (mounted) {
-        setState(() {
-          _duration = newDuration;
-        });
-      }
-    });
-
-    _audioPlayer.onPositionChanged.listen((newPosition) {
-      if (mounted) {
-        setState(() {
-          _position = newPosition;
-        });
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _audioPlayer.dispose();
-    super.dispose();
-  }
-
-  void _play() {
-    if (widget.isLocal) {
-      _audioPlayer.play(DeviceFileSource(widget.audioUrl));
-    } else {
-      _audioPlayer.play(UrlSource(widget.audioUrl));
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(8.0),
-      decoration: BoxDecoration(
-        color: Colors.grey[700],
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            icon: Icon(
-              _isPlaying ? Icons.pause : Icons.play_arrow,
-              color: Colors.white,
-            ),
-            onPressed: () async {
-              if (_isPlaying) {
-                await _audioPlayer.pause();
-              } else {
-                _play();
-              }
-            },
-          ),
-          Expanded(
-            child: Slider(
-              value: _position.inSeconds.toDouble(),
-              min: 0.0,
-              max: _duration.inSeconds.toDouble(),
-              onChanged: (value) async {
-                final position = Duration(seconds: value.toInt());
-                await _audioPlayer.seek(position);
-              },
-            ),
           ),
         ],
       ),
