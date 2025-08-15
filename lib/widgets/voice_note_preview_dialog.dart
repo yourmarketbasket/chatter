@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:audioplayers/audioplayers.dart' as ap;
+import 'package:audioplayers/audioplayers.dart';
 import 'package:audio_waveforms/audio_waveforms.dart';
 
 class VoiceNotePreviewDialog extends StatefulWidget {
@@ -18,34 +18,44 @@ class VoiceNotePreviewDialog extends StatefulWidget {
 }
 
 class _VoiceNotePreviewDialogState extends State<VoiceNotePreviewDialog> {
-  final ap.AudioPlayer _audioPlayer = ap.AudioPlayer();
-  late final WaveformController _waveformController;
+  final PlayerController _playerController = PlayerController();
+  late final AudioPlayer _audioPlayer;
   bool _isPlaying = false;
   Duration _duration = Duration.zero;
 
   @override
   void initState() {
     super.initState();
-    _waveformController = WaveformController(
-      initialWaveform: [],
-      sampleRate: 44100,
-    )..extractWaveformData(widget.audioPath).then((_) {
-      if (mounted) setState(() {});
+    _audioPlayer = AudioPlayer();
+    _playerController.preparePlayer(
+      path: widget.audioPath,
+      shouldExtractWaveform: true,
+    );
+    _playerController.onPlayerStateChanged.listen((state) {
+      if (mounted) {
+        setState(() {
+          _isPlaying = state == PlayerState.playing;
+        });
+      }
     });
+    _getDuration();
+  }
 
-    _audioPlayer.onPlayerStateChanged.listen((state) {
-      if (mounted) setState(() => _isPlaying = state == ap.PlayerState.playing);
-    });
-
-    _audioPlayer.onDurationChanged.listen((duration) {
-      if (mounted) setState(() => _duration = duration);
-    });
+  void _getDuration() async {
+    final duration = await _audioPlayer.getDuration(DeviceFileSource(widget.audioPath));
+    if (duration != null) {
+      if(mounted){
+        setState(() {
+          _duration = duration;
+        });
+      }
+    }
   }
 
   @override
   void dispose() {
+    _playerController.dispose();
     _audioPlayer.dispose();
-    _waveformController.dispose();
     super.dispose();
   }
 
@@ -56,26 +66,23 @@ class _VoiceNotePreviewDialogState extends State<VoiceNotePreviewDialog> {
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          AudioWaveforms(
+          AudioFileWaveforms(
             size: Size(MediaQuery.of(context).size.width * 0.5, 50),
-            waveformController: _waveformController,
-            enableGesture: true,
-            waveStyle: const WaveStyle(
-              waveColor: Colors.white,
-              showDurationLabel: true,
-              spacing: 8.0,
-              showBottom: false,
-              extendWaveform: true,
-              showMiddleLine: false,
+            playerController: _playerController,
+            enableSeekGesture: true,
+            playerWaveStyle: const PlayerWaveStyle(
+              fixedWaveColor: Colors.white54,
+              liveWaveColor: Colors.white,
+              spacing: 6,
             ),
           ),
           IconButton(
             icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
             onPressed: () {
               if (_isPlaying) {
-                _audioPlayer.pause();
+                _playerController.pausePlayer();
               } else {
-                _audioPlayer.play(ap.DeviceFileSource(widget.audioPath));
+                _playerController.startPlayer();
               }
             },
           ),
