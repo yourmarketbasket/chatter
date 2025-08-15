@@ -386,10 +386,12 @@ class _ChatScreenState extends State<ChatScreen> {
     final hasAttachment = message.attachments != null && message.attachments!.isNotEmpty;
 
     return GestureDetector(
-      onLongPress: () => _showMessageOptions(message),
+      onLongPress: () {
+        if (!message.deleted) _showMessageOptions(message);
+      },
       child: Dismissible(
         key: Key(message.id),
-        direction: DismissDirection.startToEnd,
+        direction: message.deleted ? DismissDirection.none : DismissDirection.startToEnd,
         confirmDismiss: (direction) async {
           setState(() {
             _replyingTo = message;
@@ -415,43 +417,6 @@ class _ChatScreenState extends State<ChatScreen> {
           child: Column(
             crossAxisAlignment: isYou ? CrossAxisAlignment.end : CrossAxisAlignment.start,
             children: [
-              if (message.voiceNote != null)
-                GestureDetector(
-                  onTap: () {
-                    final attachmentsForViewer = [
-                      {
-                        'url': message.voiceNote!.url,
-                        'type': 'audio',
-                        'filename': message.voiceNote!.url.split('/').last,
-                      }
-                    ];
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => MediaViewPage(
-                          attachments: attachmentsForViewer,
-                          initialIndex: 0,
-                          message: '',
-                          userName: widget.chat.isGroup ? message.senderId : widget.chat.participants.firstWhere((p) => p.id != dataController.user.value['user']['_id']).name,
-                          userAvatarUrl: null,
-                          timestamp: message.createdAt,
-                          viewsCount: 0,
-                          likesCount: 0,
-                          repostsCount: 0,
-                        ),
-                      ),
-                    );
-                  },
-                  child: AudioPlayerWidget(
-                    audioUrl: message.voiceNote!.url,
-                    isLocal: true, // Voice notes are always local initially
-                  ),
-                ),
-              if (hasAttachment) ...[
-                _buildAttachment(message),
-                if (message.text != null && message.text!.isNotEmpty)
-                  const SizedBox(height: 8),
-              ],
               if (message.deleted)
                 Text(
                   'Message deleted',
@@ -460,11 +425,50 @@ class _ChatScreenState extends State<ChatScreen> {
                     fontStyle: FontStyle.italic,
                   ),
                 )
-              else if (message.text != null && message.text!.isNotEmpty)
-                Text(
-                  message.text!,
-                  style: TextStyle(color: isYou ? Colors.white : Colors.grey[200]),
-                ),
+              else ...[
+                if (message.voiceNote != null)
+                  GestureDetector(
+                    onTap: () {
+                      final attachmentsForViewer = [
+                        {
+                          'url': message.voiceNote!.url,
+                          'type': 'audio',
+                          'filename': message.voiceNote!.url.split('/').last,
+                        }
+                      ];
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => MediaViewPage(
+                            attachments: attachmentsForViewer,
+                            initialIndex: 0,
+                            message: '',
+                            userName: widget.chat.isGroup ? message.senderId : widget.chat.participants.firstWhere((p) => p.id != dataController.user.value['user']['_id']).name,
+                            userAvatarUrl: null,
+                            timestamp: message.createdAt,
+                            viewsCount: 0,
+                            likesCount: 0,
+                            repostsCount: 0,
+                          ),
+                        ),
+                      );
+                    },
+                    child: AudioPlayerWidget(
+                      audioUrl: message.voiceNote!.url,
+                      isLocal: true, // Voice notes are always local initially
+                    ),
+                  ),
+                if (hasAttachment) ...[
+                  _buildAttachment(message),
+                  if (message.text != null && message.text!.isNotEmpty)
+                    const SizedBox(height: 8),
+                ],
+                if (message.text != null && message.text!.isNotEmpty)
+                  Text(
+                    message.text!,
+                    style: TextStyle(color: isYou ? Colors.white : Colors.grey[200]),
+                  ),
+              ],
               const SizedBox(height: 4),
               Row(
                 mainAxisSize: MainAxisSize.min,
@@ -699,28 +703,39 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return _controller.value.isInitialized
-        ? AspectRatio(
-            aspectRatio: _controller.value.aspectRatio,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                VideoPlayer(_controller),
-                IconButton(
-                  icon: Icon(
-                    _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
-                    color: Colors.white,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _controller.value.isPlaying ? _controller.pause() : _controller.play();
-                    });
-                  },
-                ),
-              ],
+    if (!_controller.value.isInitialized) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8.0),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          SizedBox.expand(
+            child: FittedBox(
+              fit: BoxFit.cover,
+              child: SizedBox(
+                width: _controller.value.size.width,
+                height: _controller.value.size.height,
+                child: VideoPlayer(_controller),
+              ),
             ),
-          )
-        : const Center(child: CircularProgressIndicator());
+          ),
+          IconButton(
+            icon: Icon(
+              _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
+              color: Colors.white,
+              size: 36,
+            ),
+            onPressed: () {
+              setState(() {
+                _controller.value.isPlaying ? _controller.pause() : _controller.play();
+              });
+            },
+          ),
+        ],
+      ),
+    );
   }
 }
 
