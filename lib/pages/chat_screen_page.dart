@@ -154,41 +154,51 @@ class _ChatScreenState extends State<ChatScreen> {
       return const SizedBox.shrink();
     }
 
-    final attachment = message.attachments!.first;
-    final isLocalFile = !attachment.url.startsWith('http');
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 4,
+        mainAxisSpacing: 4,
+      ),
+      itemCount: message.attachments!.length,
+      itemBuilder: (context, index) {
+        final attachment = message.attachments![index];
+        final isLocalFile = !attachment.url.startsWith('http');
 
-    return GestureDetector(
-      onTap: () {
-        final attachmentsForViewer = message.attachments!
-            .map((att) => {
-                  'url': att.url,
-                  'type': att.type,
-                  'filename': att.filename,
-                })
-            .toList();
+        return GestureDetector(
+          onTap: () {
+            final attachmentsForViewer = message.attachments!
+                .map((att) => {
+                      'url': att.url,
+                      'type': att.type,
+                      'filename': att.filename,
+                    })
+                .toList();
 
-        final initialIndex = message.attachments!.indexOf(attachment);
-
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => MediaViewPage(
-              attachments: attachmentsForViewer,
-              initialIndex: initialIndex,
-              message: message.text ?? '',
-              userName: widget.chat.isGroup ? message.senderId : widget.chat.participants.firstWhere((p) => p.id != dataController.user.value['user']['_id']).name,
-              userAvatarUrl: null,
-              timestamp: message.createdAt,
-              viewsCount: 0,
-              likesCount: 0,
-              repostsCount: 0,
-            ),
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => MediaViewPage(
+                  attachments: attachmentsForViewer,
+                  initialIndex: index,
+                  message: message.text ?? '',
+                  userName: widget.chat.isGroup ? message.senderId : widget.chat.participants.firstWhere((p) => p.id != dataController.user.value['user']['_id']).name,
+                  userAvatarUrl: null,
+                  timestamp: message.createdAt,
+                  viewsCount: 0,
+                  likesCount: 0,
+                  repostsCount: 0,
+                ),
+              ),
+            );
+          },
+          child: AbsorbPointer(
+            child: _buildAttachmentContent(attachment, isLocalFile),
           ),
         );
       },
-      child: AbsorbPointer(
-        child: _buildAttachmentContent(attachment, isLocalFile),
-      ),
     );
   }
 
@@ -215,6 +225,30 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       case 'mp4':
         return VideoPlayerWidget(videoUrl: attachment.url, isLocal: isLocalFile);
+      case 'audio':
+        return AudioPlayerWidget(audioUrl: attachment.url, isLocal: isLocalFile);
+      case 'pdf':
+        return Container(
+          padding: const EdgeInsets.all(8.0),
+          decoration: BoxDecoration(
+            color: Colors.grey[700],
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.picture_as_pdf, color: Colors.white),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  attachment.filename,
+                  style: const TextStyle(color: Colors.white),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        );
       default:
         // Generic file attachment
         return Container(
