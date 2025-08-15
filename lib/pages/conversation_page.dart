@@ -1,4 +1,5 @@
 import 'package:chatter/controllers/data-controller.dart';
+import 'package:chatter/models/chat_models.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -38,8 +39,14 @@ class _ConversationPageState extends State<ConversationPage> {
 
   void _sendMessage() {
     if (_messageController.text.trim().isEmpty) return;
-    // Placeholder: Use DataController to send message
-    _dataController.sendMessage(widget.conversationId, _messageController.text.trim());
+
+    final message = ChatMessage(
+      chatId: widget.conversationId,
+      senderId: _dataController.user.value['user']['_id'], // Assuming user ID is here
+      text: _messageController.text.trim(),
+    );
+    _dataController.sendChatMessage(message);
+
     _messageController.clear();
     // Scroll to bottom after sending
     WidgetsBinding.instance.addPostFrameCallback((_) {

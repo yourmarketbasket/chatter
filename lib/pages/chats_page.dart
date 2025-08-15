@@ -1,3 +1,5 @@
+import 'package:chatter/models/chat_models.dart';
+import 'package:chatter/models/feed_models.dart';
 import 'package:chatter/pages/chat_screen_page.dart';
 import 'package:flutter/material.dart';
 
@@ -9,54 +11,57 @@ class ChatsPage extends StatefulWidget {
 }
 
 class _ChatsPageState extends State<ChatsPage> {
-  bool _isSearching = false;
-  final TextEditingController _searchController = TextEditingController();
-
-  final List<Map<String, dynamic>> _dummyChats = [
-    {
-      'name': 'Alice',
-      'initials': 'A',
-      'online': true,
-      'lastMessage': 'Hey, how are you?',
-      'sender': 'other',
-      'time': '10:30 AM',
-      'status': 'read',
-      'edited': false,
-      'deleted': false,
-      'attachment': null,
-    },
-    {
-      'name': 'Bob',
-      'initials': 'B',
-      'online': false,
-      'lastMessage': 'Check this out!',
-      'sender': 'you',
-      'time': 'Yesterday',
-      'status': 'delivered',
-      'edited': true,
-      'deleted': false,
-      'attachment': 'https://example.com/image.jpg',
-    },
-    {
-      'name': 'Charlie',
-      'initials': 'C',
-      'online': true,
-      'lastMessage': 'Message deleted',
-      'sender': 'other',
-      'time': '2 days ago',
-      'status': 'sent',
-      'edited': false,
-      'deleted': true,
-      'attachment': null,
-    },
-    // Add more dummy data as needed
+  final List<Chat> _dummyChats = [
+    Chat(
+      id: 'chat_1',
+      isGroup: false,
+      participants: [
+        User(id: 'user_1', name: 'Alice', online: true),
+        User(id: 'you', name: 'You'),
+      ],
+      lastMessage: ChatMessage(
+        id: 'msg_1',
+        chatId: 'chat_1',
+        senderId: 'user_1',
+        text: 'Hey, how are you?',
+        status: MessageStatus.read,
+        createdAt: DateTime.now().subtract(const Duration(minutes: 5)),
+      ),
+    ),
+    Chat(
+      id: 'chat_2',
+      isGroup: false,
+      participants: [
+        User(id: 'user_2', name: 'Bob', online: false),
+        User(id: 'you', name: 'You'),
+      ],
+      lastMessage: ChatMessage(
+        id: 'msg_2',
+        chatId: 'chat_2',
+        senderId: 'you',
+        text: 'Check this out!',
+        status: MessageStatus.delivered,
+        createdAt: DateTime.now().subtract(const Duration(days: 1)),
+        attachments: [Attachment(filename: 'image.jpg', url: 'https://example.com/image.jpg', size: 1234)],
+      ),
+    ),
+    Chat(
+      id: 'chat_3',
+      isGroup: false,
+      participants: [
+        User(id: 'user_3', name: 'Charlie', online: true),
+        User(id: 'you', name: 'You'),
+      ],
+      lastMessage: ChatMessage(
+        id: 'msg_3',
+        chatId: 'chat_3',
+        senderId: 'user_3',
+        text: 'This message was deleted',
+        status: MessageStatus.sent,
+        createdAt: DateTime.now().subtract(const Duration(days: 2)),
+      ),
+    ),
   ];
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,30 +71,33 @@ class _ChatsPageState extends State<ChatsPage> {
         itemCount: _dummyChats.length,
         itemBuilder: (context, index) {
           final chat = _dummyChats[index];
-          String preview = chat['deleted']
-              ? 'Message deleted'
-              : chat['attachment'] != null
-                  ? 'Attachment'
-                  : chat['lastMessage'];
-          if (chat['edited']) {
-            preview += ' (edited)';
-          }
-          if (chat['sender'] == 'you') {
-            preview = 'You: $preview';
+          final otherUser = chat.participants.firstWhere((p) => p.id != 'you');
+          final lastMessage = chat.lastMessage;
+
+          String preview = '...';
+          if (lastMessage != null) {
+            if (lastMessage.attachments != null && lastMessage.attachments!.isNotEmpty) {
+              preview = 'Attachment';
+            } else {
+              preview = lastMessage.text ?? '';
+            }
+            if (lastMessage.senderId == 'you') {
+              preview = 'You: $preview';
+            }
           }
 
           IconData statusIcon;
           Color statusColor;
-          switch (chat['status']) {
-            case 'sent':
+          switch (lastMessage?.status) {
+            case MessageStatus.sent:
               statusIcon = Icons.check;
               statusColor = Colors.grey[400]!;
               break;
-            case 'delivered':
+            case MessageStatus.delivered:
               statusIcon = Icons.done_all;
               statusColor = Colors.grey[400]!;
               break;
-            case 'read':
+            case MessageStatus.read:
               statusIcon = Icons.done_all;
               statusColor = Colors.tealAccent;
               break;
@@ -105,11 +113,11 @@ class _ChatsPageState extends State<ChatsPage> {
                 CircleAvatar(
                   backgroundColor: Colors.tealAccent,
                   child: Text(
-                    chat['initials'],
+                    otherUser.name[0],
                     style: const TextStyle(color: Colors.black),
                   ),
                 ),
-                if (chat['online'])
+                if (otherUser.online ?? false)
                   Positioned(
                     bottom: 0,
                     right: 0,
@@ -126,7 +134,7 @@ class _ChatsPageState extends State<ChatsPage> {
               ],
             ),
             title: Text(
-              chat['name'],
+              otherUser.name,
               style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.w500,
@@ -145,13 +153,14 @@ class _ChatsPageState extends State<ChatsPage> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text(
-                  chat['time'],
-                  style: TextStyle(
-                    color: Colors.grey[400],
-                    fontSize: 12,
+                if (lastMessage != null)
+                  Text(
+                    '${lastMessage.createdAt.hour}:${lastMessage.createdAt.minute}',
+                    style: TextStyle(
+                      color: Colors.grey[400],
+                      fontSize: 12,
+                    ),
                   ),
-                ),
                 Icon(
                   statusIcon,
                   size: 16,
@@ -163,7 +172,7 @@ class _ChatsPageState extends State<ChatsPage> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => ChatScreen(chat: _dummyChats[index]),
+                  builder: (context) => ChatScreen(chat: chat),
                 ),
               );
             },
