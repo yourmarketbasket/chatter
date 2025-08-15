@@ -61,7 +61,7 @@ class CustomShortMessages implements timeago.LookupMessages {
   @override
   String prefixFromNow() => '';
   @override
-  String suffixAgo() => '';
+  String suffixAgo() => ' ago';
   @override
   String suffixFromNow() => '';
   @override
