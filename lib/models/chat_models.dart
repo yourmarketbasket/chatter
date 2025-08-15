@@ -3,6 +3,102 @@ import 'package:objectid/objectid.dart';
 
 enum MessageStatus { sending, sent, delivered, read, failed }
 
+class Attachment {
+  final String id;
+  final String filename;
+  final String url;
+  final int size;
+  final String? type;
+  final bool isUploading;
+  final double uploadProgress;
+  final bool isDownloading;
+  final double downloadProgress;
+
+  Attachment({
+    String? id,
+    required this.filename,
+    required this.url,
+    required this.size,
+    this.type,
+    this.isUploading = false,
+    this.uploadProgress = 0.0,
+    this.isDownloading = false,
+    this.downloadProgress = 0.0,
+  }) : id = id ?? ObjectId().hexString;
+
+  Attachment copyWith({
+    String? id,
+    String? filename,
+    String? url,
+    int? size,
+    String? type,
+    bool? isUploading,
+    double? uploadProgress,
+    bool? isDownloading,
+    double? downloadProgress,
+  }) {
+    return Attachment(
+      id: id ?? this.id,
+      filename: filename ?? this.filename,
+      url: url ?? this.url,
+      size: size ?? this.size,
+      type: type ?? this.type,
+      isUploading: isUploading ?? this.isUploading,
+      uploadProgress: uploadProgress ?? this.uploadProgress,
+      isDownloading: isDownloading ?? this.isDownloading,
+      downloadProgress: downloadProgress ?? this.downloadProgress,
+    );
+  }
+
+  factory Attachment.fromJson(Map<String, dynamic> json) {
+    return Attachment(
+      id: json['_id'] as String,
+      filename: json['filename'] as String,
+      url: json['url'] as String,
+      size: json['size'] as int,
+      type: json['type'] as String?,
+    );
+  }
+
+  ChatMessage copyWith({
+    String? id,
+    String? chatId,
+    String? senderId,
+    String? text,
+    List<Attachment>? attachments,
+    VoiceNote? voiceNote,
+    MessageStatus? status,
+    DateTime? createdAt,
+    String? replyTo,
+    bool? edited,
+    bool? deleted,
+  }) {
+    return ChatMessage(
+      id: id ?? this.id,
+      chatId: chatId ?? this.chatId,
+      senderId: senderId ?? this.senderId,
+      text: text ?? this.text,
+      attachments: attachments ?? this.attachments,
+      voiceNote: voiceNote ?? this.voiceNote,
+      status: status ?? this.status,
+      createdAt: createdAt ?? this.createdAt,
+      replyTo: replyTo ?? this.replyTo,
+      edited: edited ?? this.edited,
+      deleted: deleted ?? this.deleted,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      '_id': id,
+      'filename': filename,
+      'url': url,
+      'size': size,
+      'type': type,
+    };
+  }
+}
+
 class VoiceNote {
   final String url;
   final Duration duration;

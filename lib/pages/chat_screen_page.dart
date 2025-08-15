@@ -149,54 +149,109 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  void _openMediaView(ChatMessage message, int initialIndex) {
+    final attachmentsForViewer = message.attachments!
+        .map((att) => {
+              'url': att.url,
+              'type': att.type,
+              'filename': att.filename,
+            })
+        .toList();
+
+    final sender = widget.chat.participants.firstWhere(
+      (p) => p.id == message.senderId,
+      // Fallback for safety, though sender should always be in participants
+      orElse: () => ChatUser(id: message.senderId, name: 'Unknown User'),
+    );
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MediaViewPage(
+          attachments: attachmentsForViewer,
+          initialIndex: initialIndex,
+          message: message.text ?? '',
+          userName: sender.name,
+          userAvatarUrl: sender.avatar,
+          timestamp: message.createdAt,
+          viewsCount: 0,
+          likesCount: 0,
+          repostsCount: 0,
+        ),
+      ),
+    );
+  }
+
   Widget _buildAttachment(ChatMessage message) {
     if (message.attachments == null || message.attachments!.isEmpty) {
       return const SizedBox.shrink();
     }
 
+    final attachments = message.attachments!;
+    const maxVisible = 4;
+    final hasMore = attachments.length > maxVisible;
+    final gridItemCount = hasMore ? maxVisible : attachments.length;
+    // Dynamic cross-axis count for better layout
+    final crossAxisCount = attachments.length == 1 ? 1 : 2;
+    // For a single image, use a portrait-ish aspect ratio. For a grid, use squares.
+    final aspectRatio = attachments.length == 1 ? 3 / 4 : 1.0;
+
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
         crossAxisSpacing: 4,
         mainAxisSpacing: 4,
+        childAspectRatio: aspectRatio,
       ),
-      itemCount: message.attachments!.length,
+      itemCount: gridItemCount,
       itemBuilder: (context, index) {
-        final attachment = message.attachments![index];
+        final attachment = attachments[index];
         final isLocalFile = !attachment.url.startsWith('http');
+
+        // The last grid item, if there are more attachments to show
+        if (hasMore && index == maxVisible - 1) {
+          final remainingCount = attachments.length - maxVisible + 1;
+          return GestureDetector(
+            onTap: () => _openMediaView(message, index),
+            child: Stack(
+              alignment: Alignment.center,
+              fit: StackFit.expand,
+              children: [
+                _buildAttachmentContent(attachment, isLocalFile),
+                Container(
+                  color: Colors.black.withOpacity(0.6),
+                  child: Center(
+                    child: Text(
+                      '+$remainingCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        // Regular attachment item
+        final attachmentType = attachment.type?.toLowerCase();
+        // Assuming 'file' is a generic type for other downloadable files
+        final isDownloadable = attachmentType == 'pdf' || attachmentType == 'file';
 
         return GestureDetector(
           onTap: () {
-            final attachmentsForViewer = message.attachments!
-                .map((att) => {
-                      'url': att.url,
-                      'type': att.type,
-                      'filename': att.filename,
-                    })
-                .toList();
-
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => MediaViewPage(
-                  attachments: attachmentsForViewer,
-                  initialIndex: index,
-                  message: message.text ?? '',
-                  userName: widget.chat.isGroup ? message.senderId : widget.chat.participants.firstWhere((p) => p.id != dataController.user.value['user']['_id']).name,
-                  userAvatarUrl: null,
-                  timestamp: message.createdAt,
-                  viewsCount: 0,
-                  likesCount: 0,
-                  repostsCount: 0,
-                ),
-              ),
-            );
+            if (isDownloadable && !attachment.isDownloading) {
+              dataController.handleFileAttachmentTap(message.id, attachment.id);
+            } else if (!isDownloadable) {
+              _openMediaView(message, index);
+            }
           },
-          child: AbsorbPointer(
-            child: _buildAttachmentContent(attachment, isLocalFile),
-          ),
+          child: _buildAttachmentContent(attachment, isLocalFile),
         );
       },
     );
@@ -205,11 +260,29 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildAttachmentContent(Attachment attachment, bool isLocalFile) {
     final attachmentType = attachment.type?.toLowerCase();
 
+    final uploadOverlay = attachment.isUploading
+        ? Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Center(
+                child: CircularProgressIndicator(
+                  value: attachment.uploadProgress,
+                  strokeWidth: 2,
+                  backgroundColor: Colors.grey.withOpacity(0.5),
+                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              ),
+            ),
+          )
+        : const SizedBox.shrink();
+
+    Widget content;
     switch (attachmentType) {
       case 'image':
-        return Container(
-          width: 150,
-          height: 150,
+        content = Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
             image: DecorationImage(
@@ -220,12 +293,15 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
         );
+        break;
       case 'video':
-        return VideoPlayerWidget(videoUrl: attachment.url, isLocal: isLocalFile);
+        content = VideoPlayerWidget(videoUrl: attachment.url, isLocal: isLocalFile);
+        break;
       case 'audio':
-        return AudioPlayerWidget(audioUrl: attachment.url, isLocal: isLocalFile);
+        content = AudioPlayerWidget(audioUrl: attachment.url, isLocal: isLocalFile);
+        break;
       case 'pdf':
-        return Container(
+        content = Container(
           padding: const EdgeInsets.all(8.0),
           decoration: BoxDecoration(
             color: Colors.grey[700],
@@ -246,9 +322,10 @@ class _ChatScreenState extends State<ChatScreen> {
             ],
           ),
         );
+        break;
       default:
         // Generic file attachment
-        return Container(
+        content = Container(
           padding: const EdgeInsets.all(8.0),
           decoration: BoxDecoration(
             color: Colors.grey[700],
@@ -269,7 +346,36 @@ class _ChatScreenState extends State<ChatScreen> {
             ],
           ),
         );
+        break;
     }
+
+    final downloadOverlay = attachment.isDownloading
+        ? Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Center(
+                child: CircularProgressIndicator(
+                  value: attachment.downloadProgress,
+                  strokeWidth: 2,
+                  backgroundColor: Colors.grey.withOpacity(0.5),
+                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.tealAccent),
+                ),
+              ),
+            ),
+          )
+        : const SizedBox.shrink();
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        content,
+        uploadOverlay,
+        downloadOverlay,
+      ],
+    );
   }
 
   Widget _buildMessageContent(ChatMessage message, int index) {

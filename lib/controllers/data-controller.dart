@@ -5,6 +5,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:dio/dio.dart' as dio; // Use prefix for dio to avoid conflicts
 import 'dart:convert';
 // import 'package:path/path.dart' as path; // path is used by UploadService
+import 'package:path_provider/path_provider.dart';
+import 'package:open_file/open_file.dart';
 import '../models/chat_models.dart';
 import '../models/feed_models.dart'; // Added import for ChatterPost
 import '../services/upload_service.dart'; // Import the UploadService
@@ -992,53 +994,68 @@ class DataController extends GetxController {
     // Optimistic UI update: add message to the list with 'sending' status
     currentConversationMessages.insert(0, message);
 
-    try {
-      // Simulate network call
-      await Future.delayed(const Duration(seconds: 1));
+    // If there are attachments, simulate upload
+    if (message.attachments != null && message.attachments!.isNotEmpty) {
+      // This is a simplified simulation of file uploading
+      final messageIndex = currentConversationMessages.indexWhere((m) => m.id == message.id);
 
-      // TODO: Replace with actual API call
-      // final response = await _dio.post('api/chats/messages', data: message.toJson());
+      if (messageIndex != -1) {
+        // Create a list of new attachments marked as uploading
+        final initialAttachments = currentConversationMessages[messageIndex]
+            .attachments!
+            .map((a) => a.copyWith(isUploading: true, uploadProgress: 0.0))
+            .toList();
 
-      // On successful API call, update the message status to 'sent'
-      // The backend should return the confirmed message, possibly with an updated timestamp or ID.
-      final int index = currentConversationMessages.indexWhere((m) => m.id == message.id);
-      if (index != -1) {
-        // In a real scenario, you would update the message with data from the server response.
-        // For now, we just update the status.
-        final sentMessage = ChatMessage(
-          id: message.id,
-          chatId: message.chatId,
-          senderId: message.senderId,
-          text: message.text,
-          attachments: message.attachments,
-          voiceNote: message.voiceNote,
-          status: MessageStatus.sent, // Update status
-          createdAt: message.createdAt,
-          replyTo: message.replyTo,
-        );
-        currentConversationMessages[index] = sentMessage;
-      }
+        var updatedMessage = currentConversationMessages[messageIndex].copyWith(attachments: initialAttachments);
+        currentConversationMessages[messageIndex] = updatedMessage;
+        currentConversationMessages.refresh();
 
-      // TODO: Add socket event listener for real-time status updates (delivered, read)
-    } catch (e) {
-      print('Error sending message: $e');
-      // If the API call fails, update the message status to 'failed'
-      final int index = currentConversationMessages.indexWhere((m) => m.id == message.id);
-      if (index != -1) {
-        final failedMessage = ChatMessage(
-          id: message.id,
-          chatId: message.chatId,
-          senderId: message.senderId,
-          text: message.text,
-          attachments: message.attachments,
-          voiceNote: message.voiceNote,
-          status: MessageStatus.failed, // Update status
-          createdAt: message.createdAt,
-          replyTo: message.replyTo,
-        );
-        currentConversationMessages[index] = failedMessage;
+        // Simulate progress for each attachment one by one
+        for (var i = 0; i < initialAttachments.length; i++) {
+          // Simulate progress updates
+          for (var p = 1; p <= 10; p++) {
+            await Future.delayed(const Duration(milliseconds: 150));
+            final mIndex = currentConversationMessages.indexWhere((m) => m.id == message.id);
+            if (mIndex != -1) {
+              final currentAttachments = List<Attachment>.from(currentConversationMessages[mIndex].attachments!);
+              currentAttachments[i] = currentAttachments[i].copyWith(uploadProgress: p / 10.0);
+
+              final msgToUpdate = currentConversationMessages[mIndex].copyWith(attachments: currentAttachments);
+              currentConversationMessages[mIndex] = msgToUpdate;
+              currentConversationMessages.refresh();
+            }
+          }
+
+          // Mark as uploaded and replace with a fake network URL
+           final mIndex = currentConversationMessages.indexWhere((m) => m.id == message.id);
+           if (mIndex != -1) {
+              final currentAttachments = List<Attachment>.from(currentConversationMessages[mIndex].attachments!);
+              currentAttachments[i] = currentAttachments[i].copyWith(
+                isUploading: false,
+                uploadProgress: 1.0,
+                url: 'https://picsum.photos/seed/${currentAttachments[i].id}/400/300',
+              );
+
+              final msgToUpdate = currentConversationMessages[mIndex].copyWith(attachments: currentAttachments);
+              currentConversationMessages[mIndex] = msgToUpdate;
+              currentConversationMessages.refresh();
+           }
+        }
       }
     }
+
+
+    // Simulate network delay for sending the message itself
+    await Future.delayed(const Duration(seconds: 1));
+
+    // Update message status to 'sent' (or 'failed' to test that)
+    final messageIndex = currentConversationMessages.indexWhere((m) => m.id == message.id);
+    if (messageIndex != -1) {
+      final sentMessage = currentConversationMessages[messageIndex].copyWith(status: MessageStatus.sent);
+      currentConversationMessages[messageIndex] = sentMessage;
+      currentConversationMessages.refresh();
+    }
+    // No catch block for failure simulation, assuming success for now.
   }
 
   Future<void> editChatMessage(String messageId, String newText) async {
@@ -1067,21 +1084,110 @@ class DataController extends GetxController {
     final int index = currentConversationMessages.indexWhere((m) => m.id == messageId);
     if (index != -1) {
       final originalMessage = currentConversationMessages[index];
-      final deletedMessage = ChatMessage(
-        id: originalMessage.id,
-        chatId: originalMessage.chatId,
-        senderId: originalMessage.senderId,
+      final deletedMessage = originalMessage.copyWith(
         text: 'Message deleted',
         attachments: null,
         voiceNote: null,
-        status: originalMessage.status,
-        createdAt: originalMessage.createdAt,
-        replyTo: originalMessage.replyTo,
         deleted: true,
       );
       currentConversationMessages[index] = deletedMessage;
 
       // TODO: API call to delete message on backend
+    }
+  }
+
+  // --- Attachment Download Logic ---
+
+  Future<String> get _localPath async {
+    final directory = await getApplicationDocumentsDirectory();
+    return directory.path;
+  }
+
+  Future<File> _localFile(String filename) async {
+    final path = await _localPath;
+    return File('$path/$filename');
+  }
+
+  Future<void> handleFileAttachmentTap(String messageId, String attachmentId) async {
+    final messageIndex = currentConversationMessages.indexWhere((m) => m.id == messageId);
+    if (messageIndex == -1) return;
+
+    final message = currentConversationMessages[messageIndex];
+    final attachmentIndex = message.attachments!.indexWhere((a) => a.id == attachmentId);
+    if (attachmentIndex == -1) return;
+
+    final attachment = message.attachments![attachmentIndex];
+    final file = await _localFile(attachment.filename);
+
+    if (await file.exists()) {
+      OpenFile.open(file.path);
+    } else {
+      downloadAttachment(messageId, attachmentId);
+    }
+  }
+
+  Future<void> downloadAttachment(String messageId, String attachmentId) async {
+    final messageIndex = currentConversationMessages.indexWhere((m) => m.id == messageId);
+    if (messageIndex == -1) return;
+
+    final message = currentConversationMessages[messageIndex];
+    final attachmentIndex = message.attachments!.indexWhere((a) => a.id == attachmentId);
+    if (attachmentIndex == -1) return;
+
+    final attachment = message.attachments![attachmentIndex];
+
+    // Mark as downloading
+    final updatedAttachments = List<Attachment>.from(message.attachments!);
+    updatedAttachments[attachmentIndex] = attachment.copyWith(isDownloading: true, downloadProgress: 0.0);
+    currentConversationMessages[messageIndex] = message.copyWith(attachments: updatedAttachments);
+    currentConversationMessages.refresh();
+
+    try {
+      final file = await _localFile(attachment.filename);
+      await _dio.download(
+        attachment.url,
+        file.path,
+        onReceiveProgress: (received, total) {
+          if (total != -1) {
+            final progress = received / total;
+            final mIndex = currentConversationMessages.indexWhere((m) => m.id == messageId);
+            if (mIndex != -1) {
+              final aIndex = currentConversationMessages[mIndex].attachments!.indexWhere((a) => a.id == attachmentId);
+              if (aIndex != -1) {
+                final attachments = List<Attachment>.from(currentConversationMessages[mIndex].attachments!);
+                attachments[aIndex] = attachments[aIndex].copyWith(downloadProgress: progress);
+                currentConversationMessages[mIndex] = currentConversationMessages[mIndex].copyWith(attachments: attachments);
+                currentConversationMessages.refresh();
+              }
+            }
+          }
+        },
+      );
+
+      // Mark download as complete
+      final mIndex = currentConversationMessages.indexWhere((m) => m.id == messageId);
+      if (mIndex != -1) {
+        final aIndex = currentConversationMessages[mIndex].attachments!.indexWhere((a) => a.id == attachmentId);
+        if (aIndex != -1) {
+          final attachments = List<Attachment>.from(currentConversationMessages[mIndex].attachments!);
+          attachments[aIndex] = attachments[aIndex].copyWith(isDownloading: false, downloadProgress: 1.0);
+          currentConversationMessages[mIndex] = currentConversationMessages[mIndex].copyWith(attachments: attachments);
+          currentConversationMessages.refresh();
+        }
+      }
+    } catch (e) {
+      print('Error downloading file: $e');
+      // Mark as failed
+      final mIndex = currentConversationMessages.indexWhere((m) => m.id == messageId);
+      if (mIndex != -1) {
+        final aIndex = currentConversationMessages[mIndex].attachments!.indexWhere((a) => a.id == attachmentId);
+        if (aIndex != -1) {
+          final attachments = List<Attachment>.from(currentConversationMessages[mIndex].attachments!);
+          attachments[aIndex] = attachments[aIndex].copyWith(isDownloading: false);
+          currentConversationMessages[mIndex] = currentConversationMessages[mIndex].copyWith(attachments: attachments);
+          currentConversationMessages.refresh();
+        }
+      }
     }
   }
 
