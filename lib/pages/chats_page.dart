@@ -2,6 +2,7 @@ import 'package:chatter/models/chat_models.dart';
 import 'package:chatter/models/feed_models.dart' hide Attachment;
 import 'package:chatter/pages/chat_screen_page.dart';
 import 'package:flutter/material.dart';
+import 'package:chatter/helpers/time_helper.dart';
 
 class ChatsPage extends StatefulWidget {
   const ChatsPage({super.key});
@@ -32,7 +33,7 @@ class _ChatsPageState extends State<ChatsPage> {
       id: 'chat_2',
       isGroup: false,
       participants: [
-        User(id: 'user_2', name: 'Bob', online: false),
+        User(id: 'user_2', name: 'Bob', online: false, lastSeen: DateTime.now().subtract(const Duration(hours: 3))),
         User(id: 'you', name: 'You'),
       ],
       lastMessage: ChatMessage(
@@ -71,13 +72,45 @@ class _ChatsPageState extends State<ChatsPage> {
         itemCount: _dummyChats.length,
         itemBuilder: (context, index) {
           final chat = _dummyChats[index];
-          final otherUser = chat.participants.firstWhere((p) => p.id != 'you');
           final lastMessage = chat.lastMessage;
+
+          Widget title;
+          Widget avatar;
+          Widget statusWidget;
+
+          if (chat.isGroup) {
+            title = Text(chat.groupName ?? 'Group Chat', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500));
+            avatar = CircleAvatar(
+              backgroundColor: Colors.tealAccent,
+              child: Text(chat.groupName?[0] ?? 'G', style: const TextStyle(color: Colors.black)),
+            );
+            final onlineCount = chat.participants.where((p) => p.online ?? false).length;
+            statusWidget = onlineCount > 0
+                ? Text('$onlineCount online', style: TextStyle(color: Colors.grey[400], fontSize: 12))
+                : const SizedBox.shrink();
+          } else {
+            final otherUser = chat.participants.firstWhere((p) => p.id != 'you', orElse: () => chat.participants.first);
+            title = Text(otherUser.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500));
+            avatar = CircleAvatar(
+              backgroundColor: Colors.tealAccent,
+              child: Text(otherUser.name[0], style: const TextStyle(color: Colors.black)),
+            );
+            statusWidget = Text(
+              otherUser.online == true ? 'online' : (otherUser.lastSeen != null ? formatLastSeen(otherUser.lastSeen!) : 'offline'),
+              style: TextStyle(
+                color: otherUser.online == true ? Colors.tealAccent : Colors.grey[400],
+                fontSize: 12,
+                fontWeight: otherUser.online == true ? FontWeight.bold : FontWeight.normal,
+              ),
+            );
+          }
 
           String preview = '...';
           if (lastMessage != null) {
             if (lastMessage.attachments != null && lastMessage.attachments!.isNotEmpty) {
               preview = 'Attachment';
+            } else if (lastMessage.voiceNote != null) {
+              preview = 'Voice note';
             } else {
               preview = lastMessage.text ?? '';
             }
@@ -108,38 +141,8 @@ class _ChatsPageState extends State<ChatsPage> {
 
           return ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            leading: Stack(
-              children: [
-                CircleAvatar(
-                  backgroundColor: Colors.tealAccent,
-                  child: Text(
-                    otherUser.name[0],
-                    style: const TextStyle(color: Colors.black),
-                  ),
-                ),
-                if (otherUser.online ?? false)
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.black, width: 2),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            title: Text(
-              otherUser.name,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+            leading: avatar,
+            title: title,
             subtitle: Text(
               preview,
               style: TextStyle(
@@ -153,6 +156,8 @@ class _ChatsPageState extends State<ChatsPage> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
+                statusWidget,
+                const SizedBox(height: 4),
                 if (lastMessage != null)
                   Text(
                     '${lastMessage.createdAt.hour}:${lastMessage.createdAt.minute}',
@@ -161,11 +166,13 @@ class _ChatsPageState extends State<ChatsPage> {
                       fontSize: 12,
                     ),
                   ),
-                Icon(
-                  statusIcon,
-                  size: 16,
-                  color: statusColor,
-                ),
+                const SizedBox(height: 4),
+                if(lastMessage?.senderId == 'you')
+                  Icon(
+                    statusIcon,
+                    size: 16,
+                    color: statusColor,
+                  ),
               ],
             ),
             onTap: () {

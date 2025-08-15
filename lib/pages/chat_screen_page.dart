@@ -13,6 +13,7 @@ import 'package:chatter/widgets/video_player_widget.dart';
 import 'package:chatter/widgets/audio_waveform_widget.dart';
 import 'package:chatter/widgets/all_attachments_dialog.dart';
 import 'package:chatter/widgets/reply_message_snippet.dart';
+import 'package:chatter/helpers/time_helper.dart';
 
 class ChatScreen extends StatefulWidget {
   final Chat chat;
