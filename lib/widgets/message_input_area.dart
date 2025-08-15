@@ -108,13 +108,16 @@ class _MessageInputAreaState extends State<MessageInputArea> {
     try {
       final result = await FilePicker.platform.pickFiles(allowMultiple: true);
       if (result != null && result.files.isNotEmpty) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => AttachmentPreviewDialog(
-              files: result.files,
-              onSend: widget.onSend,
-            ),
-            fullscreenDialog: true,
+        // Show the dialog as a general dialog, not a full-screen page route
+        showDialog(
+          context: context,
+          builder: (context) => AttachmentPreviewDialog(
+            files: result.files,
+            initialText: _messageController.text.trim(),
+            onSend: (text, files) {
+              widget.onSend(text, files);
+              _messageController.clear();
+            },
           ),
         );
       }
@@ -131,7 +134,7 @@ class _MessageInputAreaState extends State<MessageInputArea> {
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.add, color: Colors.tealAccent),
+            icon: const Icon(Icons.attach_file, color: Colors.tealAccent),
             onPressed: _pickAttachments,
           ),
           Expanded(
