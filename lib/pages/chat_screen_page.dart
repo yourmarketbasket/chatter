@@ -5,6 +5,7 @@ import 'package:chatter/models/feed_models.dart';
 import 'package:chatter/widgets/message_input_area.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:chatter/pages/media_view_page.dart';
 import 'package:video_player/video_player.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -132,12 +133,46 @@ class _ChatScreenState extends State<ChatScreen> {
       return const SizedBox.shrink();
     }
 
-    // For now, we only display the first attachment.
     final attachment = message.attachments!.first;
-    final attachmentType = attachment.type?.toLowerCase();
-
-    // In a real app, you would have a more robust way to check if the URL is local or remote.
     final isLocalFile = !attachment.url.startsWith('http');
+
+    return GestureDetector(
+      onTap: () {
+        final attachmentsForViewer = message.attachments!
+            .map((att) => {
+                  'url': att.url,
+                  'type': att.type,
+                  'filename': att.filename,
+                })
+            .toList();
+
+        final initialIndex = message.attachments!.indexOf(attachment);
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MediaViewPage(
+              attachments: attachmentsForViewer,
+              initialIndex: initialIndex,
+              message: message.text ?? '',
+              userName: widget.chat.isGroup ? message.senderId : widget.chat.participants.firstWhere((p) => p.id != dataController.user.value['user']['_id']).name,
+              userAvatarUrl: null,
+              timestamp: message.createdAt,
+              viewsCount: 0,
+              likesCount: 0,
+              repostsCount: 0,
+            ),
+          ),
+        );
+      },
+      child: AbsorbPointer(
+        child: _buildAttachmentContent(attachment, isLocalFile),
+      ),
+    );
+  }
+
+  Widget _buildAttachmentContent(Attachment attachment, bool isLocalFile) {
+    final attachmentType = attachment.type?.toLowerCase();
 
     switch (attachmentType) {
       case 'jpg':
