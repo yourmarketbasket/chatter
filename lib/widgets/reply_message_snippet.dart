@@ -1,6 +1,9 @@
 import 'package:chatter/models/chat_models.dart';
 import 'package:chatter/models/feed_models.dart' hide Attachment;
 import 'package:flutter/material.dart';
+import 'dart:io';
+import 'package:chatter/widgets/video_player_widget.dart';
+import 'package:chatter/widgets/audio_waveform_widget.dart';
 
 class ReplyMessageSnippet extends StatelessWidget {
   final ChatMessage originalMessage;
@@ -14,6 +17,30 @@ class ReplyMessageSnippet extends StatelessWidget {
     required this.currentUserId,
   });
 
+  Widget _buildPreview(Attachment attachment) {
+    final extension = attachment.type?.toLowerCase() ?? '';
+    final isLocalFile = !attachment.url.startsWith('http');
+    Widget preview;
+
+    switch (extension) {
+      case 'image':
+        preview = Image(
+          image: isLocalFile ? FileImage(File(attachment.url)) : NetworkImage(attachment.url) as ImageProvider,
+          fit: BoxFit.cover,
+        );
+        break;
+      case 'video':
+        preview = const Icon(Icons.videocam, size: 24, color: Colors.white);
+        break;
+      case 'audio':
+        preview = const Icon(Icons.audiotrack, size: 24, color: Colors.white);
+        break;
+      default:
+        preview = const Icon(Icons.insert_drive_file, size: 24, color: Colors.white);
+    }
+    return SizedBox(width: 40, height: 40, child: ClipRRect(borderRadius: BorderRadius.circular(4), child: preview));
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool isReplyingToSelf = originalMessage.senderId == currentUserId;
@@ -23,13 +50,41 @@ class ReplyMessageSnippet extends StatelessWidget {
     );
     final senderName = isReplyingToSelf ? 'You' : sender.name;
 
-    String contentPreview;
+    Widget contentPreview;
     if (originalMessage.attachments != null && originalMessage.attachments!.isNotEmpty) {
-      contentPreview = 'Attachment: ${originalMessage.attachments!.first.filename}';
+      final firstAttachment = originalMessage.attachments!.first;
+      contentPreview = Row(
+        children: [
+          _buildPreview(firstAttachment),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              firstAttachment.type == 'image' ? 'Image' : firstAttachment.filename,
+              style: TextStyle(color: Colors.grey[300]),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      );
     } else if (originalMessage.voiceNote != null) {
-      contentPreview = 'Voice note';
+      contentPreview = Row(
+        children: [
+          const Icon(Icons.audiotrack, size: 24, color: Colors.white),
+          const SizedBox(width: 8),
+          Text(
+            'Voice note',
+            style: TextStyle(color: Colors.grey[300]),
+          ),
+        ],
+      );
     } else {
-      contentPreview = originalMessage.text ?? '';
+      contentPreview = Text(
+        originalMessage.text ?? '',
+        style: TextStyle(color: Colors.grey[300]),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      );
     }
 
     return Container(
@@ -53,12 +108,7 @@ class ReplyMessageSnippet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          Text(
-            contentPreview,
-            style: TextStyle(color: Colors.grey[300]),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
+          contentPreview,
         ],
       ),
     );

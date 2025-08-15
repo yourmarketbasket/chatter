@@ -130,19 +130,72 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  Widget _buildReplyAttachmentPreview(Attachment attachment) {
+    final extension = attachment.type?.toLowerCase() ?? '';
+    final isLocalFile = !attachment.url.startsWith('http');
+    Widget preview;
+
+    switch (extension) {
+      case 'image':
+        preview = Image(
+          image: isLocalFile ? FileImage(File(attachment.url)) : NetworkImage(attachment.url) as ImageProvider,
+          fit: BoxFit.cover,
+        );
+        break;
+      case 'video':
+        preview = const Icon(Icons.videocam, size: 24, color: Colors.white);
+        break;
+      case 'audio':
+        preview = const Icon(Icons.audiotrack, size: 24, color: Colors.white);
+        break;
+      default:
+        preview = const Icon(Icons.insert_drive_file, size: 24, color: Colors.white);
+    }
+    return SizedBox(width: 40, height: 40, child: ClipRRect(borderRadius: BorderRadius.circular(4), child: preview));
+  }
+
   Widget _buildReplyPreview(ChatMessage replyTo) {
     final sender = widget.chat.participants.firstWhere(
       (p) => p.id == replyTo.senderId,
       orElse: () => User(id: replyTo.senderId, name: 'Unknown User'),
     );
+    final senderName = replyTo.senderId == dataController.user.value['user']['_id'] ? 'You' : sender.name;
 
-    String contentPreview;
+    Widget contentPreview;
     if (replyTo.attachments != null && replyTo.attachments!.isNotEmpty) {
-      contentPreview = 'Attachment: ${replyTo.attachments!.first.filename}';
+      final firstAttachment = replyTo.attachments!.first;
+      contentPreview = Row(
+        children: [
+          _buildReplyAttachmentPreview(firstAttachment),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              firstAttachment.type == 'image' ? 'Image' : firstAttachment.filename,
+              style: TextStyle(color: Colors.grey[300]),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      );
     } else if (replyTo.voiceNote != null) {
-      contentPreview = 'Voice note';
+      contentPreview = Row(
+        children: [
+          const Icon(Icons.audiotrack, size: 24, color: Colors.white),
+          const SizedBox(width: 8),
+          Text(
+            'Voice note',
+            style: TextStyle(color: Colors.grey[300]),
+          ),
+        ],
+      );
     } else {
-      contentPreview = replyTo.text ?? '';
+      contentPreview = Text(
+        replyTo.text ?? '',
+        style: TextStyle(color: Colors.grey[300]),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      );
     }
 
     return Container(
@@ -168,19 +221,14 @@ class _ChatScreenState extends State<ChatScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    sender.name,
+                    senderName,
                     style: const TextStyle(
                       color: Colors.tealAccent,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    contentPreview,
-                    style: TextStyle(color: Colors.grey[300]),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  contentPreview,
                 ],
               ),
             ),
