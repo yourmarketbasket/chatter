@@ -277,9 +277,36 @@ class _ChatScreenState extends State<ChatScreen> {
             crossAxisAlignment: isYou ? CrossAxisAlignment.end : CrossAxisAlignment.start,
             children: [
               if (message.voiceNote != null)
-                AudioPlayerWidget(
-                  audioUrl: message.voiceNote!.url,
-                  isLocal: true, // Voice notes are always local initially
+                GestureDetector(
+                  onTap: () {
+                    final attachmentsForViewer = [
+                      {
+                        'url': message.voiceNote!.url,
+                        'type': 'audio',
+                        'filename': message.voiceNote!.url.split('/').last,
+                      }
+                    ];
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => MediaViewPage(
+                          attachments: attachmentsForViewer,
+                          initialIndex: 0,
+                          message: '',
+                          userName: widget.chat.isGroup ? message.senderId : widget.chat.participants.firstWhere((p) => p.id != dataController.user.value['user']['_id']).name,
+                          userAvatarUrl: null,
+                          timestamp: message.createdAt,
+                          viewsCount: 0,
+                          likesCount: 0,
+                          repostsCount: 0,
+                        ),
+                      ),
+                    );
+                  },
+                  child: AudioPlayerWidget(
+                    audioUrl: message.voiceNote!.url,
+                    isLocal: true, // Voice notes are always local initially
+                  ),
                 ),
               if (hasAttachment) ...[
                 _buildAttachment(message),
@@ -342,6 +369,28 @@ class _ChatScreenState extends State<ChatScreen> {
         return Colors.red;
       default:
         return Colors.grey[400]!;
+    }
+  }
+
+  String _getMediaType(String extension) {
+    switch (extension.toLowerCase()) {
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+      case 'gif':
+        return 'image';
+      case 'mp4':
+      case 'mov':
+      case 'avi':
+        return 'video';
+      case 'mp3':
+      case 'wav':
+      case 'm4a':
+        return 'audio';
+      case 'pdf':
+        return 'pdf';
+      default:
+        return 'file';
     }
   }
 
@@ -430,11 +479,11 @@ class _ChatScreenState extends State<ChatScreen> {
                         filename: file.name,
                         url: file.path!,
                         size: file.size,
-                        type: file.extension ?? 'file',
+                        type: _getMediaType(file.extension ?? ''),
                       ))
                   .toList();
 
-              final isVoiceNote = attachments.isNotEmpty && (attachments.first.type == 'm4a');
+              final isVoiceNote = attachments.isNotEmpty && attachments.first.type == 'audio';
 
               final message = ChatMessage(
                 chatId: widget.chat.id,
