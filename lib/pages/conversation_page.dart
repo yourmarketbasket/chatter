@@ -36,17 +36,29 @@ class _ConversationPageState extends State<ConversationPage> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final AudioRecorder _audioRecorder = AudioRecorder();
+  final RxBool _isMessageEmpty = true.obs;
   bool _isRecording = false;
 
   @override
   void initState() {
     super.initState();
+    _messageController.addListener(() {
+      _isMessageEmpty.value = _messageController.text.isEmpty;
+    });
     // Fetch messages for this conversation
     _dataController.getMessagesForChat(widget.conversationId).catchError((e) {
       Get.snackbar('Error', 'Could not load messages: ${e.toString()}',
           backgroundColor: Colors.red, colorText: Colors.white);
     });
     _socketService.joinChat(widget.conversationId);
+  }
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    _scrollController.dispose();
+    _audioRecorder.dispose();
+    super.dispose();
   }
 
   List<Map<String, dynamic>> _attachments = [];
@@ -394,11 +406,11 @@ class _ConversationPageState extends State<ConversationPage> {
           const SizedBox(width: 8),
           Obx(() => IconButton(
                 icon: Icon(
-                  _messageController.text.isEmpty ? FeatherIcons.mic : FeatherIcons.send,
+                  _isMessageEmpty.value ? FeatherIcons.mic : FeatherIcons.send,
                   color: Colors.tealAccent,
                 ),
                 onPressed: () async {
-                  if (_messageController.text.isEmpty) {
+                  if (_isMessageEmpty.value) {
                     if (_isRecording) {
                       final path = await _audioRecorder.stop();
                       if (path != null) {
