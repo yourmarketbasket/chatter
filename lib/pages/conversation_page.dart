@@ -13,6 +13,9 @@ import 'package:feather_icons/feather_icons.dart';
 import 'package:intl/intl.dart';
 import 'package:objectid/objectid.dart';
 import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:chatter/widgets/audio_attachment_widget.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
 class ConversationPage extends StatefulWidget {
@@ -359,7 +362,7 @@ class _ConversationPageState extends State<ConversationPage> {
                                 ... (message['attachments'] as List).map((attachment) {
                                   return Padding(
                                     padding: const EdgeInsets.only(top: 8.0),
-                                    child: _buildAttachment(attachment, isMe),
+                                    child: _buildAttachment(attachment, isMe, message),
                                   );
                                 }).toList(),
                               const SizedBox(height: 5),
@@ -512,6 +515,83 @@ class _ConversationPageState extends State<ConversationPage> {
     );
   }
 
+  void _showPermissionDialog(String title, String message, {bool openSettings = false}) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title, style: GoogleFonts.roboto(color: Colors.white)),
+        content: Text(message, style: GoogleFonts.roboto(color: Colors.white70)),
+        backgroundColor: const Color(0xFF252525),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel', style: GoogleFonts.roboto(color: Colors.tealAccent)),
+          ),
+          if (openSettings)
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                openAppSettings();
+              },
+              child: Text('Settings', style: GoogleFonts.roboto(color: Colors.tealAccent)),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _startAudioRecording() async {
+    final hasPermission = await Permission.microphone.isGranted;
+    if (!hasPermission) {
+      final status = await Permission.microphone.request();
+      if (!status.isGranted) {
+        _showPermissionDialog(
+          'Microphone Permission Required',
+          'Please grant microphone permission to record audio.',
+          openSettings: status.isPermanentlyDenied,
+        );
+        return;
+      }
+    }
+
+    try {
+      final directory = await getTemporaryDirectory();
+      final path = '${directory.path}/audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      await _audioRecorder.start(const RecordConfig(), path: path);
+      setState(() {
+        _isRecording = true;
+      });
+    } catch (e) {
+      _showPermissionDialog('Recording Error', 'Failed to start audio recording: $e');
+    }
+  }
+
+  Future<void> _stopAudioRecording() async {
+    try {
+      final path = await _audioRecorder.stop();
+      if (path != null) {
+        final file = File(path);
+        final attachment = {
+          'type': 'audio',
+          'path': path,
+          'file': file,
+          'filename': 'voice_note.m4a',
+          'isUploading': true,
+        };
+        setState(() {
+          _pendingAttachments.add(attachment);
+        });
+        _sendMessage();
+      }
+    } catch (e) {
+      _showPermissionDialog('Recording Error', 'Failed to stop audio recording: $e');
+    } finally {
+      setState(() {
+        _isRecording = false;
+      });
+    }
+  }
+
   Widget _buildMessageInputField() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
@@ -555,38 +635,12 @@ class _ConversationPageState extends State<ConversationPage> {
                   _isMessageEmpty.value ? FeatherIcons.mic : FeatherIcons.send,
                   color: Colors.tealAccent,
                 ),
-                onPressed: () async {
+                onPressed: () {
                   if (_isMessageEmpty.value) {
                     if (_isRecording) {
-                      final path = await _audioRecorder.stop();
-                      if (path != null) {
-                        final file = File(path);
-                        final uploadResult = await _dataController.uploadFiles([
-                          {'type': 'audio', 'file': file}
-                        ]);
-
-                        if (uploadResult.isNotEmpty && uploadResult[0]['success']) {
-                          final attachment = {
-                            'type': 'audio',
-                            'url': uploadResult[0]['url'],
-                            'filename': 'voice_note.m4a',
-                          };
-                          _pendingAttachments.add(attachment);
-                          _sendMessage();
-                        } else {
-                          Get.snackbar('Error', 'Failed to upload voice note.');
-                        }
-                      }
-                      setState(() {
-                        _isRecording = false;
-                      });
+                      _stopAudioRecording();
                     } else {
-                      if (await _audioRecorder.hasPermission()) {
-                        await _audioRecorder.start(const RecordConfig(), path: 'audio_record.m4a');
-                        setState(() {
-                          _isRecording = true;
-                        });
-                      }
+                      _startAudioRecording();
                     }
                   } else {
                     _sendMessage();
@@ -665,7 +719,7 @@ class _ConversationPageState extends State<ConversationPage> {
     );
   }
 
-  Widget _buildAttachment(Map<String, dynamic> attachment, bool isMe) {
+  Widget _buildAttachment(Map<String, dynamic> attachment, bool isMe, Map<String, dynamic> message) {
     final String type = attachment['type'] ?? 'document';
     final String? url = attachment['url'];
     final String? localPath = attachment['path'];
@@ -733,7 +787,22 @@ class _ConversationPageState extends State<ConversationPage> {
         // A future step would be to implement video thumbnails and players.
         return placeholder(const Icon(FeatherIcons.video, color: Colors.white, size: 28));
       case 'audio':
-        return placeholder(const Icon(FeatherIcons.mic, color: Colors.white, size: 28));
+        final post = {
+          'attachments': message['attachments'],
+          'content': message['content'],
+          'username': message['sender']['name'],
+          'useravatar': message['sender']['avatar'],
+          'timestamp': message['createdAt'],
+          'viewsCount': 0,
+          'likesCount': 0,
+          'repostsCount': 0,
+        };
+        return AudioAttachmentWidget(
+          key: Key(attachment['url'] ?? attachment['path']),
+          attachment: attachment,
+          post: post,
+          borderRadius: BorderRadius.circular(12.0),
+        );
       case 'document':
       default:
         return placeholder(const Icon(FeatherIcons.fileText, color: Colors.white, size: 28));
