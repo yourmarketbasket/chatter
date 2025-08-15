@@ -663,7 +663,7 @@ class _ReplyPageState extends State<ReplyPage> {
         // So, indent = lineAndAvatarAreaTotalWidth. (No, this is where the content *starts*, PostContent handles its own avatar padding)
         // The divider should start where the text content of the PostContent starts.
         // PostContent's padding logic: left: widget.isReply ? indentOffset : 8.0. For level 0 reply, indentOffset is 0.
-        // Then avatar area. Avatar: CircleAvatar(radius: 14). Padding around avatar: right: 12.0.
+        // Then avatar area. Avatar: CircleAvatar(radius: 12). Padding around avatar: right: 12.0.
         // So text starts roughly at lineAndAvatarAreaTotalWidth + (isReply ? 0 : 8.0) + 14 (avatar radius, for center) + 12 (avatar right padding).
         // Let's use the previously defined firstLevelContentIndent which is from very left.
         // The contentGroup is already padded by lineAndAvatarAreaTotalWidth.

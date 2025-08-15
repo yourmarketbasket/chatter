@@ -257,7 +257,7 @@ class _PostContentState extends State<PostContent> {
                             _navigateToProfilePage(context, authorUserId, username, userAvatar);
                           },
                           child: CircleAvatar(
-                            radius: avatarRadius,
+                            radius: widget.isReply ? 12 : 16,
                             backgroundColor: Colors.tealAccent.withOpacity(0.2),
                             backgroundImage: userAvatar != null && userAvatar.isNotEmpty ? NetworkImage(userAvatar) : null,
                             child: userAvatar == null || userAvatar.isEmpty
@@ -288,7 +288,7 @@ class _PostContentState extends State<PostContent> {
                         _navigateToProfilePage(context, authorUserId, username, userAvatar);
                       },
                       child: CircleAvatar(
-                        radius: avatarRadius,
+                        radius: widget.isReply ? 12 : 16,
                         backgroundColor: Colors.tealAccent.withOpacity(0.2),
                         backgroundImage: userAvatar != null && userAvatar.isNotEmpty ? NetworkImage(userAvatar) : null,
                         child: userAvatar == null || userAvatar.isEmpty

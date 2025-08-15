@@ -229,7 +229,7 @@ class _FollowersPageState extends State<FollowersPage> with SingleTickerProvider
           return ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
             leading: CircleAvatar(
-              radius: 24,
+              radius: 22,
               backgroundColor: Colors.tealAccent.withOpacity(0.2),
               backgroundImage: avatarUrl.isNotEmpty ? CachedNetworkImageProvider(avatarUrl) : null,
               child: avatarUrl.isEmpty ? Text(avatarInitial, style: GoogleFonts.poppins(color: Colors.tealAccent, fontWeight: FontWeight.w600, fontSize: 18)) : null,

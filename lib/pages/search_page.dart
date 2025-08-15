@@ -196,7 +196,7 @@ class _SearchPageState extends State<SearchPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           CircleAvatar(
-            radius: 20,
+            radius: 18,
             backgroundColor: Colors.tealAccent.withOpacity(0.2),
             backgroundImage: userAvatar != null && userAvatar.isNotEmpty ? CachedNetworkImageProvider(userAvatar) : null,
             child: userAvatar == null || userAvatar.isEmpty

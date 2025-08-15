@@ -554,7 +554,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                   _navigateToProfilePage(context, authorUserId, username, userAvatar);
                 },
                 child: CircleAvatar(
-                  radius: isReply ? 16 : 20, backgroundColor: Colors.tealAccent.withOpacity(0.2),
+                  radius: isReply ? 14 : 18, backgroundColor: Colors.tealAccent.withOpacity(0.2),
                   backgroundImage: userAvatar != null && userAvatar.isNotEmpty ? NetworkImage(userAvatar) : null,
                   child: userAvatar == null || userAvatar.isEmpty ? Text(avatarInitial, style: GoogleFonts.poppins(color: Colors.tealAccent, fontWeight: FontWeight.w600, fontSize: isReply ? 14 : 16)) : null,
                 ),

@@ -1,16 +1,22 @@
+import 'dart:async';
 import 'dart:io';
+import 'package:chatter/models/chat_model.dart';
+import 'package:chatter/models/group_model.dart';
+import 'package:chatter/models/message_model.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:dio/dio.dart' as dio; // Use prefix for dio to avoid conflicts
+import 'package:dio/dio.dart' as dio;
 import 'dart:convert';
-// import 'package:path/path.dart' as path; // path is used by UploadService
-import '../models/feed_models.dart'; // Added import for ChatterPost
-import '../services/upload_service.dart'; // Import the UploadService
+import 'package:chatter/data/dummy_data.dart' as dummy;
+import 'package:objectid/objectid.dart';
+
+import '../models/feed_models.dart';
+import '../services/upload_service.dart';
 import '../services/socket-service.dart';
 
 class DataController extends GetxController {
-  final UploadService _uploadService = UploadService(); // Instantiate UploadService
+  final UploadService _uploadService = UploadService();
 
   final RxBool isLoading = false.obs;
   final FlutterSecureStorage _storage = const FlutterSecureStorage(
@@ -22,10 +28,8 @@ class DataController extends GetxController {
     ),
   );
 
-  // Set to keep track of post IDs for which view registration is in progress
   final Set<String> _pendingViewRegistrations = <String>{};
 
-  // URL
   final String baseUrl = 'https://chatter-api.fly.dev/';
   final dio.Dio _dio = dio.Dio(dio.BaseOptions(
     baseUrl: 'https://chatter-api.fly.dev/',
@@ -36,14 +40,12 @@ class DataController extends GetxController {
   final user = {}.obs;
   final RxList<Map<String, dynamic>> posts = <Map<String, dynamic>>[].obs;
 
-  // Placeholder for all users
   final RxList<Map<String, dynamic>> allUsers = <Map<String, dynamic>>[].obs;
 
-  // Add these Rx variables inside DataController class
-  final RxList<Map<String, dynamic>> conversations = <Map<String, dynamic>>[].obs;
-  final RxList<Map<String, dynamic>> groupConversations = <Map<String, dynamic>>[].obs;
+  final RxList<Chat> conversations = <Chat>[].obs;
+  final RxList<Group> groupConversations = <Group>[].obs;
   final RxBool isLoadingConversations = false.obs;
-  final RxList<Map<String, dynamic>> currentConversationMessages = <Map<String, dynamic>>[].obs;
+  final RxList<Message> currentConversationMessages = <Message>[].obs;
   final RxBool isLoadingMessages = false.obs;
   final RxBool isTyping = false.obs;
   String? _currentlyOpenChatId;
@@ -89,28 +91,26 @@ class DataController extends GetxController {
   }
 
   void init() async {
-    // Load user data from secure storage
-    String? userJson = await _storage.read(key: 'user');
-    if (userJson != null) {
-      user.value = jsonDecode(userJson);
-      final String? currentUserId = user.value['user']?['_id'];
-      if (currentUserId != null && currentUserId.isNotEmpty) {
-        print('[DataController.init] User loaded from storage. Fetching initial network data for $currentUserId');
-        fetchFollowers(currentUserId).catchError((e) => print('Error fetching followers in init: $e'));
-        fetchFollowing(currentUserId).catchError((e) => print('Error fetching following in init: $e'));
-      }
-    }
-    // fetch initial feeds
+    // Load dummy user
+    user.value = {
+      'user': {
+        '_id': dummy.currentUser.id,
+        'name': dummy.currentUser.name,
+        'avatar': dummy.currentUser.avatar,
+      },
+      // Keep a dummy token if other parts of the app need it
+      'token': 'dummy-token',
+    };
+
+    // Load dummy chats and groups
+    getAllChats();
+
+    // Keep post-related fetching
     try {
-      // Only fetch feeds if user is actually logged in (token exists)
-      if (user.value['token'] != null) {
-        await fetchFeeds();
-        await getAllChats();
-        await fetchAllUsers();
-      }
+      await fetchFeeds();
     } catch (e) {
       print('Error fetching initial data: $e');
-      posts.clear(); // Clear posts on error
+      posts.clear();
     }
   }
 
@@ -462,156 +462,6 @@ class DataController extends GetxController {
     }
   }
 
-  Future<Map<String, dynamic>> updateGroupInfo(String chatId, String groupName, String groupAvatar) async {
-    try {
-      final String? token = user.value['token'];
-      if (token == null) throw Exception('User not authenticated.');
-
-      final response = await _dio.put(
-        'api/chats/groups/$chatId',
-        data: {'groupName': groupName, 'groupAvatar': groupAvatar},
-        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
-      );
-
-      if (response.statusCode == 200) {
-        return {'success': true, 'group': response.data};
-      } else {
-        return {'success': false, 'message': response.data['message'] ?? 'Failed to update group info'};
-      }
-    } catch (e) {
-      print('[DataController] Error updating group info: $e');
-      return {'success': false, 'message': e.toString()};
-    }
-  }
-
-  Future<Map<String, dynamic>> addMembersToGroup(String chatId, List<String> memberIds) async {
-    try {
-      final String? token = user.value['token'];
-      if (token == null) throw Exception('User not authenticated.');
-
-      final response = await _dio.post(
-        'api/chats/groups/$chatId/members',
-        data: {'memberIds': memberIds},
-        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
-      );
-
-      if (response.statusCode == 200) {
-        return {'success': true, 'group': response.data};
-      } else {
-        return {'success': false, 'message': response.data['message'] ?? 'Failed to add members'};
-      }
-    } catch (e) {
-      print('[DataController] Error adding members to group: $e');
-      return {'success': false, 'message': e.toString()};
-    }
-  }
-
-  Future<Map<String, dynamic>> removeMemberFromGroup(String chatId, String memberId) async {
-    try {
-      final String? token = user.value['token'];
-      if (token == null) throw Exception('User not authenticated.');
-
-      final response = await _dio.delete(
-        'api/chats/groups/$chatId/members/$memberId',
-        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
-      );
-
-      if (response.statusCode == 200) {
-        return {'success': true, 'group': response.data};
-      } else {
-        return {'success': false, 'message': response.data['message'] ?? 'Failed to remove member'};
-      }
-    } catch (e) {
-      print('[DataController] Error removing member from group: $e');
-      return {'success': false, 'message': e.toString()};
-    }
-  }
-
-  Future<Map<String, dynamic>> promoteMemberToAdmin(String chatId, String memberId) async {
-    try {
-      final String? token = user.value['token'];
-      if (token == null) throw Exception('User not authenticated.');
-
-      final response = await _dio.put(
-        'api/chats/groups/$chatId/admins/$memberId',
-        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
-      );
-
-      if (response.statusCode == 200) {
-        return {'success': true, 'group': response.data};
-      } else {
-        return {'success': false, 'message': response.data['message'] ?? 'Failed to promote member'};
-      }
-    } catch (e) {
-      print('[DataController] Error promoting member to admin: $e');
-      return {'success': false, 'message': e.toString()};
-    }
-  }
-
-  Future<Map<String, dynamic>> leaveGroup(String chatId) async {
-    try {
-      final String? token = user.value['token'];
-      if (token == null) throw Exception('User not authenticated.');
-
-      final response = await _dio.post(
-        'api/chats/groups/$chatId/leave',
-        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
-      );
-
-      if (response.statusCode == 200) {
-        await getAllChats(); // Refresh conversation list
-        return {'success': true, 'message': 'Successfully left the group'};
-      } else {
-        return {'success': false, 'message': response.data['message'] ?? 'Failed to leave group'};
-      }
-    } catch (e) {
-      print('[DataController] Error leaving group: $e');
-      return {'success': false, 'message': e.toString()};
-    }
-  }
-
-  Future<Map<String, dynamic>> createGroupInviteLink(String chatId) async {
-    try {
-      final String? token = user.value['token'];
-      if (token == null) throw Exception('User not authenticated.');
-
-      final response = await _dio.post(
-        'api/chats/groups/$chatId/invite-link',
-        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
-      );
-
-      if (response.statusCode == 200) {
-        return {'success': true, 'inviteToken': response.data['inviteToken']};
-      } else {
-        return {'success': false, 'message': response.data['message'] ?? 'Failed to create invite link'};
-      }
-    } catch (e) {
-      print('[DataController] Error creating group invite link: $e');
-      return {'success': false, 'message': e.toString()};
-    }
-  }
-
-  Future<Map<String, dynamic>> joinGroupViaInviteLink(String token) async {
-    try {
-      final String? authToken = user.value['token'];
-      if (authToken == null) throw Exception('User not authenticated.');
-
-      final response = await _dio.post(
-        'api/chats/join-group/$token',
-        options: dio.Options(headers: {'Authorization': 'Bearer $authToken'}),
-      );
-
-      if (response.statusCode == 200) {
-        await getAllChats(); // Refresh conversation list
-        return {'success': true, 'chat': response.data};
-      } else {
-        return {'success': false, 'message': response.data['message'] ?? 'Failed to join group'};
-      }
-    } catch (e) {
-      print('[DataController] Error joining group via invite link: $e');
-      return {'success': false, 'message': e.toString()};
-    }
-  }
 
   // unlike post
   Future<Map<String, dynamic>> unlikePost(String postId) async {
@@ -1126,130 +976,111 @@ class DataController extends GetxController {
     return uploadResults;
   }
 
-  // --- Chat Methods ---
+  // --- Dummy Chat Methods ---
 
   Future<void> getAllChats() async {
     isLoadingConversations.value = true;
-    try {
-      final String? token = user.value['token'];
-      if (token == null) throw Exception('User not authenticated.');
-
-      final response = await _dio.get(
-        'api/chats',
-        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
-      );
-
-      if (response.statusCode == 200) {
-        final List<dynamic> chatData = response.data;
-        final allConvos = chatData.map((data) => Map<String, dynamic>.from(data)).toList();
-        conversations.assignAll(allConvos);
-        groupConversations.assignAll(allConvos.where((c) => c['isGroupChat'] == true).toList());
-      } else {
-        throw Exception('Failed to load chats: ${response.data['message']}');
-      }
-    } catch (e) {
-      print('[DataController] Error fetching chats: $e');
-      // Optionally show an error message to the user
-    } finally {
-      isLoadingConversations.value = false;
-    }
+    await Future.delayed(const Duration(seconds: 1)); // Simulate loading
+    conversations.assignAll(dummy.chats);
+    groupConversations.assignAll(dummy.groups);
+    isLoadingConversations.value = false;
   }
 
   Future<void> getMessagesForChat(String chatId) async {
     _currentlyOpenChatId = chatId;
     isLoadingMessages.value = true;
     currentConversationMessages.clear();
-    try {
-      final String? token = user.value['token'];
-      if (token == null) throw Exception('User not authenticated.');
+    await Future.delayed(const Duration(milliseconds: 500));
 
-      final response = await _dio.get(
-        'api/chats/$chatId/messages',
-        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
-      );
-
-      if (response.statusCode == 200) {
-        final List<dynamic> messageData = response.data;
-        currentConversationMessages.assignAll(messageData.map((data) => Map<String, dynamic>.from(data)).toList());
-      } else {
-        throw Exception('Failed to load messages: ${response.data['message']}');
+    final chat = conversations.firstWhereOrNull((c) => c.id == chatId);
+    if (chat != null) {
+      currentConversationMessages.assignAll(chat.messages);
+    } else {
+      final group = groupConversations.firstWhereOrNull((g) => g.id == chatId);
+      if (group != null) {
+        currentConversationMessages.assignAll(group.messages);
       }
-    } catch (e) {
-      print('[DataController] Error fetching messages for chat $chatId: $e');
-    } finally {
-      isLoadingMessages.value = false;
+    }
+    isLoadingMessages.value = false;
+  }
+
+  void sendDummyMessage(String chatId, String content, List<String>? attachments, bool isGroupChat) {
+    final newMessage = Message(
+      id: ObjectId().hexString,
+      content: content,
+      attachments: attachments,
+      createdAt: DateTime.now(),
+      status: MessageStatus.sent,
+      sender: dummy.currentUser,
+    );
+
+    if (isGroupChat) {
+      final groupIndex = groupConversations.indexWhere((g) => g.id == chatId);
+      if (groupIndex != -1) {
+        groupConversations[groupIndex].messages.add(newMessage);
+        currentConversationMessages.add(newMessage);
+        groupConversations.refresh();
+        _simulateGroupResponse(chatId);
+      }
+    } else {
+      final chatIndex = conversations.indexWhere((c) => c.id == chatId);
+      if (chatIndex != -1) {
+        conversations[chatIndex].messages.add(newMessage);
+        currentConversationMessages.add(newMessage);
+        conversations.refresh();
+        _simulateChatResponse(chatId);
+      }
+    }
+  }
+
+  void _simulateChatResponse(String chatId) {
+    final chatIndex = conversations.indexWhere((c) => c.id == chatId);
+    if (chatIndex != -1) {
+      final chat = conversations[chatIndex];
+      final otherUser = chat.participants.firstWhere((p) => p.id != dummy.currentUser.id);
+
+      Future.delayed(const Duration(seconds: 2), () {
+        final responseMessage = Message(
+          id: ObjectId().hexString,
+          content: 'This is a simulated response!',
+          createdAt: DateTime.now(),
+          status: MessageStatus.read,
+          sender: otherUser,
+        );
+        chat.messages.add(responseMessage);
+        conversations.refresh();
+        if (_currentlyOpenChatId == chatId) {
+          currentConversationMessages.add(responseMessage);
+        }
+      });
+    }
+  }
+
+  void _simulateGroupResponse(String chatId) {
+    final groupIndex = groupConversations.indexWhere((g) => g.id == chatId);
+    if (groupIndex != -1) {
+      final group = groupConversations[groupIndex];
+      final otherUser = group.participants.firstWhere((p) => p.id != dummy.currentUser.id, orElse: () => group.participants.first);
+
+      Future.delayed(const Duration(seconds: 3), () {
+        final responseMessage = Message(
+          id: ObjectId().hexString,
+          content: 'A simulated message in the group from ${otherUser.name}!',
+          createdAt: DateTime.now(),
+          status: MessageStatus.read,
+          sender: otherUser,
+        );
+        group.messages.add(responseMessage);
+        groupConversations.refresh();
+        if (_currentlyOpenChatId == chatId) {
+          currentConversationMessages.add(responseMessage);
+        }
+      });
     }
   }
 
   void clearCurrentlyOpenChatId() {
     _currentlyOpenChatId = null;
-  }
-
-  Future<Map<String, dynamic>> createNewChat(String receiverId) async {
-    try {
-      final String? token = user.value['token'];
-      if (token == null) throw Exception('User not authenticated.');
-
-      final response = await _dio.post(
-        'api/chats',
-        data: {'receiverId': receiverId},
-        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
-      );
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        // If a new chat is created or an existing one is returned
-        await getAllChats(); // Refresh the conversation list
-        return {'success': true, 'chat': response.data};
-      } else {
-        return {'success': false, 'message': response.data['message'] ?? 'Failed to create chat'};
-      }
-    } catch (e) {
-      print('[DataController] Error creating new chat: $e');
-      return {'success': false, 'message': e.toString()};
-    }
-  }
-
-  Future<Map<String, dynamic>> editMessage(String chatId, String messageId, String content) async {
-    try {
-      final String? token = user.value['token'];
-      if (token == null) throw Exception('User not authenticated.');
-
-      final response = await _dio.put(
-        'api/chats/$chatId/messages/$messageId',
-        data: {'content': content},
-        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
-      );
-
-      if (response.statusCode == 200) {
-        return {'success': true, 'message': 'Message edited successfully'};
-      } else {
-        return {'success': false, 'message': response.data['message'] ?? 'Failed to edit message'};
-      }
-    } catch (e) {
-      print('[DataController] Error editing message: $e');
-      return {'success': false, 'message': e.toString()};
-    }
-  }
-
-  Future<Map<String, dynamic>> deleteMessage(String chatId, String messageId) async {
-    try {
-      final String? token = user.value['token'];
-      if (token == null) throw Exception('User not authenticated.');
-
-      final response = await _dio.delete(
-        'api/chats/$chatId/messages/$messageId',
-        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
-      );
-
-      if (response.statusCode == 200) {
-        return {'success': true, 'message': 'Message deleted successfully'};
-      } else {
-        return {'success': false, 'message': response.data['message'] ?? 'Failed to delete message'};
-      }
-    } catch (e) {
-      print('[DataController] Error deleting message: $e');
-      return {'success': false, 'message': e.toString()};
-    }
   }
 
   // Add these placeholder methods inside DataController class
@@ -2525,197 +2356,8 @@ void clearUserPosts() {
     profileUpdateTrigger.value = followedId ?? DateTime.now().millisecondsSinceEpoch.toString(); // Use timestamp as unique trigger if ID is null
   }
 
-  void handleNewMessage(Map<String, dynamic> message) {
-    final serverMessageId = message['_id'] as String?;
-    final clientMessageId = message['clientMessageId'] as String?; // Expecting the server to send this back
-    final chatId = message['chat'];
-    final senderId = (message['sender'] is Map ? message['sender']['_id'] : message['sender']) as String?;
-    final currentUserId = user.value['user']['_id'];
-
-    if (serverMessageId == null || chatId == null || senderId == null) {
-      print('[DataController] handleNewMessage: Received invalid message data. Ignoring.');
-      return; // Ignore invalid messages
-    }
-
-    bool messageHandled = false;
-
-    // This is the confirmation for a message sent by the current user
-    if (senderId == currentUserId && clientMessageId != null) {
-      final index = currentConversationMessages.indexWhere((m) => m['_id'] == clientMessageId && m['status'] == 'sending');
-      if (index != -1) {
-        // Replace the optimistic message with the confirmed one from the server
-        currentConversationMessages[index] = message;
-        currentConversationMessages.refresh();
-        messageHandled = true;
-        print('[DataController] Optimistic message $clientMessageId replaced with server message $serverMessageId.');
-      }
-    }
-
-    // This is a new message from another user, or a message from the current user
-    // that couldn't be matched to an optimistic one (e.g., sent from another device).
-    if (!messageHandled && chatId == _currentlyOpenChatId) {
-      // Avoid adding duplicates
-      final isAlreadyPresent = currentConversationMessages.any((m) => m['_id'] == serverMessageId);
-      if (!isAlreadyPresent) {
-        currentConversationMessages.add(message);
-        print('[DataController] New message $serverMessageId added to conversation $chatId.');
-        // If the message is from someone else, acknowledge delivery
-        if (senderId != currentUserId) {
-          final socketService = Get.find<SocketService>();
-          socketService.sendMessageDeliveredReceipt(serverMessageId, chatId);
-        }
-      }
-    }
-
-    // Update the main conversation list preview
-    final convoIndex = conversations.indexWhere((c) => c['_id'] == chatId);
-    if (convoIndex != -1) {
-      final conversation = conversations[convoIndex];
-      conversation['lastMessage'] = message;
-      // Only increment unread count if the message is from someone else AND the chat is not currently open
-      if (senderId != currentUserId && chatId != _currentlyOpenChatId) {
-        conversation['unreadCount'] = (conversation['unreadCount'] ?? 0) + 1;
-      }
-      conversations.removeAt(convoIndex);
-      conversations.insert(0, conversation); // Move to top
-    } else {
-      // If a message arrives for a chat not in the local list, it's a new chat. Refresh all chats.
-      print('[DataController] Received message for an unknown chat $chatId. Refreshing chat list.');
-      getAllChats();
-    }
-  }
-
-  void handleMessageEdited(Map<String, dynamic> message) {
-    final messageId = message['_id'];
-    final chatId = message['chat'];
-
-    // Update the message in the currently open conversation
-    final indexInCurrent = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
-    if (indexInCurrent != -1) {
-      currentConversationMessages[indexInCurrent]['content'] = message['content'];
-      currentConversationMessages[indexInCurrent]['edited'] = true;
-      currentConversationMessages.refresh();
-    }
-
-    // Update the lastMessage in the main conversations list if it was the one edited
-    if (chatId != null) {
-      final convoIndex = conversations.indexWhere((c) => c['_id'] == chatId);
-      if (convoIndex != -1) {
-        final conversation = conversations[convoIndex];
-        if (conversation['lastMessage'] != null && conversation['lastMessage']['_id'] == messageId) {
-          conversation['lastMessage'] = message;
-          // No need to move the conversation, just refresh the list
-          conversations.refresh();
-        }
-      }
-    }
-  }
-
-  void handleMessageDeleted(Map<String, dynamic> message) {
-    final messageId = message['_id'];
-    final chatId = message['chat'];
-
-    // Update the message in the currently open conversation
-    final indexInCurrent = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
-    if (indexInCurrent != -1) {
-      currentConversationMessages[indexInCurrent]['content'] = 'This message was deleted.';
-      currentConversationMessages[indexInCurrent]['deleted'] = true;
-      currentConversationMessages.refresh();
-    }
-
-    // Update the lastMessage in the main conversations list if it was the one deleted
-    if (chatId != null) {
-      final convoIndex = conversations.indexWhere((c) => c['_id'] == chatId);
-      if (convoIndex != -1) {
-        final conversation = conversations[convoIndex];
-        if (conversation['lastMessage'] != null && conversation['lastMessage']['_id'] == messageId) {
-          // This is tricky. The best we can do without fetching the previous message
-          // is to update the last message to the "deleted" state.
-          conversation['lastMessage'] = message;
-          conversations.refresh();
-        }
-      }
-    }
-  }
-
-  void handleMessageStatusUpdate(Map<String, dynamic> data) {
-    final messageId = data['_id'] as String?;
-    if (messageId == null) return;
-
-    final index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
-    if (index != -1) {
-      // To ensure all fields are updated (like a server-generated timestamp or the final status),
-      // we replace the entire message object.
-      // The original optimistic message's sender info is preserved by this replacement
-      // because the server-sent message object also contains the full sender object.
-      currentConversationMessages[index] = data;
-      currentConversationMessages.refresh();
-    }
-  }
-
-  void handleTyping(Map<String, dynamic> data) {
-    isTyping.value = true;
-  }
-
-  void handleStopTyping(Map<String, dynamic> data) {
-    isTyping.value = false;
-  }
-
-  void handleMessageRead(Map<String, dynamic> data) {
-    final index = currentConversationMessages.indexWhere((m) => m['_id'] == data['messageId']);
-    if (index != -1) {
-      currentConversationMessages[index]['isRead'] = true;
-    }
-  }
-
   // --- Group Chat Methods ---
-
-  Future<Map<String, dynamic>> createGroupChat(String groupName, List<String> participantIds) async {
-    try {
-      final String? token = user.value['token'];
-      if (token == null) throw Exception('User not authenticated.');
-
-      final response = await _dio.post(
-        'api/chats/groups',
-        data: {
-          'groupName': groupName,
-          'participantIds': participantIds,
-        },
-        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
-      );
-
-      if (response.statusCode == 201) {
-        await getAllChats(); // Refresh conversation list
-        return {'success': true, 'chat': response.data};
-      } else {
-        return {'success': false, 'message': response.data['message'] ?? 'Failed to create group chat'};
-      }
-    } catch (e) {
-      print('[DataController] Error creating group chat: $e');
-      return {'success': false, 'message': e.toString()};
-    }
-  }
-
-  Future<Map<String, dynamic>> getGroupDetails(String chatId) async {
-    try {
-      final String? token = user.value['token'];
-      if (token == null) throw Exception('User not authenticated.');
-
-      final response = await _dio.get(
-        'api/chats/groups/$chatId',
-        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
-      );
-
-      if (response.statusCode == 200) {
-        return {'success': true, 'group': response.data};
-      } else {
-        return {'success': false, 'message': response.data['message'] ?? 'Failed to get group details'};
-      }
-    } catch (e) {
-      print('[DataController] Error getting group details: $e');
-      return {'success': false, 'message': e.toString()};
-    }
-  }
+  // These are now handled by the dummy data methods
 
   // --- Post and Reply Edit/Delete Methods ---
 

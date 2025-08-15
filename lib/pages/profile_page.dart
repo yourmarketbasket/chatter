@@ -187,7 +187,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       children: <Widget>[
                         const SizedBox(height: 20),
                         CircleAvatar(
-                          radius: 60,
+                          radius: 54,
                           backgroundColor: Colors.tealAccent.withOpacity(0.2),
                           backgroundImage: displayAvatarUrl != null && displayAvatarUrl.isNotEmpty
                               ? CachedNetworkImageProvider(displayAvatarUrl)

@@ -23,7 +23,7 @@ class GroupChatList extends StatelessWidget {
           return const Center(child: CircularProgressIndicator(color: Colors.tealAccent));
         }
 
-        final groupChats = dataController.conversations.where((c) => c['isGroupChat'] ?? false).toList();
+        final groupChats = dataController.groupConversations;
 
         if (groupChats.isEmpty) {
           return Center(
@@ -66,43 +66,25 @@ class GroupChatList extends StatelessWidget {
           ),
           itemBuilder: (context, index) {
             final conversation = groupChats[index];
-            final groupName = conversation['groupName'] ?? 'Unnamed Group';
-            final avatarUrl = conversation['groupAvatar'] ?? '';
+            final groupName = conversation.name;
+            final avatarUrl = conversation.avatar;
             final initials = groupName.isNotEmpty ? groupName[0].toUpperCase() : 'G';
-            final lastMessage = conversation['lastMessage'];
+            final lastMessage = conversation.lastMessage;
             String lastMessageContent = 'No messages yet...';
             String senderName = '';
 
             if (lastMessage != null) {
-              if (lastMessage['content'] != null && lastMessage['content'].isNotEmpty) {
-                lastMessageContent = lastMessage['content'];
-                senderName = lastMessage['sender']?['name'] ?? '';
-              } else if ((lastMessage['attachments'] as List?)?.isNotEmpty ?? false) {
-                final attachment = (lastMessage['attachments'] as List).first;
-                final type = attachment['type'];
-                senderName = lastMessage['sender']?['name'] ?? '';
-                switch (type) {
-                  case 'image':
-                    lastMessageContent = '$senderName sent an image';
-                    break;
-                  case 'video':
-                    lastMessageContent = '$senderName sent a video';
-                    break;
-                  case 'audio':
-                    lastMessageContent = '$senderName sent a voice message';
-                    break;
-                  case 'document':
-                    lastMessageContent = '$senderName sent a document';
-                    break;
-                  default:
-                    lastMessageContent = '$senderName sent an attachment';
-                }
+              senderName = lastMessage.sender.name;
+              if (lastMessage.content != null && lastMessage.content!.isNotEmpty) {
+                lastMessageContent = lastMessage.content!;
+              } else if (lastMessage.attachments?.isNotEmpty ?? false) {
+                lastMessageContent = '$senderName sent an attachment';
               }
             }
 
             final String timestamp;
-            if (lastMessage != null && lastMessage['createdAt'] != null) {
-              final dateTime = DateTime.parse(lastMessage['createdAt']).toLocal();
+            if (lastMessage != null) {
+              final dateTime = lastMessage.createdAt.toLocal();
               final now = DateTime.now();
               if (dateTime.day == now.day &&
                   dateTime.month == now.month &&
@@ -118,7 +100,7 @@ class GroupChatList extends StatelessWidget {
             return ListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               leading: CircleAvatar(
-                radius: 28,
+                radius: 25, // 10% reduction from 28
                 backgroundColor: Colors.tealAccent.withOpacity(0.3),
                 backgroundImage: avatarUrl.isNotEmpty ? CachedNetworkImageProvider(avatarUrl) : null,
                 child: avatarUrl.isEmpty
@@ -174,28 +156,28 @@ class GroupChatList extends StatelessWidget {
                       fontSize: 12,
                     ),
                   ),
-                  if (conversation['unreadCount'] != null && conversation['unreadCount'] > 0)
-                    Container(
-                      margin: const EdgeInsets.only(top: 4),
-                      padding: const EdgeInsets.all(6),
-                      decoration: const BoxDecoration(
-                        color: Colors.tealAccent,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Text(
-                        conversation['unreadCount'].toString(),
-                        style: GoogleFonts.roboto(
-                          color: Colors.black,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
+                  // Dummy unread count
+                  Container(
+                    margin: const EdgeInsets.only(top: 4),
+                    padding: const EdgeInsets.all(6),
+                    decoration: const BoxDecoration(
+                      color: Colors.tealAccent,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      '1',
+                      style: GoogleFonts.roboto(
+                        color: Colors.black,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
+                  ),
                 ],
               ),
               onTap: () {
                 Get.to(() => ConversationPage(
-                      conversationId: conversation['_id'],
+                      conversationId: conversation.id,
                       username: groupName,
                       userAvatar: avatarUrl,
                       receiverId: '', // Not needed for group chat

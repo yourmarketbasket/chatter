@@ -291,7 +291,7 @@ class AppDrawer extends StatelessWidget {
                           alignment: Alignment.center,
                           children: [
                             CircleAvatar(
-                              radius: 36,
+                              radius: 32,
                               backgroundColor: Colors.tealAccent.withOpacity(0.3),
                               backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
                                   ? CachedNetworkImageProvider(avatarUrl, maxWidth: 150, maxHeight: 150)

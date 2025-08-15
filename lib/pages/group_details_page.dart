@@ -84,7 +84,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
                       child: Column(
                         children: [
                           CircleAvatar(
-                            radius: 50,
+                            radius: 45,
                             backgroundImage: (_groupDetails['groupAvatar'] as String).isNotEmpty ? CachedNetworkImageProvider(_groupDetails['groupAvatar']) : null,
                             child: (_groupDetails['groupAvatar'] as String).isEmpty ? Text(_groupDetails['groupName'][0], style: GoogleFonts.poppins(fontSize: 40, fontWeight: FontWeight.bold)) : null,
                           ),

@@ -158,7 +158,7 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
         title: Row(
           children: [
             CircleAvatar(
-              radius: 18,
+              radius: 16,
               backgroundImage: widget.userAvatarUrl != null && widget.userAvatarUrl!.isNotEmpty
                   ? CachedNetworkImageProvider(
                       _optimizeCloudinaryUrl(widget.userAvatarUrl!),

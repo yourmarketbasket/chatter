@@ -341,7 +341,7 @@ class _ReplyInputAreaState extends State<ReplyInputArea> {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 CircleAvatar(
-                  radius: 18,
+                  radius: 16,
                   backgroundColor: Colors.tealAccent.withOpacity(0.2),
                   backgroundImage: currentUserAvatar != null && currentUserAvatar.isNotEmpty
                       ? NetworkImage(currentUserAvatar)

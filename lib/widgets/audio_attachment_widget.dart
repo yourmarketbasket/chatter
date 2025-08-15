@@ -133,7 +133,7 @@ class _AudioAttachmentWidgetState extends State<AudioAttachmentWidget> {
                 alignment: Alignment.center,
                 children: [
                   CircleAvatar(
-                    radius: 20,
+                    radius: 18,
                     backgroundImage: (userAvatar != null && userAvatar.isNotEmpty)
                         ? CachedNetworkImageProvider(userAvatar)
                         : null,
