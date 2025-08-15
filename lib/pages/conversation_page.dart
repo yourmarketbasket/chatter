@@ -192,16 +192,15 @@ class _ConversationPageState extends State<ConversationPage> {
 
     // Prepare final payload for the server
     final Map<String, dynamic> messagePayload = {
-      'clientMessageId': messageId, // Use the optimistic ID for matching
-      'sender': _dataController.user.value['user']['_id'],
-      'chat': widget.conversationId,
+      'chatId': widget.conversationId,
       'content': content,
+      'clientMessageId': messageId,
       'attachments': uploadedAttachments,
       'replyTo': _replyingToMessage?['_id'],
     };
 
     if (!widget.isGroupChat) {
-      messagePayload['receiver'] = widget.receiverId;
+      messagePayload['receiverId'] = widget.receiverId;
     }
 
     _socketService.sendMessage(messagePayload);
@@ -360,7 +359,7 @@ class _ConversationPageState extends State<ConversationPage> {
                                 ... (message['attachments'] as List).map((attachment) {
                                   return Padding(
                                     padding: const EdgeInsets.only(top: 8.0),
-                                    child: _buildAttachment(attachment),
+                                    child: _buildAttachment(attachment, isMe),
                                   );
                                 }).toList(),
                               const SizedBox(height: 5),
@@ -666,7 +665,7 @@ class _ConversationPageState extends State<ConversationPage> {
     );
   }
 
-  Widget _buildAttachment(Map<String, dynamic> attachment) {
+  Widget _buildAttachment(Map<String, dynamic> attachment, bool isMe) {
     final String type = attachment['type'] ?? 'document';
     final String? url = attachment['url'];
     final String? localPath = attachment['path'];
@@ -740,6 +739,9 @@ class _ConversationPageState extends State<ConversationPage> {
         return placeholder(const Icon(FeatherIcons.fileText, color: Colors.white, size: 28));
     }
     // Fallback for any unhandled case
-    return placeholder(const Icon(FeatherIcons.file, color: Colors.grey));
+    return Align(
+      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+      child: placeholder(const Icon(FeatherIcons.file, color: Colors.grey)),
+    );
   }
 }

@@ -33,8 +33,10 @@ class _RealtimeTimeagoTextState extends State<RealtimeTimeagoText> {
   }
 
   void _updateTime() {
+    // Custom short messages for timeago
+    timeago.setLocaleMessages('en_custom', CustomShortMessages());
     setState(() {
-      _relativeTime = timeago.format(widget.timestamp, locale: 'en_short');
+      _relativeTime = timeago.format(widget.timestamp, locale: 'en_custom');
     });
   }
 
@@ -51,4 +53,39 @@ class _RealtimeTimeagoTextState extends State<RealtimeTimeagoText> {
       style: widget.style,
     );
   }
+}
+
+class CustomShortMessages implements timeago.LookupMessages {
+  @override
+  String prefixAgo() => '';
+  @override
+  String prefixFromNow() => '';
+  @override
+  String suffixAgo() => '';
+  @override
+  String suffixFromNow() => '';
+  @override
+  String lessThanOneMinute(int seconds) => 'now';
+  @override
+  String aboutAMinute(int minutes) => '1min';
+  @override
+  String minutes(int minutes) => '${minutes}min';
+  @override
+  String aboutAnHour(int minutes) => '1hr';
+  @override
+  String hours(int hours) => '${hours}hr';
+  @override
+  String aDay(int hours) => '1d';
+  @override
+  String days(int days) => '${days}d';
+  @override
+  String aboutAMonth(int days) => '1mo';
+  @override
+  String months(int months) => '${months}mo';
+  @override
+  String aboutAYear(int year) => '1y';
+  @override
+  String years(int years) => '${years}y';
+  @override
+  String wordSeparator() => ' ';
 }
