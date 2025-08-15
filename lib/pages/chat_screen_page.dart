@@ -206,10 +206,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final attachmentType = attachment.type?.toLowerCase();
 
     switch (attachmentType) {
-      case 'jpg':
-      case 'jpeg':
-      case 'png':
-      case 'gif':
+      case 'image':
         return Container(
           width: 150,
           height: 150,
@@ -223,7 +220,7 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
         );
-      case 'mp4':
+      case 'video':
         return VideoPlayerWidget(videoUrl: attachment.url, isLocal: isLocalFile);
       case 'audio':
         return AudioPlayerWidget(audioUrl: attachment.url, isLocal: isLocalFile);
