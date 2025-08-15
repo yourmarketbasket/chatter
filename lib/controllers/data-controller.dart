@@ -2528,29 +2528,19 @@ void clearUserPosts() {
     final senderId = (message['sender'] is Map ? message['sender']['_id'] : message['sender']) as String?;
     final currentUserId = user.value['user']['_id'];
 
-    if (messageId == null || chatId == null || senderId == null) return;
+    if (messageId == null || chatId == null || senderId == null || senderId == currentUserId) {
+      // This handler is only for messages from other users.
+      // The user's own messages are updated via message-status-update.
+      return;
+    }
 
-    // Determine if the message is from the current user
-    final bool isMyMessage = senderId == currentUserId;
-
-    if (isMyMessage) {
-      // This is a confirmation of a message we sent.
-      // Find the optimistic message by its _id and update it.
-      final optimisticIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
-      if (optimisticIndex != -1) {
-        // Update status and potentially other fields from the server response
-        message['status'] = 'sent';
-        currentConversationMessages[optimisticIndex] = message;
-      }
-    } else {
-      // This is a new message from someone else.
-      // Add it to the list if the user is in the correct chat.
-      if (chatId == _currentlyOpenChatId) {
-        currentConversationMessages.add(message);
-        // Acknowledge delivery
-        final socketService = Get.find<SocketService>();
-        socketService.sendMessageDeliveredReceipt(messageId, chatId);
-      }
+    // This is a new message from someone else.
+    // Add it to the list if the user is in the correct chat.
+    if (chatId == _currentlyOpenChatId) {
+      currentConversationMessages.add(message);
+      // Acknowledge delivery
+      final socketService = Get.find<SocketService>();
+      socketService.sendMessageDeliveredReceipt(messageId, chatId);
     }
 
     // Update the main conversation list
@@ -2621,15 +2611,17 @@ void clearUserPosts() {
   }
 
   void handleMessageStatusUpdate(Map<String, dynamic> data) {
-    final messageId = data['messageId'] as String?;
-    final status = data['status'] as String?;
+    final messageId = data['_id'] as String?;
+    if (messageId == null) return;
 
-    if (messageId != null && status != null) {
-      final index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
-      if (index != -1) {
-        currentConversationMessages[index]['status'] = status;
-        currentConversationMessages.refresh();
-      }
+    final index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
+    if (index != -1) {
+      // To ensure all fields are updated (like a server-generated timestamp or the final status),
+      // we replace the entire message object.
+      // The original optimistic message's sender info is preserved by this replacement
+      // because the server-sent message object also contains the full sender object.
+      currentConversationMessages[index] = data;
+      currentConversationMessages.refresh();
     }
   }
 

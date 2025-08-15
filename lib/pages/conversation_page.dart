@@ -126,7 +126,6 @@ class _ConversationPageState extends State<ConversationPage> {
       'chat': widget.conversationId,
       'content': content,
       'attachments': _attachments,
-      'replyTo': _replyingToMessage?['_id'],
     };
 
     if (!widget.isGroupChat) {
