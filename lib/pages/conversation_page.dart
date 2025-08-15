@@ -9,6 +9,7 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:feather_icons/feather_icons.dart';
+import 'package:intl/intl.dart';
 
 class ConversationPage extends StatefulWidget {
   final String conversationId;
@@ -253,6 +254,17 @@ class _ConversationPageState extends State<ConversationPage> {
                                   ),
                                   );
                                 }).toList(),
+                              const SizedBox(height: 4),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: Text(
+                                  DateFormat('h:mm a').format(DateTime.parse(message['createdAt']).toLocal()),
+                                  style: GoogleFonts.roboto(
+                                    color: isMe ? Colors.black.withOpacity(0.7) : Colors.white.withOpacity(0.7),
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
                         ),

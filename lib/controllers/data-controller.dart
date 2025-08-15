@@ -2545,20 +2545,55 @@ void clearUserPosts() {
   }
 
   void handleMessageEdited(Map<String, dynamic> message) {
-    final index = currentConversationMessages.indexWhere((m) => m['_id'] == message['_id']);
-    if (index != -1) {
-      currentConversationMessages[index]['content'] = message['content'];
-      currentConversationMessages[index]['edited'] = true;
+    final messageId = message['_id'];
+    final chatId = message['chat'];
+
+    // Update the message in the currently open conversation
+    final indexInCurrent = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
+    if (indexInCurrent != -1) {
+      currentConversationMessages[indexInCurrent]['content'] = message['content'];
+      currentConversationMessages[indexInCurrent]['edited'] = true;
       currentConversationMessages.refresh();
+    }
+
+    // Update the lastMessage in the main conversations list if it was the one edited
+    if (chatId != null) {
+      final convoIndex = conversations.indexWhere((c) => c['_id'] == chatId);
+      if (convoIndex != -1) {
+        final conversation = conversations[convoIndex];
+        if (conversation['lastMessage'] != null && conversation['lastMessage']['_id'] == messageId) {
+          conversation['lastMessage'] = message;
+          // No need to move the conversation, just refresh the list
+          conversations.refresh();
+        }
+      }
     }
   }
 
   void handleMessageDeleted(Map<String, dynamic> message) {
-    final index = currentConversationMessages.indexWhere((m) => m['_id'] == message['_id']);
-    if (index != -1) {
-      currentConversationMessages[index]['content'] = 'This message was deleted.';
-      currentConversationMessages[index]['deleted'] = true;
+    final messageId = message['_id'];
+    final chatId = message['chat'];
+
+    // Update the message in the currently open conversation
+    final indexInCurrent = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
+    if (indexInCurrent != -1) {
+      currentConversationMessages[indexInCurrent]['content'] = 'This message was deleted.';
+      currentConversationMessages[indexInCurrent]['deleted'] = true;
       currentConversationMessages.refresh();
+    }
+
+    // Update the lastMessage in the main conversations list if it was the one deleted
+    if (chatId != null) {
+      final convoIndex = conversations.indexWhere((c) => c['_id'] == chatId);
+      if (convoIndex != -1) {
+        final conversation = conversations[convoIndex];
+        if (conversation['lastMessage'] != null && conversation['lastMessage']['_id'] == messageId) {
+          // This is tricky. The best we can do without fetching the previous message
+          // is to update the last message to the "deleted" state.
+          conversation['lastMessage'] = message;
+          conversations.refresh();
+        }
+      }
     }
   }
 

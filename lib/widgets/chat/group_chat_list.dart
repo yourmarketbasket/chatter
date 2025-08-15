@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:feather_icons/feather_icons.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:intl/intl.dart';
 
 class GroupChatList extends StatelessWidget {
   const GroupChatList({Key? key}) : super(key: key);
@@ -42,7 +43,14 @@ class GroupChatList extends StatelessWidget {
             final initials = groupName.isNotEmpty ? groupName[0].toUpperCase() : 'G';
             final lastMessage = conversation['lastMessage'];
             final lastMessageContent = lastMessage != null ? lastMessage['content'] : 'No messages yet...';
-            final timestamp = lastMessage != null ? TimeOfDay.fromDateTime(DateTime.parse(lastMessage['createdAt'])).format(context) : '';
+
+            final String timestamp;
+            if (lastMessage != null && lastMessage['createdAt'] != null) {
+              final dateTime = DateTime.parse(lastMessage['createdAt']).toLocal();
+              timestamp = DateFormat('h:mm a').format(dateTime);
+            } else {
+              timestamp = '';
+            }
 
             return ListTile(
               leading: CircleAvatar(

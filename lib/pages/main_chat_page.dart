@@ -1,6 +1,8 @@
 import 'package:chatter/widgets/chat/group_chat_list.dart';
 import 'package:chatter/widgets/chat/one_to_one_chat_list.dart';
+import 'package:chatter/pages/create_group_page.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:feather_icons/feather_icons.dart';
 
@@ -11,48 +13,51 @@ class MainChatPage extends StatefulWidget {
   _MainChatPageState createState() => _MainChatPageState();
 }
 
-class _MainChatPageState extends State<MainChatPage> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _MainChatPageState extends State<MainChatPage> {
+  int _selectedIndex = 0;
 
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-  }
+  final List<Widget> _pages = const [
+    OneToOneChatList(),
+    GroupChatList(),
+  ];
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF000000),
-      appBar: AppBar(
-        title: Text('Messages', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: Colors.white)),
-        backgroundColor: const Color(0xFF121212),
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+      body: _pages[_selectedIndex],
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Get.to(() => const CreateGroupPage());
+        },
+        child: const Icon(FeatherIcons.plus),
+        backgroundColor: Colors.tealAccent,
+        foregroundColor: Colors.black,
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: const [
-          OneToOneChatList(),
-          GroupChatList(),
-        ],
-      ),
-      bottomNavigationBar: Material(
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      bottomNavigationBar: BottomAppBar(
+        shape: const CircularNotchedRectangle(),
+        notchMargin: 6.0,
         color: const Color(0xFF121212),
-        child: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.tealAccent,
-          labelColor: Colors.tealAccent,
-          unselectedLabelColor: Colors.grey[500],
-          tabs: const [
-            Tab(icon: Icon(FeatherIcons.user), text: 'Chats'),
-            Tab(icon: Icon(FeatherIcons.users), text: 'Groups'),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: <Widget>[
+            IconButton(
+              icon: Icon(FeatherIcons.user, color: _selectedIndex == 0 ? Colors.tealAccent : Colors.grey[500]),
+              onPressed: () => _onItemTapped(0),
+              tooltip: 'Chats',
+            ),
+            IconButton(
+              icon: Icon(FeatherIcons.users, color: _selectedIndex == 1 ? Colors.tealAccent : Colors.grey[500]),
+              onPressed: () => _onItemTapped(1),
+              tooltip: 'Groups',
+            ),
           ],
         ),
       ),
