@@ -1,3 +1,4 @@
+import 'package:chatter/models/chat_model.dart';
 import 'package:chatter/models/user_list_mode.dart';
 import 'package:chatter/pages/profile_page.dart';
 import 'package:chatter/pages/conversation_page.dart';
