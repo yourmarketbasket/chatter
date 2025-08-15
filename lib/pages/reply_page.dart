@@ -1,4 +1,5 @@
 import 'package:chatter/controllers/data-controller.dart';
+import 'package:chatter/services/socket-service.dart';
 import 'package:chatter/pages/home-feed-screen.dart'; // Used for navigation context in example, keep for now
 import 'package:chatter/pages/media_view_page.dart'; // Used for navigation
 import 'package:chatter/widgets/reply/reply_input_area.dart';

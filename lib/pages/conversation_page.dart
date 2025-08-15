@@ -572,7 +572,7 @@ class _ConversationPageState extends State<ConversationPage> {
                             'url': uploadResult[0]['url'],
                             'filename': 'voice_note.m4a',
                           };
-                          _attachments.add(attachment);
+                          _pendingAttachments.add(attachment);
                           _sendMessage();
                         } else {
                           Get.snackbar('Error', 'Failed to upload voice note.');
@@ -724,7 +724,7 @@ class _ConversationPageState extends State<ConversationPage> {
               imageUrl: url,
               fit: BoxFit.cover,
               placeholder: (context, url) => Container(height: 250, color: Colors.grey[900], child: const Center(child: CircularProgressIndicator())),
-              errorWidget: (context, url, error) => placeholder(const Icon(FeatherIcons.alert_triangle, color: Colors.redAccent)),
+              errorWidget: (context, url, error) => placeholder(Icon(FeatherIcons.alert_triangle, color: Colors.redAccent)),
             ),
           );
         }
