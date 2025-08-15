@@ -155,7 +155,7 @@ class _AudioAttachmentWidgetState extends State<AudioAttachmentWidget> {
                         if (isPlaying) {
                           await playerController.pausePlayer();
                         } else {
-                          await playerController.startPlayer(finishMode: FinishMode.stop);
+                          await playerController.startPlayer();
                         }
                       },
                       icon: Icon(
