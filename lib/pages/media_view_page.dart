@@ -669,10 +669,6 @@ class _VideoPlayerContainerState extends State<VideoPlayerContainer> {
       playerWidget = VideoPlayerWidget(
         url: widget.url,
         file: widget.file,
-        displayPath: widget.displayPath,
-        thumbnailUrl: widget.thumbnailUrl,
-        isFeedContext: false,
-        videoAspectRatioProp: videoAspectRatio, // Pass aspect ratio
       );
     }
     // Ensure the player is centered and respects the calculated aspect ratio
