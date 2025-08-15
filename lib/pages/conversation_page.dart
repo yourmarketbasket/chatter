@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:audio_waveforms/audio_waveforms.dart';
 import 'package:chatter/controllers/data-controller.dart';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
@@ -38,18 +40,35 @@ class ConversationPage extends StatefulWidget {
   _ConversationPageState createState() => _ConversationPageState();
 }
 
-class _ConversationPageState extends State<ConversationPage> {
+class _ConversationPageState extends State<ConversationPage>
+    with SingleTickerProviderStateMixin {
   final DataController _dataController = Get.find<DataController>();
   final SocketService _socketService = Get.find<SocketService>();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final AudioRecorder _audioRecorder = AudioRecorder();
   final RxBool _isMessageEmpty = true.obs;
-  bool _isRecording = false;
+  final RxBool _isRecording = false.obs;
+  Timer? _recordingTimer;
+  final RxInt _recordingDuration = 0.obs;
+  late final AnimationController _pulseController;
+  late final Animation<double> _pulseAnimation;
+  String? _recordedAudioPath;
+  late PlayerController _playbackController;
 
   @override
   void initState() {
     super.initState();
+    _playbackController = PlayerController();
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    )..repeat(reverse: true);
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+    _pulseController.stop();
+
     _messageController.addListener(() {
       _isMessageEmpty.value = _messageController.text.isEmpty;
     });
@@ -58,7 +77,8 @@ class _ConversationPageState extends State<ConversationPage> {
           backgroundColor: Colors.red, colorText: Colors.white);
     });
     _socketService.joinChat(widget.conversationId);
-    _socketService.markChatAsSeen(widget.conversationId, _dataController.user.value['user']['_id']);
+    _socketService.markChatAsSeen(
+        widget.conversationId, _dataController.user.value['user']['_id']);
   }
 
   @override
@@ -67,6 +87,9 @@ class _ConversationPageState extends State<ConversationPage> {
     _messageController.dispose();
     _scrollController.dispose();
     _audioRecorder.dispose();
+    _pulseController.dispose();
+    _playbackController.dispose();
+    _recordingTimer?.cancel();
     super.dispose();
   }
 
@@ -288,7 +311,9 @@ class _ConversationPageState extends State<ConversationPage> {
           Expanded(
             child: Obx(() {
               if (_dataController.isLoadingMessages.value) {
-                return const Center(child: CircularProgressIndicator(color: Colors.tealAccent));
+                return const Center(
+                    child:
+                        CircularProgressIndicator(color: Colors.tealAccent));
               }
               final messages = _dataController.currentConversationMessages;
               if (messages.isEmpty) {
@@ -315,85 +340,142 @@ class _ConversationPageState extends State<ConversationPage> {
                 itemCount: messages.length,
                 itemBuilder: (context, index) {
                   final message = messages[index];
-                  final bool isMe = message['sender']['_id'] == currentUserId;
+                  final bool isMe =
+                      message['sender']['_id'] == currentUserId;
+
+                  // Pre-process attachments to separate media from others
+                  final attachments = (message['attachments'] as List?) ?? [];
+                  final mediaAttachments = attachments
+                      .where((att) =>
+                          att['type'] == 'image' || att['type'] == 'video')
+                      .toList();
+                  final otherAttachments = attachments
+                      .where((att) =>
+                          att['type'] != 'image' && att['type'] != 'video')
+                      .toList();
+                  final hasContent = message['content'] != null &&
+                      message['content'].isNotEmpty;
 
                   return Dismissible(
-                    key: Key(message['_id']),
-                    direction: DismissDirection.startToEnd,
-                    onDismissed: (direction) {
-                      setState(() {
-                        _replyingToMessage = message;
-                      });
-                    },
-                    background: Container(
-                      color: Colors.blue,
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      alignment: Alignment.centerLeft,
-                      child: const Icon(Icons.reply, color: Colors.white),
-                    ),
-                    child: GestureDetector(
-                      onLongPress: () {
-                        if (isMe) {
-                          _showMessageOptions(context, message);
-                        }
+                      key: Key(message['_id']),
+                      direction: DismissDirection.startToEnd,
+                      onDismissed: (direction) {
+                        setState(() {
+                          _replyingToMessage = message;
+                        });
                       },
-                      child: Align(
-                        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(vertical: 5.0),
-                          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-                          constraints: BoxConstraints(
-                            maxWidth: MediaQuery.of(context).size.width * 0.75,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isMe ? const Color(0xFF005C4B) : const Color(0xFF202C33),
-                            borderRadius: BorderRadius.circular(12.0),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (message['content'] != null && message['content'].isNotEmpty)
-                                Text(
-                                  message['content'],
-                                  style: GoogleFonts.roboto(color: Colors.white, fontSize: 16),
-                                ),
-                              if (message['attachments'] != null && (message['attachments'] as List).isNotEmpty)
-                                ... (message['attachments'] as List).map((attachment) {
-                                  return Padding(
-                                    padding: const EdgeInsets.only(top: 8.0),
-                                    child: _buildAttachment(attachment, isMe, message),
-                                  );
-                                }).toList(),
-                              const SizedBox(height: 5),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    _formatTimestamp(message['createdAt']),
-                                    style: GoogleFonts.roboto(
-                                      color: Colors.white.withOpacity(0.6),
-                                      fontSize: 12,
+                      background: Container(
+                        color: Colors.blue,
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 20),
+                        alignment: Alignment.centerLeft,
+                        child: const Icon(Icons.reply, color: Colors.white),
+                      ),
+                      child: GestureDetector(
+                        onLongPress: () {
+                          if (isMe) {
+                            _showMessageOptions(context, message);
+                          }
+                        },
+                        child: Align(
+                          alignment: isMe
+                              ? Alignment.centerRight
+                              : Alignment.centerLeft,
+                          child: Container(
+                            margin:
+                                const EdgeInsets.symmetric(vertical: 5.0),
+                            padding: const EdgeInsets.all(8.0),
+                            constraints: BoxConstraints(
+                              maxWidth:
+                                  MediaQuery.of(context).size.width *
+                                      0.75,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isMe
+                                  ? const Color(0xFF005C4B)
+                                  : const Color(0xFF202C33),
+                              borderRadius: BorderRadius.circular(12.0),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // 1. Media Attachments
+                                if (mediaAttachments.isNotEmpty)
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(8.0),
+                                    child: Column(
+                                      children: mediaAttachments
+                                          .map((attachment) =>
+                                              _buildAttachment(
+                                                  attachment, isMe, message))
+                                          .toList(),
                                     ),
                                   ),
-                                  if (isMe) ...[
-                                    const SizedBox(width: 5),
-                                    _buildStatusIcon(message),
-                                  ],
-                                ],
-                              ),
-                            ],
+
+                                // 2. Content
+                                if (hasContent)
+                                  Padding(
+                                    padding: EdgeInsets.only(
+                                      top: mediaAttachments.isNotEmpty ? 8.0 : 0,
+                                      left: 4.0,
+                                      right: 4.0,
+                                      bottom: 4.0,
+                                    ),
+                                    child: Text(
+                                      message['content'],
+                                      style: GoogleFonts.roboto(
+                                          color: Colors.white, fontSize: 16),
+                                    ),
+                                  ),
+
+                                // 3. Other Attachments (Audio, Docs)
+                                if (otherAttachments.isNotEmpty)
+                                  ...otherAttachments.map((attachment) {
+                                    return Padding(
+                                      padding: EdgeInsets.only(top: hasContent || mediaAttachments.isNotEmpty ? 8.0 : 0),
+                                      child: _buildAttachment(
+                                          attachment, isMe, message),
+                                    );
+                                  }).toList(),
+
+                                // 4. Timestamp and Status
+                                Align(
+                                  alignment: Alignment.bottomRight,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        _formatTimestamp(
+                                            message['createdAt']),
+                                        style: GoogleFonts.roboto(
+                                          color: Colors.white
+                                              .withOpacity(0.6),
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                      if (isMe) ...[
+                                        const SizedBox(width: 5),
+                                        _buildStatusIcon(message),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                  ));
+                      ));
                 },
               );
             }),
           ),
           if (_replyingToMessage != null) _buildReplyContext(),
           if (_pendingAttachments.isNotEmpty) _buildPendingAttachments(),
-          _buildMessageInputField(),
+          if (_recordedAudioPath != null)
+            _buildRecordingPlayback()
+          else
+            _buildMessageInputField(),
         ],
       ),
     );
@@ -540,6 +622,13 @@ class _ConversationPageState extends State<ConversationPage> {
     );
   }
 
+  String _formatDuration(int totalSeconds) {
+    final duration = Duration(seconds: totalSeconds);
+    final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return "$minutes:$seconds";
+  }
+
   Future<void> _startAudioRecording() async {
     final hasPermission = await Permission.microphone.isGranted;
     if (!hasPermission) {
@@ -556,43 +645,80 @@ class _ConversationPageState extends State<ConversationPage> {
 
     try {
       final directory = await getTemporaryDirectory();
-      final path = '${directory.path}/audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      final path =
+          '${directory.path}/audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
       await _audioRecorder.start(const RecordConfig(), path: path);
-      setState(() {
-        _isRecording = true;
+      _isRecording.value = true;
+      _recordingDuration.value = 0;
+      _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        _recordingDuration.value++;
       });
+      _pulseController.forward();
     } catch (e) {
-      _showPermissionDialog('Recording Error', 'Failed to start audio recording: $e');
+      _showPermissionDialog(
+          'Recording Error', 'Failed to start audio recording: $e');
     }
   }
 
   Future<void> _stopAudioRecording() async {
+    _recordingTimer?.cancel();
     try {
       final path = await _audioRecorder.stop();
       if (path != null) {
-        final file = File(path);
-        final attachment = {
-          'type': 'audio',
-          'path': path,
-          'file': file,
-          'filename': 'voice_note.m4a',
-          'isUploading': true,
-        };
+        await _playbackController.preparePlayer(path: path);
         setState(() {
-          _pendingAttachments.add(attachment);
+          _recordedAudioPath = path;
         });
-        _sendMessage();
       }
     } catch (e) {
-      _showPermissionDialog('Recording Error', 'Failed to stop audio recording: $e');
+      _showPermissionDialog(
+          'Recording Error', 'Failed to stop audio recording: $e');
     } finally {
+      _isRecording.value = false;
+      _pulseController.reset();
+    }
+  }
+
+  Future<void> _cancelAudioRecording() async {
+    _recordingTimer?.cancel();
+    try {
+      await _audioRecorder.stop(); // Stop and discard
+    } catch (e) {
+      // Ignore errors on cancel, maybe log them
+      print("Error stopping recorder on cancel: $e");
+    } finally {
+      _isRecording.value = false;
+      _pulseController.reset();
+      _recordingDuration.value = 0;
       setState(() {
-        _isRecording = false;
+        _recordedAudioPath = null;
       });
     }
   }
 
-  Widget _buildMessageInputField() {
+  void _sendVoiceMessage() {
+    if (_recordedAudioPath == null) return;
+
+    final file = File(_recordedAudioPath!);
+    final attachment = {
+      'type': 'audio',
+      'path': _recordedAudioPath,
+      'file': file,
+      'filename': 'voice_note.m4a',
+      'isUploading': true,
+    };
+
+    // Clear the recorded audio path and rebuild UI
+    setState(() {
+      _pendingAttachments.add(attachment);
+      _recordedAudioPath = null;
+    });
+
+    // Send the message with the attachment
+    _sendMessage();
+  }
+
+  Widget _buildRecordingPlayback() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
       decoration: BoxDecoration(
@@ -602,54 +728,128 @@ class _ConversationPageState extends State<ConversationPage> {
       child: Row(
         children: [
           IconButton(
-            icon: Icon(FeatherIcons.paperclip, color: Colors.grey[400]),
-            onPressed: _pickFiles,
+            icon: const Icon(FeatherIcons.trash2, color: Colors.redAccent),
+            onPressed: () {
+              setState(() {
+                _recordedAudioPath = null;
+              });
+            },
           ),
           Expanded(
-            child: TextField(
-              controller: _messageController,
-              style: GoogleFonts.roboto(color: Colors.white, fontSize: 16),
-              decoration: InputDecoration(
-                hintText: 'Type a message...',
-                hintStyle: GoogleFonts.roboto(color: Colors.grey[500]),
-                border: InputBorder.none,
-                filled: true,
-                fillColor: Colors.grey[850],
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
-                isDense: true,
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20.0),
-                  borderSide: BorderSide.none,
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20.0),
-                  borderSide: BorderSide(color: Colors.tealAccent, width: 1.5),
-                ),
+            child: AudioFileWaveforms(
+              size: Size(MediaQuery.of(context).size.width, 50.0),
+              playerController: _playbackController,
+              playerWaveStyle: const PlayerWaveStyle(
+                fixedWaveColor: Colors.white54,
+                liveWaveColor: Colors.white,
+                spacing: 6.0,
+                showSeekLine: false,
               ),
-              onSubmitted: (_) => _sendMessage(),
+              waveformType: WaveformType.long,
+              continuousWaveform: true,
             ),
           ),
-          const SizedBox(width: 8),
-          Obx(() => IconButton(
-                icon: Icon(
-                  _isMessageEmpty.value ? FeatherIcons.mic : FeatherIcons.send,
-                  color: Colors.tealAccent,
-                ),
-                onPressed: () {
-                  if (_isMessageEmpty.value) {
-                    if (_isRecording) {
-                      _stopAudioRecording();
-                    } else {
-                      _startAudioRecording();
-                    }
-                  } else {
-                    _sendMessage();
-                  }
-                },
-              )),
+          IconButton(
+            icon: const Icon(FeatherIcons.send, color: Colors.tealAccent),
+            onPressed: _sendVoiceMessage,
+          ),
         ],
       ),
     );
+  }
+
+  Widget _buildMessageInputField() {
+    return Obx(() => Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+          decoration: BoxDecoration(
+            color: const Color(0xFF121212),
+            border: Border(top: BorderSide(color: Colors.grey[850]!)),
+          ),
+          child: Row(
+            children: [
+              if (_isRecording.value)
+                IconButton(
+                  icon: const Icon(FeatherIcons.trash2, color: Colors.redAccent),
+                  onPressed: _cancelAudioRecording,
+                )
+              else
+                IconButton(
+                  icon: Icon(FeatherIcons.paperclip, color: Colors.grey[400]),
+                  onPressed: _pickFiles,
+                ),
+              Expanded(
+                child: _isRecording.value
+                    ? Row(
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        children: [
+                          const Icon(FeatherIcons.mic,
+                              color: Colors.redAccent, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            _formatDuration(_recordingDuration.value),
+                            style: GoogleFonts.roboto(
+                                color: Colors.white, fontSize: 16),
+                          ),
+                        ],
+                      )
+                    : TextField(
+                        controller: _messageController,
+                        style: GoogleFonts.roboto(
+                            color: Colors.white, fontSize: 16),
+                        decoration: InputDecoration(
+                          hintText: 'Type a message...',
+                          hintStyle: GoogleFonts.roboto(color: Colors.grey[500]),
+                          border: InputBorder.none,
+                          filled: true,
+                          fillColor: Colors.grey[850],
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16.0, vertical: 10.0),
+                          isDense: true,
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20.0),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20.0),
+                            borderSide: const BorderSide(
+                                color: Colors.tealAccent, width: 1.5),
+                          ),
+                        ),
+                        onSubmitted: (_) => _sendMessage(),
+                      ),
+              ),
+              const SizedBox(width: 8),
+              _buildSendOrRecordButton(),
+            ],
+          ),
+        ));
+  }
+
+  Widget _buildSendOrRecordButton() {
+    return Obx(() {
+      if (_isRecording.value) {
+        // Show pulsing stop button
+        return ScaleTransition(
+          scale: _pulseAnimation,
+          child: IconButton(
+            icon: const Icon(FeatherIcons.square, color: Colors.red),
+            onPressed: _stopAudioRecording,
+          ),
+        );
+      } else if (!_isMessageEmpty.value) {
+        // Show send button
+        return IconButton(
+          icon: const Icon(FeatherIcons.send, color: Colors.tealAccent),
+          onPressed: _sendMessage,
+        );
+      } else {
+        // Show mic button
+        return IconButton(
+          icon: const Icon(FeatherIcons.mic, color: Colors.tealAccent),
+          onPressed: _startAudioRecording,
+        );
+      }
+    });
   }
 
   Widget _buildStatusIcon(Map<String, dynamic> message) {

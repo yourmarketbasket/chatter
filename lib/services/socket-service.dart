@@ -361,6 +361,7 @@ class SocketService {
 
     _socket!.on('receive-message', (data) {
       print('[SocketService] receive-message event received: $data');
+      print(data);
       _dataController.handleNewMessage(data);
     });
 
@@ -391,6 +392,7 @@ class SocketService {
 
     _socket!.on('message-status-update', (data) {
       print('[SocketService] message-status-update event received: $data');
+      print(data);
       _dataController.handleMessageStatusUpdate(data);
     });
 
