@@ -268,46 +268,46 @@ class _ConversationPageState extends State<ConversationPage> {
                                     color: Colors.pink[300],
                                     borderRadius: BorderRadius.circular(12.0),
                                   ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (message['content'] != null && message['content'].isNotEmpty)
-                                Text(
-                                  message['content'],
-                                  style: GoogleFonts.roboto(color: isMe ? Colors.tealAccent : Colors.white, fontSize: 15),
-                                ),
-                              if (message['attachments'] != null && (message['attachments'] as List).isNotEmpty)
-                                ... (message['attachments'] as List).map((attachment) {
-                                  return Padding(
-                                    padding: const EdgeInsets.only(top: 8.0),
-                                    child: _buildAttachment(attachment),
-                                  );
-                                }).toList(),
-                              const SizedBox(height: 4),
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      DateFormat('h:mm a').format(DateTime.parse(message['createdAt']).toLocal()),
-                                      style: GoogleFonts.roboto(
-                                        color: Colors.white.withOpacity(0.7),
-                                        fontSize: 10,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (message['content'] != null && message['content'].isNotEmpty)
+                                  Text(
+                                    message['content'],
+                                    style: GoogleFonts.roboto(color: isMe ? Colors.tealAccent : Colors.white, fontSize: 15),
+                                  ),
+                                if (message['attachments'] != null && (message['attachments'] as List).isNotEmpty)
+                                  ... (message['attachments'] as List).map((attachment) {
+                                    return Padding(
+                                      padding: const EdgeInsets.only(top: 8.0),
+                                      child: _buildAttachment(attachment),
+                                    );
+                                  }).toList(),
+                                const SizedBox(height: 4),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        DateFormat('h:mm a').format(DateTime.parse(message['createdAt']).toLocal()),
+                                        style: GoogleFonts.roboto(
+                                          color: Colors.white.withOpacity(0.7),
+                                          fontSize: 10,
+                                        ),
                                       ),
-                                    ),
-                                    if (isMe) ...[
-                                      const SizedBox(width: 4),
-                                      _buildStatusIcon(message),
+                                      if (isMe) ...[
+                                        const SizedBox(width: 4),
+                                        _buildStatusIcon(message),
+                                      ],
                                     ],
-                                  ],
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
                   );
                 },
               );
