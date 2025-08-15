@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:record/record.dart';
@@ -6,15 +7,11 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:chatter/widgets/voice_note_preview_dialog.dart';
 
 class MessageInputArea extends StatefulWidget {
-  final Function(String) onSendMessage;
-  final Function(List<PlatformFile>) onSendAttachments;
-  final Function(String path, Duration duration) onSendVoiceNote;
+  final Function(String text, List<PlatformFile> files) onSend;
 
   const MessageInputArea({
     super.key,
-    required this.onSendMessage,
-    required this.onSendAttachments,
-    required this.onSendVoiceNote,
+    required this.onSend,
   });
 
   @override
@@ -24,6 +21,7 @@ class MessageInputArea extends StatefulWidget {
 class _MessageInputAreaState extends State<MessageInputArea> {
   final TextEditingController _messageController = TextEditingController();
   final AudioRecorder _audioRecorder = AudioRecorder();
+  final List<PlatformFile> _pendingFiles = [];
   bool _isTyping = false;
   bool _isRecording = false;
 
@@ -33,7 +31,7 @@ class _MessageInputAreaState extends State<MessageInputArea> {
     _messageController.addListener(() {
       if (mounted) {
         setState(() {
-          _isTyping = _messageController.text.trim().isNotEmpty;
+          _isTyping = _messageController.text.trim().isNotEmpty || _pendingFiles.isNotEmpty;
         });
       }
     });
@@ -48,8 +46,11 @@ class _MessageInputAreaState extends State<MessageInputArea> {
 
   void _handleSend() {
     if (_isTyping) {
-      widget.onSendMessage(_messageController.text.trim());
+      widget.onSend(_messageController.text.trim(), _pendingFiles);
       _messageController.clear();
+      setState(() {
+        _pendingFiles.clear();
+      });
     }
   }
 
@@ -93,7 +94,12 @@ class _MessageInputAreaState extends State<MessageInputArea> {
         return VoiceNotePreviewDialog(
           audioPath: path,
           onSend: (duration) {
-            widget.onSendVoiceNote(path, duration);
+            final file = PlatformFile(
+              name: path.split('/').last,
+              path: path,
+              size: 0, // Placeholder, as we don't have the size here
+            );
+            widget.onSend('', [file]);
             Navigator.of(context).pop();
           },
         );
@@ -105,7 +111,10 @@ class _MessageInputAreaState extends State<MessageInputArea> {
     try {
       final result = await FilePicker.platform.pickFiles(allowMultiple: true);
       if (result != null && result.files.isNotEmpty) {
-        widget.onSendAttachments(result.files);
+        setState(() {
+          _pendingFiles.addAll(result.files);
+          _isTyping = true; // To enable send button
+        });
       }
     } catch (e) {
       // Handle exceptions
@@ -115,40 +124,83 @@ class _MessageInputAreaState extends State<MessageInputArea> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(8.0),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.add, color: Colors.tealAccent),
-            onPressed: _pickAttachments,
-          ),
-          Expanded(
-            child: TextField(
-              controller: _messageController,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: 'Type a message...',
-                hintStyle: TextStyle(color: Colors.grey[400]),
-                filled: true,
-                fillColor: Colors.grey[800],
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_pendingFiles.isNotEmpty)
+          Container(
+            height: 100,
+            padding: const EdgeInsets.all(8.0),
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: _pendingFiles.length,
+              itemBuilder: (context, index) {
+                final file = _pendingFiles[index];
+                return Stack(
+                  alignment: Alignment.topRight,
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 80,
+                      margin: const EdgeInsets.only(right: 8.0),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8.0),
+                        image: DecorationImage(
+                          image: FileImage(File(file.path!)),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.cancel, color: Colors.red),
+                      onPressed: () {
+                        setState(() {
+                          _pendingFiles.removeAt(index);
+                          _isTyping = _messageController.text.trim().isNotEmpty || _pendingFiles.isNotEmpty;
+                        });
+                      },
+                    ),
+                  ],
+                );
+              },
             ),
           ),
-          const SizedBox(width: 8),
-          IconButton(
-            icon: Icon(_isTyping ? Icons.send : (_isRecording ? Icons.stop : Icons.mic), color: Colors.tealAccent),
-            onPressed: _isTyping
-                ? _handleSend
-                : (_isRecording ? _stopRecording : _startRecording),
+        Container(
+          padding: const EdgeInsets.all(8.0),
+          child: Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.add, color: Colors.tealAccent),
+                onPressed: _pickAttachments,
+              ),
+              Expanded(
+                child: TextField(
+                  controller: _messageController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'Type a message...',
+                    hintStyle: TextStyle(color: Colors.grey[400]),
+                    filled: true,
+                    fillColor: Colors.grey[800],
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: Icon(_isTyping ? Icons.send : (_isRecording ? Icons.stop : Icons.mic), color: Colors.tealAccent),
+                onPressed: _isTyping
+                    ? _handleSend
+                    : (_isRecording ? _stopRecording : _startRecording),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

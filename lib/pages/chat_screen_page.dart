@@ -433,48 +433,34 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           if (_replyingTo != null) _buildReplyPreview(_replyingTo!),
           MessageInputArea(
-            onSendMessage: (text) {
+            onSend: (text, files) {
+              // Create a list of Attachment objects from the PlatformFile list
+              final attachments = files
+                  .map((file) => Attachment(
+                        filename: file.name,
+                        url: file.path!,
+                        size: file.size,
+                        type: file.extension ?? 'file',
+                      ))
+                  .toList();
+
+              // Check if it's a voice note (by extension, for now)
+              final isVoiceNote = attachments.isNotEmpty && (attachments.first.type == 'm4a');
+
               final message = ChatMessage(
                 chatId: widget.chat.id,
                 senderId: dataController.user.value['user']['_id'],
                 text: text,
+                attachments: isVoiceNote ? null : attachments,
+                voiceNote: isVoiceNote ? VoiceNote(url: attachments.first.url, duration: Duration.zero) : null, // duration is not available here
                 replyTo: _replyingTo?.id,
               );
+
               dataController.sendChatMessage(message);
+
               setState(() {
                 _replyingTo = null;
               });
-            },
-            onSendAttachments: (files) {
-              for (final file in files) {
-                // This is a temporary way to create an attachment.
-                // In a real app, you would upload the file to a server first.
-                final attachment = Attachment(
-                  filename: file.name,
-                  url: file.path!, // Using local path for now
-                  size: file.size,
-                  type: file.extension ?? 'file',
-                );
-                final message = ChatMessage(
-                  chatId: widget.chat.id,
-                  senderId: dataController.user.value['user']['_id'],
-                  attachments: [attachment],
-                  text: '', // Or maybe the filename?
-                );
-                dataController.sendChatMessage(message);
-              }
-            },
-            onSendVoiceNote: (path, duration) {
-              final voiceNote = VoiceNote(
-                url: path,
-                duration: duration,
-              );
-              final message = ChatMessage(
-                chatId: widget.chat.id,
-                senderId: dataController.user.value['user']['_id'],
-                voiceNote: voiceNote,
-              );
-              dataController.sendChatMessage(message);
             },
           ),
         ],
