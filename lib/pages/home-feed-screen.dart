@@ -1,5 +1,6 @@
 import 'package:better_player_enhanced/better_player.dart';
 import 'package:chatter/controllers/data-controller.dart';
+import 'package:chatter/pages/main_chats.dart';
 import 'package:chatter/pages/new-posts-page.dart';
 import 'package:chatter/pages/reply_page.dart' hide Padding; // Attempt to resolve conflict
 // import 'package:chatter/pages/repost_page.dart'; // Removed
@@ -1084,6 +1085,23 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
             },
             tooltip: 'Add Post',
             child: const Icon(FeatherIcons.plusCircle, color: Colors.tealAccent),
+          ),
+          // main chats page
+          FloatingActionButton.small(
+            heroTag: 'fab_chats',
+            backgroundColor: Colors.black,
+            shape: RoundedRectangleBorder(
+              side: const BorderSide(color: Colors.tealAccent, width: 1),
+              borderRadius: BorderRadius.circular(10.0),
+            ),
+            onPressed: () {
+              // Navigate to main chats page
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => MainChatsPage()),
+              );
+            },
+            child: const Icon(FeatherIcons.messageSquare, color: Colors.tealAccent),
           ),
           FloatingActionButton.small(
             heroTag: 'fab_home',
