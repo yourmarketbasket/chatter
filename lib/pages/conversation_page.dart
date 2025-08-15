@@ -255,7 +255,11 @@ class _ConversationPageState extends State<ConversationPage> {
                           margin: const EdgeInsets.symmetric(vertical: 4.0),
                           padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
                           decoration: BoxDecoration(
-                            color: isMe ? Colors.tealAccent.withOpacity(0.8) : Colors.grey[800],
+                            color: Colors.transparent,
+                            border: Border.all(
+                              color: isMe ? Colors.tealAccent : Colors.grey[700]!,
+                              width: 1.5,
+                            ),
                             borderRadius: BorderRadius.circular(12.0),
                           ),
                           child: Column(
@@ -264,20 +268,13 @@ class _ConversationPageState extends State<ConversationPage> {
                               if (message['content'] != null && message['content'].isNotEmpty)
                                 Text(
                                   message['content'],
-                                  style: GoogleFonts.roboto(color: isMe ? Colors.black : Colors.white, fontSize: 15),
+                                  style: GoogleFonts.roboto(color: isMe ? Colors.tealAccent : Colors.white, fontSize: 15),
                                 ),
                               if (message['attachments'] != null && (message['attachments'] as List).isNotEmpty)
                                 ... (message['attachments'] as List).map((attachment) {
                                   return Padding(
                                     padding: const EdgeInsets.only(top: 8.0),
-                                    child: Text(
-                                      attachment['filename'] ?? 'Attachment',
-                                      style: GoogleFonts.roboto(
-                                        color: isMe ? Colors.black : Colors.white,
-                                        fontSize: 12,
-                                        decoration: TextDecoration.underline,
-                                      ),
-                                  ),
+                                    child: _buildAttachment(attachment),
                                   );
                                 }).toList(),
                               const SizedBox(height: 4),
@@ -522,5 +519,48 @@ class _ConversationPageState extends State<ConversationPage> {
       default:
         return const SizedBox.shrink();
     }
+  }
+
+  Widget _buildAttachment(Map<String, dynamic> attachment) {
+    final String type = attachment['type'] ?? 'file';
+    final String? url = attachment['url'];
+
+    if (type == 'image' && url != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12.0),
+        child: CachedNetworkImage(
+          imageUrl: url,
+          placeholder: (context, url) => Container(
+            height: 200,
+            color: Colors.grey[800],
+            child: const Center(child: CircularProgressIndicator(color: Colors.tealAccent)),
+          ),
+          errorWidget: (context, url, error) => const Icon(Icons.error),
+        ),
+      );
+    }
+
+    // Fallback for non-image files or files without a URL yet
+    return Container(
+      padding: const EdgeInsets.all(8.0),
+      decoration: BoxDecoration(
+        color: Colors.grey[800],
+        borderRadius: BorderRadius.circular(8.0),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(FeatherIcons.file, color: Colors.white, size: 24),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              attachment['filename'] ?? 'Attachment',
+              style: GoogleFonts.roboto(color: Colors.white),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
