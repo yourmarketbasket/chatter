@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
@@ -37,16 +38,18 @@ class _AttachmentPreviewDialogState extends State<AttachmentPreviewDialog> {
     final extension = file.extension?.toLowerCase() ?? '';
     Widget preview;
 
+    // Use file.path for mobile/desktop, fallback to bytes for web
+    final imageProvider = file.path != null ? FileImage(File(file.path!)) : MemoryImage(file.bytes!) as ImageProvider;
+
     switch (extension) {
       case 'jpg':
       case 'jpeg':
       case 'png':
       case 'gif':
-        preview = Image.file(
-          File(file.path!),
+        preview = FittedBox(
           fit: BoxFit.cover,
-          width: 100,
-          height: 100,
+          clipBehavior: Clip.hardEdge,
+          child: Image(image: imageProvider),
         );
         break;
       case 'mp4':
@@ -66,50 +69,60 @@ class _AttachmentPreviewDialogState extends State<AttachmentPreviewDialog> {
         preview = const Icon(Icons.insert_drive_file, size: 50, color: Colors.white);
     }
 
-    return Container(
-      width: 100,
-      height: 100,
-      decoration: BoxDecoration(
-        color: Colors.grey[800],
-        borderRadius: BorderRadius.circular(8.0),
-      ),
-      child: Center(
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(8.0),
-          child: preview,
-        ),
-      ),
-    );
+    return Center(child: preview);
   }
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Send Attachments'),
-      content: SizedBox(
-        width: double.maxFinite,
+    return Dialog(
+      backgroundColor: Colors.grey[900],
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            const Text('Send Attachments', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
             if (_files.isEmpty)
               const Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Text('No files selected.'),
+                padding: EdgeInsets.symmetric(vertical: 48.0),
+                child: Text('No files selected.', style: TextStyle(color: Colors.white)),
               )
             else
-              Expanded(
-                child: ListView.builder(
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.4,
+                ),
+                child: GridView.builder(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
+                  ),
                   itemCount: _files.length,
                   itemBuilder: (context, index) {
                     final file = _files[index];
-                    return ListTile(
-                      leading: _buildPreview(file),
-                      title: Text(file.name, overflow: TextOverflow.ellipsis),
-                      subtitle: Text('${(file.size / 1024).toStringAsFixed(2)} KB'),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.remove_circle, color: Colors.red),
-                        onPressed: () => _removeFile(index),
-                      ),
+                    return Stack(
+                      alignment: Alignment.topRight,
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.black,
+                            borderRadius: BorderRadius.circular(8.0),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8.0),
+                            child: _buildPreview(file),
+                          ),
+                        ),
+                        IconButton(
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          icon: const Icon(Icons.cancel, color: Colors.red),
+                          onPressed: () => _removeFile(index),
+                        ),
+                      ],
                     );
                   },
                 ),
@@ -117,30 +130,40 @@ class _AttachmentPreviewDialogState extends State<AttachmentPreviewDialog> {
             const SizedBox(height: 16),
             TextField(
               controller: _captionController,
-              decoration: const InputDecoration(
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
                 hintText: 'Add a caption...',
-                border: OutlineInputBorder(),
+                hintStyle: TextStyle(color: Colors.grey[400]),
+                filled: true,
+                fillColor: Colors.grey[800],
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  borderSide: BorderSide.none,
+                ),
               ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel', style: TextStyle(color: Colors.white)),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context, {
+                      'files': _files,
+                      'caption': _captionController.text,
+                    });
+                  },
+                  child: const Text('Send', style: TextStyle(color: Colors.tealAccent)),
+                ),
+              ],
             ),
           ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        TextButton(
-          onPressed: () {
-            // Return the result
-            Navigator.pop(context, {
-              'files': _files,
-              'caption': _captionController.text,
-            });
-          },
-          child: const Text('Send'),
-        ),
-      ],
     );
   }
 }
