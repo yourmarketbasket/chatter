@@ -41,7 +41,7 @@ class GroupChatList extends StatelessWidget {
             final avatarUrl = conversation['groupAvatar'] ?? '';
             final initials = groupName.isNotEmpty ? groupName[0].toUpperCase() : 'G';
             final lastMessage = conversation['lastMessage'];
-            final lastMessageContent = lastMessage?['content'] ?? 'No messages yet...';
+            final lastMessageContent = lastMessage != null ? lastMessage['content'] : 'No messages yet...';
             final timestamp = lastMessage != null ? TimeOfDay.fromDateTime(DateTime.parse(lastMessage['createdAt'])).format(context) : '';
 
             return ListTile(

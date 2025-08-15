@@ -101,13 +101,12 @@ class DataController extends GetxController {
       if (user.value['token'] != null) {
         await fetchFeeds();
         await getAllChats();
+        await fetchAllUsers();
       }
     } catch (e) {
-      print('Error fetching initial feeds: $e');
+      print('Error fetching initial data: $e');
       posts.clear(); // Clear posts on error
     }
-    // Fetch all users (placeholder) - This is typically called on demand by UsersListPage
-    // fetchAllUsers();
   }
 
   // Method to fetch/initialize all users

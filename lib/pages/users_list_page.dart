@@ -26,32 +26,6 @@ class _UsersListPageState extends State<UsersListPage> {
   @override
   void initState() {
     super.initState();
-    // Fetch users. DataController's fetchAllUsers now handles isLoading state.
-    // No need to check if allUsers is empty here, as fetchAllUsers will be called
-    // and the Obx widget will react to isLoading and allUsers list changes.
-    // Wrap in addPostFrameCallback to ensure it runs after the first frame build.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) { // Check if widget is still mounted when callback executes
-        _dataController.fetchAllUsers().catchError((error) {
-          print("Error initially fetching all users from initState: $error");
-          if (mounted) {
-            // It's good practice to also schedule the snackbar display after the frame,
-            // especially if the error handling itself might happen very quickly.
-            WidgetsBinding.instance.addPostFrameCallback((_){
-              if (mounted) {
-                 Get.snackbar(
-                  'Error Loading Users',
-                  'Failed to load users. Please try again later.',
-                  snackPosition: SnackPosition.BOTTOM,
-                  backgroundColor: Colors.red[700],
-                  colorText: Colors.white,
-                );
-              }
-            });
-          }
-        });
-      }
-    });
   }
 
   Future<void> _toggleFollow(String targetUserId, bool currentFollowStatus) async {
@@ -233,11 +207,11 @@ class _UsersListPageState extends State<UsersListPage> {
                 );
               }) : null,
               onTap: () async {
-                if (widget.mode == UserListMode.Browse) {
+                if (widget.mode == UserListMode.Browse || widget.mode == UserListMode.SelectForChat) {
                   final result = await _dataController.createNewChat(userId);
                   if (result['success']) {
                     final chat = result['chat'];
-                    Get.to(() => ConversationPage(
+                    Get.off(() => ConversationPage( // Use Get.off to replace the user list page
                           conversationId: chat['_id'],
                           username: name,
                           userAvatar: avatarUrl,
@@ -247,7 +221,7 @@ class _UsersListPageState extends State<UsersListPage> {
                   } else {
                     Get.snackbar('Error', result['message'] ?? 'Could not start chat.');
                   }
-                } else {
+                } else { // SelectForGroup
                   Get.back(result: user);
                 }
               },

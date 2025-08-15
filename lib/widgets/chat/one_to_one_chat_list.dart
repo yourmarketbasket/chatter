@@ -13,10 +13,12 @@ class OneToOneChatList extends StatelessWidget {
     final DataController dataController = Get.find<DataController>();
     final String currentUserId = dataController.user.value['user']['_id'];
 
-    return Obx(() {
-      if (dataController.isLoadingConversations.value) {
-        return const Center(child: CircularProgressIndicator(color: Colors.tealAccent));
-      }
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Obx(() {
+        if (dataController.isLoadingConversations.value) {
+          return const Center(child: CircularProgressIndicator(color: Colors.tealAccent));
+        }
 
       final oneToOneChats = dataController.conversations.where((c) => (c['isGroupChat'] ?? false) == false).toList();
 
@@ -49,7 +51,7 @@ class OneToOneChatList extends StatelessWidget {
           final receiverId = otherParticipant['_id'] ?? '';
           final initials = name.isNotEmpty ? name[0].toUpperCase() : '?';
           final lastMessage = conversation['lastMessage'];
-          final lastMessageContent = lastMessage?['content'] ?? 'No messages yet...';
+          final lastMessageContent = lastMessage != null ? lastMessage['content'] : 'No messages yet...';
           final timestamp = lastMessage != null ? TimeOfDay.fromDateTime(DateTime.parse(lastMessage['createdAt'])).format(context) : '';
 
           return ListTile(
@@ -78,7 +80,14 @@ class OneToOneChatList extends StatelessWidget {
             },
           );
         },
-      );
-    });
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Get.to(() => const UsersListPage(mode: UserListMode.SelectForChat));
+        },
+        backgroundColor: Colors.tealAccent,
+        child: const Icon(FeatherIcons.plus, color: Colors.black),
+      ),
+    );
   }
 }
