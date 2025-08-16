@@ -2604,13 +2604,13 @@ void clearUserPosts() {
     }
   }
 
-  Future<Chat?> createChat(List<String> participantIds,
-      {bool isGroup = false, String? groupName}) async {
+  Future<Chat?> createChat(List<String> participantIds, {bool isGroup = false, String? groupName}) async {
     try {
       final token = user.value['token'];
       if (token == null) {
         throw Exception('User not authenticated');
       }
+
       final response = await _dio.post(
         'api/chats',
         data: {
@@ -2622,36 +2622,10 @@ void clearUserPosts() {
           headers: {'Authorization': 'Bearer $token'},
         ),
       );
-      if (response.statusCode == 201 && response.data['success'] == true) {
-        final Map<String, dynamic> chatData =
-            response.data['chat'] as Map<String, dynamic>;
-        final List<User> participants = participantIds.map((id) {
-          final userMap = allUsers.firstWhere(
-            (u) => u['_id'] == id,
-            orElse: () => <String,
-                dynamic>{}, // Return an empty map if no user is found
-          );
-          if (userMap.isEmpty) {
-            final currentUser = user.value['user'];
-            if (currentUser != null && currentUser['_id'] == id) {
-              return User.fromJson(currentUser as Map<String, dynamic>);
-            }
-          }
-          return User.fromJson(userMap);
-        }).toList();
 
-        final chat = Chat(
-          id: chatData['_id'] as String,
-          participants: participants,
-          isGroup: chatData['isGroup'] as bool,
-          groupName: chatData['groupName'] as String?,
-          groupAvatar: chatData['groupAvatar'] as String?,
-          lastMessage: chatData['lastMessage'] != null
-              ? ChatMessage.fromJson(
-                  chatData['lastMessage'] as Map<String, dynamic>)
-              : null,
-          unreadCount: 0,
-        );
+      if (response.statusCode == 201 && response.data['success'] == true) {
+        final chat = Chat.fromJson(response.data['chat']);
+        // Add to conversations list and navigate
         conversations.insert(0, chat);
         return chat;
       } else {
