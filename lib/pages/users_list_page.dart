@@ -37,15 +37,18 @@ class _UsersListPageState extends State<UsersListPage> {
       if (mounted) {
         final currentUserId = _dataController.user.value['user']?['_id'];
         if (currentUserId != null) {
-          _dataController.fetchFollowing(currentUserId).catchError((error) {
-            print(
-                "Error initially fetching following list from initState: $error");
+          // Fetch both lists
+          Future.wait([
+            _dataController.fetchFollowing(currentUserId),
+            _dataController.fetchFollowers(currentUserId),
+          ]).catchError((error) {
+            print("Error fetching contacts from initState: $error");
             if (mounted) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (mounted) {
                   Get.snackbar(
-                    'Error Loading Users',
-                    'Failed to load users you follow. Please try again later.',
+                    'Error Loading Contacts',
+                    'Failed to load your contacts. Please try again later.',
                     snackPosition: SnackPosition.BOTTOM,
                     backgroundColor: Colors.red[700],
                     colorText: Colors.white,
@@ -168,7 +171,7 @@ class _UsersListPageState extends State<UsersListPage> {
       backgroundColor: const Color(0xFF000000), // Twitter dark theme background
       appBar: AppBar(
         title: Text(
-          _isGroupCreationMode ? 'Select Users' : 'Browse Users',
+          _isGroupCreationMode ? 'Select Contacts' : 'Contacts',
           style: GoogleFonts.poppins(
             fontWeight: FontWeight.w600,
             color: Colors.white,
@@ -193,17 +196,29 @@ class _UsersListPageState extends State<UsersListPage> {
       drawer: const AppDrawer(),
       body: Obx(() {
         final currentUserId = _dataController.user.value['user']?['_id'];
-        final usersToShow = _dataController.following
+        final combined = <String, Map<String, dynamic>>{};
+        for (var user in _dataController.following) {
+          combined[user['_id']] = user;
+        }
+        for (var user in _dataController.followers) {
+          combined[user['_id']] = user;
+        }
+        final usersToShow = combined.values
             .where((user) => user['_id'] != currentUserId)
             .toList();
-        if (_dataController.isLoadingFollowers.value && usersToShow.isEmpty) {
+
+        final isLoading = _dataController.isLoadingFollowers.value ||
+            _dataController.isLoadingFollowing.value;
+
+        if (isLoading && usersToShow.isEmpty) {
           return Center(
             child: CircularProgressIndicator(
               valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent[400]!),
             ),
           );
         }
-        if (!_dataController.isLoadingFollowers.value && usersToShow.isEmpty) {
+
+        if (!isLoading && usersToShow.isEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -211,7 +226,7 @@ class _UsersListPageState extends State<UsersListPage> {
                 Icon(FeatherIcons.users, size: 48, color: Colors.grey[700]),
                 const SizedBox(height: 16),
                 Text(
-                  'You are not following anyone yet.',
+                  'No contacts found.',
                   style: GoogleFonts.roboto(
                       color: Colors.grey[500], fontSize: 16),
                 ),
@@ -224,10 +239,9 @@ class _UsersListPageState extends State<UsersListPage> {
                   icon: const Icon(FeatherIcons.refreshCw, size: 18),
                   label: const Text('Retry'),
                   onPressed: () {
-                    final currentUserId =
-                        _dataController.user.value['user']?['_id'];
                     if (currentUserId != null) {
                       _dataController.fetchFollowing(currentUserId);
+                      _dataController.fetchFollowers(currentUserId);
                     }
                   },
                 )
