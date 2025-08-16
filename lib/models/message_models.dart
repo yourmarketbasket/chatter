@@ -155,10 +155,18 @@ class ChatMessage {
   }
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
+    dynamic senderIdValue = json['senderId'];
+    String senderId;
+    if (senderIdValue is Map<String, dynamic>) {
+      senderId = senderIdValue['_id'] as String;
+    } else {
+      senderId = senderIdValue as String;
+    }
+
     return ChatMessage(
       id: json['_id'] as String,
       chatId: json['chatId'] as String,
-      senderId: json['senderId'] as String,
+      senderId: senderId,
       text: json['text'] as String?,
       attachments: (json['attachments'] as List<dynamic>?)
           ?.map((e) => Attachment.fromJson(e as Map<String, dynamic>))
