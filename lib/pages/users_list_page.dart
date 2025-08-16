@@ -296,14 +296,43 @@ class _UsersListPageState extends State<UsersListPage> {
                     }
                   });
                 } else {
-                  final currentUserId = _dataController.user.value['user']['_id'];
-                  final newChat = await _dataController.createChat([currentUserId, userId]);
-                  if (newChat != null) {
-                    _dataController.currentChat.value = newChat;
+                  final currentUserId =
+                      _dataController.user.value['user']['_id'];
+
+                  // Look for an existing chat
+                  final existingChat =
+                      _dataController.chats.values.firstWhere(
+                    (chat) {
+                      if (chat['isGroup'] == true) return false;
+
+                      final participantIds =
+                          (chat['participants'] as List).map((p) {
+                        if (p is Map<String, dynamic>)
+                          return p['_id'] as String;
+                        return p as String;
+                      }).toSet(); // Use a Set for efficient lookup
+
+                      return participantIds.contains(currentUserId) &&
+                          participantIds.contains(userId);
+                    },
+                    orElse: () => null,
+                  );
+
+                  if (existingChat != null) {
+                    // Chat already exists, just open it
+                    _dataController.currentChat.value = existingChat;
                     Get.to(() => const ChatScreen());
                   } else {
-                    Get.snackbar('Error', 'Could not create chat.',
-                        snackPosition: SnackPosition.BOTTOM);
+                    // Chat does not exist, create it
+                    final newChat = await _dataController
+                        .createChat([currentUserId, userId]);
+                    if (newChat != null) {
+                      _dataController.currentChat.value = newChat;
+                      Get.to(() => const ChatScreen());
+                    } else {
+                      Get.snackbar('Error', 'Could not create chat.',
+                          snackPosition: SnackPosition.BOTTOM);
+                    }
                   }
                 }
               },

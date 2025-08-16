@@ -1,6 +1,5 @@
 import 'package:chatter/controllers/data-controller.dart';
 import 'package:chatter/pages/chat_screen_page.dart';
-import 'package:chatter/pages/conversation_page.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -35,30 +34,52 @@ class _ContactsPageState extends State<ContactsPage> {
         }
       });
     } else {
-      print("Selected user data: $user");
       final currentUserId = _dataController.user.value['user']['_id'];
-      final currentUserData = _dataController.user.value['user'];
 
-      _dataController
-          .createChat([currentUserId, user['_id']], isGroup: false)
-          .then((chat) {
-        if (chat != null) {
-          final hydratedChat = Map<String, dynamic>.from(chat);
-          hydratedChat['participants'] = [currentUserData, user];
-          _dataController.chats[chat['_id']] = hydratedChat;
-          _dataController.currentChat.value = hydratedChat;
+      // Look for an existing chat
+      final existingChat = _dataController.chats.values.firstWhere(
+        (chat) {
+          if (chat['isGroup'] == true) return false;
 
-          print("Opening chat screen with hydrated chat data: $hydratedChat");
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const ChatScreen(),
-            ),
-          );
-        } else {
-          print("Failed to create chat.");
-        }
-      });
+          final participantIds = (chat['participants'] as List).map((p) {
+            if (p is Map<String, dynamic>) return p['_id'] as String;
+            return p as String;
+          }).toSet(); // Use a Set for efficient lookup
+
+          return participantIds.contains(currentUserId) &&
+              participantIds.contains(user['_id']);
+        },
+        orElse: () => null,
+      );
+
+      if (existingChat != null) {
+        // Chat already exists, just open it
+        _dataController.currentChat.value = existingChat;
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const ChatScreen()),
+        );
+      } else {
+        // Chat does not exist, create it
+        final currentUserData = _dataController.user.value['user'];
+        _dataController
+            .createChat([currentUserId, user['_id']], isGroup: false)
+            .then((chat) {
+          if (chat != null) {
+            final hydratedChat = Map<String, dynamic>.from(chat);
+            hydratedChat['participants'] = [currentUserData, user];
+            _dataController.chats[chat['_id']] = hydratedChat;
+            _dataController.currentChat.value = hydratedChat;
+
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const ChatScreen()),
+            );
+          } else {
+            Get.snackbar('Error', 'Could not create chat.');
+          }
+        });
+      }
     }
   }
 
