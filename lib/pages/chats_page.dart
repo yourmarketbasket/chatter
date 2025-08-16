@@ -38,6 +38,7 @@ class _ChatsPageState extends State<ChatsPage> {
           itemBuilder: (context, index) {
             final chat = oneOnOneChats[index];
             final lastMessageData = chat['lastMessage'];
+            print('Last message data: $lastMessageData');
             final currentUserId = _dataController.user.value['user']['_id'];
 
             final otherUser = (chat['participants'] as List).firstWhere(
@@ -46,7 +47,7 @@ class _ChatsPageState extends State<ChatsPage> {
 
             String preview = '...';
             ChatMessage? lastMessage;
-            if (lastMessageData != null) {
+            if (lastMessageData != null && lastMessageData is Map<String, dynamic>) {
               lastMessage = ChatMessage.fromJson(lastMessageData);
               if (lastMessage.attachments != null &&
                   lastMessage.attachments!.isNotEmpty) {
