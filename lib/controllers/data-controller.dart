@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'package:path_provider/path_provider.dart';
 import '../models/chat_models.dart';
 import '../models/feed_models.dart' hide Attachment; // Added import for ChatterPost
+import '../services/notification_service.dart';
 import '../services/upload_service.dart'; // Import the UploadService
 
 class DataController extends GetxController {
@@ -902,6 +903,14 @@ class DataController extends GetxController {
               print('[DataController.loginUser] Fetching initial network data for $currentUserId');
               fetchFollowers(currentUserId).catchError((e) => print('Error fetching followers post-login: $e'));
               fetchFollowing(currentUserId).catchError((e) => print('Error fetching following post-login: $e'));
+            }
+
+            // After successful login and data fetch, update FCM token
+            try {
+              await NotificationService().init();
+              print('[DataController] FCM Token update process triggered after login.');
+            } catch (e) {
+              print('[DataController] Error triggering FCM token update after login: $e');
             }
 
           } catch (feedError) {
