@@ -722,7 +722,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     final otherUserMap = otherUser is Map<String, dynamic>
         ? otherUser
-        : _dataController.allUsers.firstWhere(
+        : dataController.allUsers.firstWhere(
             (u) => u['_id'] == otherUser,
             orElse: () => {'name': 'Unknown', 'avatar': ''},
           );

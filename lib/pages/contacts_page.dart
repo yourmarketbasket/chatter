@@ -153,23 +153,37 @@ class _ContactsPageState extends State<ContactsPage> {
             final user = _dataController.following[index];
             final isSelected = _selectedUserIds.contains(user['_id']);
             final String avatarUrl = user['avatar'] ?? '';
+            final bool isVerified = user['isVerified'] ?? false;
 
             return ListTile(
               leading: CircleAvatar(
                 radius: 24,
-                backgroundColor: Colors.grey[800],
+                backgroundColor: Colors.tealAccent.withOpacity(0.2),
                 backgroundImage:
                     avatarUrl.isNotEmpty ? CachedNetworkImageProvider(avatarUrl) : null,
                 child: avatarUrl.isEmpty
                     ? Text(
                         user['name']?[0] ?? '?',
                         style: const TextStyle(
-                            color: Colors.white, fontWeight: FontWeight.bold),
+                            color: Colors.tealAccent, fontWeight: FontWeight.bold),
                       )
                     : null,
               ),
-              title: Text(user['name'] ?? 'No Name',
-                  style: const TextStyle(color: Colors.white)),
+              title: Row(
+                children: [
+                  Text(user['name'] ?? 'No Name',
+                      style: const TextStyle(color: Colors.white)),
+                  if (isVerified)
+                    const Padding(
+                      padding: EdgeInsets.only(left: 4.0),
+                      child: Icon(Icons.verified, color: Colors.amber, size: 16),
+                    ),
+                ],
+              ),
+              subtitle: Text(
+                '${user['followersCount'] ?? 0} Followers, ${user['followingCount'] ?? 0} Following',
+                style: TextStyle(color: Colors.grey[400], fontSize: 12),
+              ),
               onTap: () => _onUserTap(user),
               trailing: widget.isCreatingGroup
                   ? InkWell(
