@@ -300,23 +300,26 @@ class _UsersListPageState extends State<UsersListPage> {
                       _dataController.user.value['user']['_id'];
 
                   // Look for an existing chat
-                  final existingChat =
-                      _dataController.chats.values.firstWhere(
-                    (chat) {
-                      if (chat['isGroup'] == true) return false;
+                  Map<String, dynamic>? existingChat;
+                  try {
+                    existingChat = _dataController.chats.values.firstWhere(
+                      (chat) {
+                        if (chat['isGroup'] == true) return false;
 
-                      final participantIds =
-                          (chat['participants'] as List).map((p) {
-                        if (p is Map<String, dynamic>)
-                          return p['_id'] as String;
-                        return p as String;
-                      }).toSet(); // Use a Set for efficient lookup
+                        final participantIds =
+                            (chat['participants'] as List).map((p) {
+                          if (p is Map<String, dynamic>)
+                            return p['_id'] as String;
+                          return p as String;
+                        }).toSet(); // Use a Set for efficient lookup
 
-                      return participantIds.contains(currentUserId) &&
-                          participantIds.contains(userId);
-                    },
-                    orElse: () => null,
-                  );
+                        return participantIds.contains(currentUserId) &&
+                            participantIds.contains(userId);
+                      },
+                    );
+                  } catch (e) {
+                    existingChat = null;
+                  }
 
                   if (existingChat != null) {
                     // Chat already exists, just open it
