@@ -81,18 +81,27 @@ class _MainChatsPageState extends State<MainChatsPage> {
           title: Text(_currentIndex == 0 ? 'Chats' : 'Groups'),
           automaticallyImplyLeading: false, // No back arrow
           actions: [
-            IconButton(
-              icon: const Icon(Icons.add_circle_outline),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ContactsPage(
-                      isCreatingGroup: _currentIndex == 1,
-                    ),
-                  ),
-                );
-              },
+            Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.tealAccent.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.add, color: Colors.tealAccent),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ContactsPage(
+                          isCreatingGroup: _currentIndex == 1,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
             ),
           ],
           bottom: PreferredSize(
