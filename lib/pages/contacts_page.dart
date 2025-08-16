@@ -35,17 +35,22 @@ class _ContactsPageState extends State<ContactsPage> {
         }
       });
     } else {
+      print("Creating new chat with user: ${user['name']}");
       final currentUserId = _dataController.user.value['user']['_id'];
       _dataController
           .createChat([currentUserId, user['_id']], isGroup: false)
           .then((chat) {
         if (chat != null) {
+          print("Chat created successfully: ${chat['_id']}");
+          print("Navigating to chat screen.");
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => ChatScreen(chat: chat),
             ),
           );
+        } else {
+          print("Failed to create chat.");
         }
       });
     }

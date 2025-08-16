@@ -740,7 +740,11 @@ class _ChatScreenState extends State<ChatScreen> {
                   backgroundImage: (widget.chat['isGroup']
                               ? widget.chat['groupAvatar']
                               : otherUserMap?['avatar']) !=
-                          null
+                          null &&
+                          (widget.chat['isGroup']
+                              ? widget.chat['groupAvatar']
+                              : otherUserMap?['avatar'])
+                              .isNotEmpty
                       ? NetworkImage((widget.chat['isGroup']
                           ? widget.chat['groupAvatar']
                           : otherUserMap!['avatar'])!)
@@ -748,7 +752,11 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: (widget.chat['isGroup']
                               ? widget.chat['groupAvatar']
                               : otherUserMap?['avatar']) ==
-                          null
+                          null ||
+                          (widget.chat['isGroup']
+                              ? widget.chat['groupAvatar']
+                              : otherUserMap?['avatar'])
+                              .isEmpty
                       ? Text(
                           widget.chat['isGroup']
                               ? (widget.chat['groupName']?[0] ?? '?')
