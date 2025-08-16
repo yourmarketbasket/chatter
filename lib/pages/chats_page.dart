@@ -78,7 +78,7 @@ class _ChatsPageState extends State<ChatsPage> {
                 otherUser.online == true
                     ? 'online'
                     : (otherUser.lastSeen != null
-                        ? formatLastSeen(otherUser.lastSeen!)
+                        ? TimeHelper.formatLastSeen(otherUser.lastSeen!)
                         : 'offline'),
                 style: TextStyle(
                   color: otherUser.online == true
