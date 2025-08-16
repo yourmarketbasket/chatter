@@ -108,7 +108,7 @@ class DataController extends GetxController {
       posts.clear(); // Clear posts on error
     }
     // Fetch all users (placeholder) - This is typically called on demand by UsersListPage
-    // fetchAllUsers();
+    fetchAllUsers();
     fetchChats();
   }
 
