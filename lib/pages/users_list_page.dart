@@ -34,25 +34,27 @@ class _UsersListPageState extends State<UsersListPage> {
     // and the Obx widget will react to isLoading and allUsers list changes.
     // Wrap in addPostFrameCallback to ensure it runs after the first frame build.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) { // Check if widget is still mounted when callback executes
-        _dataController.fetchAllUsers().catchError((error) {
-          print("Error initially fetching all users from initState: $error");
-          if (mounted) {
-            // It's good practice to also schedule the snackbar display after the frame,
-            // especially if the error handling itself might happen very quickly.
-            WidgetsBinding.instance.addPostFrameCallback((_){
-              if (mounted) {
-                 Get.snackbar(
-                  'Error Loading Users',
-                  'Failed to load users. Please try again later.',
-                  snackPosition: SnackPosition.BOTTOM,
-                  backgroundColor: Colors.red[700],
-                  colorText: Colors.white,
-                );
-              }
-            });
-          }
-        });
+      if (mounted) {
+        final currentUserId = _dataController.user.value['user']?['_id'];
+        if (currentUserId != null) {
+          _dataController.fetchFollowing(currentUserId).catchError((error) {
+            print(
+                "Error initially fetching following list from initState: $error");
+            if (mounted) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) {
+                  Get.snackbar(
+                    'Error Loading Users',
+                    'Failed to load users you follow. Please try again later.',
+                    snackPosition: SnackPosition.BOTTOM,
+                    backgroundColor: Colors.red[700],
+                    colorText: Colors.white,
+                  );
+                }
+              });
+            }
+          });
+        }
       }
     });
   }
@@ -190,14 +192,15 @@ class _UsersListPageState extends State<UsersListPage> {
       ),
       drawer: const AppDrawer(),
       body: Obx(() {
-        if (_dataController.isLoading.value && _dataController.allUsers.isEmpty) {
+        final usersToShow = _dataController.following;
+        if (_dataController.isLoadingFollowers.value && usersToShow.isEmpty) {
           return Center(
             child: CircularProgressIndicator(
               valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent[400]!),
             ),
           );
         }
-        if (!_dataController.isLoading.value && _dataController.allUsers.isEmpty) {
+        if (!_dataController.isLoadingFollowers.value && usersToShow.isEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -205,8 +208,9 @@ class _UsersListPageState extends State<UsersListPage> {
                 Icon(FeatherIcons.users, size: 48, color: Colors.grey[700]),
                 const SizedBox(height: 16),
                 Text(
-                  'No users found or failed to load.',
-                  style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 16),
+                  'You are not following anyone yet.',
+                  style: GoogleFonts.roboto(
+                      color: Colors.grey[500], fontSize: 16),
                 ),
                 const SizedBox(height: 8),
                 ElevatedButton.icon(
@@ -216,17 +220,24 @@ class _UsersListPageState extends State<UsersListPage> {
                   ),
                   icon: const Icon(FeatherIcons.refreshCw, size: 18),
                   label: const Text('Retry'),
-                  onPressed: () => _dataController.fetchAllUsers(),
+                  onPressed: () {
+                    final currentUserId =
+                        _dataController.user.value['user']?['_id'];
+                    if (currentUserId != null) {
+                      _dataController.fetchFollowing(currentUserId);
+                    }
+                  },
                 )
               ],
             ),
           );
         }
         return ListView.separated(
-          itemCount: _dataController.allUsers.length,
-          separatorBuilder: (context, index) => Divider(color: Colors.grey[850], height: 1, indent: 72, endIndent: 16),
+          itemCount: usersToShow.length,
+          separatorBuilder: (context, index) => Divider(
+              color: Colors.grey[850], height: 1, indent: 72, endIndent: 16),
           itemBuilder: (context, index) {
-            final user = _dataController.allUsers[index];
+            final user = usersToShow[index];
             final String userId = user['_id'] ?? '';
             final String avatarUrl = user['avatar'] ?? '';
             final String name = user['name'] ?? 'User'; // Display name
@@ -267,32 +278,53 @@ class _UsersListPageState extends State<UsersListPage> {
                   ),
                 ],
               ),
-              trailing: Obx(() {
-                // Listen to changes in the loading state for this specific user's button
-                final bool isLoadingFollowAction = _isUpdatingFollowStatus[userId] ?? false;
-
-                return ElevatedButton(
-                  onPressed: isLoadingFollowAction ? null : () => _toggleFollow(userId, isFollowing),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isFollowing ? Colors.transparent : Colors.white,
-                    foregroundColor: isFollowing ? Colors.white : Colors.black,
-                    side: isFollowing ? BorderSide(color: Colors.grey[700]!) : null,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    minimumSize: const Size(90, 36), // Ensure button has a decent size
-                  ),
-                  child: isLoadingFollowAction
-                      ? SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(isFollowing ? Colors.white : Colors.black),
-                          ),
+              trailing: _isGroupCreationMode
+                  ? (_selectedUsers.any((u) => u['_id'] == userId)
+                      ? const CircleAvatar(
+                          radius: 12,
+                          backgroundColor: Colors.tealAccent,
+                          child: Icon(Icons.check, size: 16, color: Colors.black),
                         )
-                      : Text(isFollowing ? 'Unfollow' : 'Follow', style: GoogleFonts.roboto(fontWeight: FontWeight.bold, fontSize: 13)),
-                );
-              }),
+                      : const SizedBox.shrink())
+                  : Obx(() {
+                      // Listen to changes in the loading state for this specific user's button
+                      final bool isLoadingFollowAction =
+                          _isUpdatingFollowStatus[userId] ?? false;
+
+                      return ElevatedButton(
+                        onPressed: isLoadingFollowAction
+                            ? null
+                            : () => _toggleFollow(userId, isFollowing),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor:
+                              isFollowing ? Colors.transparent : Colors.white,
+                          foregroundColor:
+                              isFollowing ? Colors.white : Colors.black,
+                          side: isFollowing
+                              ? BorderSide(color: Colors.grey[700]!)
+                              : null,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20)),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          minimumSize:
+                              const Size(90, 36), // Ensure button has a decent size
+                        ),
+                        child: isLoadingFollowAction
+                            ? SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      isFollowing ? Colors.white : Colors.black),
+                                ),
+                              )
+                            : Text(isFollowing ? 'Unfollow' : 'Follow',
+                                style: GoogleFonts.roboto(
+                                    fontWeight: FontWeight.bold, fontSize: 13)),
+                      );
+                    }),
               onTap: () async {
                 if (_isGroupCreationMode) {
                   setState(() {

@@ -84,8 +84,8 @@ class _ConversationPageState extends State<ConversationPage> {
   @override
   Widget build(BuildContext context) {
     // Determine current user ID for message alignment (assuming it's available in dataController.user)
-    final String currentUserId = _dataController.user.value['id']?.toString() ?? 'currentUser';
-
+    final String currentUserId =
+        _dataController.user.value['user']?['_id'] ?? '';
 
     return Scaffold(
       backgroundColor: const Color(0xFF000000),
