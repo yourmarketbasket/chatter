@@ -160,7 +160,7 @@ class _ContactsPageState extends State<ContactsPage> {
                 radius: 24,
                 backgroundColor: Colors.tealAccent.withOpacity(0.2),
                 backgroundImage:
-                    avatarUrl.isNotEmpty ? CachedNetworkImageProvider(avatarUrl) : null,
+                    (avatarUrl != null && avatarUrl.isNotEmpty) ? CachedNetworkImageProvider(avatarUrl) : null,
                 child: avatarUrl.isEmpty
                     ? Text(
                         user['name']?[0] ?? '?',

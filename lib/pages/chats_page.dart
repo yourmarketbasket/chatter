@@ -149,7 +149,7 @@ class _ChatsPageState extends State<ChatsPage> {
                   const SizedBox(height: 4),
                   if (lastMessageData != null && lastMessageData is Map<String, dynamic>)
                     Text(
-                      formatTime(DateTime.parse(lastMessageData['createdAt'])),
+                      formatTime(DateTime.parse(lastMessageData['createdAt'] as String)),
                       style: TextStyle(
                         color: Colors.grey[400],
                         fontSize: 12,
