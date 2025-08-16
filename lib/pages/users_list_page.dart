@@ -192,7 +192,10 @@ class _UsersListPageState extends State<UsersListPage> {
       ),
       drawer: const AppDrawer(),
       body: Obx(() {
-        final usersToShow = _dataController.following;
+        final currentUserId = _dataController.user.value['user']?['_id'];
+        final usersToShow = _dataController.following
+            .where((user) => user['_id'] != currentUserId)
+            .toList();
         if (_dataController.isLoadingFollowers.value && usersToShow.isEmpty) {
           return Center(
             child: CircularProgressIndicator(

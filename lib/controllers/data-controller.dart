@@ -2640,16 +2640,23 @@ void clearUserPosts() {
         final Map<String, dynamic> chatData =
             response.data['chat'] as Map<String, dynamic>;
         final List<User> participants = participantIds.map((id) {
-          final userMap = allUsers.firstWhere(
+          final userMap = following.firstWhere(
             (u) => u['_id'] == id,
-            orElse: () => <String,
-                dynamic>{}, // Return an empty map if no user is found
+            orElse: () {
+              // Also check the current user, as they are a participant but not in the 'following' list
+              final currentUser = user.value['user'];
+              if (currentUser != null && currentUser['_id'] == id) {
+                return currentUser as Map<String, dynamic>;
+              }
+              return <String,
+                  dynamic>{}; // Return an empty map if no user is found
+            },
           );
           if (userMap.isEmpty) {
-            final currentUser = user.value['user'];
-            if (currentUser != null && currentUser['_id'] == id) {
-              return User.fromJson(currentUser as Map<String, dynamic>);
-            }
+            // This case should ideally not be hit if the UI is populated correctly,
+            // but as a fallback, we create a user with just an ID.
+            print('Warning: User with ID $id not found in following or as current user.');
+            return User(id: id, name: 'Unknown User');
           }
           return User.fromJson(userMap);
         }).toList();
