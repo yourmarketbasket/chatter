@@ -1,5 +1,3 @@
-import 'package:chatter/models/message_models.dart';
-import 'package:chatter/models/feed_models.dart' hide Attachment;
 import 'package:flutter/material.dart';
 import 'package:chatter/pages/media_view_page.dart';
 import 'package:chatter/widgets/video_player_widget.dart';
@@ -7,32 +5,32 @@ import 'package:chatter/widgets/audio_waveform_widget.dart';
 import 'dart:io';
 
 class AllAttachmentsDialog extends StatelessWidget {
-  final ChatMessage message;
+  final Map<String, dynamic> message;
   final Map<String, dynamic> chat;
 
   const AllAttachmentsDialog({super.key, required this.message, required this.chat});
 
-  Widget _buildPreview(BuildContext context, Attachment attachment) {
-    final extension = attachment.type?.toLowerCase() ?? '';
-    final isLocalFile = !attachment.url.startsWith('http');
+  Widget _buildPreview(BuildContext context, Map<String, dynamic> attachment) {
+    final extension = attachment['type']?.toLowerCase() ?? '';
+    final isLocalFile = !(attachment['url'] as String).startsWith('http');
     Widget preview;
 
     switch (extension) {
       case 'image':
         preview = Image(
-          image: isLocalFile ? FileImage(File(attachment.url)) : NetworkImage(attachment.url) as ImageProvider,
+          image: isLocalFile ? FileImage(File(attachment['url'])) : NetworkImage(attachment['url']) as ImageProvider,
           fit: BoxFit.cover,
         );
         break;
       case 'video':
         preview = VideoPlayerWidget(
-          url: isLocalFile ? null : attachment.url,
-          file: isLocalFile ? File(attachment.url) : null,
+          url: isLocalFile ? null : attachment['url'],
+          file: isLocalFile ? File(attachment['url']) : null,
         );
         break;
       case 'audio':
         preview = AudioWaveformWidget(
-          audioPath: attachment.url,
+          audioPath: attachment['url'],
           isLocal: isLocalFile,
         );
         break;
@@ -47,17 +45,17 @@ class AllAttachmentsDialog extends StatelessWidget {
   }
 
   void _openMediaView(BuildContext context, int initialIndex) {
-    final attachmentsForViewer = message.attachments!
+    final attachmentsForViewer = (message['attachments'] as List)
         .map((att) => {
-              'url': att.url,
-              'type': att.type,
-              'filename': att.filename,
+              'url': att['url'],
+              'type': att['type'],
+              'filename': att['filename'],
             })
         .toList();
 
     final sender = (chat['participants'] as List).firstWhere(
-      (p) => p['_id'] == message.senderId,
-      orElse: () => {'_id': message.senderId, 'name': 'Unknown User'},
+      (p) => p['_id'] == message['senderId'],
+      orElse: () => {'_id': message['senderId'], 'name': 'Unknown User'},
     );
 
     Navigator.push(
@@ -66,10 +64,10 @@ class AllAttachmentsDialog extends StatelessWidget {
         builder: (context) => MediaViewPage(
           attachments: attachmentsForViewer,
           initialIndex: initialIndex,
-          message: message.text ?? '',
+          message: message['text'] ?? '',
           userName: sender['name'],
           userAvatarUrl: sender['avatar'],
-          timestamp: message.createdAt,
+          timestamp: DateTime.parse(message['createdAt']),
           viewsCount: 0, // Placeholder
           likesCount: 0, // Placeholder
           repostsCount: 0, // Placeholder
@@ -91,9 +89,9 @@ class AllAttachmentsDialog extends StatelessWidget {
             crossAxisSpacing: 8,
             mainAxisSpacing: 8,
           ),
-          itemCount: message.attachments!.length,
+          itemCount: (message['attachments'] as List).length,
           itemBuilder: (context, index) {
-            final attachment = message.attachments![index];
+            final attachment = (message['attachments'] as List)[index];
             return GestureDetector(
               onTap: () => _openMediaView(context, index),
               child: Container(

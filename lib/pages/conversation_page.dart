@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:chatter/controllers/data-controller.dart';
-import 'package:chatter/models/message_models.dart';
 import 'package:chatter/services/socket-service.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -61,11 +60,13 @@ class _ConversationPageState extends State<ConversationPage> {
   void _sendMessage() {
     if (_messageController.text.trim().isEmpty) return;
 
-    final message = ChatMessage(
-      chatId: widget.conversationId,
-      senderId: _dataController.user.value['user']['_id'], // Assuming user ID is here
-      text: _messageController.text.trim(),
-    );
+    final message = {
+      '_id': DateTime.now().millisecondsSinceEpoch.toString(),
+      'chatId': widget.conversationId,
+      'senderId': _dataController.user.value['user']['_id'], // Assuming user ID is here
+      'text': _messageController.text.trim(),
+      'createdAt': DateTime.now().toIso8601String(),
+    };
     _dataController.sendChatMessage(message);
 
     _messageController.clear();
@@ -145,7 +146,7 @@ class _ConversationPageState extends State<ConversationPage> {
                 itemCount: messages.length,
                 itemBuilder: (context, index) {
                   final message = messages[index];
-                  final bool isMe = message.senderId == currentUserId;
+                  final bool isMe = message['senderId'] == currentUserId;
                   // Basic message bubble
                   return Align(
                     alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
@@ -157,7 +158,7 @@ class _ConversationPageState extends State<ConversationPage> {
                         borderRadius: BorderRadius.circular(12.0),
                       ),
                       child: Text(
-                        message.text ?? '',
+                        message['text'] ?? '',
                         style: GoogleFonts.roboto(color: isMe ? Colors.black : Colors.white, fontSize: 15),
                       ),
                     ),

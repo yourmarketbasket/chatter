@@ -81,10 +81,11 @@ class _GroupsPageState extends State<GroupsPage> {
                 overflow: TextOverflow.ellipsis,
               ),
               onTap: () {
+                _dataController.currentChat.value = chat;
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => ChatScreen(chat: chat),
+                    builder: (context) => const ChatScreen(),
                   ),
                 );
               },

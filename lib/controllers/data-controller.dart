@@ -1104,15 +1104,15 @@ class DataController extends GetxController {
   }
 
   Future<void> handleFileAttachmentTap(String messageId, String attachmentId) async {
-    final messageIndex = currentConversationMessages.indexWhere((m) => m.id == messageId);
+    final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
     if (messageIndex == -1) return;
 
     final message = currentConversationMessages[messageIndex];
-    final attachmentIndex = message.attachments!.indexWhere((a) => a.id == attachmentId);
+    final attachmentIndex = (message['attachments'] as List).indexWhere((a) => a['_id'] == attachmentId);
     if (attachmentIndex == -1) return;
 
-    final attachment = message.attachments![attachmentIndex];
-    final file = await _localFile(attachment.filename);
+    final attachment = (message['attachments'] as List)[attachmentIndex];
+    final file = await _localFile(attachment['filename']);
 
     if (await file.exists()) {
       print('File already downloaded at: ${file.path}');
@@ -1124,36 +1124,37 @@ class DataController extends GetxController {
   }
 
   Future<void> downloadAttachment(String messageId, String attachmentId) async {
-    final messageIndex = currentConversationMessages.indexWhere((m) => m.id == messageId);
+    final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
     if (messageIndex == -1) return;
 
     final message = currentConversationMessages[messageIndex];
-    final attachmentIndex = message.attachments!.indexWhere((a) => a.id == attachmentId);
+    final attachmentIndex = (message['attachments'] as List).indexWhere((a) => a['_id'] == attachmentId);
     if (attachmentIndex == -1) return;
 
-    final attachment = message.attachments![attachmentIndex];
+    final attachment = (message['attachments'] as List)[attachmentIndex];
 
     // Mark as downloading
-    final updatedAttachments = List<Attachment>.from(message.attachments!);
-    updatedAttachments[attachmentIndex] = attachment.copyWith(isDownloading: true, downloadProgress: 0.0);
-    currentConversationMessages[messageIndex] = message.copyWith(attachments: updatedAttachments);
+    final updatedAttachments = List<Map<String, dynamic>>.from(message['attachments']);
+    updatedAttachments[attachmentIndex]['isDownloading'] = true;
+    updatedAttachments[attachmentIndex]['downloadProgress'] = 0.0;
+    currentConversationMessages[messageIndex]['attachments'] = updatedAttachments;
     currentConversationMessages.refresh();
 
     try {
-      final file = await _localFile(attachment.filename);
+      final file = await _localFile(attachment['filename']);
       await _dio.download(
-        attachment.url,
+        attachment['url'],
         file.path,
         onReceiveProgress: (received, total) {
           if (total != -1) {
             final progress = received / total;
-            final mIndex = currentConversationMessages.indexWhere((m) => m.id == messageId);
+            final mIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
             if (mIndex != -1) {
-              final aIndex = currentConversationMessages[mIndex].attachments!.indexWhere((a) => a.id == attachmentId);
+              final aIndex = (currentConversationMessages[mIndex]['attachments'] as List).indexWhere((a) => a['_id'] == attachmentId);
               if (aIndex != -1) {
-                final attachments = List<Attachment>.from(currentConversationMessages[mIndex].attachments!);
-                attachments[aIndex] = attachments[aIndex].copyWith(downloadProgress: progress);
-                currentConversationMessages[mIndex] = currentConversationMessages[mIndex].copyWith(attachments: attachments);
+                final attachments = List<Map<String, dynamic>>.from(currentConversationMessages[mIndex]['attachments']);
+                attachments[aIndex]['downloadProgress'] = progress;
+                currentConversationMessages[mIndex]['attachments'] = attachments;
                 currentConversationMessages.refresh();
               }
             }
@@ -1162,26 +1163,27 @@ class DataController extends GetxController {
       );
 
       // Mark download as complete
-      final mIndex = currentConversationMessages.indexWhere((m) => m.id == messageId);
+      final mIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
       if (mIndex != -1) {
-        final aIndex = currentConversationMessages[mIndex].attachments!.indexWhere((a) => a.id == attachmentId);
+        final aIndex = (currentConversationMessages[mIndex]['attachments'] as List).indexWhere((a) => a['_id'] == attachmentId);
         if (aIndex != -1) {
-          final attachments = List<Attachment>.from(currentConversationMessages[mIndex].attachments!);
-          attachments[aIndex] = attachments[aIndex].copyWith(isDownloading: false, downloadProgress: 1.0);
-          currentConversationMessages[mIndex] = currentConversationMessages[mIndex].copyWith(attachments: attachments);
+          final attachments = List<Map<String, dynamic>>.from(currentConversationMessages[mIndex]['attachments']);
+          attachments[aIndex]['isDownloading'] = false;
+          attachments[aIndex]['downloadProgress'] = 1.0;
+          currentConversationMessages[mIndex]['attachments'] = attachments;
           currentConversationMessages.refresh();
         }
       }
     } catch (e) {
       print('Error downloading file: $e');
       // Mark as failed
-      final mIndex = currentConversationMessages.indexWhere((m) => m.id == messageId);
+      final mIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
       if (mIndex != -1) {
-        final aIndex = currentConversationMessages[mIndex].attachments!.indexWhere((a) => a.id == attachmentId);
+        final aIndex = (currentConversationMessages[mIndex]['attachments'] as List).indexWhere((a) => a['_id'] == attachmentId);
         if (aIndex != -1) {
-          final attachments = List<Attachment>.from(currentConversationMessages[mIndex].attachments!);
-          attachments[aIndex] = attachments[aIndex].copyWith(isDownloading: false);
-          currentConversationMessages[mIndex] = currentConversationMessages[mIndex].copyWith(attachments: attachments);
+          final attachments = List<Map<String, dynamic>>.from(currentConversationMessages[mIndex]['attachments']);
+          attachments[aIndex]['isDownloading'] = false;
+          currentConversationMessages[mIndex]['attachments'] = attachments;
           currentConversationMessages.refresh();
         }
       }
