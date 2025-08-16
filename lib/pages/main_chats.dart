@@ -1,6 +1,5 @@
-import 'package:chatter/pages/chats_page.dart';
 import 'package:chatter/pages/contacts_page.dart';
-import 'package:chatter/pages/groups_page.dart';
+import 'package:chatter/pages/unified_chats_page.dart';
 import 'package:flutter/material.dart';
 
 class MainChatsPage extends StatefulWidget {
@@ -11,24 +10,55 @@ class MainChatsPage extends StatefulWidget {
 }
 
 class _MainChatsPageState extends State<MainChatsPage> {
-  int _currentIndex = 0;
-  final PageController _pageController = PageController();
   final TextEditingController _searchController = TextEditingController();
-
-  // Dummy unread counts
-  final int _unreadChats = 3;
-  final int _unreadGroups = 5;
-
-  final List<Widget> _children = [
-    const ChatsPage(),
-    const GroupsPage(),
-  ];
 
   @override
   void dispose() {
-    _pageController.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _showCreateChatDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: Colors.grey[900],
+          title: const Text('Start something new', style: TextStyle(color: Colors.white)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.person_add, color: Colors.tealAccent),
+                title: const Text('New Chat', style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ContactsPage(isCreatingGroup: false),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.group_add, color: Colors.tealAccent),
+                title: const Text('New Group', style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ContactsPage(isCreatingGroup: true),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -50,21 +80,6 @@ class _MainChatsPageState extends State<MainChatsPage> {
           bodyMedium: TextStyle(color: Colors.white),
           labelMedium: TextStyle(color: Colors.grey),
         ),
-        bottomNavigationBarTheme: BottomNavigationBarThemeData(
-          backgroundColor: Colors.transparent, // Transparent to match body
-          selectedItemColor: Colors.tealAccent,
-          unselectedItemColor: Colors.grey[400],
-          selectedLabelStyle: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 12,
-            color: Colors.white,
-          ),
-          unselectedLabelStyle: const TextStyle(
-            fontWeight: FontWeight.w400,
-            fontSize: 12,
-            color: Colors.grey,
-          ),
-        ),
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.black, // Match body background
           elevation: 0,
@@ -78,7 +93,7 @@ class _MainChatsPageState extends State<MainChatsPage> {
       child: Scaffold(
         extendBody: true, // Allow body to extend behind nav bar
         appBar: AppBar(
-          title: Text(_currentIndex == 0 ? 'Chats' : 'Groups'),
+          title: const Text('Chats'),
           automaticallyImplyLeading: false, // No back arrow
           actions: [
             Padding(
@@ -90,16 +105,7 @@ class _MainChatsPageState extends State<MainChatsPage> {
                 ),
                 child: IconButton(
                   icon: const Icon(Icons.add, color: Colors.tealAccent),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ContactsPage(
-                          isCreatingGroup: _currentIndex == 1,
-                        ),
-                      ),
-                    );
-                  },
+                  onPressed: _showCreateChatDialog,
                 ),
               ),
             ),
@@ -111,7 +117,7 @@ class _MainChatsPageState extends State<MainChatsPage> {
               child: TextField(
                 controller: _searchController,
                 decoration: InputDecoration(
-                  hintText: 'Search ${_currentIndex == 0 ? 'chats' : 'groups'}...',
+                  hintText: 'Search...',
                   hintStyle: TextStyle(color: Colors.grey[400]),
                   filled: true,
                   fillColor: Colors.grey[900]!.withOpacity(0.3),
@@ -129,146 +135,7 @@ class _MainChatsPageState extends State<MainChatsPage> {
             ),
           ),
         ),
-        body: ClipRRect(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(40)),
-          child: Container(
-            color: Colors.black, // Match body background
-            child: PageView(
-              controller: _pageController,
-              physics: const NeverScrollableScrollPhysics(), // Disable PageView swipe to allow list scrolling
-              children: _children,
-              onPageChanged: (index) {
-                setState(() {
-                  _currentIndex = index;
-                  _searchController.clear(); // Clear search when switching pages
-                });
-              },
-            ),
-          ),
-        ),
-        bottomNavigationBar: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.grey[900], // Keep grey for raised element
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
-                  blurRadius: 10,
-                  spreadRadius: 2,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(30),
-              child: BottomNavigationBar(
-                currentIndex: _currentIndex,
-                onTap: (index) {
-                  setState(() {
-                    _currentIndex = index;
-                    _pageController.animateToPage(
-                      index,
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeInOut,
-                    );
-                  });
-                },
-                backgroundColor: Colors.transparent, // Transparent to show grey container
-                elevation: 0,
-                selectedItemColor: Colors.tealAccent,
-                unselectedItemColor: Colors.grey[400],
-                showUnselectedLabels: true,
-                type: BottomNavigationBarType.fixed,
-                selectedLabelStyle: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
-                  color: Colors.white,
-                ),
-                unselectedLabelStyle: const TextStyle(
-                  fontWeight: FontWeight.w400,
-                  fontSize: 12,
-                  color: Colors.grey,
-                ),
-                items: [
-                  BottomNavigationBarItem(
-                    icon: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        AnimatedScale(
-                          scale: _currentIndex == 0 ? 1.2 : 1.0,
-                          duration: const Duration(milliseconds: 200),
-                          child: Icon(
-                            Icons.chat,
-                            color: _currentIndex == 0 ? Colors.tealAccent : Colors.grey[400],
-                          ),
-                        ),
-                        if (_unreadChats > 0)
-                          Positioned(
-                            top: -10,
-                            right: -10,
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(
-                                color: Colors.red,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Text(
-                                _unreadChats.toString(),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    label: 'Chats',
-                  ),
-                  BottomNavigationBarItem(
-                    icon: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        AnimatedScale(
-                          scale: _currentIndex == 1 ? 1.2 : 1.0,
-                          duration: const Duration(milliseconds: 200),
-                          child: Icon(
-                            Icons.group,
-                            color: _currentIndex == 1 ? Colors.tealAccent : Colors.grey[400],
-                          ),
-                        ),
-                        if (_unreadGroups > 0)
-                          Positioned(
-                            top: -10,
-                            right: -10,
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(
-                                color: Colors.orange,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Text(
-                                _unreadGroups.toString(),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    label: 'Groups',
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
+        body: const UnifiedChatsPage(),
       ),
     );
   }
