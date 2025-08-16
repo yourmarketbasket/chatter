@@ -35,33 +35,19 @@ class _ContactsPageState extends State<ContactsPage> {
         }
       });
     } else {
-      // Logic from users_list_page
-      final existingChat = _dataController.chats.values.firstWhere(
-          (chat) =>
-              chat['isGroup'] == false &&
-              chat['participants'].any((p) => p['_id'] == user['_id']),
-          orElse: () => <String, dynamic>{});
-
-      if (existingChat.isNotEmpty) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ChatScreen(chat: existingChat),
-          ),
-        );
-      } else {
-        final currentUserId = _dataController.user.value['user']['_id'];
-        _dataController.createChat([currentUserId, user['_id']]).then((chat) {
-          if (chat != null) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ChatScreen(chat: chat),
-              ),
-            );
-          }
-        });
-      }
+      final currentUserId = _dataController.user.value['user']['_id'];
+      _dataController
+          .createChat([currentUserId, user['_id']], isGroup: false)
+          .then((chat) {
+        if (chat != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ChatScreen(chat: chat),
+            ),
+          );
+        }
+      });
     }
   }
 
