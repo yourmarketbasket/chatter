@@ -112,7 +112,7 @@ class _UnifiedChatsPageState extends State<UnifiedChatsPage> {
 
             IconData statusIcon = Icons.access_time;
             Color statusColor = Colors.grey[400]!;
-            if (lastMessageData != null) {
+            if (lastMessageData != null && lastMessageData is Map<String, dynamic>) {
                 switch (lastMessageData['status']) {
                   case 'sent':
                     statusIcon = Icons.check;
@@ -166,7 +166,7 @@ class _UnifiedChatsPageState extends State<UnifiedChatsPage> {
                         fontSize: 12,
                       ),
                     ),
-                  if (lastMessageData != null && lastMessageData['senderId'] == currentUserId)
+                  if (lastMessageData != null && lastMessageData is Map<String, dynamic> && lastMessageData['senderId'] == currentUserId)
                     Icon(
                       statusIcon,
                       size: 16,
