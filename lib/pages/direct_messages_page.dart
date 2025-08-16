@@ -1,5 +1,4 @@
 import 'package:chatter/controllers/data-controller.dart';
-import 'package:chatter/models/message_models.dart';
 import 'package:chatter/pages/chat_screen_page.dart';
 import 'package:chatter/widgets/app_drawer.dart';
 import 'package:flutter/material.dart';
@@ -80,7 +79,8 @@ class _DirectMessagesPageState extends State<DirectMessagesPage> {
                 style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 12),
               ),
               onTap: () {
-                Get.to(() => ChatScreen(chat: chat));
+                _dataController.currentChat.value = chat;
+                Get.to(() => const ChatScreen());
               },
             );
           },
