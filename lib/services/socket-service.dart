@@ -248,6 +248,25 @@ class SocketService {
       }
     });
 
+    _socket!.on('message:new', (data) {
+      if (data is Map<String, dynamic>) {
+        _dataController.handleNewMessage(data);
+      } else {
+        print('[SocketService] Received message:new event with unexpected data type: ${data.runtimeType}');
+      }
+    });
+
+    _socket!.on('typing:start', (data) {
+      if (data is Map<String, dynamic>) {
+        _dataController.handleTypingStart(data);
+      }
+    });
+
+    _socket!.on('typing:stop', (data) {
+      if (data is Map<String, dynamic>) {
+        _dataController.handleTypingStop(data);
+      }
+    });
   }
 
   void connect() {
@@ -267,6 +286,18 @@ class SocketService {
       _socket!.emit('message', message);
     } else {
       print('Cannot send message: Socket is not connected or message is empty');
+    }
+  }
+
+  void sendTypingStart(String chatId) {
+    if (_socket != null && _socket!.connected) {
+      _socket!.emit('typing:start', {'chatId': chatId});
+    }
+  }
+
+  void sendTypingStop(String chatId) {
+    if (_socket != null && _socket!.connected) {
+      _socket!.emit('typing:stop', {'chatId': chatId});
     }
   }
 

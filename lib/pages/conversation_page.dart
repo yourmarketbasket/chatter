@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:chatter/controllers/data-controller.dart';
 import 'package:chatter/models/chat_models.dart';
+import 'package:chatter/services/socket-service.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -24,8 +26,10 @@ class ConversationPage extends StatefulWidget {
 
 class _ConversationPageState extends State<ConversationPage> {
   final DataController _dataController = Get.find<DataController>();
+  final SocketService _socketService = Get.find<SocketService>();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  Timer? _typingTimer;
 
   @override
   void initState() {
@@ -35,6 +39,23 @@ class _ConversationPageState extends State<ConversationPage> {
       Get.snackbar('Error', 'Could not load messages: ${e.toString()}',
           backgroundColor: Colors.red, colorText: Colors.white);
     });
+
+    _messageController.addListener(_onTyping);
+  }
+
+  void _onTyping() {
+    if (_typingTimer?.isActive ?? false) _typingTimer!.cancel();
+    _socketService.sendTypingStart(widget.conversationId);
+    _typingTimer = Timer(const Duration(seconds: 2), () {
+      _socketService.sendTypingStop(widget.conversationId);
+    });
+  }
+
+  @override
+  void dispose() {
+    _messageController.removeListener(_onTyping);
+    _typingTimer?.cancel();
+    super.dispose();
   }
 
   void _sendMessage() {
@@ -145,6 +166,23 @@ class _ConversationPageState extends State<ConversationPage> {
               );
             }),
           ),
+          Obx(() {
+            final isTyping = _dataController.isTyping[widget.conversationId] ?? false;
+            if (isTyping) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                child: Row(
+                  children: [
+                    Text(
+                      '${widget.username} is typing...',
+                      style: GoogleFonts.roboto(color: Colors.grey[400], fontStyle: FontStyle.italic),
+                    ),
+                  ],
+                ),
+              );
+            }
+            return const SizedBox.shrink();
+          }),
           _buildMessageInputField(),
         ],
       ),

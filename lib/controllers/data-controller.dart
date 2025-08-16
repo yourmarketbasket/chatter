@@ -45,6 +45,7 @@ class DataController extends GetxController {
   final RxBool isLoadingConversations = false.obs;
   final RxList<ChatMessage> currentConversationMessages = <ChatMessage>[].obs;
   final RxBool isLoadingMessages = false.obs;
+  final RxMap<String, bool> isTyping = <String, bool>{}.obs;
 
   // Add these Rx variables inside DataController class
   final RxList<Map<String, dynamic>> followers = <Map<String, dynamic>>[].obs;
@@ -973,88 +974,89 @@ class DataController extends GetxController {
   // Add these placeholder methods inside DataController class
 
   Future<void> fetchConversations() async {
-    // This method will be updated later to fetch real conversation data.
-    // For now, it's a placeholder.
     isLoadingConversations.value = true;
-    await Future.delayed(const Duration(seconds: 1));
-    isLoadingConversations.value = false;
+    try {
+      final token = user.value['token'];
+      if (token == null) {
+        throw Exception('User not authenticated');
+      }
+      final response = await _dio.get(
+        'api/chats',
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        final List<dynamic> chatData = response.data['chats'];
+        conversations.value = chatData.map((data) => Chat.fromJson(data)).toList();
+      } else {
+        throw Exception('Failed to fetch conversations');
+      }
+    } catch (e) {
+      print('Error fetching conversations: $e');
+      // Optionally, show a snackbar or some error message to the user
+    } finally {
+      isLoadingConversations.value = false;
+    }
   }
 
   Future<void> fetchMessages(String conversationId) async {
-    // This method will be updated later to fetch real messages for a conversation.
-    // For now, it's a placeholder.
     isLoadingMessages.value = true;
-    await Future.delayed(const Duration(seconds: 1));
-    isLoadingMessages.value = false;
+    try {
+      final token = user.value['token'];
+      if (token == null) {
+        throw Exception('User not authenticated');
+      }
+      final response = await _dio.get(
+        'api/chats/$conversationId/messages',
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        final List<dynamic> messageData = response.data['messages'];
+        currentConversationMessages.value = messageData.map((data) => ChatMessage.fromJson(data)).toList();
+      } else {
+        throw Exception('Failed to fetch messages');
+      }
+    } catch (e) {
+      print('Error fetching messages: $e');
+    } finally {
+      isLoadingMessages.value = false;
+    }
   }
 
   // Send a new chat message
   Future<void> sendChatMessage(ChatMessage message) async {
-    // Optimistic UI update: add message to the list with 'sending' status
-    currentConversationMessages.insert(0, message);
+    final messageIndex = currentConversationMessages.length;
+    currentConversationMessages.insert(0, message.copyWith(status: MessageStatus.sending));
 
-    // If there are attachments, simulate upload
-    if (message.attachments != null && message.attachments!.isNotEmpty) {
-      // This is a simplified simulation of file uploading
-      final messageIndex = currentConversationMessages.indexWhere((m) => m.id == message.id);
-
-      if (messageIndex != -1) {
-        // Create a list of new attachments marked as uploading
-        final initialAttachments = currentConversationMessages[messageIndex]
-            .attachments!
-            .map((a) => a.copyWith(isUploading: true, uploadProgress: 0.0))
-            .toList();
-
-        var updatedMessage = currentConversationMessages[messageIndex].copyWith(attachments: initialAttachments);
-        currentConversationMessages[messageIndex] = updatedMessage;
-        currentConversationMessages.refresh();
-
-        // Simulate progress for each attachment one by one
-        for (var i = 0; i < initialAttachments.length; i++) {
-          // Simulate progress updates
-          for (var p = 1; p <= 10; p++) {
-            await Future.delayed(const Duration(milliseconds: 150));
-            final mIndex = currentConversationMessages.indexWhere((m) => m.id == message.id);
-            if (mIndex != -1) {
-              final currentAttachments = List<Attachment>.from(currentConversationMessages[mIndex].attachments!);
-              currentAttachments[i] = currentAttachments[i].copyWith(uploadProgress: p / 10.0);
-
-              final msgToUpdate = currentConversationMessages[mIndex].copyWith(attachments: currentAttachments);
-              currentConversationMessages[mIndex] = msgToUpdate;
-              currentConversationMessages.refresh();
-            }
-          }
-
-          // Mark as uploaded and replace with a fake network URL
-           final mIndex = currentConversationMessages.indexWhere((m) => m.id == message.id);
-           if (mIndex != -1) {
-              final currentAttachments = List<Attachment>.from(currentConversationMessages[mIndex].attachments!);
-              currentAttachments[i] = currentAttachments[i].copyWith(
-                isUploading: false,
-                uploadProgress: 1.0,
-                url: 'https://picsum.photos/seed/${currentAttachments[i].id}/400/300',
-              );
-
-              final msgToUpdate = currentConversationMessages[mIndex].copyWith(attachments: currentAttachments);
-              currentConversationMessages[mIndex] = msgToUpdate;
-              currentConversationMessages.refresh();
-           }
-        }
+    try {
+      final token = user.value['token'];
+      if (token == null) {
+        throw Exception('User not authenticated');
       }
-    }
 
+      final response = await _dio.post(
+        'api/chats/${message.chatId}/messages',
+        data: message.toJson(),
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
 
-    // Simulate network delay for sending the message itself
-    await Future.delayed(const Duration(seconds: 1));
-
-    // Update message status to 'sent' (or 'failed' to test that)
-    final messageIndex = currentConversationMessages.indexWhere((m) => m.id == message.id);
-    if (messageIndex != -1) {
-      final sentMessage = currentConversationMessages[messageIndex].copyWith(status: MessageStatus.sent);
-      currentConversationMessages[messageIndex] = sentMessage;
+      if (response.statusCode == 201 && response.data['success'] == true) {
+        final sentMessage = ChatMessage.fromJson(response.data['message']);
+        currentConversationMessages[messageIndex] = sentMessage.copyWith(status: MessageStatus.sent);
+        currentConversationMessages.refresh();
+      } else {
+        throw Exception('Failed to send message');
+      }
+    } catch (e) {
+      print('Error sending message: $e');
+      currentConversationMessages[messageIndex] = message.copyWith(status: MessageStatus.failed);
       currentConversationMessages.refresh();
     }
-    // No catch block for failure simulation, assuming success for now.
   }
 
   Future<void> editChatMessage(String messageId, String newText) async {
@@ -2551,5 +2553,36 @@ void clearUserPosts() {
 
     // Notify ProfilePage if the unfollowed user's profile might be open
     profileUpdateTrigger.value = unfollowedId ?? DateTime.now().millisecondsSinceEpoch.toString();
+  }
+
+  void handleNewMessage(Map<String, dynamic> messageData) {
+    final newMessage = ChatMessage.fromJson(messageData);
+
+    // Add to the current conversation if it's the one being viewed
+    if (currentConversationMessages.isNotEmpty && currentConversationMessages.first.chatId == newMessage.chatId) {
+      currentConversationMessages.insert(0, newMessage);
+    }
+
+    // Update the last message in the conversations list
+    final conversationIndex = conversations.indexWhere((c) => c.id == newMessage.chatId);
+    if (conversationIndex != -1) {
+      final chat = conversations[conversationIndex];
+      // This is tricky because the Chat model is not easily mutable.
+      // A better approach would be to refetch conversations or make the Chat model more easily updatable.
+      // For now, let's just update the unread count.
+      // final updatedChat = chat.copyWith(lastMessage: newMessage, unreadCount: (chat.unreadCount ?? 0) + 1);
+      // conversations[conversationIndex] = updatedChat;
+      conversations.refresh();
+    }
+  }
+
+  void handleTypingStart(Map<String, dynamic> data) {
+    final chatId = data['chatId'] as String;
+    isTyping[chatId] = true;
+  }
+
+  void handleTypingStop(Map<String, dynamic> data) {
+    final chatId = data['chatId'] as String;
+    isTyping[chatId] = false;
   }
 }
