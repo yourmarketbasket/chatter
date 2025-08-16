@@ -19,6 +19,9 @@ void main() async {
   // Ensure Flutter bindings are initialized
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Initialize Firebase
+  await Firebase.initializeApp();
+
   // Initialize DataController and register as singleton
   final DataController dataController = Get.put(DataController());
   // Initialize MediaVisibilityService
