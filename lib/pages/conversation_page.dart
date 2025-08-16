@@ -233,7 +233,7 @@ class _ConversationPageState extends State<ConversationPage> {
             icon: Icon(FeatherIcons.send, color: Colors.tealAccent),
             onPressed: _sendMessage,
           ),
-        ],
+        ],//force
       ),
     );
   }
