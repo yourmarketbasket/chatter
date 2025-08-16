@@ -1,7 +1,10 @@
 import 'package:chatter/controllers/data-controller.dart';
 import 'package:chatter/pages/chat_screen_page.dart';
+import 'package:chatter/pages/conversation_page.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class ContactsPage extends StatefulWidget {
   final bool isCreatingGroup;
@@ -32,16 +35,14 @@ class _ContactsPageState extends State<ContactsPage> {
         }
       });
     } else {
-      // Find existing chat or create a new one
+      // Logic from users_list_page
       final existingChat = _dataController.chats.values.firstWhere(
-        (chat) =>
-            chat['isGroup'] == false &&
-            chat['participants']
-                .any((p) => p['_id'] == user['_id']),
-        orElse: () => <String, dynamic>{},
-      );
+          (chat) =>
+              chat['isGroup'] == false &&
+              chat['participants'].any((p) => p['_id'] == user['_id']),
+          orElse: () => <String, dynamic>{});
 
-      if (existingChat != null) {
+      if (existingChat.isNotEmpty) {
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -66,64 +67,73 @@ class _ContactsPageState extends State<ContactsPage> {
 
   void _createGroup() {
     if (_selectedUserIds.length < 2) {
-      // Show error, need at least 2 other members for a group
+      Get.snackbar('Error', 'Select at least 2 members to create a group.',
+          backgroundColor: Colors.red, colorText: Colors.white);
       return;
     }
     final currentUserId = _dataController.user.value['user']['_id'];
     final participantIds = <String>[currentUserId, ..._selectedUserIds];
 
-    // a dialog to get group name
     final groupNameController = TextEditingController();
-    showDialog(
-        context: context,
-        builder: (context) {
-          return AlertDialog(
-            title: const Text('New Group'),
-            content: TextField(
-              controller: groupNameController,
-              decoration: const InputDecoration(hintText: 'Group Name'),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () {
-                  final groupName = groupNameController.text.trim();
-                  if (groupName.isNotEmpty) {
-                    _dataController.createChat(participantIds, isGroup: true, groupName: groupName).then((chat) {
-                      if (chat != null) {
-                        Navigator.pop(context); // close dialog
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => ChatScreen(chat: chat),
-                          ),
-                        );
-                      }
-                    });
+    Get.dialog(
+      AlertDialog(
+        backgroundColor: Colors.grey[900],
+        title: const Text('New Group', style: TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: groupNameController,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            hintText: 'Group Name',
+            hintStyle: TextStyle(color: Colors.grey),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancel', style: TextStyle(color: Colors.tealAccent)),
+          ),
+          TextButton(
+            onPressed: () {
+              final groupName = groupNameController.text.trim();
+              if (groupName.isNotEmpty) {
+                _dataController
+                    .createChat(participantIds,
+                        isGroup: true, groupName: groupName)
+                    .then((chat) {
+                  Get.back(); // Close dialog
+                  if (chat != null) {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ChatScreen(chat: chat),
+                      ),
+                    );
                   }
-                },
-                child: const Text('Create'),
-              ),
-            ],
-          );
-        });
+                });
+              }
+            },
+            child: const Text('Create', style: TextStyle(color: Colors.tealAccent)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
+        backgroundColor: Colors.black,
         title: Text(
-            widget.isCreatingGroup ? 'Create Group' : 'New Chat'),
+          widget.isCreatingGroup ? 'Create Group' : 'New Chat',
+          style: GoogleFonts.poppins(
+              fontWeight: FontWeight.w600, color: Colors.white),
+        ),
         actions: [
           if (widget.isCreatingGroup)
             IconButton(
-              icon: const Icon(Icons.check),
+              icon: const Icon(Icons.check, color: Colors.tealAccent),
               onPressed: _createGroup,
             ),
         ],
@@ -133,26 +143,58 @@ class _ContactsPageState extends State<ContactsPage> {
           return const Center(child: CircularProgressIndicator());
         }
         if (_dataController.following.isEmpty) {
-          return const Center(child: Text('You are not following anyone yet.'));
+          return const Center(
+              child: Text('You are not following anyone yet.',
+                  style: TextStyle(color: Colors.white)));
         }
         return ListView.builder(
           itemCount: _dataController.following.length,
           itemBuilder: (context, index) {
             final user = _dataController.following[index];
             final isSelected = _selectedUserIds.contains(user['_id']);
+            final String avatarUrl = user['avatar'] ?? '';
 
             return ListTile(
               leading: CircleAvatar(
-                backgroundImage: NetworkImage(user['avatar'] ?? ''),
+                radius: 24,
+                backgroundColor: Colors.grey[800],
+                backgroundImage:
+                    avatarUrl.isNotEmpty ? CachedNetworkImageProvider(avatarUrl) : null,
+                child: avatarUrl.isEmpty
+                    ? Text(
+                        user['name']?[0] ?? '?',
+                        style: const TextStyle(
+                            color: Colors.white, fontWeight: FontWeight.bold),
+                      )
+                    : null,
               ),
-              title: Text(user['name'] ?? 'No Name'),
+              title: Text(user['name'] ?? 'No Name',
+                  style: const TextStyle(color: Colors.white)),
               onTap: () => _onUserTap(user),
               trailing: widget.isCreatingGroup
-                  ? Checkbox(
-                      value: isSelected,
-                      onChanged: (bool? value) {
-                        _onUserTap(user);
-                      },
+                  ? InkWell(
+                      onTap: () => _onUserTap(user),
+                      child: Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isSelected
+                              ? Colors.tealAccent
+                              : Colors.transparent,
+                          border: Border.all(
+                            color: isSelected ? Colors.tealAccent : Colors.grey,
+                            width: 2,
+                          ),
+                        ),
+                        child: isSelected
+                            ? const Icon(
+                                Icons.check,
+                                size: 16,
+                                color: Colors.black,
+                              )
+                            : null,
+                      ),
                     )
                   : null,
             );
