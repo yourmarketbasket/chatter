@@ -986,6 +986,7 @@ class DataController extends GetxController {
           headers: {'Authorization': 'Bearer $token'},
         ),
       );
+        print(response.data);
       if (response.statusCode == 200 && response.data['success'] == true) {
         final List<dynamic> chatData = response.data['chats'];
         conversations.value = chatData.map((data) => Chat.fromJson(data)).toList();
