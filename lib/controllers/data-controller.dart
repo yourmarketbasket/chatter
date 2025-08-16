@@ -2610,18 +2610,22 @@ void clearUserPosts() {
       if (token == null) {
         throw Exception('User not authenticated');
       }
+      final requestData = {
+        'participantIds': participantIds,
+        'isGroup': isGroup,
+        if (isGroup) 'groupName': groupName,
+      };
+      print("Sending createChat request with data: $requestData");
 
       final response = await _dio.post(
         'api/chats',
-        data: {
-          'participantIds': participantIds,
-          'isGroup': isGroup,
-          if (isGroup) 'groupName': groupName,
-        },
+        data: requestData,
         options: dio.Options(
           headers: {'Authorization': 'Bearer $token'},
         ),
       );
+
+      print("Received createChat response: ${response.data}");
 
       if (response.statusCode == 201 && response.data['success'] == true) {
         final chat = response.data['chat'];

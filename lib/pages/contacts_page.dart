@@ -35,35 +35,25 @@ class _ContactsPageState extends State<ContactsPage> {
         }
       });
     } else {
-      print("Creating new chat with user: ${user['name']}");
+      print("Selected user data: $user");
       final currentUserId = _dataController.user.value['user']['_id'];
+      final currentUserData = _dataController.user.value['user'];
+
       _dataController
           .createChat([currentUserId, user['_id']], isGroup: false)
           .then((chat) {
         if (chat != null) {
-          print("Chat created successfully: ${chat['_id']}");
-          print("Fetching all chats to ensure local data is up-to-date.");
-          _dataController.fetchChats().then((_) {
-            print("Chats fetched. Navigating to chat screen.");
-            final newChat = _dataController.chats[chat['_id']];
-            if (newChat != null) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ChatScreen(chat: newChat),
-                ),
-              );
-            } else {
-              print(
-                  "Could not find chat in chats list after fetch, using chat object from creation.");
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ChatScreen(chat: chat),
-                ),
-              );
-            }
-          });
+          // Create a hydrated chat object with full participant details.
+          final hydratedChat = Map<String, dynamic>.from(chat);
+          hydratedChat['participants'] = [currentUserData, user];
+
+          print("Opening chat screen with hydrated chat data: $hydratedChat");
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ChatScreen(chat: hydratedChat),
+            ),
+          );
         } else {
           print("Failed to create chat.");
         }
