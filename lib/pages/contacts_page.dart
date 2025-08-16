@@ -42,13 +42,28 @@ class _ContactsPageState extends State<ContactsPage> {
           .then((chat) {
         if (chat != null) {
           print("Chat created successfully: ${chat['_id']}");
-          print("Navigating to chat screen.");
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ChatScreen(chat: chat),
-            ),
-          );
+          print("Fetching all chats to ensure local data is up-to-date.");
+          _dataController.fetchChats().then((_) {
+            print("Chats fetched. Navigating to chat screen.");
+            final newChat = _dataController.chats[chat['_id']];
+            if (newChat != null) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ChatScreen(chat: newChat),
+                ),
+              );
+            } else {
+              print(
+                  "Could not find chat in chats list after fetch, using chat object from creation.");
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ChatScreen(chat: chat),
+                ),
+              );
+            }
+          });
         } else {
           print("Failed to create chat.");
         }
