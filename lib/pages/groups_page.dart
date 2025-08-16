@@ -107,7 +107,7 @@ class _GroupsPageState extends State<GroupsPage> {
                 Get.to(() => ConversationPage(
                       conversationId: group.id,
                       username: group.groupName ?? 'Group',
-                      userAvatar: group.groupAvatar,
+                      userAvatar: group.groupAvatar ?? '',
                     ));
               },
             );
