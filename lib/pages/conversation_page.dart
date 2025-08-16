@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:chatter/controllers/data-controller.dart';
-import 'package:chatter/models/chat_models.dart';
+import 'package:chatter/models/message_models.dart';
 import 'package:chatter/services/socket-service.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';

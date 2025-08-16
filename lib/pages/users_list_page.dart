@@ -141,9 +141,9 @@ class _UsersListPageState extends State<UsersListPage> {
 
                 if (newChat != null) {
                   Get.to(() => ConversationPage(
-                        conversationId: newChat.id,
-                        username: newChat.groupName!,
-                        userAvatar: newChat.groupAvatar ?? '',
+                        conversationId: newChat['_id'],
+                        username: newChat['groupName']!,
+                        userAvatar: newChat['groupAvatar'] ?? '',
                       ));
                 } else {
                   Get.snackbar('Error', 'Could not create group chat.');
@@ -303,7 +303,7 @@ class _UsersListPageState extends State<UsersListPage> {
                   final newChat = await _dataController.createChat([currentUserId, userId]);
                   if (newChat != null) {
                     Get.to(() => ConversationPage(
-                          conversationId: newChat.id,
+                          conversationId: newChat['_id'],
                           username: name,
                           userAvatar: avatarUrl,
                         ));

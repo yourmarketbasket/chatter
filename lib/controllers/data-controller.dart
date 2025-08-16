@@ -7,7 +7,7 @@ import 'dart:convert';
 // import 'package:path/path.dart' as path; // path is used by UploadService
 import 'package:path_provider/path_provider.dart';
 import '../models/message_models.dart';
-import '../models/feed_models.dart';
+import '../models/feed_models.dart' hide Attachment;
 import '../services/upload_service.dart'; // Import the UploadService
 
 class DataController extends GetxController {

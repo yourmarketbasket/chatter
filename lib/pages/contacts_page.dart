@@ -38,7 +38,7 @@ class _ContactsPageState extends State<ContactsPage> {
             chat['isGroup'] == false &&
             chat['participants']
                 .any((p) => p['_id'] == user['_id']),
-        orElse: () => null,
+        orElse: () => <String, dynamic>{},
       );
 
       if (existingChat != null) {
@@ -70,7 +70,7 @@ class _ContactsPageState extends State<ContactsPage> {
       return;
     }
     final currentUserId = _dataController.user.value['user']['_id'];
-    final participantIds = [currentUserId, ..._selectedUserIds];
+    final participantIds = <String>[currentUserId, ..._selectedUserIds];
 
     // a dialog to get group name
     final groupNameController = TextEditingController();
