@@ -709,10 +709,10 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     final otherUser = widget.chat['isGroup']
         ? null
-        : (widget.chat['participants'] as List).firstWhere(
+        : (widget.chat['participants'] as List<dynamic>).firstWhere(
             (p) => p['_id'] != dataController.user.value['user']['_id'],
-            orElse: () => (widget.chat['participants'] as List).first,
-          );
+            orElse: () => (widget.chat['participants'] as List<dynamic>).first,
+          ) as Map<String, dynamic>;
 
     return Scaffold(
       backgroundColor: Colors.black,
