@@ -1,6 +1,8 @@
 import 'package:chatter/pages/chats_page.dart';
 import 'package:chatter/pages/groups_page.dart';
+import 'package:chatter/pages/select_contacts_page.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
 class MainChatsPage extends StatefulWidget {
   const MainChatsPage({super.key});
@@ -79,6 +81,18 @@ class _MainChatsPageState extends State<MainChatsPage> {
         appBar: AppBar(
           title: Text(_currentIndex == 0 ? 'Chats' : 'Groups'),
           automaticallyImplyLeading: false, // No back arrow
+          actions: [
+            IconButton(
+              icon: Icon(_currentIndex == 0 ? Icons.person_add_alt_1 : Icons.group_add),
+              onPressed: () {
+                Get.to(() => SelectContactsPage(
+                      mode: _currentIndex == 0
+                          ? SelectContactsMode.dm
+                          : SelectContactsMode.group,
+                    ));
+              },
+            ),
+          ],
           bottom: PreferredSize(
             preferredSize: const Size.fromHeight(60.0),
             child: Padding(
