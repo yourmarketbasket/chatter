@@ -65,16 +65,11 @@ class _ContactsPageState extends State<ContactsPage> {
         );
       } else {
         // Chat does not exist, create it
-        final currentUserData = _dataController.user.value['user'];
         _dataController
             .createChat([currentUserId, user['_id']], isGroup: false)
             .then((chat) {
           if (chat != null) {
-            final hydratedChat = Map<String, dynamic>.from(chat);
-            hydratedChat['participants'] = [currentUserData, user];
-            _dataController.chats[chat['_id']] = hydratedChat;
-            _dataController.currentChat.value = hydratedChat;
-
+            _dataController.currentChat.value = chat;
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => const ChatScreen()),
