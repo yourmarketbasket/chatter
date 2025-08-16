@@ -8,6 +8,7 @@ import 'package:chatter/services/socket-service.dart';
 import 'package:chatter/services/media_visibility_service.dart'; // Import MediaVisibilityService
 import 'package:chatter/services/notification_service.dart'; // Import NotificationService
 import 'package:chatter/controllers/data-controller.dart'; // Added import
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'; // For kDebugMode
 import 'package:get/get.dart';
