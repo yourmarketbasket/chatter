@@ -1,3 +1,5 @@
+import 'package:intl/intl.dart';
+
 String formatLastSeen(DateTime lastSeen) {
   final now = DateTime.now();
   final difference = now.difference(lastSeen);
@@ -13,4 +15,8 @@ String formatLastSeen(DateTime lastSeen) {
   } else {
     return '${difference.inDays}d ago';
   }
+}
+
+String formatTime(DateTime time) {
+  return DateFormat.Hm().format(time);
 }
