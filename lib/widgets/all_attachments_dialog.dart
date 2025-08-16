@@ -1,6 +1,6 @@
-import 'package:chatter/models/feed_models.dart' hide Attachment;
+import 'package:chatter/models/message_models.dart';
+import 'package:chatter/models/feed_models.dart';
 import 'package:flutter/material.dart';
-import 'package:chatter/models/chat_models.dart';
 import 'package:chatter/pages/media_view_page.dart';
 import 'package:chatter/widgets/video_player_widget.dart';
 import 'package:chatter/widgets/audio_waveform_widget.dart';
@@ -8,7 +8,7 @@ import 'dart:io';
 
 class AllAttachmentsDialog extends StatelessWidget {
   final ChatMessage message;
-  final Chat chat;
+  final Map<String, dynamic> chat;
 
   const AllAttachmentsDialog({super.key, required this.message, required this.chat});
 
@@ -55,9 +55,9 @@ class AllAttachmentsDialog extends StatelessWidget {
             })
         .toList();
 
-    final sender = chat.participants.firstWhere(
-      (p) => p.id == message.senderId,
-      orElse: () => User(id: message.senderId, name: 'Unknown User'),
+    final sender = (chat['participants'] as List).firstWhere(
+      (p) => p['_id'] == message.senderId,
+      orElse: () => {'_id': message.senderId, 'name': 'Unknown User'},
     );
 
     Navigator.push(
@@ -67,8 +67,8 @@ class AllAttachmentsDialog extends StatelessWidget {
           attachments: attachmentsForViewer,
           initialIndex: initialIndex,
           message: message.text ?? '',
-          userName: sender.name,
-          userAvatarUrl: sender.avatar,
+          userName: sender['name'],
+          userAvatarUrl: sender['avatar'],
           timestamp: message.createdAt,
           viewsCount: 0, // Placeholder
           likesCount: 0, // Placeholder

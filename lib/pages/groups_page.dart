@@ -1,7 +1,8 @@
-import 'package:chatter/models/chat_models.dart';
-import 'package:chatter/models/feed_models.dart';
+import 'package:chatter/controllers/data-controller.dart';
 import 'package:chatter/pages/chat_screen_page.dart';
+import 'package:chatter/pages/contacts_page.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
 class GroupsPage extends StatefulWidget {
   const GroupsPage({super.key});
@@ -11,147 +12,96 @@ class GroupsPage extends StatefulWidget {
 }
 
 class _GroupsPageState extends State<GroupsPage> {
-  final List<Map<String, dynamic>> _dummyGroups = [
-    {
-      'name': 'Family Group',
-      'initials': 'F',
-      'participants': ['Alice', 'Bob', 'You'],
-      'lastMessage': 'Let\'s plan the trip!',
-      'sender': 'Alice',
-      'time': '11:45 AM',
-      'status': 'read',
-      'edited': false,
-      'deleted': false,
-      'attachment': null,
-    },
-    {
-      'name': 'Work Team',
-      'initials': 'W',
-      'participants': ['Charlie', 'David', 'You'],
-      'lastMessage': 'Meeting notes',
-      'sender': 'You',
-      'time': 'Yesterday',
-      'status': 'delivered',
-      'edited': false,
-      'deleted': false,
-      'attachment': 'https://example.com/document.pdf',
-    },
-    {
-      'name': 'Friends Circle',
-      'initials': 'FC',
-      'participants': ['Eve', 'Frank', 'You'],
-      'lastMessage': 'Message deleted',
-      'sender': 'Eve',
-      'time': '3 days ago',
-      'status': 'sent',
-      'edited': true,
-      'deleted': true,
-      'attachment': null,
-    },
-    // Add more dummy data as needed
-  ];
+  final DataController _dataController = Get.find<DataController>();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: ListView.builder(
-        itemCount: _dummyGroups.length,
-        itemBuilder: (context, index) {
-          final group = _dummyGroups[index];
-          String preview = group['deleted']
-              ? 'Message deleted'
-              : group['attachment'] != null
-                  ? 'Attachment'
-                  : group['lastMessage'];
-          if (group['edited']) {
-            preview += ' (edited)';
-          }
-          preview = '${group['sender']}: $preview';
+      body: Obx(() {
+        if (_dataController.isLoadingChats.value) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-          IconData statusIcon;
-          Color statusColor;
-          switch (group['status']) {
-            case 'sent':
-              statusIcon = Icons.check;
-              statusColor = Colors.grey[400]!;
-              break;
-            case 'delivered':
-              statusIcon = Icons.done_all;
-              statusColor = Colors.grey[400]!;
-              break;
-            case 'read':
-              statusIcon = Icons.done_all;
-              statusColor = Colors.tealAccent;
-              break;
-            default:
-              statusIcon = Icons.access_time;
-              statusColor = Colors.grey[400]!;
-          }
+        final groupChats = _dataController.chats.values
+            .where((chat) => chat['isGroup'] == true)
+            .toList();
 
-          return ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            leading: CircleAvatar(
-              backgroundColor: Colors.tealAccent,
-              child: Text(
-                group['initials'],
-                style: const TextStyle(color: Colors.black),
+        if (groupChats.isEmpty) {
+          return const Center(
+              child: Text('No groups yet.',
+                  style: TextStyle(color: Colors.white)));
+        }
+        return ListView.builder(
+          itemCount: groupChats.length,
+          itemBuilder: (context, index) {
+            final chat = groupChats[index];
+            final lastMessage = chat['lastMessage'];
+            final currentUserId = _dataController.user.value['user']['_id'];
+
+            String preview = '...';
+            if (lastMessage != null) {
+              if (lastMessage['attachments'] != null &&
+                  lastMessage['attachments'].isNotEmpty) {
+                preview = 'Attachment';
+              } else if (lastMessage['voiceNote'] != null) {
+                preview = 'Voice note';
+              } else {
+                preview = lastMessage['text'] ?? '';
+              }
+              if (lastMessage['senderId'] == currentUserId) {
+                preview = 'You: $preview';
+              }
+            }
+
+            return ListTile(
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              leading: CircleAvatar(
+                backgroundColor: Colors.tealAccent,
+                child: Text(
+                  chat['groupName']?[0] ?? 'G',
+                  style: const TextStyle(color: Colors.black),
+                ),
               ),
-            ),
-            title: Text(
-              group['name'],
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w500,
+              title: Text(
+                chat['groupName'] ?? 'Group Chat',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-            ),
-            subtitle: Text(
-              preview,
-              style: TextStyle(
-                color: Colors.grey[400],
-                fontSize: 14,
+              subtitle: Text(
+                preview,
+                style: TextStyle(
+                  color: Colors.grey[400],
+                  fontSize: 14,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  group['time'],
-                  style: TextStyle(
-                    color: Colors.grey[400],
-                    fontSize: 12,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ChatScreen(chat: chat),
                   ),
-                ),
-                Icon(
-                  statusIcon,
-                  size: 16,
-                  color: statusColor,
-                ),
-              ],
-            ),
-            onTap: () {
-              final chat = Chat(
-                id: 'group_$index', // Dummy ID
-                isGroup: true,
-                groupName: group['name'],
-                groupAvatar: null, // No avatar in dummy data
-                participants: (group['participants'] as List<String>)
-                    .map((name) => User(id: name.toLowerCase(), name: name))
-                    .toList(),
-              );
-
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ChatScreen(chat: chat),
-                ),
-              );
-            },
+                );
+              },
+            );
+          },
+        );
+      }),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) => const ContactsPage(isCreatingGroup: true)),
           );
         },
+        backgroundColor: Colors.tealAccent,
+        child: const Icon(Icons.add, color: Colors.black),
       ),
     );
   }

@@ -1,13 +1,10 @@
-import 'package:chatter/models/chat_models.dart';
-import 'package:chatter/models/feed_models.dart' hide Attachment;
+import 'package:chatter/models/message_models.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';
-import 'package:chatter/widgets/video_player_widget.dart';
-import 'package:chatter/widgets/audio_waveform_widget.dart';
 
 class ReplyMessageSnippet extends StatelessWidget {
   final ChatMessage originalMessage;
-  final Chat chat;
+  final Map<String, dynamic> chat;
   final String currentUserId;
 
   const ReplyMessageSnippet({
@@ -44,11 +41,11 @@ class ReplyMessageSnippet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool isReplyingToSelf = originalMessage.senderId == currentUserId;
-    final sender = chat.participants.firstWhere(
-      (p) => p.id == originalMessage.senderId,
-      orElse: () => User(id: originalMessage.senderId, name: 'Unknown User'),
+    final sender = (chat['participants'] as List).firstWhere(
+      (p) => p['_id'] == originalMessage.senderId,
+      orElse: () => {'_id': originalMessage.senderId, 'name': 'Unknown User'},
     );
-    final senderName = isReplyingToSelf ? 'You' : sender.name;
+    final senderName = isReplyingToSelf ? 'You' : sender['name'];
 
     Widget contentPreview;
     if (originalMessage.attachments != null && originalMessage.attachments!.isNotEmpty) {

@@ -1,6 +1,6 @@
 import 'package:chatter/controllers/data-controller.dart';
-import 'package:chatter/models/chat_models.dart';
-import 'package:chatter/models/feed_models.dart' hide Attachment;
+import 'package:chatter/models/message_models.dart';
+import 'package:chatter/models/feed_models.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:chatter/pages/media_view_page.dart';
@@ -16,7 +16,7 @@ import 'package:chatter/widgets/reply_message_snippet.dart';
 import 'package:chatter/helpers/time_helper.dart';
 
 class ChatScreen extends StatefulWidget {
-  final Chat chat;
+  final Map<String, dynamic> chat;
 
   const ChatScreen({super.key, required this.chat});
 
@@ -34,7 +34,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     // Fetch messages for this chat when the screen loads
-    dataController.fetchMessages(widget.chat.id);
+    dataController.fetchMessages(widget.chat['_id']);
   }
 
   @override
@@ -49,7 +49,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void _sendMessage() {
     if (_messageController.text.trim().isNotEmpty) {
       final message = ChatMessage(
-        chatId: widget.chat.id,
+        chatId: widget.chat['_id'],
         senderId: dataController.user.value['user']['_id'],
         text: _messageController.text.trim(),
         replyTo: _replyingTo?.id,
@@ -80,7 +80,8 @@ class _ChatScreenState extends State<ChatScreen> {
           TextButton(
             onPressed: () {
               if (editController.text.trim().isNotEmpty) {
-                dataController.editChatMessage(message.id, editController.text.trim());
+                dataController.editChatMessage(
+                    message.id, editController.text.trim());
               }
               Navigator.pop(context);
             },
@@ -106,7 +107,8 @@ class _ChatScreenState extends State<ChatScreen> {
             title: const Text('Edit'),
             onTap: () {
               Navigator.pop(context);
-              if (message.senderId == dataController.user.value['user']['_id']) {
+              if (message.senderId ==
+                  dataController.user.value['user']['_id']) {
                 _editMessage(message);
               }
             },
@@ -140,7 +142,9 @@ class _ChatScreenState extends State<ChatScreen> {
     switch (extension) {
       case 'image':
         preview = Image(
-          image: isLocalFile ? FileImage(File(attachment.url)) : NetworkImage(attachment.url) as ImageProvider,
+          image: isLocalFile
+              ? FileImage(File(attachment.url))
+              : NetworkImage(attachment.url) as ImageProvider,
           fit: BoxFit.cover,
         );
         break;
@@ -151,17 +155,25 @@ class _ChatScreenState extends State<ChatScreen> {
         preview = const Icon(Icons.audiotrack, size: 24, color: Colors.white);
         break;
       default:
-        preview = const Icon(Icons.insert_drive_file, size: 24, color: Colors.white);
+        preview =
+            const Icon(Icons.insert_drive_file, size: 24, color: Colors.white);
     }
-    return SizedBox(width: 40, height: 40, child: ClipRRect(borderRadius: BorderRadius.circular(4), child: preview));
+    return SizedBox(
+        width: 40,
+        height: 40,
+        child: ClipRRect(
+            borderRadius: BorderRadius.circular(4), child: preview));
   }
 
   Widget _buildReplyPreview(ChatMessage replyTo) {
-    final sender = widget.chat.participants.firstWhere(
-      (p) => p.id == replyTo.senderId,
-      orElse: () => User(id: replyTo.senderId, name: 'Unknown User'),
+    final sender = (widget.chat['participants'] as List).firstWhere(
+      (p) => p['_id'] == replyTo.senderId,
+      orElse: () => {'_id': replyTo.senderId, 'name': 'Unknown User'},
     );
-    final senderName = replyTo.senderId == dataController.user.value['user']['_id'] ? 'You' : sender.name;
+    final senderName = replyTo.senderId ==
+            dataController.user.value['user']['_id']
+        ? 'You'
+        : sender['name'];
 
     Widget contentPreview;
     if (replyTo.attachments != null && replyTo.attachments!.isNotEmpty) {
@@ -172,7 +184,9 @@ class _ChatScreenState extends State<ChatScreen> {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              firstAttachment.type == 'image' ? 'Image' : firstAttachment.filename,
+              firstAttachment.type == 'image'
+                  ? 'Image'
+                  : firstAttachment.filename,
               style: TextStyle(color: Colors.grey[300]),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -253,10 +267,10 @@ class _ChatScreenState extends State<ChatScreen> {
             })
         .toList();
 
-    final sender = widget.chat.participants.firstWhere(
-      (p) => p.id == message.senderId,
+    final sender = (widget.chat['participants'] as List).firstWhere(
+      (p) => p['_id'] == message.senderId,
       // Fallback for safety, though sender should always be in participants
-      orElse: () => User(id: message.senderId, name: 'Unknown User'),
+      orElse: () => {'_id': message.senderId, 'name': 'Unknown User'},
     );
 
     Navigator.push(
@@ -266,8 +280,8 @@ class _ChatScreenState extends State<ChatScreen> {
           attachments: attachmentsForViewer,
           initialIndex: initialIndex,
           message: message.text ?? '',
-          userName: sender.name,
-          userAvatarUrl: sender.avatar,
+          userName: sender['name'],
+          userAvatarUrl: sender['avatar'],
           timestamp: message.createdAt,
           viewsCount: 0,
           likesCount: 0,
@@ -365,7 +379,8 @@ class _ChatScreenState extends State<ChatScreen> {
                   value: attachment.uploadProgress,
                   strokeWidth: 2,
                   backgroundColor: Colors.grey.withOpacity(0.5),
-                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                  valueColor:
+                      const AlwaysStoppedAnimation<Color>(Colors.white),
                 ),
               ),
             ),
@@ -460,7 +475,8 @@ class _ChatScreenState extends State<ChatScreen> {
                   value: attachment.downloadProgress,
                   strokeWidth: 2,
                   backgroundColor: Colors.grey.withOpacity(0.5),
-                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.tealAccent),
+                  valueColor:
+                      const AlwaysStoppedAnimation<Color>(Colors.tealAccent),
                 ),
               ),
             ),
@@ -478,11 +494,14 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildMessageContent(ChatMessage message, int index) {
-    final isYou = message.senderId == dataController.user.value['user']['_id'];
+    final isYou =
+        message.senderId == dataController.user.value['user']['_id'];
     final messages = dataController.currentConversationMessages;
-    final isSameSenderAsNext = index > 0 && messages[index - 1].senderId == message.senderId;
+    final isSameSenderAsNext =
+        index > 0 && messages[index - 1].senderId == message.senderId;
     final bottomMargin = isSameSenderAsNext ? 2.0 : 8.0;
-    final hasAttachment = message.attachments != null && message.attachments!.isNotEmpty;
+    final hasAttachment =
+        message.attachments != null && message.attachments!.isNotEmpty;
 
     return GestureDetector(
       onLongPress: () {
@@ -490,7 +509,9 @@ class _ChatScreenState extends State<ChatScreen> {
       },
       child: Dismissible(
         key: Key(message.id),
-        direction: message.deleted ? DismissDirection.none : DismissDirection.startToEnd,
+        direction: message.deleted
+            ? DismissDirection.none
+            : DismissDirection.startToEnd,
         confirmDismiss: (direction) async {
           setState(() {
             _replyingTo = message;
@@ -510,11 +531,13 @@ class _ChatScreenState extends State<ChatScreen> {
             maxWidth: MediaQuery.of(context).size.width * 0.7,
           ),
           decoration: BoxDecoration(
-            color: isYou ? Colors.tealAccent.withOpacity(0.2) : Colors.grey[800],
+            color:
+                isYou ? Colors.tealAccent.withOpacity(0.2) : Colors.grey[800],
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
-            crossAxisAlignment: isYou ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            crossAxisAlignment:
+                isYou ? CrossAxisAlignment.end : CrossAxisAlignment.start,
             children: [
               if (message.deleted)
                 Text(
@@ -527,9 +550,14 @@ class _ChatScreenState extends State<ChatScreen> {
               else ...[
                 if (message.replyTo != null)
                   Obx(() {
-                    final originalMessage = dataController.currentConversationMessages.firstWhere(
+                    final originalMessage = dataController
+                        .currentConversationMessages
+                        .firstWhere(
                       (m) => m.id == message.replyTo,
-                      orElse: () => ChatMessage(chatId: '', senderId: '', text: 'Original message not found.'),
+                      orElse: () => ChatMessage(
+                          chatId: '',
+                          senderId: '',
+                          text: 'Original message not found.'),
                     );
                     // A message with an empty ID is our signal that the original message wasn't found
                     if (originalMessage.id.isEmpty) {
@@ -558,7 +586,13 @@ class _ChatScreenState extends State<ChatScreen> {
                             attachments: attachmentsForViewer,
                             initialIndex: 0,
                             message: '',
-                            userName: widget.chat.isGroup ? message.senderId : widget.chat.participants.firstWhere((p) => p.id != dataController.user.value['user']['_id']).name,
+                            userName: widget.chat['isGroup']
+                                ? message.senderId
+                                : (widget.chat['participants'] as List)
+                                    .firstWhere((p) =>
+                                        p['_id'] !=
+                                        dataController
+                                            .user.value['user']['_id'])['name'],
                             userAvatarUrl: null,
                             timestamp: message.createdAt,
                             viewsCount: 0,
@@ -581,7 +615,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 if (message.text != null && message.text!.isNotEmpty)
                   Text(
                     message.text!,
-                    style: TextStyle(color: isYou ? Colors.white : Colors.grey[200]),
+                    style: TextStyle(
+                        color: isYou ? Colors.white : Colors.grey[200]),
                   ),
               ],
               const SizedBox(height: 4),
@@ -671,11 +706,11 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final otherUser = widget.chat.isGroup
+    final otherUser = widget.chat['isGroup']
         ? null
-        : widget.chat.participants.firstWhere(
-            (p) => p.id != dataController.user.value['user']['_id'],
-            orElse: () => widget.chat.participants.first,
+        : (widget.chat['participants'] as List).firstWhere(
+            (p) => p['_id'] != dataController.user.value['user']['_id'],
+            orElse: () => (widget.chat['participants'] as List).first,
           );
 
     return Scaffold(
@@ -688,17 +723,27 @@ class _ChatScreenState extends State<ChatScreen> {
               children: [
                 CircleAvatar(
                   backgroundColor: Colors.tealAccent,
-                  backgroundImage: (widget.chat.isGroup ? widget.chat.groupAvatar : otherUser?.avatar) != null
-                      ? NetworkImage((widget.chat.isGroup ? widget.chat.groupAvatar : otherUser!.avatar)!)
+                  backgroundImage: (widget.chat['isGroup']
+                              ? widget.chat['groupAvatar']
+                              : otherUser?['avatar']) !=
+                          null
+                      ? NetworkImage((widget.chat['isGroup']
+                          ? widget.chat['groupAvatar']
+                          : otherUser!['avatar'])!)
                       : null,
-                  child: (widget.chat.isGroup ? widget.chat.groupAvatar : otherUser?.avatar) == null
+                  child: (widget.chat['isGroup']
+                              ? widget.chat['groupAvatar']
+                              : otherUser?['avatar']) ==
+                          null
                       ? Text(
-                          widget.chat.isGroup ? (widget.chat.groupName?[0] ?? '?') : (otherUser?.name[0] ?? '?'),
+                          widget.chat['isGroup']
+                              ? (widget.chat['groupName']?[0] ?? '?')
+                              : (otherUser?['name'][0] ?? '?'),
                           style: const TextStyle(color: Colors.black),
                         )
                       : null,
                 ),
-                if (!widget.chat.isGroup && (otherUser?.online ?? false))
+                if (!widget.chat['isGroup'] && (otherUser?['online'] ?? false))
                   Positioned(
                     bottom: 0,
                     right: 0,
@@ -716,7 +761,9 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
             const SizedBox(width: 10),
             Text(
-              widget.chat.isGroup ? widget.chat.groupName! : otherUser!.name,
+              widget.chat['isGroup']
+                  ? widget.chat['groupName']!
+                  : otherUser!['name'],
               style: const TextStyle(color: Colors.white),
             ),
           ],
@@ -732,12 +779,15 @@ class _ChatScreenState extends State<ChatScreen> {
             child: Obx(() {
               return ListView.builder(
                 reverse: true,
-                padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+                padding: const EdgeInsets.symmetric(
+                    vertical: 8.0, horizontal: 16.0),
                 itemCount: dataController.currentConversationMessages.length,
                 itemBuilder: (context, index) {
-                  final message = dataController.currentConversationMessages[index];
+                  final message =
+                      dataController.currentConversationMessages[index];
                   return Align(
-                    alignment: message.senderId == dataController.user.value['user']['_id']
+                    alignment: message.senderId ==
+                            dataController.user.value['user']['_id']
                         ? Alignment.centerRight
                         : Alignment.centerLeft,
                     child: _buildMessageContent(message, index),
@@ -758,14 +808,18 @@ class _ChatScreenState extends State<ChatScreen> {
                       ))
                   .toList();
 
-              final isVoiceNote = attachments.isNotEmpty && attachments.first.type == 'audio';
+              final isVoiceNote = attachments.isNotEmpty &&
+                  attachments.first.type == 'audio';
 
               final message = ChatMessage(
-                chatId: widget.chat.id,
+                chatId: widget.chat['_id'],
                 senderId: dataController.user.value['user']['_id'],
                 text: text,
                 attachments: isVoiceNote ? null : attachments,
-                voiceNote: isVoiceNote ? VoiceNote(url: attachments.first.url, duration: Duration.zero) : null,
+                voiceNote: isVoiceNote
+                    ? VoiceNote(
+                        url: attachments.first.url, duration: Duration.zero)
+                    : null,
                 replyTo: _replyingTo?.id,
               );
 

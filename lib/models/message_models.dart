@@ -1,8 +1,6 @@
-import 'package:chatter/models/feed_models.dart';
 import 'package:objectid/objectid.dart';
 
 enum MessageStatus { sending, sent, delivered, read, failed }
-// forced
 
 class Attachment {
   final String id;
@@ -192,54 +190,6 @@ class ChatMessage {
       'replyTo': replyTo,
       'edited': edited,
       'deleted': deleted,
-    };
-  }
-}
-
-class Chat {
-  final String id;
-  final List<User> participants;
-  final bool isGroup;
-  final String? groupName;
-  final String? groupAvatar;
-  final ChatMessage? lastMessage;
-  final int unreadCount;
-
-  Chat({
-    String? id,
-    required this.participants,
-    this.isGroup = false,
-    this.groupName,
-    this.groupAvatar,
-    this.lastMessage,
-    this.unreadCount = 0,
-  }) : id = id ?? ObjectId().hexString;
-
-  factory Chat.fromJson(Map<String, dynamic> json) {
-    return Chat(
-      id: json['_id'] as String,
-      participants: (json['participants'] as List<dynamic>)
-          .map((e) => User.fromJson(e as Map<String, dynamic>))
-          .toList(),
-      isGroup: json['isGroup'] as bool,
-      groupName: json['groupName'] as String?,
-      groupAvatar: json['groupAvatar'] as String?,
-      lastMessage: json['lastMessage'] != null
-          ? ChatMessage.fromJson(json['lastMessage'] as Map<String, dynamic>)
-          : null,
-      unreadCount: json['unreadCount'] as int,
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      '_id': id,
-      'participants': participants.map((e) => e.toJson()).toList(),
-      'isGroup': isGroup,
-      'groupName': groupName,
-      'groupAvatar': groupAvatar,
-      'lastMessage': lastMessage?.toJson(),
-      'unreadCount': unreadCount,
     };
   }
 }

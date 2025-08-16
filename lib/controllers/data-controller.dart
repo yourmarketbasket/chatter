@@ -6,8 +6,8 @@ import 'package:dio/dio.dart' as dio; // Use prefix for dio to avoid conflicts
 import 'dart:convert';
 // import 'package:path/path.dart' as path; // path is used by UploadService
 import 'package:path_provider/path_provider.dart';
-import '../models/chat_models.dart';
-import '../models/feed_models.dart' hide Attachment; // Added import for ChatterPost
+import '../models/message_models.dart';
+import '../models/feed_models.dart';
 import '../services/upload_service.dart'; // Import the UploadService
 
 class DataController extends GetxController {
@@ -41,8 +41,9 @@ class DataController extends GetxController {
   final RxList<Map<String, dynamic>> allUsers = <Map<String, dynamic>>[].obs;
 
   // Add these Rx variables inside DataController class
-  final RxList<Chat> conversations = <Chat>[].obs;
-  final RxBool isLoadingConversations = false.obs;
+  final RxMap<String, Map<String, dynamic>> chats =
+      <String, Map<String, dynamic>>{}.obs;
+  final RxBool isLoadingChats = false.obs;
   final RxList<ChatMessage> currentConversationMessages = <ChatMessage>[].obs;
   final RxBool isLoadingMessages = false.obs;
   final RxMap<String, bool> isTyping = <String, bool>{}.obs;
@@ -108,6 +109,7 @@ class DataController extends GetxController {
     }
     // Fetch all users (placeholder) - This is typically called on demand by UsersListPage
     // fetchAllUsers();
+    fetchChats();
   }
 
   // Method to fetch/initialize all users
@@ -973,8 +975,8 @@ class DataController extends GetxController {
 
   // Add these placeholder methods inside DataController class
 
-  Future<void> fetchConversations() async {
-    isLoadingConversations.value = true;
+  Future<void> fetchChats() async {
+    isLoadingChats.value = true;
     try {
       final token = user.value['token'];
       if (token == null) {
@@ -988,15 +990,17 @@ class DataController extends GetxController {
       );
       if (response.statusCode == 200 && response.data['success'] == true) {
         final List<dynamic> chatData = response.data['chats'];
-        conversations.value = chatData.map((data) => Chat.fromJson(data)).toList();
+        for (var chat in chatData) {
+          chats[chat['_id']] = chat;
+        }
       } else {
-        throw Exception('Failed to fetch conversations');
+        throw Exception('Failed to fetch chats');
       }
     } catch (e) {
-      print('Error fetching conversations: $e');
+      print('Error fetching chats: $e');
       // Optionally, show a snackbar or some error message to the user
     } finally {
-      isLoadingConversations.value = false;
+      isLoadingChats.value = false;
     }
   }
 
@@ -1403,7 +1407,7 @@ class DataController extends GetxController {
       user.value = {};
       posts.clear();
       allUsers.clear(); // If you want to clear this list on logout
-      conversations.clear();
+      chats.clear();
       currentConversationMessages.clear();
       followers.clear();
       following.clear();
@@ -1418,7 +1422,7 @@ class DataController extends GetxController {
 
       // Any other cleanup specific to your application's state
       isLoading.value = false;
-      isLoadingConversations.value = false;
+      isLoadingChats.value = false;
       isLoadingMessages.value = false;
       isLoadingFollowers.value = false;
       isLoadingFollowing.value = false;
@@ -1429,7 +1433,7 @@ class DataController extends GetxController {
       user.value = {};
       posts.clear();
       allUsers.clear();
-      conversations.clear();
+      chats.clear();
       currentConversationMessages.clear();
       followers.clear();
       following.clear();
@@ -2563,16 +2567,12 @@ void clearUserPosts() {
       currentConversationMessages.insert(0, newMessage);
     }
 
-    // Update the last message in the conversations list
-    final conversationIndex = conversations.indexWhere((c) => c.id == newMessage.chatId);
-    if (conversationIndex != -1) {
-      final chat = conversations[conversationIndex];
-      // This is tricky because the Chat model is not easily mutable.
-      // A better approach would be to refetch conversations or make the Chat model more easily updatable.
-      // For now, let's just update the unread count.
-      // final updatedChat = chat.copyWith(lastMessage: newMessage, unreadCount: (chat.unreadCount ?? 0) + 1);
-      // conversations[conversationIndex] = updatedChat;
-      conversations.refresh();
+    // Update the last message in the chats map
+    if (chats.containsKey(newMessage.chatId)) {
+      final chat = chats[newMessage.chatId]!;
+      chat['lastMessage'] = messageData;
+      chat['unreadCount'] = (chat['unreadCount'] ?? 0) + 1;
+      chats[newMessage.chatId] = chat;
     }
   }
 
@@ -2604,7 +2604,7 @@ void clearUserPosts() {
     }
   }
 
-  Future<Chat?> createChat(List<String> participantIds, {bool isGroup = false, String? groupName}) async {
+  Future<Map<String, dynamic>?> createChat(List<String> participantIds, {bool isGroup = false, String? groupName}) async {
     try {
       final token = user.value['token'];
       if (token == null) {
@@ -2624,9 +2624,8 @@ void clearUserPosts() {
       );
 
       if (response.statusCode == 201 && response.data['success'] == true) {
-        final chat = Chat.fromJson(response.data['chat']);
-        // Add to conversations list and navigate
-        conversations.insert(0, chat);
+        final chat = response.data['chat'];
+        chats[chat['_id']] = chat;
         return chat;
       } else {
         throw Exception('Failed to create chat');
