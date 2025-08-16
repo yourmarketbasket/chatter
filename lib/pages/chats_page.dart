@@ -1,9 +1,11 @@
 import 'package:chatter/controllers/data-controller.dart';
 import 'package:chatter/models/message_models.dart';
 import 'package:chatter/pages/chat_screen_page.dart';
+import 'package:chatter/pages/contacts_page.dart';
 import 'package:flutter/material.dart';
 import 'package:chatter/helpers/time_helper.dart';
 import 'package:get/get.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class ChatsPage extends StatefulWidget {
   const ChatsPage({super.key});
@@ -14,7 +16,6 @@ class ChatsPage extends StatefulWidget {
 
 class _ChatsPageState extends State<ChatsPage> {
   final DataController _dataController = Get.find<DataController>();
-
 
   @override
   Widget build(BuildContext context) {
@@ -38,27 +39,44 @@ class _ChatsPageState extends State<ChatsPage> {
           itemBuilder: (context, index) {
             final chat = oneOnOneChats[index];
             final lastMessageData = chat['lastMessage'];
-            print('Last message data: $lastMessageData');
             final currentUserId = _dataController.user.value['user']['_id'];
 
-            final otherUser = (chat['participants'] as List).firstWhere(
-                (p) => p['_id'] != currentUserId,
-                orElse: () => chat['participants'].first);
+            final otherUserRaw = (chat['participants'] as List<dynamic>).firstWhere(
+                (p) {
+                  if (p is Map<String, dynamic>) {
+                    return p['_id'] != currentUserId;
+                  }
+                  return p != currentUserId;
+                },
+                orElse: () => (chat['participants'] as List<dynamic>).first,
+              );
+
+            final otherUser = otherUserRaw is Map<String, dynamic>
+                ? otherUserRaw
+                : _dataController.allUsers.firstWhere(
+                    (u) => u['_id'] == otherUserRaw,
+                    orElse: () => {'name': 'Unknown', 'avatar': ''},
+                  );
 
             String preview = '...';
             ChatMessage? lastMessage;
             if (lastMessageData != null && lastMessageData is Map<String, dynamic>) {
-              lastMessage = ChatMessage.fromJson(lastMessageData);
-              if (lastMessage.attachments != null &&
-                  lastMessage.attachments!.isNotEmpty) {
-                preview = 'Attachment';
-              } else if (lastMessage.voiceNote != null) {
-                preview = 'Voice note';
-              } else {
-                preview = lastMessage.text ?? '';
-              }
-              if (lastMessage.senderId == currentUserId) {
-                preview = 'You: $preview';
+              try {
+                lastMessage = ChatMessage.fromJson(lastMessageData);
+                if (lastMessage.attachments != null &&
+                    lastMessage.attachments!.isNotEmpty) {
+                  preview = 'Attachment';
+                } else if (lastMessage.voiceNote != null) {
+                  preview = 'Voice note';
+                } else {
+                  preview = lastMessage.text ?? '';
+                }
+                if (lastMessage.senderId == currentUserId) {
+                  preview = 'You: $preview';
+                }
+              } catch (e, s) {
+                print('Error parsing last message in chats_page: $e');
+                print(s);
               }
             }
 
@@ -86,13 +104,14 @@ class _ChatsPageState extends State<ChatsPage> {
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               leading: CircleAvatar(
-                backgroundColor: Colors.tealAccent,
+                radius: 24,
+                backgroundColor: Colors.tealAccent.withOpacity(0.2),
                 backgroundImage: otherUser['avatar'] != null && otherUser['avatar'].isNotEmpty
-                    ? NetworkImage(otherUser['avatar'])
+                    ? CachedNetworkImageProvider(otherUser['avatar'])
                     : null,
                 child: otherUser['avatar'] == null || otherUser['avatar'].isEmpty
                     ? Text(otherUser['name']?[0] ?? '?',
-                        style: const TextStyle(color: Colors.black))
+                        style: const TextStyle(color: Colors.tealAccent, fontWeight: FontWeight.bold))
                     : null,
               ),
               title: Text(otherUser['name'] ?? 'User',
@@ -128,7 +147,7 @@ class _ChatsPageState extends State<ChatsPage> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  if (lastMessageData != null)
+                  if (lastMessageData != null && lastMessageData is Map<String, dynamic>)
                     Text(
                       formatTime(DateTime.parse(lastMessageData['createdAt'])),
                       style: TextStyle(
