@@ -1,6 +1,8 @@
 import 'package:chatter/pages/chats_page.dart';
 import 'package:chatter/pages/groups_page.dart';
+import 'package:chatter/pages/users_list_page.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
 class MainChatsPage extends StatefulWidget {
   const MainChatsPage({super.key});
@@ -75,6 +77,22 @@ class _MainChatsPageState extends State<MainChatsPage> {
         ),
       ),
       child: Scaffold(
+        floatingActionButton: FloatingActionButton(
+          backgroundColor: Colors.tealAccent,
+          onPressed: () {
+            if (_currentIndex == 0) {
+              // Create new one-on-one chat
+              Get.to(() => const UsersListPage(startInGroupCreationMode: false));
+            } else {
+              // Create new group chat
+              Get.to(() => const UsersListPage(startInGroupCreationMode: true));
+            }
+          },
+          child: Icon(
+            _currentIndex == 0 ? Icons.message : Icons.group_add,
+            color: Colors.black,
+          ),
+        ),
         extendBody: true, // Allow body to extend behind nav bar
         appBar: AppBar(
           title: Text(_currentIndex == 0 ? 'Chats' : 'Groups'),

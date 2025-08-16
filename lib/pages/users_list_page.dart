@@ -9,7 +9,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:chatter/widgets/app_drawer.dart';
 
 class UsersListPage extends StatefulWidget {
-  const UsersListPage({Key? key}) : super(key: key);
+  final bool? startInGroupCreationMode;
+
+  const UsersListPage({Key? key, this.startInGroupCreationMode})
+      : super(key: key);
 
   @override
   _UsersListPageState createState() => _UsersListPageState();
@@ -19,13 +22,13 @@ class _UsersListPageState extends State<UsersListPage> {
   final DataController _dataController = Get.find<DataController>();
   // Local state to manage button loading
   final RxMap<String, bool> _isUpdatingFollowStatus = <String, bool>{}.obs;
-  bool _isGroupCreationMode = false;
+  late bool _isGroupCreationMode;
   final List<Map<String, dynamic>> _selectedUsers = [];
-
 
   @override
   void initState() {
     super.initState();
+    _isGroupCreationMode = widget.startInGroupCreationMode ?? false;
     // Fetch users. DataController's fetchAllUsers now handles isLoading state.
     // No need to check if allUsers is empty here, as fetchAllUsers will be called
     // and the Obx widget will react to isLoading and allUsers list changes.
@@ -173,15 +176,16 @@ class _UsersListPageState extends State<UsersListPage> {
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
-          IconButton(
-            icon: Icon(_isGroupCreationMode ? Icons.close : Icons.group_add),
-            onPressed: () {
-              setState(() {
-                _isGroupCreationMode = !_isGroupCreationMode;
-                _selectedUsers.clear();
-              });
-            },
-          ),
+          if (widget.startInGroupCreationMode == null)
+            IconButton(
+              icon: Icon(_isGroupCreationMode ? Icons.close : Icons.group_add),
+              onPressed: () {
+                setState(() {
+                  _isGroupCreationMode = !_isGroupCreationMode;
+                  _selectedUsers.clear();
+                });
+              },
+            ),
         ],
       ),
       drawer: const AppDrawer(),
