@@ -2585,4 +2585,55 @@ void clearUserPosts() {
     final chatId = data['chatId'] as String;
     isTyping[chatId] = false;
   }
+
+  Future<void> updateFcmToken(String token) async {
+    try {
+      final userId = user.value['user']['_id'];
+      if (userId == null) return;
+
+      await _dio.post(
+        'api/users/update-fcm-token',
+        data: {'userId': userId, 'fcmToken': token},
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer ${user.value['token']}'},
+        ),
+      );
+      print('FCM token updated successfully');
+    } catch (e) {
+      print('Error updating FCM token: $e');
+    }
+  }
+
+  Future<Chat?> createChat(List<String> participantIds, {bool isGroup = false, String? groupName}) async {
+    try {
+      final token = user.value['token'];
+      if (token == null) {
+        throw Exception('User not authenticated');
+      }
+
+      final response = await _dio.post(
+        'api/chats',
+        data: {
+          'participantIds': participantIds,
+          'isGroup': isGroup,
+          if (isGroup) 'groupName': groupName,
+        },
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+
+      if (response.statusCode == 201 && response.data['success'] == true) {
+        final chat = Chat.fromJson(response.data['chat']);
+        // Add to conversations list and navigate
+        conversations.insert(0, chat);
+        return chat;
+      } else {
+        throw Exception('Failed to create chat');
+      }
+    } catch (e) {
+      print('Error creating chat: $e');
+      return null;
+    }
+  }
 }

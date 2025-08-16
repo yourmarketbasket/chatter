@@ -1,12 +1,25 @@
+import 'package:chatter/controllers/data-controller.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'dart:io' show Platform;
 
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  print("Handling a background message: ${message.messageId}");
+  NotificationService().showNotification(message);
+}
+
 class NotificationService {
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
+  final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
+  final DataController _dataController = Get.find<DataController>();
 
   static const String _channelId = 'chatter_default_channel';
   static const String _channelName = 'Chatter Notifications';
@@ -18,25 +31,68 @@ class NotificationService {
   // static const String _notificationIconName = '@drawable/ic_status_16px'; // Original problematic line
 
   Future<void> init() async {
-    // Correctly reference the drawable resource name without the '@drawable/' prefix.
+    await _firebaseMessaging.requestPermission();
+    final fcmToken = await _firebaseMessaging.getToken();
+    if (fcmToken != null) {
+      print('FCM Token: $fcmToken');
+      _dataController.updateFcmToken(fcmToken);
+    }
+
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('ic_status_16px');
-
-    // TODO: Add iOS initialization settings if needed in the future
-    // const DarwinInitializationSettings initializationSettingsIOS = ...;
 
     const InitializationSettings initializationSettings =
         InitializationSettings(
       android: initializationSettingsAndroid,
-      // iOS: initializationSettingsIOS,
     );
 
     await _flutterLocalNotificationsPlugin.initialize(
       initializationSettings,
-      // onDidReceiveNotificationResponse: onDidReceiveNotificationResponse,
+      onDidReceiveNotificationResponse: (response) async {
+        if (response.payload != null) {
+          print('notification payload: ${response.payload}');
+          // This is a simplified navigation. In a real app, you'd want to
+          // check if the user is already on the chat screen, etc.
+          // Also, you'd need the other chat details like username and avatar.
+          // For now, we'll just print.
+        }
+      },
     );
 
     await _createAndroidNotificationChannel();
+
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      print('Got a message whilst in the foreground!');
+      print('Message data: ${message.data}');
+
+      if (message.notification != null) {
+        print('Message also contained a notification: ${message.notification}');
+      }
+
+      showNotification(message);
+    });
+
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  }
+
+  void showNotification(RemoteMessage message) {
+    final notification = message.data;
+    if (notification['type'] == 'NEW_MESSAGE') {
+      _flutterLocalNotificationsPlugin.show(
+        notification.hashCode,
+        notification['senderName'],
+        notification['messageText'],
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            _channelId,
+            _channelName,
+            channelDescription: _channelDescription,
+            icon: 'ic_status_16px',
+          ),
+        ),
+        payload: notification['chatId'],
+      );
+    }
   }
 
   Future<void> _createAndroidNotificationChannel() async {

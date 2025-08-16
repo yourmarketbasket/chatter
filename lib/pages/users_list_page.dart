@@ -1,3 +1,4 @@
+import 'package:chatter/pages/conversation_page.dart';
 import 'package:chatter/pages/profile_page.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -18,6 +19,8 @@ class _UsersListPageState extends State<UsersListPage> {
   final DataController _dataController = Get.find<DataController>();
   // Local state to manage button loading
   final RxMap<String, bool> _isUpdatingFollowStatus = <String, bool>{}.obs;
+  bool _isGroupCreationMode = false;
+  final List<Map<String, dynamic>> _selectedUsers = [];
 
 
   @override
@@ -107,6 +110,52 @@ class _UsersListPageState extends State<UsersListPage> {
     }
   }
 
+  void _createGroup() {
+    final groupNameController = TextEditingController();
+    Get.dialog(
+      AlertDialog(
+        title: const Text('New Group'),
+        content: TextField(
+          controller: groupNameController,
+          decoration: const InputDecoration(hintText: 'Group Name'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              if (groupNameController.text.isNotEmpty) {
+                final participantIds = _selectedUsers.map((u) => u['_id'] as String).toList();
+                final currentUserId = _dataController.user.value['user']['_id'];
+                participantIds.add(currentUserId);
+
+                final newChat = await _dataController.createChat(
+                  participantIds,
+                  isGroup: true,
+                  groupName: groupNameController.text,
+                );
+
+                Get.back(); // Close dialog
+
+                if (newChat != null) {
+                  Get.to(() => ConversationPage(
+                        conversationId: newChat.id,
+                        username: newChat.groupName!,
+                        userAvatar: newChat.groupAvatar ?? '',
+                      ));
+                } else {
+                  Get.snackbar('Error', 'Could not create group chat.');
+                }
+              }
+            },
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -114,7 +163,7 @@ class _UsersListPageState extends State<UsersListPage> {
       backgroundColor: const Color(0xFF000000), // Twitter dark theme background
       appBar: AppBar(
         title: Text(
-          'Browse Users',
+          _isGroupCreationMode ? 'Select Users' : 'Browse Users',
           style: GoogleFonts.poppins(
             fontWeight: FontWeight.w600,
             color: Colors.white,
@@ -123,6 +172,17 @@ class _UsersListPageState extends State<UsersListPage> {
         backgroundColor: const Color(0xFF121212),
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          IconButton(
+            icon: Icon(_isGroupCreationMode ? Icons.close : Icons.group_add),
+            onPressed: () {
+              setState(() {
+                _isGroupCreationMode = !_isGroupCreationMode;
+                _selectedUsers.clear();
+              });
+            },
+          ),
+        ],
       ),
       drawer: const AppDrawer(),
       body: Obx(() {
@@ -229,18 +289,45 @@ class _UsersListPageState extends State<UsersListPage> {
                       : Text(isFollowing ? 'Unfollow' : 'Follow', style: GoogleFonts.roboto(fontWeight: FontWeight.bold, fontSize: 13)),
                 );
               }),
-              onTap: () {
-                if (username.isNotEmpty && userId.isNotEmpty) {
-                   Get.to(() => ProfilePage(userId: userId, username: username, userAvatarUrl: avatarUrl));
+              onTap: () async {
+                if (_isGroupCreationMode) {
+                  setState(() {
+                    if (_selectedUsers.any((u) => u['_id'] == userId)) {
+                      _selectedUsers.removeWhere((u) => u['_id'] == userId);
+                    } else {
+                      _selectedUsers.add(user);
+                    }
+                  });
                 } else {
-                  Get.snackbar('Error', 'Cannot navigate to profile: User data incomplete.', snackPosition: SnackPosition.BOTTOM);
+                  final currentUserId = _dataController.user.value['user']['_id'];
+                  final newChat = await _dataController.createChat([currentUserId, userId]);
+                  if (newChat != null) {
+                    Get.to(() => ConversationPage(
+                          conversationId: newChat.id,
+                          username: name,
+                          userAvatar: avatarUrl,
+                        ));
+                  } else {
+                    Get.snackbar('Error', 'Could not create chat.',
+                        snackPosition: SnackPosition.BOTTOM);
+                  }
                 }
               },
+              selected: _isGroupCreationMode && _selectedUsers.any((u) => u['_id'] == userId),
+              selectedTileColor: Colors.teal.withOpacity(0.2),
             );
           },
           padding: const EdgeInsets.only(bottom: 16), // Add padding at the bottom
         );
       }),
+      floatingActionButton: _isGroupCreationMode && _selectedUsers.isNotEmpty
+          ? FloatingActionButton.extended(
+              onPressed: _createGroup,
+              label: const Text('Create Group'),
+              icon: const Icon(Icons.check),
+              backgroundColor: Colors.tealAccent,
+            )
+          : null,
     );
   }
 }
