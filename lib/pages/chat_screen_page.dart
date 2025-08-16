@@ -707,12 +707,25 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    print('Chat data: ${widget.chat}');
     final otherUser = widget.chat['isGroup']
         ? null
         : (widget.chat['participants'] as List<dynamic>).firstWhere(
-            (p) => p['_id'] != dataController.user.value['user']['_id'],
+            (p) {
+              if (p is Map<String, dynamic>) {
+                return p['_id'] != dataController.user.value['user']['_id'];
+              }
+              return p != dataController.user.value['user']['_id'];
+            },
             orElse: () => (widget.chat['participants'] as List<dynamic>).first,
-          ) as Map<String, dynamic>;
+          );
+
+    final otherUserMap = otherUser is Map<String, dynamic>
+        ? otherUser
+        : _dataController.allUsers.firstWhere(
+            (u) => u['_id'] == otherUser,
+            orElse: () => {'name': 'Unknown', 'avatar': ''},
+          );
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -726,25 +739,25 @@ class _ChatScreenState extends State<ChatScreen> {
                   backgroundColor: Colors.tealAccent,
                   backgroundImage: (widget.chat['isGroup']
                               ? widget.chat['groupAvatar']
-                              : otherUser?['avatar']) !=
+                              : otherUserMap?['avatar']) !=
                           null
                       ? NetworkImage((widget.chat['isGroup']
                           ? widget.chat['groupAvatar']
-                          : otherUser!['avatar'])!)
+                          : otherUserMap!['avatar'])!)
                       : null,
                   child: (widget.chat['isGroup']
                               ? widget.chat['groupAvatar']
-                              : otherUser?['avatar']) ==
+                              : otherUserMap?['avatar']) ==
                           null
                       ? Text(
                           widget.chat['isGroup']
                               ? (widget.chat['groupName']?[0] ?? '?')
-                              : (otherUser?['name'][0] ?? '?'),
+                              : (otherUserMap?['name'][0] ?? '?'),
                           style: const TextStyle(color: Colors.black),
                         )
                       : null,
                 ),
-                if (!widget.chat['isGroup'] && (otherUser?['online'] ?? false))
+                if (!widget.chat['isGroup'] && (otherUserMap?['online'] ?? false))
                   Positioned(
                     bottom: 0,
                     right: 0,
@@ -764,7 +777,7 @@ class _ChatScreenState extends State<ChatScreen> {
             Text(
               widget.chat['isGroup']
                   ? widget.chat['groupName']!
-                  : otherUser!['name'],
+                  : otherUserMap!['name'],
               style: const TextStyle(color: Colors.white),
             ),
           ],
