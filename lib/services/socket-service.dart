@@ -14,7 +14,7 @@ class SocketService {
   }
 
   void _initializeSocket() {
-    _socket = IO.io('https://chatter-api.fly.dev/', <String, dynamic>{
+    _socket = IO.io('192.168.1.104:3000/', <String, dynamic>{
       'transports': ['websocket'],
       'autoConnect': false,
       'reconnection': true, // Enable automatic reconnection
