@@ -1396,6 +1396,13 @@ class DataController extends GetxController {
   // Add this method to the DataController class
   // some test changes
 
+  void addUserToAllUsers(Map<String, dynamic> user) {
+    if (allUsers.any((u) => u['_id'] == user['_id'])) {
+      return;
+    }
+    allUsers.add(user);
+  }
+
   Future<void> logoutUser() async {
     try {
       // 1. Clear data from FlutterSecureStorage
