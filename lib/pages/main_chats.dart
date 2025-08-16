@@ -1,4 +1,5 @@
 import 'package:chatter/pages/chats_page.dart';
+import 'package:chatter/pages/contacts_page.dart';
 import 'package:chatter/pages/groups_page.dart';
 import 'package:flutter/material.dart';
 
@@ -79,6 +80,21 @@ class _MainChatsPageState extends State<MainChatsPage> {
         appBar: AppBar(
           title: Text(_currentIndex == 0 ? 'Chats' : 'Groups'),
           automaticallyImplyLeading: false, // No back arrow
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.add_circle_outline),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ContactsPage(
+                      isCreatingGroup: _currentIndex == 1,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
           bottom: PreferredSize(
             preferredSize: const Size.fromHeight(60.0),
             child: Padding(
@@ -94,7 +110,7 @@ class _MainChatsPageState extends State<MainChatsPage> {
                     borderRadius: BorderRadius.circular(20),
                     borderSide: BorderSide.none,
                   ),
-                  prefixIcon: Icon(Icons.search, color: Colors.tealAccent),
+                  prefixIcon: const Icon(Icons.search, color: Colors.tealAccent),
                 ),
                 style: const TextStyle(color: Colors.white),
                 onChanged: (value) {

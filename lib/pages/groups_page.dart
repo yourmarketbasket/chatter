@@ -92,17 +92,6 @@ class _GroupsPageState extends State<GroupsPage> {
           },
         );
       }),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (context) => const ContactsPage(isCreatingGroup: true)),
-          );
-        },
-        backgroundColor: Colors.tealAccent,
-        child: const Icon(Icons.add, color: Colors.black),
-      ),
     );
   }
 }
