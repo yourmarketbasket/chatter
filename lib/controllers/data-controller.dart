@@ -90,26 +90,27 @@ class DataController extends GetxController {
     String? userJson = await _storage.read(key: 'user');
     if (userJson != null) {
       user.value = jsonDecode(userJson);
+    }
+
+    // Only proceed with network calls if user is logged in
+    if (user.value['token'] != null) {
+      // Fetch non-essential data in parallel (fire and forget)
+      fetchFeeds().catchError((e) {
+        print('Error fetching initial feeds: $e');
+        posts.clear(); // Clear posts on error
+      });
       final String? currentUserId = user.value['user']?['_id'];
       if (currentUserId != null && currentUserId.isNotEmpty) {
         print('[DataController.init] User loaded from storage. Fetching initial network data for $currentUserId');
         fetchFollowers(currentUserId).catchError((e) => print('Error fetching followers in init: $e'));
         fetchFollowing(currentUserId).catchError((e) => print('Error fetching following in init: $e'));
       }
+
+      // For chat functionality, we need all users before we can correctly display chats.
+      // So we await these calls in sequence.
+      await fetchAllUsers();
+      await fetchChats();
     }
-    // fetch initial feeds
-    try {
-      // Only fetch feeds if user is actually logged in (token exists)
-      if (user.value['token'] != null) {
-        await fetchFeeds();
-      }
-    } catch (e) {
-      print('Error fetching initial feeds: $e');
-      posts.clear(); // Clear posts on error
-    }
-    // Fetch all users (placeholder) - This is typically called on demand by UsersListPage
-    fetchAllUsers();
-    fetchChats();
   }
 
   // Method to fetch/initialize all users
