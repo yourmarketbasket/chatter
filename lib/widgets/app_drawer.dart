@@ -2,6 +2,7 @@ import 'package:chatter/pages/home-feed-screen.dart';
 import 'package:chatter/pages/users_list_page.dart';
 import 'package:chatter/pages/followers_page.dart';
 import 'package:chatter/pages/login.dart';
+import 'package:chatter/pages/terms_and_conditions_page.dart';
 import 'package:chatter/pages/user_posts_page.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -445,6 +446,14 @@ class AppDrawer extends StatelessWidget {
                   onTap: () {
                     Get.back();
                     Get.toNamed('/buy-me-a-coffee');
+                  },
+                ),
+                ListTile(
+                  leading: Icon(FeatherIcons.fileText, color: Colors.grey[300]),
+                  title: Text('Terms & Service', style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16)),
+                  onTap: () {
+                    Get.back();
+                    Get.to(() => const TermsAndConditionsPage());
                   },
                 ),
                 ListTile(
