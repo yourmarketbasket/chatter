@@ -2,6 +2,7 @@ import 'package:chatter/models/feed_models.dart';
 import 'package:objectid/objectid.dart';
 
 enum MessageStatus { sending, sent, delivered, read, failed }
+// forced
 
 class Attachment {
   final String id;
