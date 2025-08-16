@@ -1077,7 +1077,19 @@ class DataController extends GetxController {
       );
       currentConversationMessages[index] = editedMessage;
 
-      // TODO: API call to edit message on backend
+      try {
+        final token = user.value['token'];
+        if (token == null) throw Exception('Not authenticated');
+        await _dio.put(
+          'api/chats/${originalMessage.chatId}/messages/${messageId}',
+          data: {'text': newText},
+          options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
+        );
+      } catch (e) {
+        print('Error editing message: $e');
+        // Optionally revert the change or show an error
+        currentConversationMessages[index] = originalMessage;
+      }
     }
   }
 
@@ -1094,6 +1106,18 @@ class DataController extends GetxController {
       currentConversationMessages[index] = deletedMessage;
 
       // TODO: API call to delete message on backend
+      try {
+        final token = user.value['token'];
+        if (token == null) throw Exception('Not authenticated');
+        await _dio.delete(
+          'api/chats/${originalMessage.chatId}/messages/${messageId}',
+          options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
+        );
+      } catch (e) {
+        print('Error deleting message: $e');
+        // Optionally revert the change or show an error
+        currentConversationMessages[index] = originalMessage;
+      }
     }
   }
 
@@ -2584,6 +2608,15 @@ void clearUserPosts() {
   void handleTypingStop(Map<String, dynamic> data) {
     final chatId = data['chatId'] as String;
     isTyping[chatId] = false;
+  }
+
+  void handleMessageUpdated(Map<String, dynamic> data) {
+    final updatedMessage = ChatMessage.fromJson(data);
+    final index = currentConversationMessages.indexWhere((m) => m.id == updatedMessage.id);
+    if (index != -1) {
+      currentConversationMessages[index] = updatedMessage;
+      currentConversationMessages.refresh();
+    }
   }
 
   Future<void> updateFcmToken(String token) async {

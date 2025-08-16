@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:chatter/controllers/data-controller.dart';
 import 'package:chatter/models/chat_models.dart';
 import 'package:chatter/services/socket-service.dart';
+import 'package:chatter/widgets/reply_input_preview.dart';
+import 'package:chatter/widgets/reply_message_snippet.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -30,6 +32,7 @@ class _ConversationPageState extends State<ConversationPage> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   Timer? _typingTimer;
+  ChatMessage? _replyToMessage;
 
   @override
   void initState() {
@@ -58,6 +61,76 @@ class _ConversationPageState extends State<ConversationPage> {
     super.dispose();
   }
 
+  void _showMessageOptions(BuildContext context, ChatMessage message, bool isMe) {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Wrap(
+            children: <Widget>[
+              ListTile(
+                leading: const Icon(Icons.reply),
+                title: const Text('Reply'),
+                onTap: () {
+                  Navigator.pop(context);
+                  setState(() {
+                    _replyToMessage = message;
+                  });
+                },
+              ),
+              if (isMe)
+                ListTile(
+                  leading: const Icon(Icons.edit),
+                  title: const Text('Edit'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showEditMessageDialog(context, message);
+                  },
+                ),
+              if (isMe)
+                ListTile(
+                  leading: const Icon(Icons.delete, color: Colors.red),
+                  title: const Text('Delete', style: TextStyle(color: Colors.red)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _dataController.deleteChatMessage(message.id);
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showEditMessageDialog(BuildContext context, ChatMessage message) {
+    final TextEditingController editController = TextEditingController(text: message.text);
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Edit Message'),
+        content: TextField(
+          controller: editController,
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (editController.text.isNotEmpty) {
+                _dataController.editChatMessage(message.id, editController.text);
+                Get.back();
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _sendMessage() {
     if (_messageController.text.trim().isEmpty) return;
 
@@ -65,10 +138,14 @@ class _ConversationPageState extends State<ConversationPage> {
       chatId: widget.conversationId,
       senderId: _dataController.user.value['user']['_id'], // Assuming user ID is here
       text: _messageController.text.trim(),
+      replyTo: _replyToMessage?.id,
     );
     _dataController.sendChatMessage(message);
 
     _messageController.clear();
+    setState(() {
+      _replyToMessage = null;
+    });
     // Scroll to bottom after sending
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -146,19 +223,43 @@ class _ConversationPageState extends State<ConversationPage> {
                 itemBuilder: (context, index) {
                   final message = messages[index];
                   final bool isMe = message.senderId == currentUserId;
+
+                  Widget repliedMessageWidget = const SizedBox.shrink();
+                  if (message.replyTo != null) {
+                    final repliedToMessage = messages.firstWhereOrNull((m) => m.id == message.replyTo);
+                    if (repliedToMessage != null) {
+                      repliedMessageWidget = ReplyMessageSnippet(
+                        originalMessage: repliedToMessage,
+                        chat: Chat(participants: [], id: widget.conversationId), // This is not ideal
+                        currentUserId: currentUserId,
+                      );
+                    }
+                  }
+
                   // Basic message bubble
                   return Align(
                     alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(vertical: 4.0),
-                      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-                      decoration: BoxDecoration(
-                        color: isMe ? Colors.tealAccent.withOpacity(0.8) : Colors.grey[800],
-                        borderRadius: BorderRadius.circular(12.0),
-                      ),
-                      child: Text(
-                        message.text ?? '',
-                        style: GoogleFonts.roboto(color: isMe ? Colors.black : Colors.white, fontSize: 15),
+                    child: GestureDetector(
+                      onLongPress: () {
+                        _showMessageOptions(context, message, isMe);
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(vertical: 4.0),
+                        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                        decoration: BoxDecoration(
+                          color: isMe ? Colors.tealAccent.withOpacity(0.8) : Colors.grey[800],
+                          borderRadius: BorderRadius.circular(12.0),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            repliedMessageWidget,
+                            Text(
+                              message.text ?? '',
+                              style: GoogleFonts.roboto(color: isMe ? Colors.black : Colors.white, fontSize: 15),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   );
@@ -166,6 +267,15 @@ class _ConversationPageState extends State<ConversationPage> {
               );
             }),
           ),
+          if (_replyToMessage != null)
+            ReplyInputPreview(
+              repliedToMessage: _replyToMessage!,
+              onCancel: () {
+                setState(() {
+                  _replyToMessage = null;
+                });
+              },
+            ),
           Obx(() {
             final isTyping = _dataController.isTyping[widget.conversationId] ?? false;
             if (isTyping) {

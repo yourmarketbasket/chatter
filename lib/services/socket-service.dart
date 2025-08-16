@@ -267,6 +267,12 @@ class SocketService {
         _dataController.handleTypingStop(data);
       }
     });
+
+    _socket!.on('message:updated', (data) {
+      if (data is Map<String, dynamic>) {
+        _dataController.handleMessageUpdated(data);
+      }
+    });
   }
 
   void connect() {
