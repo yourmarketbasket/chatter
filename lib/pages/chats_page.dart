@@ -1,5 +1,4 @@
 import 'package:chatter/controllers/data-controller.dart';
-import 'package:chatter/models/message_models.dart';
 import 'package:chatter/pages/chat_screen_page.dart';
 import 'package:chatter/pages/contacts_page.dart';
 import 'package:flutter/material.dart';
@@ -59,39 +58,32 @@ class _ChatsPageState extends State<ChatsPage> {
                   );
 
             String preview = '...';
-            ChatMessage? lastMessage;
             if (lastMessageData != null && lastMessageData is Map<String, dynamic>) {
-              try {
-                lastMessage = ChatMessage.fromJson(lastMessageData);
-                if (lastMessage.attachments != null &&
-                    lastMessage.attachments!.isNotEmpty) {
-                  preview = 'Attachment';
-                } else if (lastMessage.voiceNote != null) {
-                  preview = 'Voice note';
-                } else {
-                  preview = lastMessage.text ?? '';
-                }
-                if (lastMessage.senderId == currentUserId) {
-                  preview = 'You: $preview';
-                }
-              } catch (e, s) {
-                print('Error parsing last message in chats_page: $e');
-                print(s);
+              if (lastMessageData['attachments'] != null &&
+                  (lastMessageData['attachments'] as List).isNotEmpty) {
+                preview = 'Attachment';
+              } else if (lastMessageData['voiceNote'] != null) {
+                preview = 'Voice note';
+              } else {
+                preview = lastMessageData['text'] ?? '';
+              }
+              if (lastMessageData['senderId'] == currentUserId) {
+                preview = 'You: $preview';
               }
             }
 
             IconData statusIcon;
             Color statusColor;
-            switch (lastMessage?.status) {
-              case MessageStatus.sent:
+            switch (lastMessageData?['status']) {
+              case 'sent':
                 statusIcon = Icons.check;
                 statusColor = Colors.grey[400]!;
                 break;
-              case MessageStatus.delivered:
+              case 'delivered':
                 statusIcon = Icons.done_all;
                 statusColor = Colors.grey[400]!;
                 break;
-              case MessageStatus.read:
+              case 'read':
                 statusIcon = Icons.done_all;
                 statusColor = Colors.tealAccent;
                 break;
@@ -155,7 +147,7 @@ class _ChatsPageState extends State<ChatsPage> {
                         fontSize: 12,
                       ),
                     ),
-                  if (lastMessage?.senderId == currentUserId)
+                  if (lastMessageData?['senderId'] == currentUserId)
                     Icon(
                       statusIcon,
                       size: 16,
@@ -164,10 +156,11 @@ class _ChatsPageState extends State<ChatsPage> {
                 ],
               ),
               onTap: () {
+                _dataController.currentChat.value = chat;
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => ChatScreen(chat: chat),
+                    builder: (context) => const ChatScreen(),
                   ),
                 );
               },

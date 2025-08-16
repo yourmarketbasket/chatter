@@ -36,18 +36,23 @@ class _ContactsPageState extends State<ContactsPage> {
       });
     } else {
       print("Selected user data: $user");
-      _dataController.addUserToAllUsers(user);
       final currentUserId = _dataController.user.value['user']['_id'];
+      final currentUserData = _dataController.user.value['user'];
 
       _dataController
           .createChat([currentUserId, user['_id']], isGroup: false)
           .then((chat) {
         if (chat != null) {
-          print("Opening chat screen with chat data: $chat");
+          final hydratedChat = Map<String, dynamic>.from(chat);
+          hydratedChat['participants'] = [currentUserData, user];
+          _dataController.chats[chat['_id']] = hydratedChat;
+          _dataController.currentChat.value = hydratedChat;
+
+          print("Opening chat screen with hydrated chat data: $hydratedChat");
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => ChatScreen(chat: chat),
+              builder: (context) => const ChatScreen(),
             ),
           );
         } else {
@@ -94,10 +99,11 @@ class _ContactsPageState extends State<ContactsPage> {
                     .then((chat) {
                   Get.back(); // Close dialog
                   if (chat != null) {
+                    _dataController.currentChat.value = chat;
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => ChatScreen(chat: chat),
+                        builder: (context) => const ChatScreen(),
                       ),
                     );
                   }

@@ -1,9 +1,8 @@
-import 'package:chatter/models/message_models.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';
 
 class ReplyMessageSnippet extends StatelessWidget {
-  final ChatMessage originalMessage;
+  final Map<String, dynamic> originalMessage;
   final Map<String, dynamic> chat;
   final String currentUserId;
 
@@ -14,15 +13,15 @@ class ReplyMessageSnippet extends StatelessWidget {
     required this.currentUserId,
   });
 
-  Widget _buildPreview(Attachment attachment) {
-    final extension = attachment.type?.toLowerCase() ?? '';
-    final isLocalFile = !attachment.url.startsWith('http');
+  Widget _buildPreview(Map<String, dynamic> attachment) {
+    final extension = attachment['type']?.toLowerCase() ?? '';
+    final isLocalFile = !(attachment['url'] as String).startsWith('http');
     Widget preview;
 
     switch (extension) {
       case 'image':
         preview = Image(
-          image: isLocalFile ? FileImage(File(attachment.url)) : NetworkImage(attachment.url) as ImageProvider,
+          image: isLocalFile ? FileImage(File(attachment['url'])) : NetworkImage(attachment['url']) as ImageProvider,
           fit: BoxFit.cover,
         );
         break;
@@ -40,23 +39,23 @@ class ReplyMessageSnippet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool isReplyingToSelf = originalMessage.senderId == currentUserId;
+    final bool isReplyingToSelf = originalMessage['senderId'] == currentUserId;
     final sender = (chat['participants'] as List).firstWhere(
-      (p) => p['_id'] == originalMessage.senderId,
-      orElse: () => {'_id': originalMessage.senderId, 'name': 'Unknown User'},
+      (p) => p['_id'] == originalMessage['senderId'],
+      orElse: () => {'_id': originalMessage['senderId'], 'name': 'Unknown User'},
     );
     final senderName = isReplyingToSelf ? 'You' : sender['name'];
 
     Widget contentPreview;
-    if (originalMessage.attachments != null && originalMessage.attachments!.isNotEmpty) {
-      final firstAttachment = originalMessage.attachments!.first;
+    if (originalMessage['attachments'] != null && (originalMessage['attachments'] as List).isNotEmpty) {
+      final firstAttachment = (originalMessage['attachments'] as List).first;
       contentPreview = Row(
         children: [
           _buildPreview(firstAttachment),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              firstAttachment.type == 'image' ? 'Image' : firstAttachment.filename,
+              firstAttachment['type'] == 'image' ? 'Image' : firstAttachment['filename'],
               style: TextStyle(color: Colors.grey[300]),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -64,7 +63,7 @@ class ReplyMessageSnippet extends StatelessWidget {
           ),
         ],
       );
-    } else if (originalMessage.voiceNote != null) {
+    } else if (originalMessage['voiceNote'] != null) {
       contentPreview = Row(
         children: [
           const Icon(Icons.audiotrack, size: 24, color: Colors.white),
@@ -77,7 +76,7 @@ class ReplyMessageSnippet extends StatelessWidget {
       );
     } else {
       contentPreview = Text(
-        originalMessage.text ?? '',
+        originalMessage['text'] ?? '',
         style: TextStyle(color: Colors.grey[300]),
         maxLines: 2,
         overflow: TextOverflow.ellipsis,

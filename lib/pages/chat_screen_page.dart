@@ -1,6 +1,5 @@
 import 'package:chatter/controllers/data-controller.dart';
-import 'package:chatter/models/message_models.dart';
-import 'package:chatter/models/feed_models.dart' hide Attachment;
+import 'package:chatter/models/feed_models.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io';
@@ -17,9 +16,7 @@ import 'package:chatter/widgets/reply_message_snippet.dart';
 import 'package:chatter/helpers/time_helper.dart';
 
 class ChatScreen extends StatefulWidget {
-  final Map<String, dynamic> chat;
-
-  const ChatScreen({super.key, required this.chat});
+  const ChatScreen({super.key});
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -29,13 +26,13 @@ class _ChatScreenState extends State<ChatScreen> {
   final DataController dataController = Get.find<DataController>();
   final TextEditingController _messageController = TextEditingController();
   final GlobalKey<AnimatedListState> _listKey = GlobalKey<AnimatedListState>();
-  ChatMessage? _replyingTo;
+  Map<String, dynamic>? _replyingTo;
 
   @override
   void initState() {
     super.initState();
     // Fetch messages for this chat when the screen loads
-    dataController.fetchMessages(widget.chat['_id']);
+    dataController.fetchMessages(dataController.currentChat.value['_id']);
   }
 
   @override
@@ -49,12 +46,14 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _sendMessage() {
     if (_messageController.text.trim().isNotEmpty) {
-      final message = ChatMessage(
-        chatId: widget.chat['_id'],
-        senderId: dataController.user.value['user']['_id'],
-        text: _messageController.text.trim(),
-        replyTo: _replyingTo?.id,
-      );
+      final message = {
+        '_id': DateTime.now().millisecondsSinceEpoch.toString(),
+        'chatId': dataController.currentChat.value['_id'],
+        'senderId': dataController.user.value['user']['_id'],
+        'text': _messageController.text.trim(),
+        'createdAt': DateTime.now().toIso8601String(),
+        'replyTo': _replyingTo?['_id'],
+      };
       dataController.sendChatMessage(message);
       _messageController.clear();
       setState(() {
@@ -63,8 +62,8 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  void _editMessage(ChatMessage message) {
-    final editController = TextEditingController(text: message.text);
+  void _editMessage(Map<String, dynamic> message) {
+    final editController = TextEditingController(text: message['text']);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -82,7 +81,7 @@ class _ChatScreenState extends State<ChatScreen> {
             onPressed: () {
               if (editController.text.trim().isNotEmpty) {
                 dataController.editChatMessage(
-                    message.id, editController.text.trim());
+                    message['_id'], editController.text.trim());
               }
               Navigator.pop(context);
             },
@@ -93,11 +92,11 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  void _deleteMessage(ChatMessage message) {
-    dataController.deleteChatMessage(message.id);
+  void _deleteMessage(Map<String, dynamic> message) {
+    dataController.deleteChatMessage(message['_id']);
   }
 
-  void _showMessageOptions(ChatMessage message) {
+  void _showMessageOptions(Map<String, dynamic> message) {
     showModalBottomSheet(
       context: context,
       builder: (context) => Column(
@@ -108,7 +107,7 @@ class _ChatScreenState extends State<ChatScreen> {
             title: const Text('Edit'),
             onTap: () {
               Navigator.pop(context);
-              if (message.senderId ==
+              if (message['senderId'] ==
                   dataController.user.value['user']['_id']) {
                 _editMessage(message);
               }
@@ -135,17 +134,17 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildReplyAttachmentPreview(Attachment attachment) {
-    final extension = attachment.type?.toLowerCase() ?? '';
-    final isLocalFile = !attachment.url.startsWith('http');
+  Widget _buildReplyAttachmentPreview(Map<String, dynamic> attachment) {
+    final extension = attachment['type']?.toLowerCase() ?? '';
+    final isLocalFile = !(attachment['url'] as String).startsWith('http');
     Widget preview;
 
     switch (extension) {
       case 'image':
         preview = Image(
           image: isLocalFile
-              ? FileImage(File(attachment.url))
-              : NetworkImage(attachment.url) as ImageProvider,
+              ? FileImage(File(attachment['url']))
+              : NetworkImage(attachment['url']) as ImageProvider,
           fit: BoxFit.cover,
         );
         break;
@@ -166,28 +165,28 @@ class _ChatScreenState extends State<ChatScreen> {
             borderRadius: BorderRadius.circular(4), child: preview));
   }
 
-  Widget _buildReplyPreview(ChatMessage replyTo) {
-    final sender = (widget.chat['participants'] as List).firstWhere(
-      (p) => p['_id'] == replyTo.senderId,
-      orElse: () => {'_id': replyTo.senderId, 'name': 'Unknown User'},
+  Widget _buildReplyPreview(Map<String, dynamic> replyTo) {
+    final sender = (dataController.currentChat.value['participants'] as List).firstWhere(
+      (p) => p['_id'] == replyTo['senderId'],
+      orElse: () => {'_id': replyTo['senderId'], 'name': 'Unknown User'},
     );
-    final senderName = replyTo.senderId ==
+    final senderName = replyTo['senderId'] ==
             dataController.user.value['user']['_id']
         ? 'You'
         : sender['name'];
 
     Widget contentPreview;
-    if (replyTo.attachments != null && replyTo.attachments!.isNotEmpty) {
-      final firstAttachment = replyTo.attachments!.first;
+    if (replyTo['attachments'] != null && (replyTo['attachments'] as List).isNotEmpty) {
+      final firstAttachment = (replyTo['attachments'] as List).first;
       contentPreview = Row(
         children: [
           _buildReplyAttachmentPreview(firstAttachment),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              firstAttachment.type == 'image'
+              firstAttachment['type'] == 'image'
                   ? 'Image'
-                  : firstAttachment.filename,
+                  : firstAttachment['filename'],
               style: TextStyle(color: Colors.grey[300]),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -195,7 +194,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ],
       );
-    } else if (replyTo.voiceNote != null) {
+    } else if (replyTo['voiceNote'] != null) {
       contentPreview = Row(
         children: [
           const Icon(Icons.audiotrack, size: 24, color: Colors.white),
@@ -208,7 +207,7 @@ class _ChatScreenState extends State<ChatScreen> {
       );
     } else {
       contentPreview = Text(
-        replyTo.text ?? '',
+        replyTo['text'] ?? '',
         style: TextStyle(color: Colors.grey[300]),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
@@ -259,19 +258,19 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  void _openMediaView(ChatMessage message, int initialIndex) {
-    final attachmentsForViewer = message.attachments!
+  void _openMediaView(Map<String, dynamic> message, int initialIndex) {
+    final attachmentsForViewer = (message['attachments'] as List)
         .map((att) => {
-              'url': att.url,
-              'type': att.type,
-              'filename': att.filename,
+              'url': att['url'],
+              'type': att['type'],
+              'filename': att['filename'],
             })
         .toList();
 
-    final sender = (widget.chat['participants'] as List).firstWhere(
-      (p) => p['_id'] == message.senderId,
+    final sender = (dataController.currentChat.value['participants'] as List).firstWhere(
+      (p) => p['_id'] == message['senderId'],
       // Fallback for safety, though sender should always be in participants
-      orElse: () => {'_id': message.senderId, 'name': 'Unknown User'},
+      orElse: () => {'_id': message['senderId'], 'name': 'Unknown User'},
     );
 
     Navigator.push(
@@ -280,10 +279,10 @@ class _ChatScreenState extends State<ChatScreen> {
         builder: (context) => MediaViewPage(
           attachments: attachmentsForViewer,
           initialIndex: initialIndex,
-          message: message.text ?? '',
+          message: message['text'] ?? '',
           userName: sender['name'],
           userAvatarUrl: sender['avatar'],
-          timestamp: message.createdAt,
+          timestamp: DateTime.parse(message['createdAt']),
           viewsCount: 0,
           likesCount: 0,
           repostsCount: 0,
@@ -292,12 +291,12 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildAttachment(ChatMessage message) {
-    if (message.attachments == null || message.attachments!.isEmpty) {
+  Widget _buildAttachment(Map<String, dynamic> message) {
+    if (message['attachments'] == null || (message['attachments'] as List).isEmpty) {
       return const SizedBox.shrink();
     }
 
-    final attachments = message.attachments!;
+    final attachments = message['attachments'] as List;
     const maxVisible = 4;
     final hasMore = attachments.length > maxVisible;
     final gridItemCount = hasMore ? maxVisible : attachments.length;
@@ -329,7 +328,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 context: context,
                 builder: (context) => AllAttachmentsDialog(
                   message: message,
-                  chat: widget.chat,
+                  chat: dataController.currentChat.value,
                 ),
               );
             },
@@ -365,10 +364,10 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildAttachmentContent(Attachment attachment, bool isLocalFile) {
-    final attachmentType = attachment.type?.toLowerCase();
+  Widget _buildAttachmentContent(Map<String, dynamic> attachment, bool isLocalFile) {
+    final attachmentType = attachment['type']?.toLowerCase();
 
-    final uploadOverlay = attachment.isUploading
+    final uploadOverlay = (attachment['isUploading'] ?? false)
         ? Positioned.fill(
             child: Container(
               decoration: BoxDecoration(
@@ -377,7 +376,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               child: Center(
                 child: CircularProgressIndicator(
-                  value: attachment.uploadProgress,
+                  value: attachment['uploadProgress'],
                   strokeWidth: 2,
                   backgroundColor: Colors.grey.withOpacity(0.5),
                   valueColor:
@@ -396,8 +395,8 @@ class _ChatScreenState extends State<ChatScreen> {
             borderRadius: BorderRadius.circular(8),
             image: DecorationImage(
               image: isLocalFile
-                  ? FileImage(File(attachment.url))
-                  : NetworkImage(attachment.url) as ImageProvider,
+                  ? FileImage(File(attachment['url']))
+                  : NetworkImage(attachment['url']) as ImageProvider,
               fit: BoxFit.cover,
             ),
           ),
@@ -405,13 +404,13 @@ class _ChatScreenState extends State<ChatScreen> {
         break;
       case 'video':
         content = VideoPlayerWidget(
-          url: isLocalFile ? null : attachment.url,
-          file: isLocalFile ? File(attachment.url) : null,
+          url: isLocalFile ? null : attachment['url'],
+          file: isLocalFile ? File(attachment['url']) : null,
         );
         break;
       case 'audio':
         content = AudioWaveformWidget(
-          audioPath: attachment.url,
+          audioPath: attachment['url'],
           isLocal: isLocalFile,
         );
         break;
@@ -429,7 +428,7 @@ class _ChatScreenState extends State<ChatScreen> {
               const SizedBox(width: 8),
               Flexible(
                 child: Text(
-                  attachment.filename,
+                  attachment['filename'],
                   style: const TextStyle(color: Colors.white),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -453,7 +452,7 @@ class _ChatScreenState extends State<ChatScreen> {
               const SizedBox(width: 8),
               Flexible(
                 child: Text(
-                  attachment.filename,
+                  attachment['filename'],
                   style: const TextStyle(color: Colors.white),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -464,7 +463,7 @@ class _ChatScreenState extends State<ChatScreen> {
         break;
     }
 
-    final downloadOverlay = attachment.isDownloading
+    final downloadOverlay = (attachment['isDownloading'] ?? false)
         ? Positioned.fill(
             child: Container(
               decoration: BoxDecoration(
@@ -473,7 +472,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               child: Center(
                 child: CircularProgressIndicator(
-                  value: attachment.downloadProgress,
+                  value: attachment['downloadProgress'],
                   strokeWidth: 2,
                   backgroundColor: Colors.grey.withOpacity(0.5),
                   valueColor:
@@ -494,23 +493,23 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildMessageContent(ChatMessage message, int index) {
+  Widget _buildMessageContent(Map<String, dynamic> message, int index) {
     final isYou =
-        message.senderId == dataController.user.value['user']['_id'];
+        message['senderId'] == dataController.user.value['user']['_id'];
     final messages = dataController.currentConversationMessages;
     final isSameSenderAsNext =
-        index > 0 && messages[index - 1].senderId == message.senderId;
+        index > 0 && messages[index - 1]['senderId'] == message['senderId'];
     final bottomMargin = isSameSenderAsNext ? 2.0 : 8.0;
     final hasAttachment =
-        message.attachments != null && message.attachments!.isNotEmpty;
+        message['attachments'] != null && (message['attachments'] as List).isNotEmpty;
 
     return GestureDetector(
       onLongPress: () {
-        if (!message.deleted) _showMessageOptions(message);
+        if (!(message['deleted'] ?? false)) _showMessageOptions(message);
       },
       child: Dismissible(
-        key: Key(message.id),
-        direction: message.deleted
+        key: Key(message['_id']),
+        direction: (message['deleted'] ?? false)
             ? DismissDirection.none
             : DismissDirection.startToEnd,
         confirmDismiss: (direction) async {
@@ -540,7 +539,7 @@ class _ChatScreenState extends State<ChatScreen> {
             crossAxisAlignment:
                 isYou ? CrossAxisAlignment.end : CrossAxisAlignment.start,
             children: [
-              if (message.deleted)
+              if (message['deleted'] ?? false)
                 Text(
                   'Message deleted',
                   style: TextStyle(
@@ -549,35 +548,35 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 )
               else ...[
-                if (message.replyTo != null)
+                if (message['replyTo'] != null)
                   Obx(() {
                     final originalMessage = dataController
                         .currentConversationMessages
                         .firstWhere(
-                      (m) => m.id == message.replyTo,
-                      orElse: () => ChatMessage(
-                          chatId: '',
-                          senderId: '',
-                          text: 'Original message not found.'),
+                      (m) => m['_id'] == message['replyTo'],
+                      orElse: () => {
+                          '_id': '',
+                          'senderId': '',
+                          'text': 'Original message not found.'},
                     );
                     // A message with an empty ID is our signal that the original message wasn't found
-                    if (originalMessage.id.isEmpty) {
+                    if (originalMessage['_id'].isEmpty) {
                       return const SizedBox.shrink();
                     }
                     return ReplyMessageSnippet(
                       originalMessage: originalMessage,
-                      chat: widget.chat,
+                      chat: dataController.currentChat.value,
                       currentUserId: dataController.user.value['user']['_id'],
                     );
                   }),
-                if (message.voiceNote != null)
+                if (message['voiceNote'] != null)
                   GestureDetector(
                     onTap: () {
                       final attachmentsForViewer = [
                         {
-                          'url': message.voiceNote!.url,
+                          'url': message['voiceNote']['url'],
                           'type': 'audio',
-                          'filename': message.voiceNote!.url.split('/').last,
+                          'filename': message['voiceNote']['url'].split('/').last,
                         }
                       ];
                       Navigator.push(
@@ -587,15 +586,15 @@ class _ChatScreenState extends State<ChatScreen> {
                             attachments: attachmentsForViewer,
                             initialIndex: 0,
                             message: '',
-                            userName: widget.chat['isGroup']
-                                ? message.senderId
-                                : (widget.chat['participants'] as List)
+                            userName: dataController.currentChat.value['isGroup']
+                                ? message['senderId']
+                                : (dataController.currentChat.value['participants'] as List)
                                     .firstWhere((p) =>
                                         p['_id'] !=
                                         dataController
                                             .user.value['user']['_id'])['name'],
                             userAvatarUrl: null,
-                            timestamp: message.createdAt,
+                            timestamp: DateTime.parse(message['createdAt']),
                             viewsCount: 0,
                             likesCount: 0,
                             repostsCount: 0,
@@ -604,18 +603,18 @@ class _ChatScreenState extends State<ChatScreen> {
                       );
                     },
                     child: AudioWaveformWidget(
-                      audioPath: message.voiceNote!.url,
+                      audioPath: message['voiceNote']['url'],
                       isLocal: true,
                     ),
                   ),
                 if (hasAttachment) ...[
                   _buildAttachment(message),
-                  if (message.text != null && message.text!.isNotEmpty)
+                  if (message['text'] != null && message['text']!.isNotEmpty)
                     const SizedBox(height: 8),
                 ],
-                if (message.text != null && message.text!.isNotEmpty)
+                if (message['text'] != null && message['text']!.isNotEmpty)
                   Text(
-                    message.text!,
+                    message['text']!,
                     style: TextStyle(
                         color: isYou ? Colors.white : Colors.grey[200]),
                   ),
@@ -624,7 +623,7 @@ class _ChatScreenState extends State<ChatScreen> {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (message.edited)
+                  if (message['edited'] ?? false)
                     Text(
                       '(edited) ',
                       style: TextStyle(
@@ -634,7 +633,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                     ),
                   Text(
-                    '${message.createdAt.hour}:${message.createdAt.minute}',
+                    '${DateTime.parse(message['createdAt']).hour}:${DateTime.parse(message['createdAt']).minute}',
                     style: TextStyle(
                       color: Colors.grey[400],
                       fontSize: 10,
@@ -643,9 +642,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   if (isYou) ...[
                     const SizedBox(width: 4),
                     Icon(
-                      _getStatusIcon(message.status),
+                      _getStatusIcon(message['status']),
                       size: 12,
-                      color: _getStatusColor(message.status),
+                      color: _getStatusColor(message['status']),
                     ),
                   ],
                 ],
@@ -657,26 +656,28 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  IconData _getStatusIcon(MessageStatus status) {
+  IconData _getStatusIcon(String? status) {
     switch (status) {
-      case MessageStatus.sending:
+      case 'sending':
         return Icons.access_time;
-      case MessageStatus.sent:
+      case 'sent':
         return Icons.check;
-      case MessageStatus.delivered:
+      case 'delivered':
         return Icons.done_all;
-      case MessageStatus.read:
+      case 'read':
         return Icons.done_all;
-      case MessageStatus.failed:
+      case 'failed':
         return Icons.error_outline;
+      default:
+        return Icons.access_time;
     }
   }
 
-  Color _getStatusColor(MessageStatus status) {
+  Color _getStatusColor(String? status) {
     switch (status) {
-      case MessageStatus.read:
+      case 'read':
         return Colors.tealAccent;
-      case MessageStatus.failed:
+      case 'failed':
         return Colors.red;
       default:
         return Colors.grey[400]!;
@@ -707,153 +708,168 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    print('Chat data: ${widget.chat}');
-    final otherUser = widget.chat['isGroup']
-        ? null
-        : (widget.chat['participants'] as List<dynamic>).firstWhere(
-            (p) {
-              if (p is Map<String, dynamic>) {
-                return p['_id'] != dataController.user.value['user']['_id'];
-              }
-              return p != dataController.user.value['user']['_id'];
-            },
-            orElse: () => (widget.chat['participants'] as List<dynamic>).first,
-          );
+    return Obx(() {
+      final chat = dataController.currentChat.value;
+      if (chat.isEmpty) {
+        return const Scaffold(
+          backgroundColor: Colors.black,
+          body: Center(child: CircularProgressIndicator()),
+        );
+      }
 
-    final otherUserMap = otherUser is Map<String, dynamic>
-        ? otherUser
-        : dataController.allUsers.firstWhere(
-            (u) => u['_id'] == otherUser,
-            orElse: () => {'name': 'Unknown', 'avatar': ''},
-          );
+      print('Chat data: $chat');
+      final otherUser = chat['isGroup']
+          ? null
+          : (chat['participants'] as List<dynamic>).firstWhere(
+              (p) {
+                if (p is Map<String, dynamic>) {
+                  return p['_id'] != dataController.user.value['user']['_id'];
+                }
+                return p != dataController.user.value['user']['_id'];
+              },
+              orElse: () => (chat['participants'] as List<dynamic>).first,
+            );
 
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
+      final otherUserMap = otherUser is Map<String, dynamic>
+          ? otherUser
+          : dataController.allUsers.firstWhere(
+              (u) => u['_id'] == otherUser,
+              orElse: () => {'name': 'Unknown', 'avatar': ''},
+            );
+
+      return Scaffold(
         backgroundColor: Colors.black,
-        title: Row(
-          children: [
-            Stack(
-              children: [
-                CircleAvatar(
-                  backgroundColor: Colors.tealAccent,
-                  backgroundImage: (widget.chat['isGroup']
-                              ? widget.chat['groupAvatar']
-                              : otherUserMap?['avatar']) !=
-                          null &&
-                          (widget.chat['isGroup']
-                              ? widget.chat['groupAvatar']
-                              : otherUserMap?['avatar'])
-                              .isNotEmpty
-                      ? NetworkImage((widget.chat['isGroup']
-                          ? widget.chat['groupAvatar']
-                          : otherUserMap!['avatar'])!)
-                      : null,
-                  child: (widget.chat['isGroup']
-                              ? widget.chat['groupAvatar']
-                              : otherUserMap?['avatar']) ==
-                          null ||
-                          (widget.chat['isGroup']
-                              ? widget.chat['groupAvatar']
-                              : otherUserMap?['avatar'])
-                              .isEmpty
-                      ? Text(
-                          widget.chat['isGroup']
-                              ? (widget.chat['groupName']?[0] ?? '?')
-                              : (otherUserMap?['name'][0] ?? '?'),
-                          style: const TextStyle(color: Colors.black),
-                        )
-                      : null,
-                ),
-                if (!widget.chat['isGroup'] && (otherUserMap?['online'] ?? false))
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.black, width: 2),
+        appBar: AppBar(
+          backgroundColor: Colors.black,
+          title: Row(
+            children: [
+              Stack(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: Colors.tealAccent,
+                    backgroundImage: (chat['isGroup']
+                                ? chat['groupAvatar']
+                                : otherUserMap?['avatar']) !=
+                            null &&
+                            (chat['isGroup']
+                                ? chat['groupAvatar']
+                                : otherUserMap?['avatar'])
+                                .isNotEmpty
+                        ? NetworkImage((chat['isGroup']
+                            ? chat['groupAvatar']
+                            : otherUserMap!['avatar'])!)
+                        : null,
+                    child: (chat['isGroup']
+                                ? chat['groupAvatar']
+                                : otherUserMap?['avatar']) ==
+                            null ||
+                            (chat['isGroup']
+                                ? chat['groupAvatar']
+                                : otherUserMap?['avatar'])
+                                .isEmpty
+                        ? Text(
+                            chat['isGroup']
+                                ? (chat['groupName']?[0] ?? '?')
+                                : (otherUserMap?['name'][0] ?? '?'),
+                            style: const TextStyle(color: Colors.black),
+                          )
+                        : null,
+                  ),
+                  if (!chat['isGroup'] && (otherUserMap?['online'] ?? false))
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: Colors.green,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.black, width: 2),
+                        ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
+              const SizedBox(width: 10),
+              Text(
+                chat['isGroup']
+                    ? chat['groupName']!
+                    : otherUserMap!['name'],
+                style: const TextStyle(color: Colors.white),
+              ),
+            ],
+          ),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+        body: Column(
+          children: [
+            Expanded(
+              child: Obx(() {
+                return ListView.builder(
+                  reverse: true,
+                  padding: const EdgeInsets.symmetric(
+                      vertical: 8.0, horizontal: 16.0),
+                  itemCount: dataController.currentConversationMessages.length,
+                  itemBuilder: (context, index) {
+                    final message =
+                        dataController.currentConversationMessages[index];
+                    return Align(
+                      alignment: message['senderId'] ==
+                              dataController.user.value['user']['_id']
+                          ? Alignment.centerRight
+                          : Alignment.centerLeft,
+                      child: _buildMessageContent(message, index),
+                    );
+                  },
+                );
+              }),
             ),
-            const SizedBox(width: 10),
-            Text(
-              widget.chat['isGroup']
-                  ? widget.chat['groupName']!
-                  : otherUserMap!['name'],
-              style: const TextStyle(color: Colors.white),
+            if (_replyingTo != null) _buildReplyPreview(_replyingTo!),
+            MessageInputArea(
+              onSend: (text, files) {
+                final attachments = files
+                    .map((file) => {
+                          'filename': file.name,
+                          'url': file.path!,
+                          'size': file.size,
+                          'type': _getMediaType(file.extension ?? ''),
+                        })
+                    .toList();
+
+                final isVoiceNote = attachments.isNotEmpty &&
+                    attachments.first['type'] == 'audio';
+
+                final message = {
+                  '_id': DateTime.now().millisecondsSinceEpoch.toString(),
+                  'chatId': chat['_id'],
+                  'senderId': dataController.user.value['user']['_id'],
+                  'text': text,
+                  'createdAt': DateTime.now().toIso8601String(),
+                  'attachments': isVoiceNote ? null : attachments,
+                  'voiceNote': isVoiceNote
+                      ? {
+                          'url': attachments.first['url'],
+                          'duration': Duration.zero.inMilliseconds
+                        }
+                      : null,
+                  'replyTo': _replyingTo?['_id'],
+                };
+
+                dataController.sendChatMessage(message);
+
+                setState(() {
+                  _replyingTo = null;
+                });
+              },
             ),
           ],
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: Obx(() {
-              return ListView.builder(
-                reverse: true,
-                padding: const EdgeInsets.symmetric(
-                    vertical: 8.0, horizontal: 16.0),
-                itemCount: dataController.currentConversationMessages.length,
-                itemBuilder: (context, index) {
-                  final message =
-                      dataController.currentConversationMessages[index];
-                  return Align(
-                    alignment: message.senderId ==
-                            dataController.user.value['user']['_id']
-                        ? Alignment.centerRight
-                        : Alignment.centerLeft,
-                    child: _buildMessageContent(message, index),
-                  );
-                },
-              );
-            }),
-          ),
-          if (_replyingTo != null) _buildReplyPreview(_replyingTo!),
-          MessageInputArea(
-            onSend: (text, files) {
-              final attachments = files
-                  .map((file) => Attachment(
-                        filename: file.name,
-                        url: file.path!,
-                        size: file.size,
-                        type: _getMediaType(file.extension ?? ''),
-                      ))
-                  .toList();
-
-              final isVoiceNote = attachments.isNotEmpty &&
-                  attachments.first.type == 'audio';
-
-              final message = ChatMessage(
-                chatId: widget.chat['_id'],
-                senderId: dataController.user.value['user']['_id'],
-                text: text,
-                attachments: isVoiceNote ? null : attachments,
-                voiceNote: isVoiceNote
-                    ? VoiceNote(
-                        url: attachments.first.url, duration: Duration.zero)
-                    : null,
-                replyTo: _replyingTo?.id,
-              );
-
-              dataController.sendChatMessage(message);
-
-              setState(() {
-                _replyingTo = null;
-              });
-            },
-          ),
-        ],
-      ),
-    );
+      );
+    });
+  }
   }
 }

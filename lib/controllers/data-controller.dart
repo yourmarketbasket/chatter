@@ -6,8 +6,7 @@ import 'package:dio/dio.dart' as dio; // Use prefix for dio to avoid conflicts
 import 'dart:convert';
 // import 'package:path/path.dart' as path; // path is used by UploadService
 import 'package:path_provider/path_provider.dart';
-import '../models/message_models.dart';
-import '../models/feed_models.dart' hide Attachment;
+import '../models/feed_models.dart';
 import '../services/upload_service.dart'; // Import the UploadService
 
 class DataController extends GetxController {
@@ -44,9 +43,10 @@ class DataController extends GetxController {
   final RxMap<String, Map<String, dynamic>> chats =
       <String, Map<String, dynamic>>{}.obs;
   final RxBool isLoadingChats = false.obs;
-  final RxList<ChatMessage> currentConversationMessages = <ChatMessage>[].obs;
+  final RxList<Map<String, dynamic>> currentConversationMessages = <Map<String, dynamic>>[].obs;
   final RxBool isLoadingMessages = false.obs;
   final RxMap<String, bool> isTyping = <String, bool>{}.obs;
+  final Rx<Map<String, dynamic>> currentChat = Rx<Map<String, dynamic>>({});
 
   // Add these Rx variables inside DataController class
   final RxList<Map<String, dynamic>> followers = <Map<String, dynamic>>[].obs;
@@ -1019,7 +1019,7 @@ class DataController extends GetxController {
       );
       if (response.statusCode == 200 && response.data['success'] == true) {
         final List<dynamic> messageData = response.data['messages'];
-        currentConversationMessages.value = messageData.map((data) => ChatMessage.fromJson(data)).toList();
+        currentConversationMessages.value = List<Map<String, dynamic>>.from(messageData);
       } else {
         throw Exception('Failed to fetch messages');
       }
@@ -1031,9 +1031,10 @@ class DataController extends GetxController {
   }
 
   // Send a new chat message
-  Future<void> sendChatMessage(ChatMessage message) async {
+  Future<void> sendChatMessage(Map<String, dynamic> message) async {
     final messageIndex = currentConversationMessages.length;
-    currentConversationMessages.insert(0, message.copyWith(status: MessageStatus.sending));
+    message['status'] = 'sending';
+    currentConversationMessages.insert(0, message);
 
     try {
       final token = user.value['token'];
@@ -1042,60 +1043,49 @@ class DataController extends GetxController {
       }
 
       final response = await _dio.post(
-        'api/chats/${message.chatId}/messages',
-        data: message.toJson(),
+        'api/chats/${message['chatId']}/messages',
+        data: message,
         options: dio.Options(
           headers: {'Authorization': 'Bearer $token'},
         ),
       );
 
       if (response.statusCode == 201 && response.data['success'] == true) {
-        final sentMessage = ChatMessage.fromJson(response.data['message']);
-        currentConversationMessages[messageIndex] = sentMessage.copyWith(status: MessageStatus.sent);
+        final sentMessage = response.data['message'];
+        sentMessage['status'] = 'sent';
+        currentConversationMessages[messageIndex] = sentMessage;
         currentConversationMessages.refresh();
       } else {
         throw Exception('Failed to send message');
       }
     } catch (e) {
       print('Error sending message: $e');
-      currentConversationMessages[messageIndex] = message.copyWith(status: MessageStatus.failed);
+      currentConversationMessages[messageIndex]['status'] = 'failed';
       currentConversationMessages.refresh();
     }
   }
 
   Future<void> editChatMessage(String messageId, String newText) async {
-    final int index = currentConversationMessages.indexWhere((m) => m.id == messageId);
+    final int index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
     if (index != -1) {
       final originalMessage = currentConversationMessages[index];
-      final editedMessage = ChatMessage(
-        id: originalMessage.id,
-        chatId: originalMessage.chatId,
-        senderId: originalMessage.senderId,
-        text: newText,
-        attachments: originalMessage.attachments,
-        voiceNote: originalMessage.voiceNote,
-        status: originalMessage.status,
-        createdAt: originalMessage.createdAt,
-        replyTo: originalMessage.replyTo,
-        edited: true,
-      );
-      currentConversationMessages[index] = editedMessage;
+      originalMessage['text'] = newText;
+      originalMessage['edited'] = true;
+      currentConversationMessages[index] = originalMessage;
 
       // TODO: API call to edit message on backend
     }
   }
 
   Future<void> deleteChatMessage(String messageId) async {
-    final int index = currentConversationMessages.indexWhere((m) => m.id == messageId);
+    final int index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
     if (index != -1) {
       final originalMessage = currentConversationMessages[index];
-      final deletedMessage = originalMessage.copyWith(
-        text: 'Message deleted',
-        attachments: null,
-        voiceNote: null,
-        deleted: true,
-      );
-      currentConversationMessages[index] = deletedMessage;
+      originalMessage['text'] = 'Message deleted';
+      originalMessage['attachments'] = null;
+      originalMessage['voiceNote'] = null;
+      originalMessage['deleted'] = true;
+      currentConversationMessages[index] = originalMessage;
 
       // TODO: API call to delete message on backend
     }
@@ -2567,19 +2557,17 @@ void clearUserPosts() {
   }
 
   void handleNewMessage(Map<String, dynamic> messageData) {
-    final newMessage = ChatMessage.fromJson(messageData);
-
     // Add to the current conversation if it's the one being viewed
-    if (currentConversationMessages.isNotEmpty && currentConversationMessages.first.chatId == newMessage.chatId) {
-      currentConversationMessages.insert(0, newMessage);
+    if (currentConversationMessages.isNotEmpty && currentConversationMessages.first['chatId'] == messageData['chatId']) {
+      currentConversationMessages.insert(0, messageData);
     }
 
     // Update the last message in the chats map
-    if (chats.containsKey(newMessage.chatId)) {
-      final chat = chats[newMessage.chatId]!;
+    if (chats.containsKey(messageData['chatId'])) {
+      final chat = chats[messageData['chatId']]!;
       chat['lastMessage'] = messageData;
       chat['unreadCount'] = (chat['unreadCount'] ?? 0) + 1;
-      chats[newMessage.chatId] = chat;
+      chats[messageData['chatId']] = chat;
     }
   }
 
