@@ -2676,7 +2676,130 @@ void clearUserPosts() {
         print(
             'Dio error creating chat: ${e.response?.statusCode} - ${e.response?.data}');
       }
+      if (e is dio.DioException) {
+        print(
+            'Dio error creating chat: ${e.response?.statusCode} - ${e.response?.data}');
+      }
       print('Error creating chat: $e');
+      return null;
+    }
+  }
+
+  Future<Chat?> updateGroupInfo(String chatId,
+      {String? groupName, String? groupAvatar}) async {
+    try {
+      final token = user.value['token'];
+      final response = await _dio.put(
+        'api/chats/groups/$chatId',
+        data: {
+          if (groupName != null) 'groupName': groupName,
+          if (groupAvatar != null) 'groupAvatar': groupAvatar,
+        },
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+      if (response.statusCode == 200) {
+        return Chat.fromJson(response.data);
+      }
+      return null;
+    } catch (e) {
+      print('Error updating group info: $e');
+      return null;
+    }
+  }
+
+  Future<Chat?> addMembersToGroup(
+      String chatId, List<String> memberIds) async {
+    try {
+      final token = user.value['token'];
+      final response = await _dio.post(
+        'api/chats/groups/$chatId/members',
+        data: {'memberIds': memberIds},
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+      if (response.statusCode == 200) {
+        return Chat.fromJson(response.data);
+      }
+      return null;
+    } catch (e) {
+      print('Error adding members to group: $e');
+      return null;
+    }
+  }
+
+  Future<Chat?> removeMemberFromGroup(
+      String chatId, String memberId) async {
+    try {
+      final token = user.value['token'];
+      final response = await _dio.delete(
+        'api/chats/groups/$chatId/members/$memberId',
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+      if (response.statusCode == 200) {
+        return Chat.fromJson(response.data);
+      }
+      return null;
+    } catch (e) {
+      print('Error removing member from group: $e');
+      return null;
+    }
+  }
+
+  Future<Chat?> promoteAdmin(String chatId, String memberId) async {
+    try {
+      final token = user.value['token'];
+      final response = await _dio.put(
+        'api/chats/groups/$chatId/admins/$memberId',
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+      if (response.statusCode == 200) {
+        return Chat.fromJson(response.data);
+      }
+      return null;
+    } catch (e) {
+      print('Error promoting admin: $e');
+      return null;
+    }
+  }
+
+  Future<bool> leaveGroup(String chatId) async {
+    try {
+      final token = user.value['token'];
+      final response = await _dio.post(
+        'api/chats/groups/$chatId/leave',
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+      return response.statusCode == 200 && response.data['success'] == true;
+    } catch (e) {
+      print('Error leaving group: $e');
+      return false;
+    }
+  }
+
+  Future<Chat?> fetchGroupDetails(String chatId) async {
+    try {
+      final token = user.value['token'];
+      final response = await _dio.get(
+        'api/chats/groups/$chatId',
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+      if (response.statusCode == 200) {
+        return Chat.fromJson(response.data);
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching group details: $e');
       return null;
     }
   }
