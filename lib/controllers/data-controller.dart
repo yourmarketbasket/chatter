@@ -1032,7 +1032,8 @@ class DataController extends GetxController {
 
   // Send a new chat message
   Future<void> sendChatMessage(Map<String, dynamic> message) async {
-    final messageIndex = currentConversationMessages.length;
+    final tempId = DateTime.now().millisecondsSinceEpoch.toString();
+    message['_id'] = tempId; // Use _id for consistency, as it's used for keys
     message['status'] = 'sending';
     currentConversationMessages.insert(0, message);
 
@@ -1042,9 +1043,14 @@ class DataController extends GetxController {
         throw Exception('User not authenticated');
       }
 
+      // The message object sent to the backend should not contain the temporary id or status
+      Map<String, dynamic> messageToSend = Map.from(message);
+      messageToSend.remove('_id');
+      messageToSend.remove('status');
+
       final response = await _dio.post(
         'api/chats/${message['chatId']}/messages',
-        data: message,
+        data: messageToSend, // Send the cleaned message
         options: dio.Options(
           headers: {'Authorization': 'Bearer $token'},
         ),
@@ -1053,15 +1059,23 @@ class DataController extends GetxController {
       if (response.statusCode == 201 && response.data['success'] == true) {
         final sentMessage = response.data['message'];
         sentMessage['status'] = 'sent';
-        currentConversationMessages[messageIndex] = sentMessage;
-        currentConversationMessages.refresh();
+        final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == tempId);
+        if (messageIndex != -1) {
+          currentConversationMessages[messageIndex] = sentMessage;
+        } else {
+          // Fallback: if not found, maybe it was removed. Add it again.
+          currentConversationMessages.insert(0, sentMessage);
+        }
       } else {
-        throw Exception('Failed to send message');
+        throw Exception('Failed to send message: ${response.data?['message']}');
       }
     } catch (e) {
       print('Error sending message: $e');
-      currentConversationMessages[messageIndex]['status'] = 'failed';
-      currentConversationMessages.refresh();
+      final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == tempId);
+      if (messageIndex != -1) {
+        currentConversationMessages[messageIndex]['status'] = 'failed';
+        currentConversationMessages.refresh();
+      }
     }
   }
 
@@ -1092,6 +1106,24 @@ class DataController extends GetxController {
   }
 
   // --- Attachment Download Logic ---
+
+  void _updateMessageAttachment(String messageId, String attachmentId, Map<String, dynamic> updates) {
+    final mIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
+    if (mIndex != -1) {
+      final messageToUpdate = Map<String, dynamic>.from(currentConversationMessages[mIndex]);
+      final attachments = List<Map<String, dynamic>>.from(messageToUpdate['attachments'] as List);
+      final aIndex = attachments.indexWhere((a) => a['_id'] == attachmentId);
+      if (aIndex != -1) {
+        final attachmentToUpdate = Map<String, dynamic>.from(attachments[aIndex]);
+        updates.forEach((key, value) {
+          attachmentToUpdate[key] = value;
+        });
+        attachments[aIndex] = attachmentToUpdate;
+        messageToUpdate['attachments'] = attachments;
+        currentConversationMessages[mIndex] = messageToUpdate;
+      }
+    }
+  }
 
   Future<String> get _localPath async {
     final directory = await getApplicationDocumentsDirectory();
@@ -1126,19 +1158,12 @@ class DataController extends GetxController {
   Future<void> downloadAttachment(String messageId, String attachmentId) async {
     final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
     if (messageIndex == -1) return;
-
     final message = currentConversationMessages[messageIndex];
     final attachmentIndex = (message['attachments'] as List).indexWhere((a) => a['_id'] == attachmentId);
     if (attachmentIndex == -1) return;
-
     final attachment = (message['attachments'] as List)[attachmentIndex];
 
-    // Mark as downloading
-    final updatedAttachments = List<Map<String, dynamic>>.from(message['attachments']);
-    updatedAttachments[attachmentIndex]['isDownloading'] = true;
-    updatedAttachments[attachmentIndex]['downloadProgress'] = 0.0;
-    currentConversationMessages[messageIndex]['attachments'] = updatedAttachments;
-    currentConversationMessages.refresh();
+    _updateMessageAttachment(messageId, attachmentId, {'isDownloading': true, 'downloadProgress': 0.0});
 
     try {
       final file = await _localFile(attachment['filename']);
@@ -1148,45 +1173,16 @@ class DataController extends GetxController {
         onReceiveProgress: (received, total) {
           if (total != -1) {
             final progress = received / total;
-            final mIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
-            if (mIndex != -1) {
-              final aIndex = (currentConversationMessages[mIndex]['attachments'] as List).indexWhere((a) => a['_id'] == attachmentId);
-              if (aIndex != -1) {
-                final attachments = List<Map<String, dynamic>>.from(currentConversationMessages[mIndex]['attachments']);
-                attachments[aIndex]['downloadProgress'] = progress;
-                currentConversationMessages[mIndex]['attachments'] = attachments;
-                currentConversationMessages.refresh();
-              }
-            }
+            _updateMessageAttachment(messageId, attachmentId, {'downloadProgress': progress});
           }
         },
       );
 
-      // Mark download as complete
-      final mIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
-      if (mIndex != -1) {
-        final aIndex = (currentConversationMessages[mIndex]['attachments'] as List).indexWhere((a) => a['_id'] == attachmentId);
-        if (aIndex != -1) {
-          final attachments = List<Map<String, dynamic>>.from(currentConversationMessages[mIndex]['attachments']);
-          attachments[aIndex]['isDownloading'] = false;
-          attachments[aIndex]['downloadProgress'] = 1.0;
-          currentConversationMessages[mIndex]['attachments'] = attachments;
-          currentConversationMessages.refresh();
-        }
-      }
+      _updateMessageAttachment(messageId, attachmentId, {'isDownloading': false, 'downloadProgress': 1.0});
+
     } catch (e) {
       print('Error downloading file: $e');
-      // Mark as failed
-      final mIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
-      if (mIndex != -1) {
-        final aIndex = (currentConversationMessages[mIndex]['attachments'] as List).indexWhere((a) => a['_id'] == attachmentId);
-        if (aIndex != -1) {
-          final attachments = List<Map<String, dynamic>>.from(currentConversationMessages[mIndex]['attachments']);
-          attachments[aIndex]['isDownloading'] = false;
-          currentConversationMessages[mIndex]['attachments'] = attachments;
-          currentConversationMessages.refresh();
-        }
-      }
+      _updateMessageAttachment(messageId, attachmentId, {'isDownloading': false});
     }
   }
 

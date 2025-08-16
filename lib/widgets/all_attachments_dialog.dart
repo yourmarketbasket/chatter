@@ -53,10 +53,19 @@ class AllAttachmentsDialog extends StatelessWidget {
             })
         .toList();
 
-    final sender = (chat['participants'] as List).firstWhere(
-      (p) => p['_id'] == message['senderId'],
-      orElse: () => {'_id': message['senderId'], 'name': 'Unknown User'},
+    final senderRaw = (chat['participants'] as List<dynamic>).firstWhere(
+        (p) {
+          if (p is Map<String, dynamic>) {
+            return p['_id'] == message['senderId'];
+          }
+          return p == message['senderId'];
+        },
+        orElse: () => null,
     );
+
+    final sender = senderRaw is Map<String, dynamic>
+        ? senderRaw
+        : {'_id': message['senderId'], 'name': 'Unknown User'};
 
     Navigator.push(
       context,

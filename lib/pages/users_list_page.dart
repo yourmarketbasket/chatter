@@ -1,4 +1,4 @@
-import 'package:chatter/pages/conversation_page.dart';
+import 'package:chatter/pages/chat_screen_page.dart';
 import 'package:chatter/pages/profile_page.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -140,11 +140,8 @@ class _UsersListPageState extends State<UsersListPage> {
                 Get.back(); // Close dialog
 
                 if (newChat != null) {
-                  Get.to(() => ConversationPage(
-                        conversationId: newChat['_id'],
-                        username: newChat['groupName']!,
-                        userAvatar: newChat['groupAvatar'] ?? '',
-                      ));
+                  _dataController.currentChat.value = newChat;
+                  Get.to(() => const ChatScreen());
                 } else {
                   Get.snackbar('Error', 'Could not create group chat.');
                 }
@@ -302,11 +299,8 @@ class _UsersListPageState extends State<UsersListPage> {
                   final currentUserId = _dataController.user.value['user']['_id'];
                   final newChat = await _dataController.createChat([currentUserId, userId]);
                   if (newChat != null) {
-                    Get.to(() => ConversationPage(
-                          conversationId: newChat['_id'],
-                          username: name,
-                          userAvatar: avatarUrl,
-                        ));
+                    _dataController.currentChat.value = newChat;
+                    Get.to(() => const ChatScreen());
                   } else {
                     Get.snackbar('Error', 'Could not create chat.',
                         snackPosition: SnackPosition.BOTTOM);

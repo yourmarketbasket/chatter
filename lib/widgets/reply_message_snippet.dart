@@ -40,10 +40,21 @@ class ReplyMessageSnippet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool isReplyingToSelf = originalMessage['senderId'] == currentUserId;
-    final sender = (chat['participants'] as List).firstWhere(
-      (p) => p['_id'] == originalMessage['senderId'],
-      orElse: () => {'_id': originalMessage['senderId'], 'name': 'Unknown User'},
+
+    final senderRaw = (chat['participants'] as List<dynamic>).firstWhere(
+        (p) {
+          if (p is Map<String, dynamic>) {
+            return p['_id'] == originalMessage['senderId'];
+          }
+          return p == originalMessage['senderId'];
+        },
+        orElse: () => null,
     );
+
+    final sender = senderRaw is Map<String, dynamic>
+        ? senderRaw
+        : {'_id': originalMessage['senderId'], 'name': 'Unknown User'};
+
     final senderName = isReplyingToSelf ? 'You' : sender['name'];
 
     Widget contentPreview;

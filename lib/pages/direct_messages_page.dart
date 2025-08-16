@@ -52,11 +52,42 @@ class _DirectMessagesPageState extends State<DirectMessagesPage> {
           itemBuilder: (context, index) {
             final chat = oneOnOneChats[index];
             final currentUserId = _dataController.user.value['user']['_id'];
-            final otherUser = (chat['participants'] as List).firstWhere(
-                (p) => p['_id'] != currentUserId,
-                orElse: () => chat['participants'].first);
+            final otherUserRaw =
+                (chat['participants'] as List<dynamic>).firstWhere(
+              (p) {
+                if (p is Map<String, dynamic>) {
+                  return p['_id'] != currentUserId;
+                }
+                return p != currentUserId;
+              },
+              orElse: () => (chat['participants'] as List<dynamic>).first,
+            );
+
+            final otherUser = otherUserRaw is Map<String, dynamic>
+                ? otherUserRaw
+                : _dataController.allUsers.firstWhere(
+                    (u) => u['_id'] == otherUserRaw,
+                    orElse: () => {'name': 'Unknown', 'avatar': ''},
+                  );
             final lastMessageData = chat['lastMessage'];
-            final String avatarUrl = otherUser['avatar'] ?? 'https://via.placeholder.com/150/teal/white?text=${otherUser['name'][0]}';
+            final String avatarUrl = otherUser['avatar'] ??
+                'https://via.placeholder.com/150/teal/white?text=${otherUser['name'][0]}';
+
+            String preview = '...';
+            if (lastMessageData != null &&
+                lastMessageData is Map<String, dynamic>) {
+              if (lastMessageData['attachments'] != null &&
+                  (lastMessageData['attachments'] as List).isNotEmpty) {
+                preview = 'Attachment';
+              } else if (lastMessageData['voiceNote'] != null) {
+                preview = 'Voice note';
+              } else {
+                preview = lastMessageData['text'] ?? '';
+              }
+              if (lastMessageData['senderId'] == currentUserId) {
+                preview = 'You: $preview';
+              }
+            }
 
             return ListTile(
               leading: CircleAvatar(
@@ -66,10 +97,13 @@ class _DirectMessagesPageState extends State<DirectMessagesPage> {
               ),
               title: Text(
                 otherUser['name'],
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w500, color: Colors.white, fontSize: 16),
+                style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white,
+                    fontSize: 16),
               ),
               subtitle: Text(
-                lastMessageData != null ? lastMessageData['text'] ?? 'No messages yet...' : 'No messages yet...',
+                preview,
                 style: GoogleFonts.roboto(color: Colors.grey[400], fontSize: 14),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,

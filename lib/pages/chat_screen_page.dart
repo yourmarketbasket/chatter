@@ -317,7 +317,7 @@ class _ChatScreenState extends State<ChatScreen> {
       itemCount: gridItemCount,
       itemBuilder: (context, index) {
         final attachment = attachments[index];
-        final isLocalFile = !attachment.url.startsWith('http');
+        final isLocalFile = !(attachment['url'] as String).startsWith('http');
 
         // The last grid item, if there are more attachments to show
         if (hasMore && index == maxVisible - 1) {
