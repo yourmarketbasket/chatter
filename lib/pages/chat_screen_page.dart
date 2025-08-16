@@ -44,6 +44,7 @@ class _ChatScreenState extends State<ChatScreen> {
     dataController.currentConversationMessages.clear();
     super.dispose();
   }
+  // force
 
   void _sendMessage() {
     if (_messageController.text.trim().isNotEmpty) {
