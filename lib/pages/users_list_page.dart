@@ -195,20 +195,9 @@ class _UsersListPageState extends State<UsersListPage> {
       ),
       drawer: const AppDrawer(),
       body: Obx(() {
+        final usersToShow = _dataController.contacts;
+        final isLoading = _dataController.isLoadingFollowers.value || _dataController.isLoadingFollowing.value;
         final currentUserId = _dataController.user.value['user']?['_id'];
-        final combined = <String, Map<String, dynamic>>{};
-        for (var user in _dataController.following) {
-          combined[user['_id']] = user;
-        }
-        for (var user in _dataController.followers) {
-          combined[user['_id']] = user;
-        }
-        final usersToShow = combined.values
-            .where((user) => user['_id'] != currentUserId)
-            .toList();
-
-        final isLoading = _dataController.isLoadingFollowers.value ||
-            _dataController.isLoadingFollowing.value;
 
         if (isLoading && usersToShow.isEmpty) {
           return Center(

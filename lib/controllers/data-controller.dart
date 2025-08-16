@@ -53,6 +53,7 @@ class DataController extends GetxController {
   final RxBool isLoadingFollowers = false.obs;
   final RxList<Map<String, dynamic>> following = <Map<String, dynamic>>[].obs;
   final RxBool isLoadingFollowing = false.obs;
+  final RxList<Map<String, dynamic>> contacts = <Map<String, dynamic>>[].obs;
 
   // For User's Posts Page
   final RxList<Map<String, dynamic>> userPosts = <Map<String, dynamic>>[].obs;
@@ -93,8 +94,12 @@ class DataController extends GetxController {
       final String? currentUserId = user.value['user']?['_id'];
       if (currentUserId != null && currentUserId.isNotEmpty) {
         print('[DataController.init] User loaded from storage. Fetching initial network data for $currentUserId');
-        fetchFollowers(currentUserId).catchError((e) => print('Error fetching followers in init: $e'));
-        fetchFollowing(currentUserId).catchError((e) => print('Error fetching following in init: $e'));
+        Future.wait([
+          fetchFollowers(currentUserId),
+          fetchFollowing(currentUserId),
+        ]).then((_) {
+          combineFollowersAndFollowing();
+        }).catchError((e) => print('Error fetching followers/following in init: $e'));
       }
     }
     // fetch initial feeds
@@ -901,8 +906,12 @@ class DataController extends GetxController {
             final String? currentUserId = user.value['user']?['_id'];
             if (currentUserId != null && currentUserId.isNotEmpty) {
               print('[DataController.loginUser] Fetching initial network data for $currentUserId');
-              fetchFollowers(currentUserId).catchError((e) => print('Error fetching followers post-login: $e'));
-              fetchFollowing(currentUserId).catchError((e) => print('Error fetching following post-login: $e'));
+              Future.wait([
+                fetchFollowers(currentUserId),
+                fetchFollowing(currentUserId)
+              ]).then((_) {
+                combineFollowersAndFollowing();
+              }).catchError((e) => print('Error fetching followers/following post-login: $e'));
             }
 
             // After successful login and data fetch, update FCM token
@@ -1352,6 +1361,25 @@ class DataController extends GetxController {
     } finally {
       isLoadingFollowing.value = false;
     }
+  }
+
+  void combineFollowersAndFollowing() {
+    final allUsers = <String, Map<String, dynamic>>{};
+
+    for (var user in followers) {
+      allUsers[user['_id']] = user;
+    }
+    for (var user in following) {
+      allUsers[user['_id']] = user;
+    }
+
+    final String? currentUserId = user.value['user']?['_id'];
+    if (currentUserId != null) {
+      allUsers.remove(currentUserId);
+    }
+
+    contacts.assignAll(allUsers.values.toList());
+    print('[DataController] Combined contacts list updated. Count: ${contacts.length}');
   }
 
   // Placeholder for toggling follow status
@@ -2640,23 +2668,27 @@ void clearUserPosts() {
         final Map<String, dynamic> chatData =
             response.data['chat'] as Map<String, dynamic>;
         final List<User> participants = participantIds.map((id) {
-          final userMap = following.firstWhere(
+          // Look for the user in the combined contacts list first.
+          final userMap = contacts.firstWhere(
             (u) => u['_id'] == id,
             orElse: () {
-              // Also check the current user, as they are a participant but not in the 'following' list
+              // If not in contacts, check if it's the current user.
               final currentUser = user.value['user'];
               if (currentUser != null && currentUser['_id'] == id) {
                 return currentUser as Map<String, dynamic>;
               }
-              return <String,
-                  dynamic>{}; // Return an empty map if no user is found
+              // As a final fallback, check the allUsers list.
+              return allUsers.firstWhere(
+                (u) => u['_id'] == id,
+                orElse: () => <String, dynamic>{}, // Return an empty map if not found anywhere.
+              );
             },
           );
+
           if (userMap.isEmpty) {
-            // This case should ideally not be hit if the UI is populated correctly,
-            // but as a fallback, we create a user with just an ID.
-            print('Warning: User with ID $id not found in following or as current user.');
-            return User(id: id, name: 'Unknown User');
+            // This case should ideally not be hit if the UI is populated correctly.
+            print('Warning: User with ID $id not found in contacts, allUsers, or as current user.');
+            return User(id: id, name: 'Unknown User', avatar: '');
           }
           return User.fromJson(userMap);
         }).toList();
