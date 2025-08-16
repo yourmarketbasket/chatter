@@ -1062,8 +1062,13 @@ class DataController extends GetxController {
         throw Exception('Failed to send message');
       }
     } catch (e) {
+      if (e is dio.DioException) {
+        print(
+            'Dio error sending message: ${e.response?.statusCode} - ${e.response?.data}');
+      }
       print('Error sending message: $e');
-      currentConversationMessages[messageIndex] = message.copyWith(status: MessageStatus.failed);
+      currentConversationMessages[messageIndex] =
+          message.copyWith(status: MessageStatus.failed);
       currentConversationMessages.refresh();
     }
   }
@@ -2667,6 +2672,10 @@ void clearUserPosts() {
         throw Exception('Failed to create chat');
       }
     } catch (e) {
+      if (e is dio.DioException) {
+        print(
+            'Dio error creating chat: ${e.response?.statusCode} - ${e.response?.data}');
+      }
       print('Error creating chat: $e');
       return null;
     }

@@ -1,7 +1,10 @@
+import 'package:chatter/controllers/data-controller.dart';
+import 'package:chatter/helpers/time_helper.dart';
 import 'package:chatter/models/chat_models.dart';
-import 'package:chatter/models/feed_models.dart';
-import 'package:chatter/pages/chat_screen_page.dart';
+import 'package:chatter/pages/conversation_page.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class GroupsPage extends StatefulWidget {
   const GroupsPage({super.key});
@@ -11,148 +14,106 @@ class GroupsPage extends StatefulWidget {
 }
 
 class _GroupsPageState extends State<GroupsPage> {
-  final List<Map<String, dynamic>> _dummyGroups = [
-    {
-      'name': 'Family Group',
-      'initials': 'F',
-      'participants': ['Alice', 'Bob', 'You'],
-      'lastMessage': 'Let\'s plan the trip!',
-      'sender': 'Alice',
-      'time': '11:45 AM',
-      'status': 'read',
-      'edited': false,
-      'deleted': false,
-      'attachment': null,
-    },
-    {
-      'name': 'Work Team',
-      'initials': 'W',
-      'participants': ['Charlie', 'David', 'You'],
-      'lastMessage': 'Meeting notes',
-      'sender': 'You',
-      'time': 'Yesterday',
-      'status': 'delivered',
-      'edited': false,
-      'deleted': false,
-      'attachment': 'https://example.com/document.pdf',
-    },
-    {
-      'name': 'Friends Circle',
-      'initials': 'FC',
-      'participants': ['Eve', 'Frank', 'You'],
-      'lastMessage': 'Message deleted',
-      'sender': 'Eve',
-      'time': '3 days ago',
-      'status': 'sent',
-      'edited': true,
-      'deleted': true,
-      'attachment': null,
-    },
-    // Add more dummy data as needed
-  ];
+  final DataController _dataController = Get.find<DataController>();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: ListView.builder(
-        itemCount: _dummyGroups.length,
-        itemBuilder: (context, index) {
-          final group = _dummyGroups[index];
-          String preview = group['deleted']
-              ? 'Message deleted'
-              : group['attachment'] != null
-                  ? 'Attachment'
-                  : group['lastMessage'];
-          if (group['edited']) {
-            preview += ' (edited)';
-          }
-          preview = '${group['sender']}: $preview';
+      body: Obx(() {
+        final groupChats = _dataController.conversations
+            .where((chat) => chat.isGroup)
+            .toList();
 
-          IconData statusIcon;
-          Color statusColor;
-          switch (group['status']) {
-            case 'sent':
-              statusIcon = Icons.check;
-              statusColor = Colors.grey[400]!;
-              break;
-            case 'delivered':
-              statusIcon = Icons.done_all;
-              statusColor = Colors.grey[400]!;
-              break;
-            case 'read':
-              statusIcon = Icons.done_all;
-              statusColor = Colors.tealAccent;
-              break;
-            default:
-              statusIcon = Icons.access_time;
-              statusColor = Colors.grey[400]!;
-          }
+        if (_dataController.isLoadingConversations.value &&
+            groupChats.isEmpty) {
+          return const Center(
+              child: CircularProgressIndicator(color: Colors.tealAccent));
+        }
 
-          return ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            leading: CircleAvatar(
-              backgroundColor: Colors.tealAccent,
-              child: Text(
-                group['initials'],
-                style: const TextStyle(color: Colors.black),
-              ),
+        if (groupChats.isEmpty) {
+          return const Center(
+            child: Text(
+              'No groups yet.\nTap the + icon to create a new group.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey, fontSize: 16),
             ),
-            title: Text(
-              group['name'],
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            subtitle: Text(
-              preview,
-              style: TextStyle(
-                color: Colors.grey[400],
-                fontSize: 14,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  group['time'],
-                  style: TextStyle(
-                    color: Colors.grey[400],
-                    fontSize: 12,
-                  ),
-                ),
-                Icon(
-                  statusIcon,
-                  size: 16,
-                  color: statusColor,
-                ),
-              ],
-            ),
-            onTap: () {
-              final chat = Chat(
-                id: 'group_$index', // Dummy ID
-                isGroup: true,
-                groupName: group['name'],
-                groupAvatar: null, // No avatar in dummy data
-                participants: (group['participants'] as List<String>)
-                    .map((name) => User(id: name.toLowerCase(), name: name))
-                    .toList(),
-              );
-
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ChatScreen(chat: chat),
-                ),
-              );
-            },
           );
-        },
-      ),
+        }
+
+        return ListView.builder(
+          itemCount: groupChats.length,
+          itemBuilder: (context, index) {
+            final group = groupChats[index];
+            final lastMessage = group.lastMessage;
+
+            String preview = 'No messages yet.';
+            if (lastMessage != null) {
+              preview = lastMessage.deleted
+                  ? 'Message deleted'
+                  : lastMessage.attachments?.isNotEmpty == true
+                      ? 'Attachment'
+                      : lastMessage.text ?? '...';
+              if (lastMessage.edited) {
+                preview += ' (edited)';
+              }
+            }
+
+            final avatarText = group.groupName != null && group.groupName!.isNotEmpty
+                ? group.groupName![0].toUpperCase()
+                : 'G';
+
+            return ListTile(
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              leading: CircleAvatar(
+                backgroundColor: Colors.tealAccent,
+                backgroundImage: group.groupAvatar != null
+                    ? CachedNetworkImageProvider(group.groupAvatar!)
+                    : null,
+                child: group.groupAvatar == null
+                    ? Text(
+                        avatarText,
+                        style: const TextStyle(color: Colors.black),
+                      )
+                    : null,
+              ),
+              title: Text(
+                group.groupName ?? 'Unnamed Group',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              subtitle: Text(
+                preview,
+                style: TextStyle(
+                  color: Colors.grey[400],
+                  fontSize: 14,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              trailing: lastMessage != null
+                  ? Text(
+                      TimeHelper.getFormattedTime(lastMessage.createdAt),
+                      style: TextStyle(
+                        color: Colors.grey[400],
+                        fontSize: 12,
+                      ),
+                    )
+                  : null,
+              onTap: () {
+                Get.to(() => ConversationPage(
+                      conversationId: group.id,
+                      username: group.groupName ?? 'Group',
+                      userAvatar: group.groupAvatar,
+                    ));
+              },
+            );
+          },
+        );
+      }),
     );
   }
 }
