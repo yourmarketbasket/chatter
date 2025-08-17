@@ -2649,11 +2649,17 @@ void clearUserPosts() {
     }
 
     // Update the last message in the chats map
-    if (chats.containsKey(messageData['chatId'])) {
-      final chat = chats[messageData['chatId']]!;
-      chat['lastMessage'] = messageData;
-      chat['unreadCount'] = (chat['unreadCount'] ?? 0) + 1;
-      chats[messageData['chatId']] = chat;
+    final chatId = messageData['chatId'];
+    if (chatId != null) {
+      if (chats.containsKey(chatId)) {
+        final chat = chats[chatId]!;
+        chat['lastMessage'] = messageData;
+        chat['unreadCount'] = (chat['unreadCount'] ?? 0) + 1;
+        chats[chatId] = chat;
+      } else {
+        // If the chat doesn't exist locally, fetch the updated chat list
+        fetchChats();
+      }
     }
   }
 
