@@ -369,72 +369,79 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildAttachment(Map<String, dynamic> message) {
-    if (message['files'] == null || (message['files'] as List).isEmpty) {
-      return const SizedBox.shrink();
-    }
+    return Obx(() {
+      final updatedMessage = dataController.currentConversationMessages.firstWhere(
+        (m) => m['clientMessageId'] == message['clientMessageId'],
+        orElse: () => message,
+      );
 
-    final attachments = message['files'] as List;
-    const maxVisible = 4;
-    final hasMore = attachments.length > maxVisible;
-    final gridItemCount = hasMore ? maxVisible : attachments.length;
-    final crossAxisCount = attachments.length == 1 ? 1 : 2;
-    final aspectRatio = attachments.length == 1 ? 3 / 4 : 1.0;
+      if (updatedMessage['files'] == null || (updatedMessage['files'] as List).isEmpty) {
+        return const SizedBox.shrink();
+      }
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: crossAxisCount,
-        crossAxisSpacing: 4,
-        mainAxisSpacing: 4,
-        childAspectRatio: aspectRatio,
-      ),
-      itemCount: gridItemCount,
-      itemBuilder: (context, index) {
-        final attachment = attachments[index];
-        final isLocalFile = !(attachment['url'] as String).startsWith('http');
+      final attachments = updatedMessage['files'] as List;
+      const maxVisible = 4;
+      final hasMore = attachments.length > maxVisible;
+      final gridItemCount = hasMore ? maxVisible : attachments.length;
+      final crossAxisCount = attachments.length == 1 ? 1 : 2;
+      final aspectRatio = attachments.length == 1 ? 3 / 4 : 1.0;
 
-        if (hasMore && index == maxVisible - 1) {
-          final remainingCount = attachments.length - maxVisible + 1;
-          return GestureDetector(
-            onTap: () {
-              showDialog(
-                context: context,
-                builder: (context) => AllAttachmentsDialog(
-                  message: message,
-                  chat: dataController.currentChat.value,
-                ),
-              );
-            },
-            child: Stack(
-              alignment: Alignment.center,
-              fit: StackFit.expand,
-              children: [
-                _buildAttachmentContent(attachment, isLocalFile),
-                Container(
-                  color: Colors.black.withOpacity(0.6),
-                  child: Center(
-                    child: Text(
-                      '+$remainingCount',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
+      return GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: crossAxisCount,
+          crossAxisSpacing: 4,
+          mainAxisSpacing: 4,
+          childAspectRatio: aspectRatio,
+        ),
+        itemCount: gridItemCount,
+        itemBuilder: (context, index) {
+          final attachment = attachments[index];
+          final isLocalFile = !(attachment['url'] as String).startsWith('http');
+
+          if (hasMore && index == maxVisible - 1) {
+            final remainingCount = attachments.length - maxVisible + 1;
+            return GestureDetector(
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AllAttachmentsDialog(
+                    message: updatedMessage,
+                    chat: dataController.currentChat.value,
+                  ),
+                );
+              },
+              child: Stack(
+                alignment: Alignment.center,
+                fit: StackFit.expand,
+                children: [
+                  _buildAttachmentContent(attachment, isLocalFile),
+                  Container(
+                    color: Colors.black.withOpacity(0.6),
+                    child: Center(
+                      child: Text(
+                        '+$remainingCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          );
-        }
+                ],
+              ),
+            );
+          }
 
-        return GestureDetector(
-          onTap: () => _openMediaView(message, index),
-          child: _buildAttachmentContent(attachment, isLocalFile),
-        );
-      },
-    );
+          return GestureDetector(
+            onTap: () => _openMediaView(updatedMessage, index),
+            child: _buildAttachmentContent(attachment, isLocalFile),
+          );
+        },
+      );
+    });
   }
 
   Widget _buildAttachmentContent(Map<String, dynamic> attachment, bool isLocalFile) {
