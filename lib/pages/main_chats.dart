@@ -109,58 +109,69 @@ class _MainChatsPageState extends State<MainChatsPage> {
       child: Scaffold(
         extendBody: true, // Allow body to extend behind nav bar
         appBar: AppBar(
+          title: const Text('Chats'),
           automaticallyImplyLeading: false, // No back arrow
-          title: TextField(
-            controller: _searchController,
-            decoration: InputDecoration(
-              hintText: 'Search...',
-              hintStyle: TextStyle(color: Colors.grey[400]),
-              filled: true,
-              fillColor: Colors.grey[900]!.withOpacity(0.3),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(20),
-                borderSide: BorderSide.none,
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(60.0),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: 'Search...',
+                        hintStyle: TextStyle(color: Colors.grey[400]),
+                        filled: true,
+                        fillColor: Colors.grey[900]!.withOpacity(0.3),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          borderSide: BorderSide.none,
+                        ),
+                        prefixIcon: const Icon(Icons.search, color: Colors.tealAccent),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                      ),
+                      style: const TextStyle(color: Colors.white),
+                      onChanged: (value) {
+                        setState(() {
+                          _searchQuery = value;
+                        });
+                      },
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8.0),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.tealAccent.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.refresh, color: Colors.tealAccent),
+                        onPressed: () {
+                          _dataController.fetchChats();
+                        },
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8.0),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.tealAccent.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.add, color: Colors.tealAccent),
+                        onPressed: _showCreateChatDialog,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              prefixIcon: const Icon(Icons.search, color: Colors.tealAccent),
-              contentPadding: const EdgeInsets.symmetric(vertical: 0),
             ),
-            style: const TextStyle(color: Colors.white),
-            onChanged: (value) {
-              setState(() {
-                _searchQuery = value;
-              });
-            },
           ),
-          actions: [
-            Padding(
-              padding: const EdgeInsets.only(right: 8.0),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.tealAccent.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: IconButton(
-                  icon: const Icon(Icons.refresh, color: Colors.tealAccent),
-                  onPressed: () {
-                    _dataController.fetchChats();
-                  },
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(right: 8.0),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.tealAccent.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: IconButton(
-                  icon: const Icon(Icons.add, color: Colors.tealAccent),
-                  onPressed: _showCreateChatDialog,
-                ),
-              ),
-            ),
-          ],
         ),
         body: UnifiedChatsPage(searchQuery: _searchQuery),
       ),
