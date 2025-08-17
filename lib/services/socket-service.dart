@@ -11,12 +11,10 @@ class SocketService {
   String? _userId; // Store userId for joining rooms and emitting events
 
   SocketService() {
-    print('SocketService: Initializing...');
-    _initializeSocket();
-    connect();
+    print('SocketService: Instance created.');
   }
 
-  void _initializeSocket() {
+  void initSocket() {
     if (_isInitialized) {
       print('SocketService: Already initialized, skipping.');
       return;
@@ -40,6 +38,7 @@ class SocketService {
       _setupSocketListeners();
       _isInitialized = true;
       print('SocketService: Initialization complete.');
+      connect();
     } catch (e) {
       print('SocketService: Failed to initialize socket: $e');
     }
@@ -101,13 +100,13 @@ class SocketService {
       'message:deleted': (data) => _handleMessageDeleted(data),
       'message:statusUpdate': (data) => _handleMessageStatusUpdate(data),
       'message:reaction': (data) => _handleNewMessage(data),
-      'typing:started': (data) => _handleTyping(data, true),
-      'typing:stopped': (data) => _handleTyping(data, false),
+      'typing:start': (data) => _handleTyping(data, true),
+      'typing:stop': (data) => _handleTyping(data, false),
     };
 
     eventHandlers.forEach((event, handler) {
       _socket!.on(event, (data) {
-        print('SocketService: Received event $event with data: $data');
+          // print('SocketService: Received event $event with data: $data');
         handler(data);
       });
     });
@@ -119,10 +118,10 @@ class SocketService {
       List<String> chatIds = await _dataController.getActiveChatIds(); // Assume DataController fetches chat IDs
       for (String chatId in chatIds) {
         _socket!.emit('join', {'chatId': chatId});
-        print('SocketService: Joined chat room $chatId');
+          // print('SocketService: Joined chat room $chatId');
       }
     } catch (e) {
-      print('SocketService: Failed to join chat rooms: $e');
+        // print('SocketService: Failed to join chat rooms: $e');
     }
   }
 
@@ -131,7 +130,7 @@ class SocketService {
       _dataController.addNewPost(data);
       _eventController.add({'event': 'post:new', 'data': data});
     } else {
-      print('SocketService: Invalid post:new data format: ${data.runtimeType}');
+        // print('SocketService: Invalid post:new data format: ${data.runtimeType}');
     }
   }
 
@@ -142,7 +141,7 @@ class SocketService {
       _dataController.handleNewReply(data['parentPostId'], data['reply']);
       _eventController.add({'event': 'post:reply', 'data': data});
     } else {
-      print('SocketService: Invalid post:reply data format: ${data.runtimeType}');
+        // print('SocketService: Invalid post:reply data format: ${data.runtimeType}');
     }
   }
 
@@ -154,7 +153,7 @@ class SocketService {
       _dataController.handleNewReplyToReply(data['postId'], data['parentReplyId'], data['reply']);
       _eventController.add({'event': 'reply:new', 'data': data});
     } else {
-      print('SocketService: Invalid reply:new data format: ${data.runtimeType}');
+        // print('SocketService: Invalid reply:new data format: ${data.runtimeType}');
     }
   }
 
@@ -165,7 +164,7 @@ class SocketService {
       _dataController.fetchSinglePost(data['postId']);
       _eventController.add({'event': event, 'data': data});
     } else {
-      print('SocketService: Invalid $event data format: ${data.runtimeType}');
+        // print('SocketService: Invalid $event data format: ${data.runtimeType}');
     }
   }
 
@@ -177,7 +176,7 @@ class SocketService {
       _dataController.fetchSinglePost(data['postId']);
       _eventController.add({'event': event, 'data': data});
     } else {
-      print('SocketService: Invalid $event data format: ${data.runtimeType}');
+        // print('SocketService: Invalid $event data format: ${data.runtimeType}');
     }
   }
 
@@ -188,7 +187,7 @@ class SocketService {
       _socket!.emit('join', {'chatId': data['chatId']});
       _eventController.add({'event': 'chat:new', 'data': data});
     } else {
-      print('SocketService: Invalid chat:new data format: ${data.runtimeType}');
+        // print('SocketService: Invalid chat:new data format: ${data.runtimeType}');
     }
   }
 
@@ -204,7 +203,7 @@ class SocketService {
       }
       _eventController.add({'event': 'message:new', 'data': data});
     } else {
-      print('SocketService: Invalid message event data format: ${data.runtimeType}');
+        // print('SocketService: Invalid message event data format: ${data.runtimeType}');
     }
   }
 
@@ -216,7 +215,7 @@ class SocketService {
       _dataController.handleMessageStatusUpdate(data);
       _eventController.add({'event': 'message:statusUpdate', 'data': data});
     } else {
-      print('SocketService: Invalid message:statusUpdate data format: ${data.runtimeType}');
+        // print('SocketService: Invalid message:statusUpdate data format: ${data.runtimeType}');
     }
   }
 
@@ -225,7 +224,7 @@ class SocketService {
       _dataController.handleMessageDeleted(data);
       _eventController.add({'event': 'message:deleted', 'data': data});
     } else {
-      print('SocketService: Invalid message:deleted data format: ${data.runtimeType}');
+        // print('SocketService: Invalid message:deleted data format: ${data.runtimeType}');
     }
   }
 
@@ -238,9 +237,9 @@ class SocketService {
       } else {
         _dataController.handleTypingStop(data);
       }
-      _eventController.add({'event': isStart ? 'typing:started' : 'typing:stopped', 'data': data});
+      _eventController.add({'event': isStart ? 'typing:start' : 'typing:stop', 'data': data});
     } else {
-      print('SocketService: Invalid typing:${isStart ? 'started' : 'stopped'} data format: ${data.runtimeType}');
+        // print('SocketService: Invalid typing:${isStart ? 'start' : 'stop'} data format: ${data.runtimeType}');
     }
   }
 
@@ -255,7 +254,7 @@ class SocketService {
       }
       _eventController.add({'event': event, 'data': data});
     } else {
-      print('SocketService: Invalid $event data format: ${data.runtimeType}');
+        // print('SocketService: Invalid $event data format: ${data.runtimeType}');
     }
   }
 
@@ -283,10 +282,10 @@ class SocketService {
 
   void emitEvent(String event, dynamic data) {
     if (_socket != null && _socket!.connected && data != null) {
-      print('SocketService: Emitting event $event with data: $data');
+        // print('SocketService: Emitting event $event with data: $data');
       _socket!.emit(event, data);
     } else {
-      print('SocketService: Cannot emit event: Socket not connected or data is null');
+        // print('SocketService: Cannot emit event: Socket not connected or data is null');
     }
   }
 
@@ -299,7 +298,7 @@ class SocketService {
         'clientMessageId': clientMessageId, // Include clientMessageId for correlation
       });
     } else {
-      print('SocketService: Cannot send message, userId is null');
+        // print('SocketService: Cannot send message, userId is null');
     }
   }
 
@@ -310,7 +309,7 @@ class SocketService {
         'userId': _userId,
       });
     } else {
-      print('SocketService: Cannot send message:delivered, userId is null');
+        // print('SocketService: Cannot send message:delivered, userId is null');
     }
   }
 
@@ -321,7 +320,7 @@ class SocketService {
         'userId': _userId,
       });
     } else {
-      print('SocketService: Cannot send message:read, userId is null');
+        // print('SocketService: Cannot send message:read, userId is null');
     }
   }
 
@@ -329,7 +328,7 @@ class SocketService {
     if (_userId != null) {
       emitEvent('typing:start', {'chatId': chatId, 'userId': _userId});
     } else {
-      print('SocketService: Cannot send typing:start, userId is null');
+        // print('SocketService: Cannot send typing:start, userId is null');
     }
   }
 
@@ -337,32 +336,32 @@ class SocketService {
     if (_userId != null) {
       emitEvent('typing:stop', {'chatId': chatId, 'userId': _userId});
     } else {
-      print('SocketService: Cannot send typing:stop, userId is null');
+        // print('SocketService: Cannot send typing:stop, userId is null');
     }
   }
 
   void joinChatRoom(String chatId) {
     emitEvent('join', {'chatId': chatId});
-    print('SocketService: Joined chat room $chatId');
+      // print('SocketService: Joined chat room $chatId');
   }
 
   Stream<Map<String, dynamic>> get events => _eventController.stream;
 
   void addListener(String event, void Function(dynamic) handler) {
     if (_socket != null) {
-      print('SocketService: Adding listener for event $event');
+        // print('SocketService: Adding listener for event $event');
       _socket!.on(event, handler);
     } else {
-      print('SocketService: Cannot add listener, socket is null');
+        // print('SocketService: Cannot add listener, socket is null');
     }
   }
 
   void removeListener(String event, void Function(dynamic) handler) {
     if (_socket != null) {
-      print('SocketService: Removing listener for event $event');
+        // print('SocketService: Removing listener for event $event');
       _socket!.off(event, handler);
     } else {
-      print('SocketService: Cannot remove listener, socket is null');
+        // print('SocketService: Cannot remove listener, socket is null');
     }
   }
 

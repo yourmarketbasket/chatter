@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import '../models/feed_models.dart';
+import '../services/socket-service.dart';
 import '../services/upload_service.dart'; // Import the UploadService
 
 class DataController extends GetxController {
@@ -100,21 +101,46 @@ class DataController extends GetxController {
     if (user.value['token'] != null) {
       // Fetch non-essential data in parallel (fire and forget)
       fetchFeeds().catchError((e) {
-        print('Error fetching initial feeds: $e');
+          // print('Error fetching initial feeds: $e');
         posts.clear(); // Clear posts on error
       });
       final String? currentUserId = user.value['user']?['_id'];
       if (currentUserId != null && currentUserId.isNotEmpty) {
-        print('[DataController.init] User loaded from storage. Fetching initial network data for $currentUserId');
-        fetchFollowers(currentUserId).catchError((e) => print('Error fetching followers in init: $e'));
-        fetchFollowing(currentUserId).catchError((e) => print('Error fetching following in init: $e'));
+          // print('[DataController.init] User loaded from storage. Fetching initial network data for $currentUserId');
+        fetchFollowers(currentUserId).catchError((e) =>   // print('Error fetching followers in init: $e'));
+        fetchFollowing(currentUserId).catchError((e) =>   // print('Error fetching following in init: $e'));
       }
 
       // For chat functionality, we need all users before we can correctly display chats.
       // So we await these calls in sequence.
       await fetchAllUsers();
       await fetchChats();
+
+      // Initialize socket service after user data is loaded
+      Get.find<SocketService>().initSocket();
     }
+  }
+
+  String? getAuthToken() {
+    if (user.value.containsKey('token')) {
+      return user.value['token'] as String?;
+    }
+    return null;
+  }
+
+  Future<List<String>> getActiveChatIds() async {
+    //TODO: Implement this method
+    return [];
+  }
+
+  String? getUserId() {
+    if (user.value.containsKey('user') && user.value['user'] is Map) {
+      final userMap = user.value['user'] as Map<String, dynamic>;
+      if (userMap.containsKey('_id')) {
+        return userMap['_id'] as String?;
+      }
+    }
+    return null;
   }
 
   // Method to fetch/initialize all users
@@ -140,13 +166,13 @@ class DataController extends GetxController {
         ),
       );
 
-      // print('[DataController] fetchAllUsers API Response Status Code: ${response.statusCode}');
-      // print('[DataController] fetchAllUsers API Response Data: ${response.data.toString()}');
+      //   // print('[DataController] fetchAllUsers API Response Status Code: ${response.statusCode}');
+      //   // print('[DataController] fetchAllUsers API Response Data: ${response.data.toString()}');
 
       if (response.statusCode == 200 && response.data['success'] == true) {
         if (response.data['users'] != null && response.data['users'] is List) {
           List<dynamic> fetchedUsersDynamic = response.data['users'];
-          print('[DataController] fetchAllUsers: Successfully fetched ${fetchedUsersDynamic.length} raw user entries.');
+            // print('[DataController] fetchAllUsers: Successfully fetched ${fetchedUsersDynamic.length} raw user entries.');
           // Process users: ensure all necessary fields are present and correctly typed.
           // Add 'isFollowingCurrentUser' based on the main user's following list.
           final List<String> currentUserFollowingIds = List<String>.from(
@@ -191,26 +217,26 @@ class DataController extends GetxController {
           }).where((userMap) => userMap.isNotEmpty && userMap['_id'] != currentUserId).toList(); // Filter out empty maps and the current user
 
           allUsers.assignAll(fetchedUsers);
-          print('[DataController] Fetched all users successfully. Count: ${allUsers.length}');
+            // print('[DataController] Fetched all users successfully. Count: ${allUsers.length}');
         } else {
           allUsers.clear();
-          print('[DataController] Fetched all users but the user list is null or not a list.');
+            // print('[DataController] Fetched all users but the user list is null or not a list.');
           throw Exception('User list not found in response or invalid format.');
         }
       } else {
         allUsers.clear();
-        print('[DataController] Failed to fetch all users. Status: ${response.statusCode}, Message: ${response.data?['message']}');
+          // print('[DataController] Failed to fetch all users. Status: ${response.statusCode}, Message: ${response.data?['message']}');
         throw Exception('Failed to fetch all users: ${response.data?['message'] ?? "Unknown server error"}');
       }
     } catch (e) {
       allUsers.clear(); // Clear on error
-      print('[DataController] Error in fetchAllUsers: ${e.toString()}');
+        // print('[DataController] Error in fetchAllUsers: ${e.toString()}');
       // Optionally rethrow or handle as per UI requirements (e.g., show snackbar)
-      print('[DataController] fetchAllUsers caught error: ${e.toString()}');
+        // print('[DataController] fetchAllUsers caught error: ${e.toString()}');
       // For now, UsersListPage will show an error based on allUsers being empty + isLoading false.
     } finally {
       isLoading.value = false; // Reset loading state
-      print('[DataController] fetchAllUsers finally block. isLoading: ${isLoading.value}, allUsers count: ${allUsers.length}');
+        // print('[DataController] fetchAllUsers finally block. isLoading: ${isLoading.value}, allUsers count: ${allUsers.length}');
     }
   }
 
@@ -248,7 +274,7 @@ class DataController extends GetxController {
         uploadProgress.value = 1.0; // Mark as complete
         return {'success': true, 'message': 'Post created successfully', 'post': response.data['post']};
       } else if (response.statusCode == 200 && response.data['success'] == true && response.data['post'] == null) {
-        print('[DataController] createPost success, but no post data returned from backend.');
+          // print('[DataController] createPost success, but no post data returned from backend.');
         uploadProgress.value = 1.0; // Mark as complete
         return {'success': true, 'message': 'Post created successfully (no post data returned)'};
       } else {
@@ -267,7 +293,7 @@ class DataController extends GetxController {
       } else if (e is dio.DioException) {
         errorMessage = 'Failed to create post: ${e.message ?? e.toString()}';
       }
-      print('[DataController] Error creating post: $errorMessage');
+        // print('[DataController] Error creating post: $errorMessage');
       return {'success': false, 'message': errorMessage};
     }
   }
@@ -319,17 +345,17 @@ class DataController extends GetxController {
           postToUpdate['replies'] = topLevelReplies; // Assign the potentially modified list back
           posts[postIndex] = postToUpdate;
           posts.refresh();
-          // print('[DataController] Reply $replyId in post $postId updated with data: $updateData.');
+          //   // print('[DataController] Reply $replyId in post $postId updated with data: $updateData.');
         } else {
-          print('[DataController] handleReplyUpdate: Target reply $replyId not found in post $postId.');
+            // print('[DataController] handleReplyUpdate: Target reply $replyId not found in post $postId.');
           // Optionally, fetch the post as a fallback
           // fetchSinglePost(postId);
         }
       } else {
-        print('[DataController] handleReplyUpdate: Post $postId not found.');
+          // print('[DataController] handleReplyUpdate: Post $postId not found.');
       }
     } catch (e) {
-      print('[DataController] Error handling reply update for reply $replyId in post $postId: $e');
+        // print('[DataController] Error handling reply update for reply $replyId in post $postId: $e');
     }
   }
 
@@ -377,24 +403,24 @@ class DataController extends GetxController {
           // If the UI shows nested replies, this update to the 'replies' list and subsequent refresh should be enough.
           posts[postIndex] = postToUpdate;
           posts.refresh();
-          print('[DataController] New nested reply added to reply $parentReplyId in post $postId.');
+            // print('[DataController] New nested reply added to reply $parentReplyId in post $postId.');
         } else {
-          print('[DataController] handleNewReplyToReply: Parent reply $parentReplyId not found in post $postId.');
+            // print('[DataController] handleNewReplyToReply: Parent reply $parentReplyId not found in post $postId.');
           // Optionally, fetch the post as a fallback if consistency is critical
           // fetchSinglePost(postId);
         }
       } else {
-        print('[DataController] handleNewReplyToReply: Post $postId not found.');
+          // print('[DataController] handleNewReplyToReply: Post $postId not found.');
       }
     } catch (e) {
-      print('[DataController] Error handling new reply to reply for post $postId: $e');
+        // print('[DataController] Error handling new reply to reply for post $postId: $e');
     }
   }
 
   // view post - THIS IS THE ORIGINAL METHOD PROVIDED BY THE USER
   Future<Map<String, dynamic>> viewPost(String postId) async {
     if (_pendingViewRegistrations.contains(postId)) {
-      print('[DataController] View registration for post $postId is already in progress. Skipping.');
+        // print('[DataController] View registration for post $postId is already in progress. Skipping.');
       return {'success': false, 'message': 'View registration already in progress.'};
     }
 
@@ -403,7 +429,7 @@ class DataController extends GetxController {
       String? token = user.value['token'];
       // Ensure user and user ID exist
       if (user.value['user'] == null || user.value['user']['_id'] == null) {
-        print('[DataController] User data or user ID is null. Cannot record view for post $postId.');
+          // print('[DataController] User data or user ID is null. Cannot record view for post $postId.');
         return {'success': false, 'message': 'User data not found.'};
       }
       String userId = user.value['user']['_id'];
@@ -420,14 +446,14 @@ class DataController extends GetxController {
 
       if (response.statusCode == 200 && response.data['success'] == true) {
         // No local state update for views here; that will be handled by socket event.
-        print('[DataController] Post view for $postId recorded successfully.');
+          // print('[DataController] Post view for $postId recorded successfully.');
         return {'success': true, 'message': 'Post viewed successfully'};
       } else {
-        print('[DataController] Failed to record post view for $postId: ${response.data['message'] ?? 'Unknown error'}');
+          // print('[DataController] Failed to record post view for $postId: ${response.data['message'] ?? 'Unknown error'}');
         return {'success': false, 'message': response.data['message'] ?? 'Post view failed'};
       }
     } catch (e) {
-      print('[DataController] Error recording post view for $postId: $e');
+        // print('[DataController] Error recording post view for $postId: $e');
       return {'success': false, 'message': e.toString()};
     } finally {
       _pendingViewRegistrations.remove(postId);
@@ -452,7 +478,7 @@ class DataController extends GetxController {
         ),
         data: {'postId': postId, 'userId': currentUserId},
       );
-      // print(response.data);
+      //   // print(response.data);
       if (response.statusCode == 200 && response.data['success'] == true) {
         // Fetch the full post to ensure data consistency
         await fetchSinglePost(postId);
@@ -483,7 +509,7 @@ class DataController extends GetxController {
         ),
         data: {'postId': postId, 'userId': currentUserId},
       );
-      // print(response.data);
+      //   // print(response.data);
       if (response.statusCode == 200 && response.data['success'] == true) {
         // Fetch the full post to ensure data consistency
         await fetchSinglePost(postId);
@@ -508,7 +534,7 @@ class DataController extends GetxController {
   //         }
   //       )
   //     );
-  //     // print(response.data);
+  //     //   // print(response.data);
   //     if (response.statusCode == 200 && response.data['success'] == true) {
   //       return {'success': true, 'message': 'Post viewed successfully'};
   //     } else {
@@ -562,17 +588,17 @@ class DataController extends GetxController {
   // Method to fetch a single post by its ID and update it in the local list
   Future<void> fetchSinglePost(String postId) async {
     if (postId.isEmpty) {
-      print('[DataController] fetchSinglePost: postId is empty. Cannot fetch.');
+        // print('[DataController] fetchSinglePost: postId is empty. Cannot fetch.');
       return;
     }
     // Optional: Add a loading state for this specific post if needed for UI
     // isLoadingPost[postId] = true; (would require managing a map of loading states)
-    print('[DataController] Fetching single post: $postId');
+      // print('[DataController] Fetching single post: $postId');
 
     try {
       var token = user.value['token'];
       if (token == null) {
-        print('[DataController] fetchSinglePost: User token not found. Cannot fetch post $postId.');
+          // print('[DataController] fetchSinglePost: User token not found. Cannot fetch post $postId.');
         throw Exception('User token not found');
       }
 
@@ -592,13 +618,13 @@ class DataController extends GetxController {
         // Use the existing updatePostFromSocket logic to process and replace the post
         // This ensures consistent handling of post data and derived counts.
         updatePostFromSocket(fetchedPostData);
-        print('[DataController] Successfully fetched and updated post $postId.');
+          // print('[DataController] Successfully fetched and updated post $postId.');
       } else {
-        print('[DataController] Failed to fetch post $postId. Status: ${response.statusCode}, Message: ${response.data['message']}');
+          // print('[DataController] Failed to fetch post $postId. Status: ${response.statusCode}, Message: ${response.data['message']}');
         throw Exception('Failed to fetch post $postId: ${response.data['message'] ?? "Unknown server error"}');
       }
     } catch (e) {
-      print('[DataController] Error fetching single post $postId: $e');
+        // print('[DataController] Error fetching single post $postId: $e');
       // Optional: Set an error state for this specific post if needed for UI
       // postErrors[postId] = e.toString();
       // Rethrow if the caller needs to handle it, or handle silently here.
@@ -637,7 +663,7 @@ class DataController extends GetxController {
         return {'success': false, 'message': response.data['message'] ?? 'Failed to repost post'};
       }
     } catch (e) {
-      print('[DataController] Error reposting post $postId: $e');
+        // print('[DataController] Error reposting post $postId: $e');
       if (e is dio.DioException && e.response?.data != null && e.response!.data['message'] != null) {
         return {'success': false, 'message': 'Failed to repost: ${e.response!.data['message']}'};
       }
@@ -725,7 +751,7 @@ class DataController extends GetxController {
         throw Exception('Failed to fetch feeds');
       }
     } catch (e) {
-      print('Error fetching feeds: $e');
+        // print('Error fetching feeds: $e');
       posts.clear();
       rethrow; // Rethrow the exception to be handled by the caller
     }
@@ -749,13 +775,13 @@ class DataController extends GetxController {
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
-        // print("[DataController] Raw replies data from API for post $postId: ${response.data}");
+        //   // print("[DataController] Raw replies data from API for post $postId: ${response.data}");
         final List<dynamic> repliesData = response.data['replies'];
         List<Map<String, dynamic>> processedReplies = [];
 
         for (var replyData in repliesData) {
           if (replyData == null || replyData is! Map<String,dynamic>) {
-            // print("[DataController] Skipping invalid reply data item: $replyData");
+            //   // print("[DataController] Skipping invalid reply data item: $replyData");
             continue;
           }
           Map<String,dynamic> currentReply = Map<String,dynamic>.from(replyData);
@@ -803,14 +829,14 @@ class DataController extends GetxController {
             'userId': currentReply['userId']?.toString(),
           });
         }
-        // print("[DataController] Processed replies for post $postId: $processedReplies");
+        //   // print("[DataController] Processed replies for post $postId: $processedReplies");
         return processedReplies;
       } else {
-        print('[DataController] Error fetching replies for post $postId: ${response.statusCode} - ${response.data?['message']}');
+          // print('[DataController] Error fetching replies for post $postId: ${response.statusCode} - ${response.data?['message']}');
         throw Exception('Failed to fetch replies: ${response.data?['message'] ?? 'Unknown error'}');
       }
     } catch (e) {
-      print('[DataController] Exception caught in fetchReplies for post $postId: $e');
+        // print('[DataController] Exception caught in fetchReplies for post $postId: $e');
       throw Exception('An error occurred while fetching replies: $e');
     }
   }
@@ -832,7 +858,7 @@ class DataController extends GetxController {
     final String? newPostId = processedNewPost['_id'] as String?;
 
     if (newPostId == null) {
-      // print("Warning: Adding a new post without an '_id'. Cannot check for duplicates by ID. Post data: $processedNewPost");
+      //   // print("Warning: Adding a new post without an '_id'. Cannot check for duplicates by ID. Post data: $processedNewPost");
       posts.insert(0, processedNewPost);
       return;
     }
@@ -844,15 +870,15 @@ class DataController extends GetxController {
 
     if (!alreadyExists) {
       posts.insert(0, processedNewPost);
-      print("New post with ID $newPostId added to the list.");
+        // print("New post with ID $newPostId added to the list.");
     } else {
-      print("Post with ID $newPostId already exists in the list. Attempting to update.");
+        // print("Post with ID $newPostId already exists in the list. Attempting to update.");
       final int existingPostIndex = posts.indexWhere((p) => (p['_id'] as String?) == newPostId);
       if (existingPostIndex != -1) {
         // Replace with new data, as it might be an update (e.g. from socket)
         posts[existingPostIndex] = processedNewPost;
         posts.refresh();
-        print("Updating existing post with ID $newPostId with new data.");
+          // print("Updating existing post with ID $newPostId with new data.");
       }
     }
   }
@@ -895,31 +921,31 @@ class DataController extends GetxController {
 
           // Update the in-memory user state immediately
           user.value = jsonDecode(userJson);
-          print('[DataController] User data saved to storage and in-memory state updated.');
+            // print('[DataController] User data saved to storage and in-memory state updated.');
 
           // Now, fetch feeds
           try {
-            print('[DataController] Login successful. Fetching initial feeds...');
+              // print('[DataController] Login successful. Fetching initial feeds...');
             await fetchFeeds(); // Fetches main content feed
-            print('[DataController] Initial feeds fetched successfully after login.');
+              // print('[DataController] Initial feeds fetched successfully after login.');
 
             // Fetch user's network data (followers/following) for AppDrawer and Network page
             final String? currentUserId = user.value['user']?['_id'];
             if (currentUserId != null && currentUserId.isNotEmpty) {
-              print('[DataController.loginUser] Fetching initial network data for $currentUserId');
-              fetchFollowers(currentUserId).catchError((e) => print('Error fetching followers post-login: $e'));
-              fetchFollowing(currentUserId).catchError((e) => print('Error fetching following post-login: $e'));
+                // print('[DataController.loginUser] Fetching initial network data for $currentUserId');
+              fetchFollowers(currentUserId).catchError((e) =>   // print('Error fetching followers post-login: $e'));
+              fetchFollowing(currentUserId).catchError((e) =>   // print('Error fetching following post-login: $e'));
             }
 
           } catch (feedError) {
-            print('[DataController] Error fetching feeds/network data immediately after login: ${feedError.toString()}. Login itself is still considered successful.');
+              // print('[DataController] Error fetching feeds/network data immediately after login: ${feedError.toString()}. Login itself is still considered successful.');
             // Optionally, you could set a flag here to indicate feeds/network failed to load.
           }
 
           return {'success': true, 'message': 'User logged in successfully'};
         } catch (e) {
           // This catch is for errors during storage write or updating user.value
-          print('[DataController] Error saving user data or updating state after login: ${e.toString()}');
+            // print('[DataController] Error saving user data or updating state after login: ${e.toString()}');
           return {
             'success': false,
             'message': 'Login partially failed: Could not save user session: ${e.toString()}'
@@ -933,7 +959,7 @@ class DataController extends GetxController {
       }
     } catch (e) {
       // This catch is for network errors or other issues with the login API call itself
-      print('[DataController] Login API call failed: ${e.toString()}');
+        // print('[DataController] Login API call failed: ${e.toString()}');
       return {'success': false, 'message': 'Login failed: ${e.toString()}'};
     }
   }
@@ -1002,7 +1028,7 @@ class DataController extends GetxController {
         throw Exception('Failed to fetch chats');
       }
     } catch (e) {
-      print('Error fetching chats: $e');
+        // print('Error fetching chats: $e');
       // Optionally, show a snackbar or some error message to the user
     } finally {
       isLoadingChats.value = false;
@@ -1029,7 +1055,7 @@ class DataController extends GetxController {
         throw Exception('Failed to fetch messages');
       }
     } catch (e) {
-      print('Error fetching messages: $e');
+        // print('Error fetching messages: $e');
     } finally {
       isLoadingMessages.value = false;
     }
@@ -1063,7 +1089,7 @@ class DataController extends GetxController {
         throw Exception('Failed to send message: ${response.data?['message']}');
       }
     } catch (e) {
-      print('Error sending message: $e');
+        // print('Error sending message: $e');
       updateMessageStatus(clientMessageId, 'failed');
     }
   }
@@ -1169,7 +1195,7 @@ class DataController extends GetxController {
     final file = await _localFile(attachment['filename']);
 
     if (await file.exists()) {
-      print('File already downloaded at: ${file.path}');
+        // print('File already downloaded at: ${file.path}');
       // On a real device, you might want to use a package like `open_file`
       // to open the file, but for now, we just log the path.
     } else {
@@ -1203,7 +1229,7 @@ class DataController extends GetxController {
       _updateMessageAttachment(messageId, attachmentId, {'isDownloading': false, 'downloadProgress': 1.0});
 
     } catch (e) {
-      print('Error downloading file: $e');
+        // print('Error downloading file: $e');
       _updateMessageAttachment(messageId, attachmentId, {'isDownloading': false});
     }
   }
@@ -1263,20 +1289,20 @@ class DataController extends GetxController {
           }).where((userMap) => userMap.isNotEmpty).toList();
 
           followers.assignAll(processedFollowers);
-          // print('[DataController] Fetched followers for user $userId successfully. Count: ${followers.length}');
+          //   // print('[DataController] Fetched followers for user $userId successfully. Count: ${followers.length}');
         } else {
           followers.clear();
-          // print('[DataController] Fetched followers for user $userId but the list is null or not a list.');
+          //   // print('[DataController] Fetched followers for user $userId but the list is null or not a list.');
           throw Exception('Followers list not found or invalid format.');
         }
       } else {
         followers.clear();
-        // print('[DataController] Failed to fetch followers for user $userId. Status: ${response.statusCode}, Message: ${response.data?['message']}');
+        //   // print('[DataController] Failed to fetch followers for user $userId. Status: ${response.statusCode}, Message: ${response.data?['message']}');
         throw Exception('Failed to fetch followers: ${response.data?['message'] ?? "Unknown server error"}');
       }
     } catch (e) {
       followers.clear();
-      // print('[DataController] Error in fetchFollowers for user $userId: ${e.toString()}');
+      //   // print('[DataController] Error in fetchFollowers for user $userId: ${e.toString()}');
       // Rethrow or handle as needed
       rethrow;
     } finally {
@@ -1336,20 +1362,20 @@ class DataController extends GetxController {
           }).where((userMap) => userMap.isNotEmpty).toList();
 
           following.assignAll(processedFollowing);
-          print('[DataController] Fetched following list for user $userId successfully. Count: ${following.length}');
+            // print('[DataController] Fetched following list for user $userId successfully. Count: ${following.length}');
         } else {
           following.clear();
-          print('[DataController] Fetched following list for user $userId but the list is null or not a list.');
+            // print('[DataController] Fetched following list for user $userId but the list is null or not a list.');
           throw Exception('Following list not found or invalid format.');
         }
       } else {
         following.clear();
-        print('[DataController] Failed to fetch following list for user $userId. Status: ${response.statusCode}, Message: ${response.data?['message']}');
+          // print('[DataController] Failed to fetch following list for user $userId. Status: ${response.statusCode}, Message: ${response.data?['message']}');
         throw Exception('Failed to fetch following list: ${response.data?['message'] ?? "Unknown server error"}');
       }
     } catch (e) {
       following.clear();
-      print('[DataController] Error in fetchFollowing for user $userId: ${e.toString()}');
+        // print('[DataController] Error in fetchFollowing for user $userId: ${e.toString()}');
       rethrow;
     } finally {
       isLoadingFollowing.value = false;
@@ -1402,7 +1428,7 @@ class DataController extends GetxController {
       allUsers.refresh();
     }
 
-    print('[DataController] Toggled follow status for $targetUserId to $follow (placeholder).');
+      // print('[DataController] Toggled follow status for $targetUserId to $follow (placeholder).');
   }
 
   // Add this method to the DataController class
@@ -1420,7 +1446,7 @@ class DataController extends GetxController {
       // 1. Clear data from FlutterSecureStorage
       await _storage.delete(key: 'token');
       await _storage.delete(key: 'user');
-      print('[DataController] Token and user data deleted from secure storage.');
+        // print('[DataController] Token and user data deleted from secure storage.');
 
       // 2. Reset reactive variables to initial states
       user.value = {};
@@ -1430,13 +1456,13 @@ class DataController extends GetxController {
       currentConversationMessages.clear();
       followers.clear();
       following.clear();
-      print('[DataController] In-memory user state cleared.');
+        // print('[DataController] In-memory user state cleared.');
 
       // 3. Optionally, disconnect other services
       // Example: If SocketService is managed or accessible here
       // final SocketService socketService = Get.find<SocketService>();
       // socketService.disconnect();
-      // print('[DataController] SocketService disconnected.');
+      //   // print('[DataController] SocketService disconnected.');
       // Note: Ensure SocketService handles multiple disconnect calls gracefully if also called in app dispose.
 
       // Any other cleanup specific to your application's state
@@ -1447,7 +1473,7 @@ class DataController extends GetxController {
       isLoadingFollowing.value = false;
 
     } catch (e) {
-      print('[DataController] Error during logout: ${e.toString()}');
+        // print('[DataController] Error during logout: ${e.toString()}');
       // Even if an error occurs, try to clear in-memory data as a fallback
       user.value = {};
       posts.clear();
@@ -1465,8 +1491,8 @@ class DataController extends GetxController {
   Future<Map<String, dynamic>> updateUserAvatar(String avatarUrl) async {
     isLoading.value = true; // Optional: indicate loading state
     try {
-      print(user.value['user']['_id']);
-      print(user.value['token']);
+        // print(user.value['user']['_id']);
+        // print(user.value['token']);
       final String? currentUserId = user.value['user']['_id']?.toString();
       final String? token = user.value['token']?.toString();
 
@@ -1510,18 +1536,18 @@ class DataController extends GetxController {
           await _storage.write(key: 'user', value: jsonEncode(updatedUserData));
         } else {
           // Handle case where 'user' map might not exist or is not a map (should not happen in normal flow)
-          print('[DataController] Error: User data structure is not as expected. Cannot update avatar in nested map.');
+            // print('[DataController] Error: User data structure is not as expected. Cannot update avatar in nested map.');
           // Potentially return an error or don't update if structure is broken
         }
 
-        print('[DataController] Avatar updated successfully on backend and locally. New URL: $returnedAvatarUrl');
+          // print('[DataController] Avatar updated successfully on backend and locally. New URL: $returnedAvatarUrl');
         return {
           'success': true,
           'message': response.data['message'] ?? 'Avatar updated successfully!',
           'avatarUrl': returnedAvatarUrl
         };
       } else {
-        print('[DataController] Backend failed to update avatar. Status: ${response.statusCode}, Message: ${response.data['message']}');
+          // print('[DataController] Backend failed to update avatar. Status: ${response.statusCode}, Message: ${response.data['message']}');
         return {
           'success': false,
           'message': response.data['message'] ?? 'Failed to update avatar on backend.'
@@ -1529,7 +1555,7 @@ class DataController extends GetxController {
       }
     } catch (e) {
       isLoading.value = false;
-      print('[DataController] Error in updateUserAvatar: ${e.toString()}');
+        // print('[DataController] Error in updateUserAvatar: ${e.toString()}');
       return {'success': false, 'message': 'An error occurred: ${e.toString()}'};
     }
   }
@@ -1542,7 +1568,7 @@ class DataController extends GetxController {
       currentlyPlayingMediaId.value = mediaId;
       currentlyPlayingMediaType.value = mediaType;
       activeMediaController.value = controller;
-      print("[DataController] Media $mediaId (type: $mediaType) started playing. Setting global lock.");
+        // print("[DataController] Media $mediaId (type: $mediaType) started playing. Setting global lock.");
     }
   }
 
@@ -1551,7 +1577,7 @@ class DataController extends GetxController {
       currentlyPlayingMediaId.value = null;
       currentlyPlayingMediaType.value = null;
       activeMediaController.value = null;
-      print("[DataController] Media $mediaId (type: $mediaType) stopped playing. Releasing global lock.");
+        // print("[DataController] Media $mediaId (type: $mediaType) stopped playing. Releasing global lock.");
     }
   }
 
@@ -1563,7 +1589,7 @@ class DataController extends GetxController {
     }
 
     if (eventPostId == null) {
-      print('[DataController] updatePostFromSocket: Received post data without a usable ID (_id or postId). Cannot update. Data: $updatedPostData');
+        // print('[DataController] updatePostFromSocket: Received post data without a usable ID (_id or postId). Cannot update. Data: $updatedPostData');
       return;
     }
 
@@ -1580,10 +1606,10 @@ class DataController extends GetxController {
         // especially with nested structures.
         posts[postIndex] = fullyProcessedUpdatedPost;
         posts.refresh();
-        // print('[DataController] Post $finalPostId updated from socket event. New data: $fullyProcessedUpdatedPost');
+        //   // print('[DataController] Post $finalPostId updated from socket event. New data: $fullyProcessedUpdatedPost');
       } else {
         // This is a new post not seen before.
-        print('[DataController] updatePostFromSocket: Post with ID $finalPostId not found. Assuming new post and adding.');
+          // print('[DataController] updatePostFromSocket: Post with ID $finalPostId not found. Assuming new post and adding.');
 
         // The fullyProcessedUpdatedPost is already processed, so it can be added directly.
         // Ensure its ID is correctly set if it was derived from 'postId'.
@@ -1598,7 +1624,7 @@ class DataController extends GetxController {
         addNewPost(fullyProcessedUpdatedPost); // addNewPost also handles duplicates and inserts at 0
       }
     } catch (e) {
-      print('[DataController] Error updating post $finalPostId from socket: $e. Data: $updatedPostData'); // Used finalPostId
+        // print('[DataController] Error updating post $finalPostId from socket: $e. Data: $updatedPostData'); // Used finalPostId
     }
   }
 
@@ -1627,14 +1653,14 @@ class DataController extends GetxController {
 
         posts[postIndex] = postToUpdate;
         posts.refresh();
-        print('[DataController] New reply added to post $parentPostId. Post updated.');
+          // print('[DataController] New reply added to post $parentPostId. Post updated.');
       } else {
-        print('[DataController] handleNewReply: Parent post with ID $parentPostId not found.');
+          // print('[DataController] handleNewReply: Parent post with ID $parentPostId not found.');
         // Optionally, fetch the post if it's critical that it should exist
         // fetchSinglePost(parentPostId);
       }
     } catch (e) {
-      print('[DataController] Error handling new reply for post $parentPostId: $e');
+        // print('[DataController] Error handling new reply for post $parentPostId: $e');
     }
   }
 
@@ -1647,7 +1673,7 @@ class DataController extends GetxController {
     // This method is now largely superseded by mediaDidStartPlaying.
     // If called, ensure it correctly interfaces with the new media state.
     // For simplicity, we can delegate or log a warning.
-    print("[DataController] Legacy videoDidStartPlaying called for $videoId. Consider updating call site to mediaDidStartPlaying.");
+      // print("[DataController] Legacy videoDidStartPlaying called for $videoId. Consider updating call site to mediaDidStartPlaying.");
     // Example: find the controller if this videoId is active and call mediaDidStartPlaying
     // This requires knowing the controller instance which isn't passed here.
     // A safer approach might be to ensure all video players call mediaDidStartPlaying directly.
@@ -1662,7 +1688,7 @@ class DataController extends GetxController {
 
   void videoDidStopPlaying(String videoId) {
     // Similar to videoDidStartPlaying, this is superseded.
-    print("[DataController] Legacy videoDidStopPlaying called for $videoId. Consider updating call site to mediaDidStopPlaying.");
+      // print("[DataController] Legacy videoDidStopPlaying called for $videoId. Consider updating call site to mediaDidStopPlaying.");
     if (currentlyPlayingMediaId.value == videoId && currentlyPlayingMediaType.value == 'video') {
       mediaDidStopPlaying(videoId, 'video');
     }
@@ -1698,7 +1724,7 @@ class DataController extends GetxController {
         // The backend might return the new reply, or the updated parent reply, or the updated main post.
         // For now, assume it returns the new reply object.
         // UI will likely need to re-fetch replies for the parent post or parent reply to show the new one.
-        print('[DataController] Reply to reply successful: ${response.data}');
+          // print('[DataController] Reply to reply successful: ${response.data}');
         // TODO: Determine how to update local state. Might need to fetch parent post's replies again.
         // For now, just returning success and the new reply if available.
         return {
@@ -1710,7 +1736,7 @@ class DataController extends GetxController {
         return {'success': false, 'message': response.data['message'] ?? 'Failed to post reply to reply'};
       }
     } catch (e) {
-      print('[DataController] Error in replyToReply: $e');
+        // print('[DataController] Error in replyToReply: $e');
       return {'success': false, 'message': e.toString()};
     }
   }
@@ -1739,7 +1765,7 @@ class DataController extends GetxController {
       if (response.statusCode == 200 && response.data['success'] == true) {
         // Fetch the full root post to ensure data consistency for the entire thread
         await fetchSinglePost(postId); // postId here is the root post ID
-        // print('[DataController] Like reply successful, root post $postId fetched: ${response.data}');
+        //   // print('[DataController] Like reply successful, root post $postId fetched: ${response.data}');
         return {
           'success': true,
           'message': response.data['message'] ?? 'Reply liked successfully',
@@ -1751,7 +1777,7 @@ class DataController extends GetxController {
         return {'success': false, 'message': response.data['message'] ?? 'Failed to like reply'};
       }
     } catch (e) {
-      print('[DataController] Error in likeReply: $e');
+        // print('[DataController] Error in likeReply: $e');
       return {'success': false, 'message': e.toString()};
     }
   }
@@ -1780,7 +1806,7 @@ class DataController extends GetxController {
       if (response.statusCode == 200 && response.data['success'] == true) {
         // Fetch the full root post to ensure data consistency for the entire thread
         await fetchSinglePost(postId); // postId here is the root post ID
-        // print('[DataController] Unlike reply successful, root post $postId fetched: ${response.data}');
+        //   // print('[DataController] Unlike reply successful, root post $postId fetched: ${response.data}');
         return {
           'success': true,
           'message': response.data['message'] ?? 'Reply unliked successfully',
@@ -1790,7 +1816,7 @@ class DataController extends GetxController {
         return {'success': false, 'message': response.data['message'] ?? 'Failed to unlike reply'};
       }
     } catch (e) {
-      print('[DataController] Error in unlikeReply: $e');
+        // print('[DataController] Error in unlikeReply: $e');
       return {'success': false, 'message': e.toString()};
     }
   }
@@ -1822,14 +1848,14 @@ class DataController extends GetxController {
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
-        // print('[DataController] View reply successful: ${response.data}');
+        //   // print('[DataController] View reply successful: ${response.data}');
         // Socket event 'replyViewed' or similar would ideally update counts if displayed.
         return {'success': true, 'message': response.data['message'] ?? 'Reply viewed successfully'};
       } else {
         return {'success': false, 'message': response.data['message'] ?? 'Failed to view reply'};
       }
     } catch (e) {
-      print('[DataController] Error in viewReply: $e');
+        // print('[DataController] Error in viewReply: $e');
       return {'success': false, 'message': e.toString()};
     }
   }
@@ -1858,7 +1884,7 @@ class DataController extends GetxController {
       if (response.statusCode == 200 && response.data['success'] == true) {
         // Fetch the full root post to ensure data consistency for the entire thread
         await fetchSinglePost(postId); // postId here is the root post ID
-        // print('[DataController] Repost reply successful, root post $postId fetched: ${response.data}');
+        //   // print('[DataController] Repost reply successful, root post $postId fetched: ${response.data}');
         // If reposting a reply creates a new top-level post for the reposter,
         // that new post should arrive via a 'newPost' socket event or be handled by a subsequent feed refresh.
         // The primary goal here is to update the state of the original thread.
@@ -1871,7 +1897,7 @@ class DataController extends GetxController {
         return {'success': false, 'message': response.data['message'] ?? 'Failed to repost reply'};
       }
     } catch (e) {
-      print('[DataController] Error in repostReply: $e');
+        // print('[DataController] Error in repostReply: $e');
       return {'success': false, 'message': e.toString()};
     }
   }
@@ -1900,13 +1926,13 @@ class DataController extends GetxController {
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
-        // print("[DataController] Raw replies data from API for parent reply $parentReplyId: ${response.data}");
+        //   // print("[DataController] Raw replies data from API for parent reply $parentReplyId: ${response.data}");
         final List<dynamic> repliesData = response.data['replies'] ?? []; // Default to empty list if null
         List<Map<String, dynamic>> processedReplies = [];
 
         for (var replyData in repliesData) {
           if (replyData == null || replyData is! Map<String,dynamic>) {
-            // print("[DataController] Skipping invalid reply data item for parent reply $parentReplyId: $replyData");
+            //   // print("[DataController] Skipping invalid reply data item for parent reply $parentReplyId: $replyData");
             continue;
           }
           Map<String,dynamic> currentReply = Map<String,dynamic>.from(replyData);
@@ -1967,14 +1993,14 @@ class DataController extends GetxController {
             // 'parentReplyId': parentReplyId, // The direct parent of these fetched replies
           });
         }
-        // print("[DataController] Processed replies for parent reply $parentReplyId: $processedReplies");
+        //   // print("[DataController] Processed replies for parent reply $parentReplyId: $processedReplies");
         return processedReplies;
       } else {
-        print('[DataController] Error fetching replies for parent reply $parentReplyId: ${response.statusCode} - ${response.data?['message']}');
+          // print('[DataController] Error fetching replies for parent reply $parentReplyId: ${response.statusCode} - ${response.data?['message']}');
         throw Exception('Failed to fetch replies for reply: ${response.data?['message'] ?? 'Unknown error'}');
       }
     } catch (e) {
-      print('[DataController] Exception caught in fetchRepliesForReply (parent reply $parentReplyId): $e');
+        // print('[DataController] Exception caught in fetchRepliesForReply (parent reply $parentReplyId): $e');
       throw Exception('An error occurred while fetching replies for reply: $e');
     }
   }
@@ -2013,7 +2039,7 @@ class DataController extends GetxController {
       }
     } catch (e) {
       // isLoading.value = false; // Removed
-      print('[DataController] Error fetching user profile for $username: $e');
+        // print('[DataController] Error fetching user profile for $username: $e');
       String errorMessage = 'An error occurred while fetching the profile.';
       if (e is dio.DioException) {
         if (e.response?.statusCode == 404) {
@@ -2156,13 +2182,13 @@ Future<Map<String, dynamic>> followUser(String userIdToFollow) async {
         }
       }
 
-      print('[DataController] User $currentUserId successfully followed $userIdToFollow.');
+        // print('[DataController] User $currentUserId successfully followed $userIdToFollow.');
       return {'success': true, 'message': response.data['message'] ?? 'Successfully followed user.'};
     } else {
       return {'success': false, 'message': response.data['message'] ?? 'Failed to follow user.'};
     }
   } catch (e) {
-    print('[DataController] Error following user $userIdToFollow: $e');
+      // print('[DataController] Error following user $userIdToFollow: $e');
     String errorMessage = 'An error occurred while trying to follow.';
     if (e is dio.DioException && e.response?.data != null && e.response!.data['message'] != null) {
       errorMessage = e.response!.data['message'];
@@ -2232,13 +2258,13 @@ Future<Map<String, dynamic>> unfollowUser(String userIdToUnfollow) async {
       following.removeWhere((u) => u['_id'] == userIdToUnfollow);
 
 
-      print('[DataController] User $currentUserId successfully unfollowed $userIdToUnfollow.');
+        // print('[DataController] User $currentUserId successfully unfollowed $userIdToUnfollow.');
       return {'success': true, 'message': response.data['message'] ?? 'Successfully unfollowed user.'};
     } else {
       return {'success': false, 'message': response.data['message'] ?? 'Failed to unfollow user.'};
     }
   } catch (e) {
-    print('[DataController] Error unfollowing user $userIdToUnfollow: $e');
+      // print('[DataController] Error unfollowing user $userIdToUnfollow: $e');
     String errorMessage = 'An error occurred while trying to unfollow.';
     if (e is dio.DioException && e.response?.data != null && e.response!.data['message'] != null) {
       errorMessage = e.response!.data['message'];
@@ -2274,7 +2300,7 @@ void clearUserPosts() {
       if (response.statusCode == 200 && response.data['success'] == true) {
         if (response.data['posts'] != null && response.data['posts'] is List) {
           List<dynamic> fetchedPostsDynamic = response.data['posts'];
-          print('[DataController.fetchUserPosts] Raw response data for $targetUserId: ${response.data.toString()}');
+            // print('[DataController.fetchUserPosts] Raw response data for $targetUserId: ${response.data.toString()}');
           List<Map<String, dynamic>> processedPosts = fetchedPostsDynamic.map((postData) {
             if (postData is Map<String, dynamic>) {
               // Use the existing _processPostOrReply to ensure consistent data structure
@@ -2283,28 +2309,28 @@ void clearUserPosts() {
             return <String, dynamic>{};
           }).where((postMap) => postMap.isNotEmpty).toList();
 
-          print('[DataController.fetchUserPosts] Processed ${processedPosts.length} posts for user $targetUserId.');
+            // print('[DataController.fetchUserPosts] Processed ${processedPosts.length} posts for user $targetUserId.');
           userPosts.assignAll(processedPosts);
-          print('[DataController] Assigned posts to userPosts list. Final count for $targetUserId: ${userPosts.length}');
+            // print('[DataController] Assigned posts to userPosts list. Final count for $targetUserId: ${userPosts.length}');
         } else {
-          print('[DataController.fetchUserPosts] Fetched posts for user $targetUserId but the list in response.data[\'posts\'] is null or not a list.');
+            // print('[DataController.fetchUserPosts] Fetched posts for user $targetUserId but the list in response.data[\'posts\'] is null or not a list.');
           userPosts.clear(); // Ensure it's cleared if backend gives bad structure
         }
       } else {
-        print('[DataController.fetchUserPosts] Failed to fetch posts for user $targetUserId. Status: ${response.statusCode}, Message: ${response.data?['message']}');
-        print('[DataController.fetchUserPosts] Raw error response data: ${response.data.toString()}');
+          // print('[DataController.fetchUserPosts] Failed to fetch posts for user $targetUserId. Status: ${response.statusCode}, Message: ${response.data?['message']}');
+          // print('[DataController.fetchUserPosts] Raw error response data: ${response.data.toString()}');
         userPosts.clear(); // Clear on failure too
         throw Exception('Failed to fetch user posts: ${response.data?['message'] ?? "Unknown server error"}');
       }
     } catch (e) {
-      print('[DataController.fetchUserPosts] Error in fetchUserPosts for user $targetUserId: ${e.toString()}');
+        // print('[DataController.fetchUserPosts] Error in fetchUserPosts for user $targetUserId: ${e.toString()}');
       userPosts.clear(); // Clear on any exception
       // userPosts remains empty, UI will show error/empty message.
       // Rethrow so the calling UI can catch it for specific error messages if needed.
       rethrow;
     } finally {
       isLoadingUserPosts.value = false;
-      print('[DataController.fetchUserPosts] Finally block. isLoadingUserPosts: ${isLoadingUserPosts.value}, userPosts count: ${userPosts.length}');
+        // print('[DataController.fetchUserPosts] Finally block. isLoadingUserPosts: ${isLoadingUserPosts.value}, userPosts count: ${userPosts.length}');
     }
   }
 
@@ -2339,14 +2365,14 @@ void clearUserPosts() {
 
           // Save updated user object to secure storage
           await _storage.write(key: 'user', value: jsonEncode(user.value));
-          print('[DataController] "About" info updated locally and in storage.');
+            // print('[DataController] "About" info updated locally and in storage.');
         }
         return {'success': true, 'message': response.data['message'] ?? 'About information updated successfully.'};
       } else {
         return {'success': false, 'message': response.data['message'] ?? 'Failed to update about information.'};
       }
     } catch (e) {
-      print('[DataController] Error updating about info: $e');
+        // print('[DataController] Error updating about info: $e');
       String errorMessage = 'An error occurred while updating about information.';
       if (e is dio.DioException && e.response?.data != null && e.response!.data['message'] != null) {
         errorMessage = e.response!.data['message'];
@@ -2366,11 +2392,11 @@ void clearUserPosts() {
     // final int? newFollowingCountForFollower = data['newFollowingCountForFollower'] as int?; // Optional
 
     if (followerId == null || followedId == null) {
-      print('[DataController.handleUserFollowedSocket] Received insufficient data: $data');
+        // print('[DataController.handleUserFollowedSocket] Received insufficient data: $data');
       return;
     }
 
-    print('[DataController.handleUserFollowedSocket] Processing: $followerId followed $followedId');
+      // print('[DataController.handleUserFollowedSocket] Processing: $followerId followed $followedId');
 
     // Update the user who was followed (their followersCount increases)
     int followedUserIndex = allUsers.indexWhere((u) => u['_id'] == followedId);
@@ -2498,10 +2524,10 @@ void clearUserPosts() {
 
 
     if (unfollowerId == null || unfollowedId == null) {
-      print('[DataController.handleUserUnfollowedSocket] Received insufficient data: $data');
+        // print('[DataController.handleUserUnfollowedSocket] Received insufficient data: $data');
       return;
     }
-    print('[DataController.handleUserUnfollowedSocket] Processing: $unfollowerId unfollowed $unfollowedId');
+      // print('[DataController.handleUserUnfollowedSocket] Processing: $unfollowerId unfollowed $unfollowedId');
 
     // Update the user who was unfollowed (their followersCount decreases)
     int unfollowedUserIndex = allUsers.indexWhere((u) => u['_id'] == unfollowedId);
@@ -2615,9 +2641,9 @@ void clearUserPosts() {
           headers: {'Authorization': 'Bearer ${user.value['token']}'},
         ),
       );
-      print('FCM token updated successfully');
+        // print('FCM token updated successfully');
     } catch (e) {
-      print('Error updating FCM token: $e');
+        // print('Error updating FCM token: $e');
     }
   }
 
@@ -2632,7 +2658,7 @@ void clearUserPosts() {
         'type': isGroup ? 'group' : 'dm',
         if (isGroup) 'name': groupName,
       };
-      print("Sending createChat request with data: $requestData");
+        // print("Sending createChat request with data: $requestData");
 
       final response = await _dio.post(
         'api/chats',
@@ -2642,7 +2668,7 @@ void clearUserPosts() {
         ),
       );
 
-      print("Received createChat response: ${response.data}");
+        // print("Received createChat response: ${response.data}");
 
       if (response.statusCode == 201 && response.data['success'] == true) {
         final chat = response.data['chat'];
@@ -2652,7 +2678,7 @@ void clearUserPosts() {
         throw Exception('Failed to create chat');
       }
     } catch (e) {
-      print('Error creating chat: $e');
+        // print('Error creating chat: $e');
       return null;
     }
   }

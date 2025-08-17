@@ -13,12 +13,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'; // For kDebugMode
 import 'package:get/get.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:logging/logging.dart';
 // import 'package:device_info_plus/device_info_plus.dart'; // No longer needed for player selection
 // import 'dart:io'; // No longer needed for player selection (Platform check)
 
 void main() async {
   // Ensure Flutter bindings are initialized
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Suppress logging
+  Logger.root.level = Level.OFF;
+  Logger.root.onRecord.listen((record) {
+    // Don't print anything to the console
+  });
 
   // Initialize Firebase
   await Firebase.initializeApp();
@@ -36,7 +43,7 @@ void main() async {
 
   // Initialize SocketService. The constructor of SocketService calls connect().
   // Register SocketService as a singleton.
-  final SocketService socketService = Get.put(SocketService());
+  Get.put(SocketService());
 
   // Initialize NotificationService
   final NotificationService notificationService = Get.put(NotificationService());
