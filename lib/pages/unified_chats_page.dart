@@ -34,7 +34,7 @@ class _UnifiedChatsPageState extends State<UnifiedChatsPage> {
           itemCount: allChats.length,
           itemBuilder: (context, index) {
             final chat = allChats[index];
-            final isGroup = chat['isGroup'] == true;
+            final isGroup = chat['type'] == "group";
             final lastMessageData = chat['lastMessage'];
             final currentUserId = _dataController.user.value['user']['_id'];
 
@@ -44,7 +44,7 @@ class _UnifiedChatsPageState extends State<UnifiedChatsPage> {
             Widget trailingWidget;
 
             if (isGroup) {
-              title = chat['groupName'] ?? 'Group Chat';
+              title = chat['name'] ?? 'Group Chat';
               avatarUrl = chat['groupAvatar'] ?? '';
               avatarLetter = title.isNotEmpty ? title[0].toUpperCase() : 'G';
               trailingWidget = const SizedBox.shrink();

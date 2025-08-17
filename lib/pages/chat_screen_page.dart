@@ -717,8 +717,8 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       }
 
-      print('Chat data: $chat');
-      final otherUser = chat['isGroup']
+      // print('Chat data: $chat');
+      final otherUser = chat['type'] == 'group'
           ? null
           : (chat['participants'] as List<dynamic>).firstWhere(
               (p) {
@@ -737,6 +737,9 @@ class _ChatScreenState extends State<ChatScreen> {
               orElse: () => {'name': 'Unknown', 'avatar': ''},
             );
 
+            // print(otherUserMap);
+                  print(otherUserMap['online']);
+
       return Scaffold(
         backgroundColor: Colors.black,
         appBar: AppBar(
@@ -747,35 +750,35 @@ class _ChatScreenState extends State<ChatScreen> {
                 children: [
                   CircleAvatar(
                     backgroundColor: Colors.tealAccent,
-                    backgroundImage: (chat['isGroup']
+                    backgroundImage: (chat['type'] == 'group'
                                 ? chat['groupAvatar']
                                 : otherUserMap?['avatar']) !=
                             null &&
-                            (chat['isGroup']
+                            (chat['type'] == 'group'
                                 ? chat['groupAvatar']
                                 : otherUserMap?['avatar'])
                                 .isNotEmpty
-                        ? NetworkImage((chat['isGroup']
+                        ? NetworkImage((chat['type'] == 'group'
                             ? chat['groupAvatar']
                             : otherUserMap!['avatar'])!)
                         : null,
-                    child: (chat['isGroup']
+                    child: (chat['type'] == 'group'
                                 ? chat['groupAvatar']
                                 : otherUserMap?['avatar']) ==
                             null ||
-                            (chat['isGroup']
+                            (chat['type'] == 'group'
                                 ? chat['groupAvatar']
                                 : otherUserMap?['avatar'])
                                 .isEmpty
                         ? Text(
-                            chat['isGroup']
-                                ? (chat['groupName']?[0] ?? '?')
+                            chat['type'] == 'group'
+                                ? (chat['name']?[0] ?? '?')
                                 : (otherUserMap?['name'][0] ?? '?'),
                             style: const TextStyle(color: Colors.black),
                           )
                         : null,
                   ),
-                  if (!chat['isGroup'] && (otherUserMap?['online'] ?? false))
+                  if (chat['type'] != 'group' && (otherUserMap?['online'] ?? false))
                     Positioned(
                       bottom: 0,
                       right: 0,
@@ -793,8 +796,8 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               const SizedBox(width: 10),
               Text(
-                chat['isGroup']
-                    ? chat['groupName']!
+                chat['type'] == 'group'
+                    ? chat['name']!
                     : otherUserMap!['name'],
                 style: const TextStyle(color: Colors.white),
               ),
@@ -843,19 +846,15 @@ class _ChatScreenState extends State<ChatScreen> {
                 final isVoiceNote = attachments.isNotEmpty &&
                     attachments.first['type'] == 'audio';
 
+                    
+
                 final message = {
-                  '_id': DateTime.now().millisecondsSinceEpoch.toString(),
+                  'clientMessageId': dataController.newClientMessageId,
                   'chatId': chat['_id'],
                   'senderId': dataController.user.value['user']['_id'],
-                  'text': text,
+                  'content': text,
                   'createdAt': DateTime.now().toIso8601String(),
-                  'attachments': isVoiceNote ? null : attachments,
-                  'voiceNote': isVoiceNote
-                      ? {
-                          'url': attachments.first['url'],
-                          'duration': Duration.zero.inMilliseconds
-                        }
-                      : null,
+                  'files': isVoiceNote ? null : attachments,
                   'replyTo': _replyingTo?['_id'],
                 };
 

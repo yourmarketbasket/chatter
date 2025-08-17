@@ -6,6 +6,7 @@ import 'package:dio/dio.dart' as dio; // Use prefix for dio to avoid conflicts
 import 'dart:convert';
 // import 'package:path/path.dart' as path; // path is used by UploadService
 import 'package:path_provider/path_provider.dart';
+import 'package:uuid/uuid.dart';
 import '../models/feed_models.dart';
 import '../services/upload_service.dart'; // Import the UploadService
 
@@ -13,6 +14,7 @@ class DataController extends GetxController {
   final UploadService _uploadService = UploadService(); // Instantiate UploadService
 
   final RxBool isLoading = false.obs;
+  final Uuid _uuid = const Uuid();
   final FlutterSecureStorage _storage = const FlutterSecureStorage(
     aOptions: AndroidOptions(
       encryptedSharedPreferences: true,
@@ -26,15 +28,16 @@ class DataController extends GetxController {
   final Set<String> _pendingViewRegistrations = <String>{};
 
   // URL
-  final String baseUrl = '192.168.1.104:3000/';
+  final String baseUrl = 'http://192.168.1.104:3000/';
   final dio.Dio _dio = dio.Dio(dio.BaseOptions(
-    baseUrl: '192.168.1.104:3000/',
+    baseUrl: 'http://192.168.1.104:3000/',
     connectTimeout: const Duration(seconds: 30),
     receiveTimeout: const Duration(seconds: 30),
     sendTimeout: const Duration(seconds: 30),
   ));
   final user = {}.obs;
   final RxList<Map<String, dynamic>> posts = <Map<String, dynamic>>[].obs;
+  String get newClientMessageId => _uuid.v4();
 
   // Placeholder for all users
   final RxList<Map<String, dynamic>> allUsers = <Map<String, dynamic>>[].obs;
@@ -1050,7 +1053,7 @@ class DataController extends GetxController {
       messageToSend.remove('status');
 
       final response = await _dio.post(
-        'api/chats/${message['chatId']}/messages',
+        'api/messages',
         data: messageToSend, // Send the cleaned message
         options: dio.Options(
           headers: {'Authorization': 'Bearer $token'},
@@ -1242,26 +1245,28 @@ class DataController extends GetxController {
           }).where((userMap) => userMap.isNotEmpty).toList();
 
           followers.assignAll(processedFollowers);
-          print('[DataController] Fetched followers for user $userId successfully. Count: ${followers.length}');
+          // print('[DataController] Fetched followers for user $userId successfully. Count: ${followers.length}');
         } else {
           followers.clear();
-          print('[DataController] Fetched followers for user $userId but the list is null or not a list.');
+          // print('[DataController] Fetched followers for user $userId but the list is null or not a list.');
           throw Exception('Followers list not found or invalid format.');
         }
       } else {
         followers.clear();
-        print('[DataController] Failed to fetch followers for user $userId. Status: ${response.statusCode}, Message: ${response.data?['message']}');
+        // print('[DataController] Failed to fetch followers for user $userId. Status: ${response.statusCode}, Message: ${response.data?['message']}');
         throw Exception('Failed to fetch followers: ${response.data?['message'] ?? "Unknown server error"}');
       }
     } catch (e) {
       followers.clear();
-      print('[DataController] Error in fetchFollowers for user $userId: ${e.toString()}');
+      // print('[DataController] Error in fetchFollowers for user $userId: ${e.toString()}');
       // Rethrow or handle as needed
       rethrow;
     } finally {
       isLoadingFollowers.value = false;
     }
   }
+
+  
 
   Future<void> fetchFollowing(String userId) async {
     isLoadingFollowing.value = true;
@@ -2605,9 +2610,9 @@ void clearUserPosts() {
         throw Exception('User not authenticated');
       }
       final requestData = {
-        'participantIds': participantIds,
-        'isGroup': isGroup,
-        if (isGroup) 'groupName': groupName,
+        'participants': participantIds,
+        'type': isGroup ? 'group' : 'dm',
+        if (isGroup) 'name': groupName,
       };
       print("Sending createChat request with data: $requestData");
 

@@ -14,7 +14,7 @@ class SocketService {
   }
 
   void _initializeSocket() {
-    _socket = IO.io('192.168.1.104:3000/', <String, dynamic>{
+    _socket = IO.io('http://192.168.1.104:3000/', <String, dynamic>{
       'transports': ['websocket'],
       'autoConnect': false,
       'reconnection': true, // Enable automatic reconnection
@@ -248,12 +248,13 @@ class SocketService {
       }
     });
 
-    _socket!.on('message:new', (data) {
-      if (data is Map<String, dynamic>) {
-        _dataController.handleNewMessage(data);
-      } else {
-        print('[SocketService] Received message:new event with unexpected data type: ${data.runtimeType}');
-      }
+    _socket!.on('newMessage', (data) {
+      print(data);
+      // if (data is Map<String, dynamic>) {
+      //   _dataController.handleNewMessage(data);
+      // } else {
+      //   print('[SocketService] Received message:new event with unexpected data type: ${data.runtimeType}');
+      // }
     });
 
     _socket!.on('typing:start', (data) {

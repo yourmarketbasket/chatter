@@ -130,6 +130,7 @@ class _UsersListPageState extends State<UsersListPage> {
                 final participantIds = _selectedUsers.map((u) => u['_id'] as String).toList();
                 final currentUserId = _dataController.user.value['user']['_id'];
                 participantIds.add(currentUserId);
+                // print(participantIds);
 
                 final newChat = await _dataController.createChat(
                   participantIds,

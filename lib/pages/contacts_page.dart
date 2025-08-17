@@ -66,8 +66,9 @@ class _ContactsPageState extends State<ContactsPage> {
       } else {
         // Chat does not exist, create it
         final currentUserData = _dataController.user.value['user'];
+        // print([currentUserId, user['_id']]);
         _dataController
-            .createChat([currentUserId, user['_id']], isGroup: false)
+            .createChat([user['_id']], isGroup: false)
             .then((chat) {
           if (chat != null) {
             final hydratedChat = Map<String, dynamic>.from(chat);
@@ -118,6 +119,7 @@ class _ContactsPageState extends State<ContactsPage> {
             onPressed: () {
               final groupName = groupNameController.text.trim();
               if (groupName.isNotEmpty) {
+                // print(participantIds);
                 _dataController
                     .createChat(participantIds,
                         isGroup: true, groupName: groupName)
