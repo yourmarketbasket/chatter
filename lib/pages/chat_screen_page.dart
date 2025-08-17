@@ -25,20 +25,34 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final DataController dataController = Get.find<DataController>();
   final TextEditingController _messageController = TextEditingController();
-  final GlobalKey<AnimatedListState> _listKey = GlobalKey<AnimatedListState>();
+  final ScrollController _scrollController = ScrollController();
   Map<String, dynamic>? _replyingTo;
 
   @override
   void initState() {
     super.initState();
     dataController.fetchMessages(dataController.currentChat.value['_id']);
+    dataController.currentConversationMessages.listen((_) {
+      Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
+    });
   }
 
   @override
   void dispose() {
     _messageController.dispose();
+    _scrollController.dispose();
     dataController.currentConversationMessages.clear();
     super.dispose();
+  }
+
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   void _sendMessage(String? text, List<PlatformFile>? files, {bool isVoiceNote = false}) async {
@@ -989,6 +1003,7 @@ class _ChatScreenState extends State<ChatScreen> {
             Expanded(
               child: Obx(() {
                 return ListView.builder(
+                  controller: _scrollController,
                   reverse: false,
                   padding: const EdgeInsets.symmetric(
                       vertical: 8.0, horizontal: 16.0),
