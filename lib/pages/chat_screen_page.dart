@@ -75,6 +75,7 @@ class _ChatScreenState extends State<ChatScreen> {
       'createdAt': now.toIso8601String(),
       'status': 'sending',
     };
+    // force
 
     // Add the temporary message to the UI
     dataController.addTemporaryMessage(tempMessage);
