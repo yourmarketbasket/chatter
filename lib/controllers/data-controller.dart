@@ -1036,26 +1036,16 @@ class DataController extends GetxController {
   }
 
   // Send a new chat message
-  Future<void> sendChatMessage(Map<String, dynamic> message) async {
-    final tempId = DateTime.now().millisecondsSinceEpoch.toString();
-    message['_id'] = tempId; // Use _id for consistency, as it's used for keys
-    message['status'] = 'sending';
-    currentConversationMessages.insert(0, message);
-
+  Future<void> sendChatMessage(Map<String, dynamic> message, String clientMessageId) async {
     try {
       final token = user.value['token'];
       if (token == null) {
         throw Exception('User not authenticated');
       }
 
-      // The message object sent to the backend should not contain the temporary id or status
-      Map<String, dynamic> messageToSend = Map.from(message);
-      messageToSend.remove('_id');
-      messageToSend.remove('status');
-
       final response = await _dio.post(
         'api/messages',
-        data: messageToSend, // Send the cleaned message
+        data: message,
         options: dio.Options(
           headers: {'Authorization': 'Bearer $token'},
         ),
@@ -1063,25 +1053,52 @@ class DataController extends GetxController {
 
       if (response.statusCode == 201 && response.data['success'] == true) {
         final sentMessage = response.data['message'];
-        sentMessage['status'] = 'sent';
-        final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == tempId);
+        updateMessageStatus(clientMessageId, 'sent');
+        // Replace the temporary message with the confirmed one from the server
+        final messageIndex = currentConversationMessages.indexWhere((m) => m['clientMessageId'] == clientMessageId);
         if (messageIndex != -1) {
           currentConversationMessages[messageIndex] = sentMessage;
-        } else {
-          // Fallback: if not found, maybe it was removed. Add it again.
-          currentConversationMessages.insert(0, sentMessage);
         }
       } else {
         throw Exception('Failed to send message: ${response.data?['message']}');
       }
     } catch (e) {
       print('Error sending message: $e');
-      final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == tempId);
-      if (messageIndex != -1) {
-        currentConversationMessages[messageIndex]['status'] = 'failed';
-        currentConversationMessages.refresh();
-      }
+      updateMessageStatus(clientMessageId, 'failed');
     }
+  }
+
+  void addTemporaryMessage(Map<String, dynamic> message) {
+    currentConversationMessages.insert(0, message);
+  }
+
+  void updateUploadProgress(String clientMessageId, double progress) {
+    final messageIndex = currentConversationMessages.indexWhere((m) => m['clientMessageId'] == clientMessageId);
+    if (messageIndex != -1) {
+      final message = currentConversationMessages[messageIndex];
+      final files = (message['files'] as List).map((file) {
+        file['uploadProgress'] = progress;
+        return file;
+      }).toList();
+      message['files'] = files;
+      currentConversationMessages[messageIndex] = message;
+    }
+  }
+
+  void updateMessageStatus(String clientMessageId, String status) {
+    final messageIndex = currentConversationMessages.indexWhere((m) => m['clientMessageId'] == clientMessageId);
+    if (messageIndex != -1) {
+      final message = currentConversationMessages[messageIndex];
+      message['status'] = status;
+      currentConversationMessages[messageIndex] = message;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> uploadChatFiles(
+    List<Map<String, dynamic>> attachmentsData,
+    Function(int sentBytes, int totalBytes) onProgress,
+  ) async {
+    return await _uploadService.uploadFilesToCloudinary(attachmentsData, onProgress);
   }
 
   Future<void> editChatMessage(String messageId, String newText) async {

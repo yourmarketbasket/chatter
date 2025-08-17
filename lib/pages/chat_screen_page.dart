@@ -41,43 +41,95 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  void _sendMessage(String? text, List<PlatformFile>? files, {bool isVoiceNote = false}) {
-    if ((text?.trim().isNotEmpty ?? false) || (files?.isNotEmpty ?? false)) {
-      final attachments = files?.map((file) => {
+  void _sendMessage(String? text, List<PlatformFile>? files, {bool isVoiceNote = false}) async {
+    if ((text?.trim().isEmpty ?? true) && (files?.isEmpty ?? true)) {
+      return;
+    }
+
+    final clientMessageId = const Uuid().v4();
+    final messageType = isVoiceNote ? 'voice' : (files?.isNotEmpty ?? false) ? 'attachment' : 'text';
+    final now = DateTime.now();
+
+    // Create a temporary message for optimistic UI update
+    final tempMessage = {
+      '_id': clientMessageId, // Use clientMessageId as a temporary unique key
+      'clientMessageId': clientMessageId,
+      'chatId': dataController.currentChat.value['_id'],
+      'senderId': {
+        '_id': dataController.user.value['user']['_id'],
+        'name': dataController.user.value['user']['name'],
+        'avatar': dataController.user.value['user']['avatar'],
+      },
+      'content': text?.trim() ?? '',
+      'type': messageType,
+      'files': files?.map((file) => {
             'url': file.path!,
             'type': isVoiceNote ? 'voice' : _getMediaType(file.extension ?? ''),
             'size': file.size,
             'filename': file.name,
-          }).toList() ?? [];
+            'isUploading': true,
+            'uploadProgress': 0.0,
+          }).toList() ?? [],
+      'replyTo': _replyingTo?['_id'],
+      'viewOnce': false,
+      'createdAt': now.toIso8601String(),
+      'status': 'sending',
+    };
 
-      final messageType = isVoiceNote
-          ? 'voice'
-          : attachments.isNotEmpty
-              ? 'attachment'
-              : 'text';
+    // Add the temporary message to the UI
+    dataController.addTemporaryMessage(tempMessage);
+    _messageController.clear();
+    setState(() {
+      _replyingTo = null;
+    });
 
-      final message = {
-        'clientMessageId': const Uuid().v4(),
-        'chatId': dataController.currentChat.value['_id'],
-        'senderId': {
-          '_id': dataController.user.value['user']['_id'],
-          'name': dataController.user.value['user']['name'],
-          'avatar': dataController.user.value['user']['avatar'],
+    List<Map<String, dynamic>> uploadedFiles = [];
+    if (files != null && files.isNotEmpty) {
+      final attachmentsData = files.map((file) {
+        final fileType = isVoiceNote ? 'voice' : _getMediaType(file.extension ?? '');
+        return {
+          'file': File(file.path!),
+          'type': fileType,
+          'filename': file.name,
+        };
+      }).toList();
+
+      final uploadResults = await dataController.uploadChatFiles(
+        attachmentsData,
+        (sentBytes, totalBytes) {
+          final progress = totalBytes > 0 ? sentBytes / totalBytes : 0.0;
+          dataController.updateUploadProgress(clientMessageId, progress);
         },
-        'content': text?.trim() ?? '',
-        'type': messageType,
-        'files': attachments,
-        'replyTo': _replyingTo?['_id'],
-        'viewOnce': false, // Default as per schema, can be adjusted based on UI logic
-        'createdAt': DateTime.now().toIso8601String(),
-      };
+      );
 
-      dataController.sendChatMessage(message);
-      _messageController.clear();
-      setState(() {
-        _replyingTo = null;
-      });
+      if (uploadResults.any((result) => !result['success'])) {
+        dataController.updateMessageStatus(clientMessageId, 'failed');
+        // Optionally, show an error message to the user
+        return;
+      }
+
+      uploadedFiles = uploadResults.map((result) => {
+        'url': result['url'],
+        'type': result['type'],
+        'size': result['size'],
+        'filename': result['filename'],
+      }).toList();
     }
+
+    // Create the final message object with uploaded file URLs
+    final finalMessage = {
+      'clientMessageId': clientMessageId,
+      'chatId': dataController.currentChat.value['_id'],
+      'senderId': dataController.user.value['user']['_id'],
+      'content': text?.trim() ?? '',
+      'type': messageType,
+      'files': uploadedFiles,
+      'replyTo': _replyingTo?['_id'],
+      'viewOnce': false,
+    };
+
+    // Send the final message to the backend
+    await dataController.sendChatMessage(finalMessage, clientMessageId);
   }
 
   void _editMessage(Map<String, dynamic> message) {
@@ -396,13 +448,13 @@ class _ChatScreenState extends State<ChatScreen> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Center(
-                child: CircularProgressIndicator(
+                child: Obx(() => CircularProgressIndicator(
                   value: attachment['uploadProgress'],
                   strokeWidth: 2,
                   backgroundColor: Colors.grey.withOpacity(0.5),
                   valueColor:
                       const AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
+                )),
               ),
             ),
           )
