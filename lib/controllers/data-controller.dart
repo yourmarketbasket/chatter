@@ -1121,6 +1121,14 @@ class DataController extends GetxController {
 
   void addTemporaryMessage(Map<String, dynamic> message) {
     currentConversationMessages.add(message);
+
+    // Optimistically update the last message for the chat
+    if (message.containsKey('chatId') && chats.containsKey(message['chatId'])) {
+      final chatId = message['chatId'];
+      final chat = chats[chatId]!;
+      chat['lastMessage'] = message;
+      chats[chatId] = chat;
+    }
   }
 
   void updateUploadProgress(String clientMessageId, double progress) {
