@@ -142,7 +142,9 @@ class DataController extends GetxController {
 
   void handleNewChat(Map<String, dynamic> data) {
     if (data['_id'] != null) {
-      chats[data['_id']] = data;
+      // Don't just add the chat, fetch the whole list to ensure UI consistency
+      // and that the chat object is fully populated.
+      fetchChats();
     }
   }
 
@@ -1105,7 +1107,21 @@ class DataController extends GetxController {
       );
 
       if (response.statusCode == 201 && response.data['success'] == true) {
-        final sentMessage = response.data['message'];
+        final responseData = response.data;
+        final sentMessage = responseData['message'];
+
+        // If a new chat was created by this message, the server sends it back
+        if (responseData.containsKey('chat')) {
+          final newChat = responseData['chat'];
+          // Add to local chats list
+          chats[newChat['_id']] = newChat;
+          // Join the new socket room
+          Get.find<SocketService>().joinChatRoom(newChat['_id']);
+          // Update the current chat screen's state
+          currentChat.value = newChat;
+          chats.refresh();
+        }
+
         updateMessageStatus(clientMessageId, 'sent');
         // Replace the temporary message with the confirmed one from the server
         final messageIndex = currentConversationMessages.indexWhere((m) => m['clientMessageId'] == clientMessageId);
