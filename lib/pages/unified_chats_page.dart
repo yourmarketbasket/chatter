@@ -6,7 +6,8 @@ import 'package:get/get.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 class UnifiedChatsPage extends StatefulWidget {
-  const UnifiedChatsPage({super.key});
+  final String searchQuery;
+  const UnifiedChatsPage({super.key, required this.searchQuery});
 
   @override
   State<UnifiedChatsPage> createState() => _UnifiedChatsPageState();
@@ -23,7 +24,7 @@ class _UnifiedChatsPageState extends State<UnifiedChatsPage> {
         if (_dataController.isLoadingChats.value) {
           return const Center(child: CircularProgressIndicator());
         }
-        final allChats = _dataController.chats.values.toList();
+        var allChats = _dataController.chats.values.toList();
         allChats.sort((a, b) {
           final lastMsgA = a['lastMessage'];
           final lastMsgB = b['lastMessage'];
@@ -32,15 +33,42 @@ class _UnifiedChatsPageState extends State<UnifiedChatsPage> {
           return timeB.compareTo(timeA);
         });
 
+        if (widget.searchQuery.isNotEmpty) {
+          allChats = allChats.where((chat) {
+            final isGroup = chat['type'] == "group";
+            String title;
+            if (isGroup) {
+              title = chat['name'] ?? 'Group Chat';
+            } else {
+              final currentUserId = _dataController.user.value['user']['_id'];
+              final otherUserRaw = (chat['participants'] as List<dynamic>)
+                  .firstWhere(
+                    (p) => p['_id'] != currentUserId,
+                    orElse: () => (chat['participants'] as List<dynamic>).first,
+                  );
+              final otherUser = otherUserRaw is Map<String, dynamic>
+                  ? otherUserRaw
+                  : _dataController.allUsers.firstWhere(
+                      (u) => u['_id'] == otherUserRaw,
+                      orElse: () => {'name': 'Unknown', 'avatar': ''},
+                    );
+              title = otherUser['name'] ?? 'User';
+            }
+            return title.toLowerCase().contains(widget.searchQuery.toLowerCase());
+          }).toList();
+        }
+
         if (allChats.isEmpty) {
           return const Center(
-              child: Text('No conversations yet.',
+              child: Text('No conversations match your search.',
                   style: TextStyle(color: Colors.white)));
         }
-        return ListView.builder(
-          itemCount: allChats.length,
-          itemBuilder: (context, index) {
-            final chat = allChats[index];
+        return RefreshIndicator(
+          onRefresh: () => _dataController.fetchChats(),
+          child: ListView.builder(
+            itemCount: allChats.length,
+            itemBuilder: (context, index) {
+              final chat = allChats[index];
             final isGroup = chat['type'] == "group";
             final lastMessageData = chat['lastMessage'];
             final currentUserId = _dataController.user.value['user']['_id'];
@@ -237,7 +265,7 @@ class _UnifiedChatsPageState extends State<UnifiedChatsPage> {
               },
             );
           },
-        );
+        ));
       }),
     );
   }

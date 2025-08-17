@@ -1,6 +1,8 @@
+import 'package:chatter/controllers/data-controller.dart';
 import 'package:chatter/pages/contacts_page.dart';
 import 'package:chatter/pages/unified_chats_page.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
 class MainChatsPage extends StatefulWidget {
   const MainChatsPage({super.key});
@@ -11,6 +13,20 @@ class MainChatsPage extends StatefulWidget {
 
 class _MainChatsPageState extends State<MainChatsPage> {
   final TextEditingController _searchController = TextEditingController();
+  final DataController _dataController = Get.find<DataController>();
+  String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(() {
+      if (mounted) {
+        setState(() {
+          _searchQuery = _searchController.text;
+        });
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -104,6 +120,21 @@ class _MainChatsPageState extends State<MainChatsPage> {
                   shape: BoxShape.circle,
                 ),
                 child: IconButton(
+                  icon: const Icon(Icons.refresh, color: Colors.tealAccent),
+                  onPressed: () {
+                    _dataController.fetchChats();
+                  },
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.tealAccent.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
                   icon: const Icon(Icons.add, color: Colors.tealAccent),
                   onPressed: _showCreateChatDialog,
                 ),
@@ -129,13 +160,15 @@ class _MainChatsPageState extends State<MainChatsPage> {
                 ),
                 style: const TextStyle(color: Colors.white),
                 onChanged: (value) {
-                  // Implement search logic here
+                  setState(() {
+                    _searchQuery = value;
+                  });
                 },
               ),
             ),
           ),
         ),
-        body: const UnifiedChatsPage(),
+        body: UnifiedChatsPage(searchQuery: _searchQuery),
       ),
     );
   }
