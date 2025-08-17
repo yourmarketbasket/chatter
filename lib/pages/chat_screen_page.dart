@@ -352,10 +352,14 @@ class _ChatScreenState extends State<ChatScreen> {
             })
         .toList();
 
+    final senderId = message['senderId'] is Map
+        ? message['senderId']['_id']
+        : message['senderId'];
+
     final sender = (dataController.currentChat.value['participants'] as List)
         .firstWhere(
-      (p) => p['_id'] == message['senderId'],
-      orElse: () => {'_id': message['senderId'], 'name': 'Unknown User'},
+      (p) => p['_id'] == senderId,
+      orElse: () => {'_id': senderId, 'name': 'Unknown User', 'avatar': ''},
     );
 
     Navigator.push(
@@ -606,16 +610,17 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
  Widget _buildMessageContent(Map<String, dynamic> message, int index) {
-  final isYou = message['senderId']['_id'] == dataController.user.value['user']['_id'];
+  final senderId = message['senderId'] is Map ? message['senderId']['_id'] : message['senderId'];
+  final isYou = senderId == dataController.user.value['user']['_id'];
   final messages = dataController.currentConversationMessages;
-  final isSameSenderAsNext = index > 0 && messages[index - 1]['senderId']['_id'] == message['senderId']['_id'];
+  final isSameSenderAsNext = index > 0 && (messages[index - 1]['senderId'] is Map ? messages[index - 1]['senderId']['_id'] : messages[index - 1]['senderId']) == senderId;
   final bottomMargin = isSameSenderAsNext ? 2.0 : 8.0;
   final hasAttachment = message['files'] != null && (message['files'] as List).isNotEmpty;
 
   // Determine sender name for display
   final sender = (dataController.currentChat.value['participants'] as List).firstWhere(
-    (p) => p['_id'] == message['senderId']['_id'],
-    orElse: () => {'_id': message['senderId']['_id'], 'name': 'Unknown User'},
+    (p) => p['_id'] == senderId,
+    orElse: () => {'_id': senderId, 'name': 'Unknown User'},
   );
   final senderName = isYou ? 'You' : sender['name'];
 
@@ -756,42 +761,32 @@ class _ChatScreenState extends State<ChatScreen> {
                   );
                 }),
               if (message['type'] == 'voice')
-                GestureDetector(
-                  onTap: () {
-                    final attachmentsForViewer = [
-                      {
-                        'url': message['files'][0]['url'],
-                        'type': 'voice',
-                        'filename': message['files'][0]['url'].split('/').last,
-                      }
-                    ];
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => MediaViewPage(
-                          attachments: attachmentsForViewer,
-                          initialIndex: 0,
-                          message: '',
-                          userName: dataController.currentChat.value['type'] == 'group'
-                              ? senderName
-                              : (dataController.currentChat.value['participants'] as List)
-                                  .firstWhere(
-                                    (p) => p['_id'] != dataController.user.value['user']['_id'],
-                                    orElse: () => {'name': 'Unknown User'},
-                                  )['name'],
-                          userAvatarUrl: sender['avatar'],
-                          timestamp: DateTime.parse(message['createdAt']),
-                          viewsCount: 0,
-                          likesCount: 0,
-                          repostsCount: 0,
+                Stack(
+                  alignment: Alignment.topRight,
+                  children: [
+                    GestureDetector(
+                  onTap: () => _openMediaView(message, 0),
+                      child: AudioWaveformWidget(
+                        audioPath: message['files'][0]['url'],
+                        isLocal: !(message['files'][0]['url'] as String).startsWith('http'),
+                      ),
+                    ),
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.5),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.open_in_full,
+                          color: Colors.white,
+                          size: 18,
                         ),
                       ),
-                    );
-                  },
-                  child: AudioWaveformWidget(
-                    audioPath: message['files'][0]['url'],
-                    isLocal: !(message['files'][0]['url'] as String).startsWith('http'),
-                  ),
+                    ),
+                  ],
                 ),
               if (hasAttachment && message['type'] != 'voice') ...[
                 _buildAttachment(message),
