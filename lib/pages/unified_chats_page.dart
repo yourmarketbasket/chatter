@@ -49,15 +49,11 @@ class _UnifiedChatsPageState extends State<UnifiedChatsPage> {
               avatarLetter = title.isNotEmpty ? title[0].toUpperCase() : 'G';
               trailingWidget = const SizedBox.shrink();
             } else {
-              final otherUserRaw = (chat['participants'] as List<dynamic>).firstWhere(
-                  (p) {
-                    if (p is Map<String, dynamic>) {
-                      return p['_id'] != currentUserId;
-                    }
-                    return p != currentUserId;
-                  },
-                  orElse: () => (chat['participants'] as List<dynamic>).first,
-                );
+              final otherUserRaw = (chat['participants'] as List<dynamic>)
+                  .firstWhere(
+                    (p) => p['_id'] != currentUserId,
+                    orElse: () => (chat['participants'] as List<dynamic>).first,
+                  );
 
               final otherUser = otherUserRaw is Map<String, dynamic>
                   ? otherUserRaw
@@ -97,13 +93,10 @@ class _UnifiedChatsPageState extends State<UnifiedChatsPage> {
 
             String preview = '';
             if (lastMessageData != null && lastMessageData is Map<String, dynamic>) {
-              if (lastMessageData['attachments'] != null &&
-                  (lastMessageData['attachments'] as List).isNotEmpty) {
+              if ((lastMessageData['files'] as List?)?.isNotEmpty ?? false) {
                 preview = 'Attachment';
-              } else if (lastMessageData['voiceNote'] != null) {
-                preview = 'Voice note';
               } else {
-                preview = lastMessageData['text'] ?? '';
+                preview = lastMessageData['content'] ?? '';
               }
               if (lastMessageData['senderId'] == currentUserId) {
                 preview = 'You: $preview';
@@ -113,7 +106,13 @@ class _UnifiedChatsPageState extends State<UnifiedChatsPage> {
             IconData statusIcon = Icons.access_time;
             Color statusColor = Colors.grey[400]!;
             if (lastMessageData != null && lastMessageData is Map<String, dynamic>) {
-                switch (lastMessageData['status']) {
+              final readReceipts = lastMessageData['readReceipts'] as List?;
+              if (readReceipts != null && readReceipts.isNotEmpty) {
+                final receipt = readReceipts.firstWhere(
+                  (r) => r['userId'] != currentUserId,
+                  orElse: () => {'status': 'sent'},
+                );
+                switch (receipt['status']) {
                   case 'sent':
                     statusIcon = Icons.check;
                     break;
@@ -125,6 +124,7 @@ class _UnifiedChatsPageState extends State<UnifiedChatsPage> {
                     statusColor = Colors.tealAccent;
                     break;
                 }
+              }
             }
 
             return ListTile(

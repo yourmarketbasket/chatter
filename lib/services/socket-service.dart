@@ -5,269 +5,194 @@ import 'package:get/get.dart';
 
 class SocketService {
   IO.Socket? _socket;
-  final StreamController<String> _messageController = StreamController<String>.broadcast();
+  final StreamController<Map<String, dynamic>> _eventController = StreamController<Map<String, dynamic>>.broadcast();
   final DataController _dataController = Get.find<DataController>();
+  bool _isInitialized = false;
 
   SocketService() {
     _initializeSocket();
-    connect(); // Automatically connect during initialization
+    connect();
   }
 
   void _initializeSocket() {
+    if (_isInitialized) return;
+
     _socket = IO.io('http://192.168.1.104:3000/', <String, dynamic>{
       'transports': ['websocket'],
       'autoConnect': false,
-      'reconnection': true, // Enable automatic reconnection
-      'reconnectionAttempts': 10, // Number of reconnection attempts
-      'reconnectionDelay': 3000, // Delay between reconnection attempts (ms)
+      'reconnection': true,
+      'reconnectionAttempts': 10,
+      'reconnectionDelay': 3000,
     });
 
-    // listen for welcome event
-    
+    _setupSocketListeners();
+    _isInitialized = true;
+  }
+
+  void _setupSocketListeners() {
+    if (_socket == null) return;
 
     _socket!.onConnect((_) {
       print('Socket connected');
+      _eventController.add({'event': 'connect', 'data': null});
     });
 
     _socket!.onDisconnect((_) {
       print('Socket disconnected');
+      _eventController.add({'event': 'disconnect', 'data': null});
     });
 
     _socket!.onConnectError((error) {
       print('Connection error: $error');
-      // Additional reconnection handling if needed
+      _eventController.add({'event': 'connect_error', 'data': error});
     });
 
     _socket!.onError((error) {
       print('Socket error: $error');
+      _eventController.add({'event': 'error', 'data': error});
     });
 
-    _socket!.on('message', (data) {
-      try {
-        if (data is String) {
-          _messageController.add(data);
-        } else {
-          print('Invalid message format: $data');
+    // Core event handlers
+    final eventHandlers = {
+      'welcome': (data) {
+        print('Welcome event received: $data');
+        _eventController.add({'event': 'welcome', 'data': data});
+      },
+      'message': (data) {
+        try {
+          if (data is String) {
+            _eventController.add({'event': 'message', 'data': data});
+          } else {
+            print('Invalid message format: $data');
+          }
+        } catch (e) {
+          print('Error processing message: $e');
         }
-      } catch (e) {
-        print('Error processing message: $e');
-      }
+      },
+      'newPost': (data) => _handleNewPost(data),
+      'newReply': (data) => _handleNewReply(data),
+      'newReplyToReply': (data) => _handleNewReplyToReply(data),
+      'postViewed': (data) => _handlePostAction(data, 'postViewed'),
+      'postLiked': (data) => _handlePostAction(data, 'postLiked'),
+      'postUnliked': (data) => _handlePostAction(data, 'postUnliked'),
+      'postReposted': (data) => _handlePostAction(data, 'postReposted'),
+      'replyLiked': (data) => _handleReplyAction(data, 'replyLiked'),
+      'replyUnliked': (data) => _handleReplyAction(data, 'replyUnliked'),
+      'replyReposted': (data) => _handleReplyAction(data, 'replyReposted'),
+      'replyViewed': (data) => _handleReplyAction(data, 'replyViewed'),
+      'newMessage': (data) => _handleNewMessage(data),
+      'typing:start': (data) => _handleTyping(data, true),
+      'typing:stop': (data) => _handleTyping(data, false),
+      'userFollowed': (data) => _handleUserAction(data, 'userFollowed'),
+      'userUnfollowed': (data) => _handleUserAction(data, 'userUnfollowed'),
+    };
+
+    eventHandlers.forEach((event, handler) {
+      _socket!.on(event, handler);
     });
-    // listen for welcome event
-    _socket!.on('welcome', (data){
-      print('Welcome event received: $data');
-      // Handle welcome event data if needed
-    });
-    // listen fore newPost event
-    _socket!.on('newPost', (data) {
-      // print('New post event received: $data');
-      if (data is Map<String, dynamic>) {
-        // Assuming 'data' is the post object in the correct format
-        _dataController.addNewPost(data);
+  }
+
+  void _handleNewPost(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      _dataController.addNewPost(data);
+      _eventController.add({'event': 'newPost', 'data': data});
+    } else {
+      print('Invalid newPost data format: ${data.runtimeType}');
+    }
+  }
+
+  void _handleNewReply(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      final parentPostId = data['parentPostId'] as String?;
+      final reply = data['reply'] as Map<String, dynamic>?;
+      if (parentPostId != null && reply != null) {
+        _dataController.handleNewReply(parentPostId, reply);
+        _eventController.add({'event': 'newReply', 'data': data});
       } else {
-        // print('Received newPost event with unexpected data type: ${data.runtimeType}');
-        // Optionally, attempt to convert or log more details if the structure is known but different
-        // For example, if it's a JSON string:
-        // if (data is String) {
-        //   try {
-        //     final Map<String, dynamic> parsedData = jsonDecode(data);
-        //     _dataController.addNewPost(parsedData);
-        //   } catch (e) {
-        //     print('Error decoding newPost JSON string: $e');
-        //   }
-        // }
+        print('Invalid newReply data: $data');
       }
-    });
+    } else {
+      print('Invalid newReply data format: ${data.runtimeType}');
+    }
+  }
 
-    _socket!.on('newReplyToReply', (data) {
-      // print('[SocketService] newReplyToReply event received: $data');
-      if (data is Map<String, dynamic>) {
-        final String? postId = data['postId'] as String?;
-        final String? parentReplyId = data['parentReplyId'] as String?;
-        final Map<String, dynamic>? reply = data['reply'] as Map<String, dynamic>?;
-
-        if (postId != null && parentReplyId != null && reply != null) {
-          _dataController.handleNewReplyToReply(postId, parentReplyId, reply);
-        } else {
-          print('[SocketService] newReplyToReply event missing required data (postId, parentReplyId, or reply). Data: $data');
-        }
+  void _handleNewReplyToReply(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      final postId = data['postId'] as String?;
+      final parentReplyId = data['parentReplyId'] as String?;
+      final reply = data['reply'] as Map<String, dynamic>?;
+      if (postId != null && parentReplyId != null && reply != null) {
+        _dataController.handleNewReplyToReply(postId, parentReplyId, reply);
+        _eventController.add({'event': 'newReplyToReply', 'data': data});
       } else {
-        print('[SocketService] Received newReplyToReply event with unexpected data type: ${data.runtimeType}');
+        print('Invalid newReplyToReply data: $data');
       }
-    });
+    } else {
+      print('Invalid newReplyToReply data format: ${data.runtimeType}');
+    }
+  }
 
-    // Listen for postViewed event
-    _socket!.on('postViewed', (data) {
-      // print('postViewed event received by SocketService: $data');
-      if (data is Map<String, dynamic>) {
-        final String? eventPostId = data['postId'] as String?; // Correctly use 'postId'
-
-        if (eventPostId != null) {
-          print('[SocketService] postViewed event for $eventPostId. Triggering fetchSinglePost.');
-          // Trigger fetching the full post to get the most up-to-date view count and other data.
-          // fetchSinglePost internally uses updatePostFromSocket which now handles both '_id' and 'postId'.
-          _dataController.fetchSinglePost(eventPostId);
-        } else {
-          print('[SocketService] Received postViewed event with missing postId field: $data');
-        }
+  void _handlePostAction(dynamic data, String event) {
+    if (data is Map<String, dynamic>) {
+      final postId = data['postId'] as String? ?? data['_id'] as String?;
+      if (postId != null) {
+        _dataController.fetchSinglePost(postId);
+        _eventController.add({'event': event, 'data': data});
       } else {
-        print('[SocketService] Received postViewed event with unexpected data type: ${data.runtimeType}');
+        print('Invalid $event data: missing postId or _id');
       }
-    });
+    } else {
+      print('Invalid $event data format: ${data.runtimeType}');
+    }
+  }
 
-    // Listen for postLiked event
-    _socket!.on('postLiked', (data) {
-      // print('[SocketService] postLiked event received: $data');
-      if (data is Map<String, dynamic>) {
-        final String? postId = data['postId'] as String? ?? data['_id'] as String?;
-        if (postId != null) {
-          print('[SocketService] postLiked event for $postId. Triggering fetchSinglePost.');
-          _dataController.fetchSinglePost(postId);
-        } else {
-          print('[SocketService] Received postLiked event with missing postId or _id: $data');
-        }
+  void _handleReplyAction(dynamic data, String event) {
+    if (data is Map<String, dynamic>) {
+      final rootPostId = data['postId'] as String?;
+      if (rootPostId != null) {
+        _dataController.fetchSinglePost(rootPostId);
+        _eventController.add({'event': event, 'data': data});
       } else {
-        print('[SocketService] Received postLiked event with unexpected data type: ${data.runtimeType}. Expected Map<String, dynamic>.');
+        print('Invalid $event data: missing postId');
       }
-    });
+    } else {
+      print('Invalid $event data format: ${data.runtimeType}');
+    }
+  }
 
-    // Listen for postUnliked event
-    _socket!.on('postUnliked', (data) {
-      // print('[SocketService] postUnliked event received: $data');
-      if (data is Map<String, dynamic>) {
-        final String? postId = data['postId'] as String? ?? data['_id'] as String?;
-        if (postId != null) {
-          print('[SocketService] postUnliked event for $postId. Triggering fetchSinglePost.');
-          _dataController.fetchSinglePost(postId);
-        } else {
-          print('[SocketService] Received postUnliked event with missing postId or _id: $data');
-        }
-      } else {
-        print('[SocketService] Received postUnliked event with unexpected data type: ${data.runtimeType}. Expected Map<String, dynamic>.');
-      }
-    });
+  void _handleNewMessage(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      _dataController.handleNewMessage(data);
+      _eventController.add({'event': 'newMessage', 'data': data});
+    } else {
+      print('Invalid newMessage data format: ${data.runtimeType}');
+    }
+  }
 
-    // postReposted event
-    _socket!.on('postReposted', (data) {
-      // print('[SocketService] postReposted event received: $data');
-      if (data is Map<String, dynamic>) {
-        final String? postId = data['postId'] as String? ?? data['_id'] as String?;
-        if (postId != null) {
-          print('[SocketService] postReposted event for $postId. Triggering fetchSinglePost.');
-          _dataController.fetchSinglePost(postId);
-        } else {
-          print('[SocketService] Received postReposted event with missing postId or _id: $data');
-        }
-      } else {
-        print('[SocketService] Received postReposted event with unexpected data type: ${data.runtimeType}. Expected Map<String, dynamic>.');
-      }
-    });
-
-    // --- Reply Specific Event Handlers ---
-
-    _socket!.on('newReply', (data) {
-      // print('[SocketService] newReply event received: $data');
-      if (data is Map<String, dynamic>) {
-        // Data should contain { parentPostId: "...", parentReplyId: "..." (optional), reply: {...} }
-        final String? parentPostId = data['parentPostId'] as String?;
-        // final String? parentReplyId = data['parentReplyId'] as String?; // ID of the direct parent if it's a nested reply
-        final Map<String, dynamic>? reply = data['reply'] as Map<String, dynamic>?;
-
-        if (parentPostId != null && reply != null) {
-          // Call the new method in DataController to handle the new reply directly
-          _dataController.handleNewReply(parentPostId, reply);
-        } else {
-          print('[SocketService] newReply event missing parentPostId or reply data. Data: $data');
-        }
-      } else {
-        print('[SocketService] Received newReply event with unexpected data type: ${data.runtimeType}');
-      }
-    });
-
-    _socket!.on('replyLiked', (data) {
-      // print('[SocketService] replyLiked event received: $data');
-      if (data is Map<String, dynamic>) {
-        final String? rootPostId = data['postId'] as String?; // This should be the root post ID
-        if (rootPostId != null) {
-          print('[SocketService] replyLiked event for a reply in root post $rootPostId. Triggering fetchSinglePost for root post.');
-          _dataController.fetchSinglePost(rootPostId);
-        } else {
-          print('[SocketService] Received replyLiked event with missing root postId. Data: $data');
-        }
-      } else {
-        print('[SocketService] Received replyLiked event with unexpected data type: ${data.runtimeType}');
-      }
-    });
-
-    _socket!.on('replyUnliked', (data) {
-      // print('[SocketService] replyUnliked event received: $data');
-      if (data is Map<String, dynamic>) {
-        final String? rootPostId = data['postId'] as String?; // This should be the root post ID
-        if (rootPostId != null) {
-          print('[SocketService] replyUnliked event for a reply in root post $rootPostId. Triggering fetchSinglePost for root post.');
-          _dataController.fetchSinglePost(rootPostId);
-        } else {
-          print('[SocketService] Received replyUnliked event with missing root postId. Data: $data');
-        }
-      } else {
-        print('[SocketService] Received replyUnliked event with unexpected data type: ${data.runtimeType}');
-      }
-    });
-
-    _socket!.on('replyReposted', (data) {
-      // print('[SocketService] replyReposted event received: $data');
-      if (data is Map<String, dynamic>) {
-        final String? rootPostId = data['postId'] as String?; // This should be the root post ID
-        // final String? replyId = data['replyId'] as String?;
-        // final int? repostsCount = data['repostsCount'] as int?;
-        if (rootPostId != null) {
-          print('[SocketService] replyReposted event for a reply in root post $rootPostId. Triggering fetchSinglePost for root post.');
-          _dataController.fetchSinglePost(rootPostId);
-        } else {
-          print('[SocketService] Received replyReposted event with missing root postId. Data: $data');
-        }
-      } else {
-        print('[SocketService] Received replyReposted event with unexpected data type: ${data.runtimeType}');
-      }
-    });
-
-    _socket!.on('replyViewed', (data) {
-      // print('[SocketService] replyViewed event received: $data');
-      if (data is Map<String, dynamic>) {
-        final String? rootPostId = data['postId'] as String?; // This should be the root post ID
-        // final String? replyId = data['replyId'] as String?;
-        // final int? viewsCount = data['viewsCount'] as int?;
-        if (rootPostId != null) {
-          print('[SocketService] replyViewed event for a reply in root post $rootPostId. Triggering fetchSinglePost for root post.');
-          _dataController.fetchSinglePost(rootPostId);
-        } else {
-          print('[SocketService] Received replyViewed event with missing root postId. Data: $data');
-        }
-      } else {
-        print('[SocketService] Received replyViewed event with unexpected data type: ${data.runtimeType}');
-      }
-    });
-
-    _socket!.on('newMessage', (data) {
-      print(data);
-      // if (data is Map<String, dynamic>) {
-      //   _dataController.handleNewMessage(data);
-      // } else {
-      //   print('[SocketService] Received message:new event with unexpected data type: ${data.runtimeType}');
-      // }
-    });
-
-    _socket!.on('typing:start', (data) {
-      if (data is Map<String, dynamic>) {
+  void _handleTyping(dynamic data, bool isStart) {
+    if (data is Map<String, dynamic>) {
+      if (isStart) {
         _dataController.handleTypingStart(data);
-      }
-    });
-
-    _socket!.on('typing:stop', (data) {
-      if (data is Map<String, dynamic>) {
+      } else {
         _dataController.handleTypingStop(data);
       }
-    });
+      _eventController.add({'event': isStart ? 'typing:start' : 'typing:stop', 'data': data});
+    } else {
+      print('Invalid typing:${isStart ? 'start' : 'stop'} data format: ${data.runtimeType}');
+    }
+  }
+
+  void _handleUserAction(dynamic data, String event) {
+    if (data is Map<String, dynamic>) {
+      if (event == 'userFollowed') {
+        _dataController.handleUserFollowedSocket(data);
+      } else {
+        _dataController.handleUserUnfollowedSocket(data);
+      }
+      _eventController.add({'event': event, 'data': data});
+    } else {
+      print('Invalid $event data format: ${data.runtimeType}');
+    }
   }
 
   void connect() {
@@ -282,60 +207,48 @@ class SocketService {
     }
   }
 
-  void sendMessage(String message) {
-    if (_socket != null && _socket!.connected && message.isNotEmpty) {
-      _socket!.emit('message', message);
+  void emitEvent(String event, dynamic data) {
+    if (_socket != null && _socket!.connected && data != null) {
+      _socket!.emit(event, data);
     } else {
-      print('Cannot send message: Socket is not connected or message is empty');
+      print('Cannot emit event: Socket not connected or data is null');
     }
+  }
+
+  void sendMessage(String message) {
+    emitEvent('message', message);
   }
 
   void sendTypingStart(String chatId) {
-    if (_socket != null && _socket!.connected) {
-      _socket!.emit('typing:start', {'chatId': chatId});
-    }
+    emitEvent('typing:start', {'chatId': chatId});
   }
 
   void sendTypingStop(String chatId) {
-    if (_socket != null && _socket!.connected) {
-      _socket!.emit('typing:stop', {'chatId': chatId});
+    emitEvent('typing:stop', {'chatId': chatId});
+  }
+
+  Stream<Map<String, dynamic>> get events => _eventController.stream;
+
+  void addListener(String event, void Function(dynamic) handler) {
+    if (_socket != null) {
+      _socket!.on(event, handler);
     }
   }
 
-  Stream<String> get messages => _messageController.stream;
+  void removeListener(String event, void Function(dynamic) handler) {
+    if (_socket != null) {
+      _socket!.off(event, handler);
+    }
+  }
 
   void dispose() {
-    disconnect(); // Ensure socket is disconnected
+    disconnect();
+    _socket?.clearListeners();
     _socket?.dispose();
     _socket = null;
-    if (!_messageController.isClosed) {
-      _messageController.close();
+    if (!_eventController.isClosed) {
+      _eventController.close();
     }
-  }
-
-  // Method to add new listeners, e.g. from DataController if needed, though direct call is fine too.
-  void listen(String event, void Function(dynamic) handler) {
-    _socket?.on(event, handler);
-  }
-
-  // Call this method after DataController is initialized, or ensure DataController is found.
-  void setupUserEventListeners() {
-    _socket?.on('userFollowed', (data) {
-      print('[SocketService] userFollowed event received: $data');
-      if (data is Map<String, dynamic>) {
-        _dataController.handleUserFollowedSocket(data);
-      } else {
-        print('[SocketService] Received userFollowed event with unexpected data type: ${data.runtimeType}');
-      }
-    });
-
-    _socket?.on('userUnfollowed', (data) {
-      print('[SocketService] userUnfollowed event received: $data');
-      if (data is Map<String, dynamic>) {
-        _dataController.handleUserUnfollowedSocket(data);
-      } else {
-        print('[SocketService] Received userUnfollowed event with unexpected data type: ${data.runtimeType}');
-      }
-    });
+    _isInitialized = false;
   }
 }
