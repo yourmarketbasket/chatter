@@ -48,7 +48,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     final clientMessageId = const Uuid().v4();
     final messageType = isVoiceNote ? 'voice' : (files?.isNotEmpty ?? false) ? 'attachment' : 'text';
-    final now = DateTime.now();
+    final now = DateTime.now().toUtc();
 
     // Create a temporary message for optimistic UI update
     final tempMessage = {
@@ -815,7 +815,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   ),
                 Text(
-                  '${DateTime.parse(message['createdAt']).hour}:${DateTime.parse(message['createdAt']).minute}',
+                  formatTime(DateTime.parse(message['createdAt']).toLocal()),
                   style: TextStyle(
                     color: Colors.grey[400],
                     fontSize: 10,
