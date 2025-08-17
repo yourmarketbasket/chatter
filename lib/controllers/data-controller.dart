@@ -94,6 +94,7 @@ class DataController extends GetxController {
     if (userJson != null) {
       user.value = jsonDecode(userJson);
     }
+    // force
 
     // Only proceed with network calls if user is logged in
     if (user.value['token'] != null) {

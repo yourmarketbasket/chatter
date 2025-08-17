@@ -74,7 +74,7 @@ class _UnifiedChatsPageState extends State<UnifiedChatsPage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                   Text(
+                  Text(
                     otherUser['online'] == true
                         ? 'online'
                         : (otherUser['lastSeen'] != null
@@ -130,20 +130,47 @@ class _UnifiedChatsPageState extends State<UnifiedChatsPage> {
             return ListTile(
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              leading: CircleAvatar(
-                radius: 24,
-                backgroundColor: Colors.tealAccent.withOpacity(0.2),
-                backgroundImage: avatarUrl.isNotEmpty
-                    ? CachedNetworkImageProvider(avatarUrl)
-                    : null,
-                child: avatarUrl.isEmpty
-                    ? Text(avatarLetter,
-                        style: const TextStyle(color: Colors.tealAccent, fontWeight: FontWeight.bold))
-                    : null,
+              leading: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: Colors.tealAccent.withOpacity(0.2),
+                    backgroundImage: avatarUrl.isNotEmpty
+                        ? CachedNetworkImageProvider(avatarUrl)
+                        : null,
+                    child: avatarUrl.isEmpty
+                        ? Text(
+                            avatarLetter,
+                            style: const TextStyle(
+                                color: Colors.tealAccent,
+                                fontWeight: FontWeight.bold),
+                          )
+                        : null,
+                  ),
+                  if (isGroup)
+                    const Positioned(
+                      right: -4,
+                      bottom: -4,
+                      child: CircleAvatar(
+                        radius: 12,
+                        backgroundColor: Colors.black,
+                        child: Icon(
+                          Icons.group,
+                          size: 16,
+                          color: Colors.tealAccent,
+                        ),
+                      ),
+                    ),
+                ],
               ),
-              title: Text(title,
-                  style: const TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.w500)),
+              title: Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
               subtitle: Text(
                 preview,
                 style: TextStyle(
@@ -158,15 +185,19 @@ class _UnifiedChatsPageState extends State<UnifiedChatsPage> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   if (!isGroup) trailingWidget,
-                  if (lastMessageData != null && lastMessageData is Map<String, dynamic>)
+                  if (lastMessageData != null &&
+                      lastMessageData is Map<String, dynamic>)
                     Text(
-                      formatTime(DateTime.parse(lastMessageData['createdAt'] as String)),
+                      formatTime(
+                          DateTime.parse(lastMessageData['createdAt'] as String)),
                       style: TextStyle(
                         color: Colors.grey[400],
                         fontSize: 12,
                       ),
                     ),
-                  if (lastMessageData != null && lastMessageData is Map<String, dynamic> && lastMessageData['senderId'] == currentUserId)
+                  if (lastMessageData != null &&
+                      lastMessageData is Map<String, dynamic> &&
+                      lastMessageData['senderId'] == currentUserId)
                     Icon(
                       statusIcon,
                       size: 16,
