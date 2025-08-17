@@ -2639,6 +2639,51 @@ void clearUserPosts() {
     profileUpdateTrigger.value = unfollowedId ?? DateTime.now().millisecondsSinceEpoch.toString();
   }
 
+  void handleUserOnlineStatus(String userId, bool isOnline, {String? lastSeen}) {
+    final index = allUsers.indexWhere((user) => user['_id'] == userId);
+    if (index != -1) {
+      final user = allUsers[index];
+      user['online'] = isOnline;
+      if (lastSeen != null) {
+        user['lastSeen'] = lastSeen;
+      }
+      allUsers[index] = user;
+    }
+  }
+
+  void markMessageAsRead(Map<String, dynamic> message) {
+    final messageId = message['_id'];
+    final currentUserId = user.value['user']['_id'];
+
+    // Avoid marking own messages as read or if there's no messageId
+    if (message['senderId'] == currentUserId || messageId == null) {
+      return;
+    }
+
+    // Check if the message is already marked as read by the current user
+    final readReceipts = (message['readReceipts'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final alreadyRead = readReceipts.any((receipt) => receipt['userId'] == currentUserId && receipt['status'] == 'read');
+
+    if (!alreadyRead) {
+      Get.find<SocketService>().sendMessageRead(messageId);
+
+      // Optimistic UI update
+      final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
+      if (messageIndex != -1) {
+        final msg = currentConversationMessages[messageIndex];
+        final receipts = (msg['readReceipts'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+
+        // Remove old receipt for this user if it exists
+        receipts.removeWhere((r) => r['userId'] == currentUserId);
+        // Add new 'read' receipt
+        receipts.add({'userId': currentUserId, 'status': 'read', 'timestamp': DateTime.now().toUtc().toIso8601String()});
+
+        msg['readReceipts'] = receipts;
+        currentConversationMessages[messageIndex] = msg;
+      }
+    }
+  }
+
   void handleNewMessage(Map<String, dynamic> messageData) {
     // Add to the current conversation if it's the one being viewed
     if (currentConversationMessages.isNotEmpty && currentConversationMessages.first['chatId'] == messageData['chatId']) {

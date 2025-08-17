@@ -181,13 +181,14 @@ class SocketService {
   }
 
   void _handleNewChat(dynamic data) {
+    print('SocketService: Received chat:new event with data: $data');
     if (data is Map<String, dynamic> && data['chatId'] is String) {
       _dataController.handleNewChat(data);
       // Join the new chat room
       _socket!.emit('join', {'chatId': data['chatId']});
       _eventController.add({'event': 'chat:new', 'data': data});
     } else {
-        // print('SocketService: Invalid chat:new data format: ${data.runtimeType}');
+        print('SocketService: Invalid chat:new data format: ${data.runtimeType}');
     }
   }
 
@@ -245,14 +246,18 @@ class SocketService {
 
   void _handleUserAction(dynamic data, String event) {
     if (data is Map<String, dynamic> && data['userId'] is String) {
-      if (event == 'user:new' &&
-          data['_id'] is String &&
-          data['name'] is String &&
-          data['avatar'] is String &&
-          data['createdAt'] != null) {
-        _dataController.handleNewUser(data); // Ensure this is implemented in DataController
-      }
-      _eventController.add({'event': event, 'data': data});
+        if (event == 'user:online') {
+            _dataController.handleUserOnlineStatus(data['userId'], true);
+        } else if (event == 'user:offline') {
+            _dataController.handleUserOnlineStatus(data['userId'], false, lastSeen: data['lastSeen']);
+        } else if (event == 'user:new' &&
+            data['_id'] is String &&
+            data['name'] is String &&
+            data['avatar'] is String &&
+            data['createdAt'] != null) {
+            _dataController.handleNewUser(data);
+        }
+        _eventController.add({'event': event, 'data': data});
     } else {
         // print('SocketService: Invalid $event data format: ${data.runtimeType}');
     }

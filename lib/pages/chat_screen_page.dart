@@ -31,10 +31,23 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    dataController.fetchMessages(dataController.currentChat.value['_id']);
+    _loadMessagesAndMarkAsRead();
     dataController.currentConversationMessages.listen((_) {
       Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
+      _markVisibleMessagesAsRead();
     });
+  }
+
+  void _loadMessagesAndMarkAsRead() async {
+    await dataController.fetchMessages(dataController.currentChat.value['_id']);
+    _markVisibleMessagesAsRead();
+  }
+
+  void _markVisibleMessagesAsRead() {
+    final messages = dataController.currentConversationMessages;
+    for (var message in messages) {
+      dataController.markMessageAsRead(message);
+    }
   }
 
   @override
