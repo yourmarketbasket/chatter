@@ -55,11 +55,7 @@ class _ChatScreenState extends State<ChatScreen> {
       '_id': clientMessageId, // Use clientMessageId as a temporary unique key
       'clientMessageId': clientMessageId,
       'chatId': dataController.currentChat.value['_id'],
-      'senderId': {
-        '_id': dataController.user.value['user']['_id'],
-        'name': dataController.user.value['user']['name'],
-        'avatar': dataController.user.value['user']['avatar'],
-      },
+      'senderId': dataController.user.value['user']['_id'],
       'content': text?.trim() ?? '',
       'type': messageType,
       'files': files?.map((file) => {
