@@ -399,6 +399,7 @@ class _ChatScreenState extends State<ChatScreen> {
         itemBuilder: (context, index) {
           final attachment = attachments[index];
           final isLocalFile = !(attachment['url'] as String).startsWith('http');
+        final attachmentKey = ValueKey('${updatedMessage['clientMessageId']}_$index');
 
           if (hasMore && index == maxVisible - 1) {
             final remainingCount = attachments.length - maxVisible + 1;
@@ -416,7 +417,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 alignment: Alignment.center,
                 fit: StackFit.expand,
                 children: [
-                  _buildAttachmentContent(attachment, isLocalFile),
+                _buildAttachmentContent(attachment, isLocalFile, key: attachmentKey),
                   Container(
                     color: Colors.black.withOpacity(0.6),
                     child: Center(
@@ -437,14 +438,14 @@ class _ChatScreenState extends State<ChatScreen> {
 
           return GestureDetector(
             onTap: () => _openMediaView(updatedMessage, index),
-            child: _buildAttachmentContent(attachment, isLocalFile),
+          child: _buildAttachmentContent(attachment, isLocalFile, key: attachmentKey),
           );
         },
       );
     });
   }
 
-  Widget _buildAttachmentContent(Map<String, dynamic> attachment, bool isLocalFile) {
+  Widget _buildAttachmentContent(Map<String, dynamic> attachment, bool isLocalFile, {Key? key}) {
     final attachmentType = attachment['type']?.toLowerCase();
 
     final uploadOverlay = (attachment['isUploading'] ?? false)
@@ -456,12 +457,12 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               child: Center(
                 child: Obx(() => CircularProgressIndicator(
-                  value: attachment['uploadProgress'],
-                  strokeWidth: 2,
-                  backgroundColor: Colors.grey.withOpacity(0.5),
-                  valueColor:
-                      const AlwaysStoppedAnimation<Color>(Colors.white),
-                )),
+                      value: attachment['uploadProgress'],
+                      strokeWidth: 2,
+                      backgroundColor: Colors.grey.withOpacity(0.5),
+                      valueColor:
+                          const AlwaysStoppedAnimation<Color>(Colors.white),
+                    )),
               ),
             ),
           )
@@ -485,6 +486,7 @@ class _ChatScreenState extends State<ChatScreen> {
         break;
       case 'video/mp4':
         content = VideoPlayerWidget(
+          key: key,
           url: isLocalFile ? null : attachment['url'],
           file: isLocalFile ? File(attachment['url']) : null,
         );
