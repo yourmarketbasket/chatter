@@ -1,6 +1,8 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:chatter/controllers/data-controller.dart';
+import 'package:chatter/helpers/time_helper.dart';
+import 'package:chatter/pages/chat_screen_page.dart';
 import 'package:chatter/pages/contacts_page.dart';
-import 'package:chatter/pages/unified_chats_page.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -82,7 +84,7 @@ class _MainChatsPageState extends State<MainChatsPage> {
     return Theme(
       data: ThemeData(
         primaryColor: Colors.black,
-        scaffoldBackgroundColor: Colors.black, // Match body background
+        scaffoldBackgroundColor: Colors.black,
         colorScheme: ColorScheme.fromSwatch(
           primarySwatch: Colors.teal,
           accentColor: Colors.tealAccent,
@@ -97,7 +99,7 @@ class _MainChatsPageState extends State<MainChatsPage> {
           labelMedium: TextStyle(color: Colors.grey),
         ),
         appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.black, // Match body background
+          backgroundColor: Colors.black,
           elevation: 0,
           titleTextStyle: TextStyle(
             color: Colors.white,
@@ -107,73 +109,261 @@ class _MainChatsPageState extends State<MainChatsPage> {
         ),
       ),
       child: Scaffold(
-        extendBody: true, // Allow body to extend behind nav bar
-        appBar: AppBar(
-          title: const Text('Chats'),
-          automaticallyImplyLeading: false, // No back arrow
-          bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(60.0),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      decoration: InputDecoration(
-                        hintText: 'Search...',
-                        hintStyle: TextStyle(color: Colors.grey[400]),
-                        filled: true,
-                        fillColor: Colors.grey[900]!.withOpacity(0.3),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          borderSide: BorderSide.none,
-                        ),
-                        prefixIcon: const Icon(Icons.search, color: Colors.tealAccent),
-                        contentPadding: const EdgeInsets.symmetric(vertical: 0),
+        extendBody: true,
+        body: Obx(() {
+          if (_dataController.isLoadingChats.value && _dataController.chats.isEmpty) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          var allChats = _dataController.chats.values.toList();
+          allChats.sort((a, b) {
+            final lastMsgA = a['lastMessage'];
+            final lastMsgB = b['lastMessage'];
+            final timeA = lastMsgA != null ? DateTime.parse(lastMsgA['createdAt']) : DateTime.parse(a['updatedAt']);
+            final timeB = lastMsgB != null ? DateTime.parse(lastMsgB['createdAt']) : DateTime.parse(b['updatedAt']);
+            return timeB.compareTo(timeA);
+          });
+
+          if (_searchQuery.isNotEmpty) {
+            allChats = allChats.where((chat) {
+              final isGroup = chat['type'] == "group";
+              String title;
+              if (isGroup) {
+                title = chat['name'] ?? 'Group Chat';
+              } else {
+                final currentUserId = _dataController.user.value['user']['_id'];
+                final otherUserRaw = (chat['participants'] as List<dynamic>).firstWhere((p) => p['_id'] != currentUserId, orElse: () => (chat['participants'] as List<dynamic>).first);
+                final otherUser = otherUserRaw is Map<String, dynamic> ? otherUserRaw : _dataController.allUsers.firstWhere((u) => u['_id'] == otherUserRaw, orElse: () => {'name': 'Unknown', 'avatar': ''});
+                title = otherUser['name'] ?? 'User';
+              }
+              return title.toLowerCase().contains(_searchQuery.toLowerCase());
+            }).toList();
+          }
+
+          return RefreshIndicator(
+            onRefresh: () => _dataController.fetchChats(),
+            child: CustomScrollView(
+              slivers: <Widget>[
+                SliverAppBar(
+                  title: const Text('Chats'),
+                  pinned: true,
+                  floating: true,
+                  expandedHeight: 120.0,
+                  bottom: PreferredSize(
+                    preferredSize: const Size.fromHeight(60.0),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _searchController,
+                              decoration: InputDecoration(
+                                hintText: 'Search...',
+                                hintStyle: TextStyle(color: Colors.grey[400]),
+                                filled: true,
+                                fillColor: Colors.grey[900]!.withOpacity(0.3),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                  borderSide: BorderSide.none,
+                                ),
+                                prefixIcon: const Icon(Icons.search, color: Colors.tealAccent),
+                                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                              ),
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 8.0),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.tealAccent.withOpacity(0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: IconButton(
+                                icon: const Icon(Icons.refresh, color: Colors.tealAccent),
+                                onPressed: () {
+                                  _dataController.fetchChats();
+                                },
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 8.0),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.tealAccent.withOpacity(0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: IconButton(
+                                icon: const Icon(Icons.add, color: Colors.tealAccent),
+                                onPressed: _showCreateChatDialog,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      style: const TextStyle(color: Colors.white),
-                      onChanged: (value) {
-                        setState(() {
-                          _searchQuery = value;
-                        });
+                    ),
+                  ),
+                ),
+                if (allChats.isEmpty)
+                  SliverFillRemaining(
+                    child: Center(
+                      child: Text(
+                        'No conversations match your search.',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  )
+                else
+                  SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final chat = allChats[index];
+                        final isGroup = chat['type'] == "group";
+                        final lastMessageData = chat['lastMessage'];
+                        final currentUserId = _dataController.user.value['user']['_id'];
+
+                        String title;
+                        String avatarUrl;
+                        String avatarLetter;
+                        Widget trailingWidget;
+
+                        if (isGroup) {
+                          title = chat['name'] ?? 'Group Chat';
+                          avatarUrl = chat['groupAvatar'] ?? '';
+                          avatarLetter = title.isNotEmpty ? title[0].toUpperCase() : 'G';
+                          trailingWidget = const SizedBox.shrink();
+                        } else {
+                          final otherUserRaw = (chat['participants'] as List<dynamic>).firstWhere((p) => p['_id'] != currentUserId, orElse: () => (chat['participants'] as List<dynamic>).first);
+                          final otherUser = otherUserRaw is Map<String, dynamic> ? otherUserRaw : _dataController.allUsers.firstWhere((u) => u['_id'] == otherUserRaw, orElse: () => {'name': 'Unknown', 'avatar': ''});
+                          title = otherUser['name'] ?? 'User';
+                          avatarUrl = otherUser['avatar'] ?? '';
+                          avatarLetter = title.isNotEmpty ? title[0].toUpperCase() : 'U';
+
+                          trailingWidget = Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                otherUser['online'] == true ? 'online' : (otherUser['lastSeen'] != null ? formatLastSeen(DateTime.parse(otherUser['lastSeen'])) : 'offline'),
+                                style: TextStyle(
+                                  color: otherUser['online'] == true ? Colors.tealAccent : Colors.grey[400],
+                                  fontSize: 12,
+                                  fontWeight: otherUser['online'] == true ? FontWeight.bold : FontWeight.normal,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                            ],
+                          );
+                        }
+
+                        String preview = '';
+                        if (lastMessageData != null && lastMessageData is Map<String, dynamic>) {
+                          if ((lastMessageData['files'] as List?)?.isNotEmpty ?? false) {
+                            preview = 'Attachment';
+                          } else {
+                            preview = lastMessageData['content'] ?? '';
+                          }
+                          final senderId = lastMessageData['senderId'];
+                          final senderIdString = senderId is Map ? senderId['_id'] : senderId;
+                          String senderName;
+                          if (senderIdString == currentUserId) {
+                            senderName = 'You';
+                          } else {
+                            if (isGroup) {
+                              final sender = (chat['participants'] as List).firstWhere((p) => p['_id'] == senderIdString, orElse: () => {'name': '...'});
+                              senderName = sender['name'];
+                            } else {
+                              senderName = title;
+                            }
+                          }
+                          preview = '$senderName: $preview';
+                        }
+
+                        IconData statusIcon = Icons.access_time;
+                        Color statusColor = Colors.grey[400]!;
+                        if (lastMessageData != null && lastMessageData is Map<String, dynamic>) {
+                          final readReceipts = lastMessageData['readReceipts'] as List?;
+                          if (readReceipts != null && readReceipts.isNotEmpty) {
+                            final receipt = readReceipts.firstWhere((r) => r['userId'] != currentUserId, orElse: () => {'status': 'sent'});
+                            switch (receipt['status']) {
+                              case 'sent':
+                                statusIcon = Icons.check;
+                                break;
+                              case 'delivered':
+                                statusIcon = Icons.done_all;
+                                break;
+                              case 'read':
+                                statusIcon = Icons.done_all;
+                                statusColor = Colors.tealAccent;
+                                break;
+                            }
+                          }
+                        }
+
+                        return ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                          leading: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              CircleAvatar(
+                                radius: 24,
+                                backgroundColor: Colors.tealAccent.withOpacity(0.2),
+                                backgroundImage: avatarUrl.isNotEmpty ? CachedNetworkImageProvider(avatarUrl) : null,
+                                child: avatarUrl.isEmpty ? Text(avatarLetter, style: const TextStyle(color: Colors.tealAccent, fontWeight: FontWeight.bold)) : null,
+                              ),
+                              if (isGroup)
+                                const Positioned(
+                                  right: -4,
+                                  bottom: -4,
+                                  child: CircleAvatar(
+                                    radius: 12,
+                                    backgroundColor: Colors.black,
+                                    child: Icon(Icons.group, size: 16, color: Colors.tealAccent),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+                          subtitle: Text(
+                            preview,
+                            style: TextStyle(color: Colors.grey[400], fontSize: 14),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          trailing: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              if (!isGroup) trailingWidget,
+                              if (lastMessageData != null && lastMessageData is Map<String, dynamic>)
+                                Text(
+                                  formatLastSeen(DateTime.parse(lastMessageData['createdAt'] as String).toLocal()),
+                                  style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                                ),
+                              if (lastMessageData != null && lastMessageData is Map<String, dynamic> && lastMessageData['senderId'] == currentUserId)
+                                Icon(statusIcon, size: 16, color: statusColor),
+                            ],
+                          ),
+                          onTap: () {
+                            _dataController.currentChat.value = chat;
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const ChatScreen(),
+                              ),
+                            );
+                          },
+                        );
                       },
+                      childCount: allChats.length,
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 8.0),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.tealAccent.withOpacity(0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: IconButton(
-                        icon: const Icon(Icons.refresh, color: Colors.tealAccent),
-                        onPressed: () {
-                          _dataController.fetchChats();
-                        },
-                      ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 8.0),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.tealAccent.withOpacity(0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: IconButton(
-                        icon: const Icon(Icons.add, color: Colors.tealAccent),
-                        onPressed: _showCreateChatDialog,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              ],
             ),
-          ),
-        ),
-        body: UnifiedChatsPage(searchQuery: _searchQuery),
+          );
+        }),
       ),
     );
   }
