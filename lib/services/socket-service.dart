@@ -57,7 +57,7 @@ class SocketService {
         // Join user's own room (matches backend's socket.join(userId))
         _socket!.emit('join', {'userId': _userId});
         // Fetch and join active chat rooms
-        _joinChatRooms();
+        syncAllChatRooms();
       }
       _eventController.add({'event': 'connect', 'data': null});
     });
@@ -112,16 +112,19 @@ class SocketService {
     });
   }
 
-  // Fetch and join active chat rooms (aligns with backend's Chat.find)
-  void _joinChatRooms() async {
+  // Syncs all chat rooms by joining the socket room for each chat ID.
+  void syncAllChatRooms() async {
+    if (_socket == null || !_socket!.connected) return;
     try {
-      List<String> chatIds = await _dataController.getActiveChatIds(); // Assume DataController fetches chat IDs
+      print('[SocketService] Starting sync of all chat rooms...');
+      List<String> chatIds = await _dataController.getActiveChatIds();
       for (String chatId in chatIds) {
+        print('[SocketService] ==> Emitting join for chatId: $chatId');
         _socket!.emit('join', {'chatId': chatId});
-          // print('SocketService: Joined chat room $chatId');
       }
+      print('[SocketService] Finished syncing all chat rooms.');
     } catch (e) {
-        // print('SocketService: Failed to join chat rooms: $e');
+        print('[SocketService] Error during syncAllChatRooms: $e');
     }
   }
 

@@ -1051,6 +1051,8 @@ class DataController extends GetxController {
         for (var chat in chatData) {
           chats[chat['_id']] = chat;
         }
+        // After successfully fetching chats, ensure we are joined to all rooms.
+        Get.find<SocketService>().syncAllChatRooms();
       } else {
         throw Exception('Failed to fetch chats');
       }
@@ -2788,10 +2790,10 @@ void clearUserPosts() {
         // print("Received createChat response: ${response.data}");
 
       if (response.statusCode == 201 && response.data['success'] == true) {
-        final chat = response.data['chat'];
-        chats[chat['_id']] = chat;
-        Get.find<SocketService>().joinChatRoom(chat['_id']);
-        return chat;
+        // Instead of manually handling the new chat, just refetch all chats.
+        // This will trigger the syncAllChatRooms logic and ensure UI consistency.
+        fetchChats();
+        return response.data['chat'];
       } else {
         throw Exception('Failed to create chat');
       }
