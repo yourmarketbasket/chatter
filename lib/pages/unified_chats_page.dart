@@ -99,13 +99,14 @@ class _UnifiedChatsPageState extends State<UnifiedChatsPage> {
                 preview = lastMessageData['content'] ?? '';
               }
               final senderId = lastMessageData['senderId'];
+              final senderIdString = senderId is Map ? senderId['_id'] : senderId;
               String senderName;
-              if (senderId == currentUserId) {
+              if (senderIdString == currentUserId) {
                 senderName = 'You';
               } else {
                 if (isGroup) {
                   final sender = (chat['participants'] as List).firstWhere(
-                    (p) => p['_id'] == senderId,
+                    (p) => p['_id'] == senderIdString,
                     orElse: () => {'name': '...'},
                   );
                   senderName = sender['name'];
