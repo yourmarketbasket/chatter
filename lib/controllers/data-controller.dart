@@ -140,11 +140,17 @@ class DataController extends GetxController {
     // Not implemented
   }
 
-  void handleNewChat(Map<String, dynamic> data) {
-    if (data['_id'] != null) {
-      // Don't just add the chat, fetch the whole list to ensure UI consistency
-      // and that the chat object is fully populated.
-      fetchChats();
+  void handleNewChat(Map<String, dynamic> newChatData) {
+    final chatId = newChatData['_id'];
+    if (chatId != null && !chats.containsKey(chatId)) {
+      // Directly add the new chat object from the event
+      chats[chatId] = newChatData;
+
+      // Join the new socket room
+      Get.find<SocketService>().joinChatRoom(chatId);
+
+      // Refresh the UI
+      chats.refresh();
     }
   }
 
