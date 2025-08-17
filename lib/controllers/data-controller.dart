@@ -129,8 +129,25 @@ class DataController extends GetxController {
   }
 
   Future<List<String>> getActiveChatIds() async {
-    //TODO: Implement this method
-    return [];
+    return chats.keys.toList();
+  }
+
+  void handleNewUser(Map<String, dynamic> data) {
+    // Not implemented
+  }
+
+  void handleNewChat(Map<String, dynamic> data) {
+    if (data['_id'] != null) {
+      chats[data['_id']] = data;
+    }
+  }
+
+  void handleMessageStatusUpdate(Map<String, dynamic> data) {
+    // Not implemented
+  }
+
+  void handleMessageDeleted(Map<String, dynamic> data) {
+    // Not implemented
   }
 
   String? getUserId() {
