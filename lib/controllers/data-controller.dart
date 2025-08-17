@@ -2688,6 +2688,7 @@ void clearUserPosts() {
     // If the message is from the current user, ignore it, as it's already handled optimistically.
     final senderId = messageData['senderId'] is Map ? messageData['senderId']['_id'] : messageData['senderId'];
     if (senderId == getUserId()) {
+      print('[DataController] Ignoring own message from socket.');
       return;
     }
 
@@ -2703,14 +2704,19 @@ void clearUserPosts() {
     final chatId = messageData['chatId'];
     if (chatId != null) {
       if (chats.containsKey(chatId)) {
+        print('[DataController] Updating lastMessage for existing chat: $chatId');
         final chat = chats[chatId]!;
         chat['lastMessage'] = messageData;
         chat['unreadCount'] = (chat['unreadCount'] ?? 0) + 1;
         chats[chatId] = chat;
+        chats.refresh(); // Explicitly refresh the RxMap to ensure UI updates
       } else {
+        print('[DataController] Received message for unknown chat: $chatId. Fetching chats.');
         // If the chat doesn't exist locally, fetch the updated chat list
         fetchChats();
       }
+    } else {
+      print('[DataController] Received message without a chatId.');
     }
   }
 
