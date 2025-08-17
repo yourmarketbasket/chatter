@@ -2774,6 +2774,7 @@ void clearUserPosts() {
       if (response.statusCode == 201 && response.data['success'] == true) {
         final chat = response.data['chat'];
         chats[chat['_id']] = chat;
+        Get.find<SocketService>().joinChatRoom(chat['_id']);
         return chat;
       } else {
         throw Exception('Failed to create chat');

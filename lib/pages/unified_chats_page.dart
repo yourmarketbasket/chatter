@@ -24,6 +24,13 @@ class _UnifiedChatsPageState extends State<UnifiedChatsPage> {
           return const Center(child: CircularProgressIndicator());
         }
         final allChats = _dataController.chats.values.toList();
+        allChats.sort((a, b) {
+          final lastMsgA = a['lastMessage'];
+          final lastMsgB = b['lastMessage'];
+          final timeA = lastMsgA != null ? DateTime.parse(lastMsgA['createdAt']) : DateTime.parse(a['updatedAt']);
+          final timeB = lastMsgB != null ? DateTime.parse(lastMsgB['createdAt']) : DateTime.parse(b['updatedAt']);
+          return timeB.compareTo(timeA);
+        });
 
         if (allChats.isEmpty) {
           return const Center(
@@ -202,8 +209,8 @@ class _UnifiedChatsPageState extends State<UnifiedChatsPage> {
                   if (lastMessageData != null &&
                       lastMessageData is Map<String, dynamic>)
                     Text(
-                      formatTime(
-                          DateTime.parse(lastMessageData['createdAt'] as String)),
+                      formatLastSeen(
+                          DateTime.parse(lastMessageData['createdAt'] as String).toLocal()),
                       style: TextStyle(
                         color: Colors.grey[400],
                         fontSize: 12,
