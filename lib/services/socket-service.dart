@@ -8,240 +8,366 @@ class SocketService {
   final StreamController<Map<String, dynamic>> _eventController = StreamController<Map<String, dynamic>>.broadcast();
   final DataController _dataController = Get.find<DataController>();
   bool _isInitialized = false;
+  String? _userId; // Store userId for joining rooms and emitting events
 
   SocketService() {
+    print('SocketService: Initializing...');
     _initializeSocket();
     connect();
   }
 
   void _initializeSocket() {
-    if (_isInitialized) return;
+    if (_isInitialized) {
+      print('SocketService: Already initialized, skipping.');
+      return;
+    }
 
-    _socket = IO.io('http://192.168.1.104:3000/', <String, dynamic>{
-      'transports': ['websocket'],
-      'autoConnect': false,
-      'reconnection': true,
-      'reconnectionAttempts': 10,
-      'reconnectionDelay': 3000,
-    });
+    try {
+      print('SocketService: Creating socket with ws://192.168.1.104:3000');
+      _socket = IO.io('ws://192.168.1.104:3000', <String, dynamic>{
+        'transports': ['websocket'],
+        'autoConnect': false,
+        'reconnection': true,
+        'reconnectionAttempts': 10,
+        'reconnectionDelay': 3000,
+        'forceNew': true,
+        // Add authentication token for backend's socketAuthenticator
+        'auth': {
+          'token': _dataController.getAuthToken(), // Assume DataController provides JWT token
+        },
+      });
 
-    _setupSocketListeners();
-    _isInitialized = true;
+      _setupSocketListeners();
+      _isInitialized = true;
+      print('SocketService: Initialization complete.');
+    } catch (e) {
+      print('SocketService: Failed to initialize socket: $e');
+    }
   }
 
   void _setupSocketListeners() {
-    if (_socket == null) return;
+    if (_socket == null) {
+      print('SocketService: Cannot setup listeners, socket is null.');
+      return;
+    }
 
     _socket!.onConnect((_) {
-      print('Socket connected');
+      print('SocketService: Connected to server');
+      _userId = _dataController.getUserId(); // Assume DataController provides userId
+      if (_userId != null) {
+        // Join user's own room (matches backend's socket.join(userId))
+        _socket!.emit('join', {'userId': _userId});
+        // Fetch and join active chat rooms
+        _joinChatRooms();
+      }
       _eventController.add({'event': 'connect', 'data': null});
     });
 
     _socket!.onDisconnect((_) {
-      print('Socket disconnected');
+      print('SocketService: Disconnected from server');
       _eventController.add({'event': 'disconnect', 'data': null});
     });
 
     _socket!.onConnectError((error) {
-      print('Connection error: $error');
-      _eventController.add({'event': 'connect_error', 'data': error});
+      print('SocketService: Connection error: $error');
+      _eventController.add({'event': 'connect_error', 'data': error.toString()});
     });
 
     _socket!.onError((error) {
-      print('Socket error: $error');
-      _eventController.add({'event': 'error', 'data': error});
+      print('SocketService: Socket error: $error');
+      _eventController.add({'event': 'error', 'data': error.toString()});
     });
 
-    // Core event handlers
+    // Core event handlers (retained all existing handlers)
     final eventHandlers = {
-      'welcome': (data) {
-        print('Welcome event received: $data');
-        _eventController.add({'event': 'welcome', 'data': data});
-      },
-      'message': (data) {
-        try {
-          if (data is String) {
-            _eventController.add({'event': 'message', 'data': data});
-          } else {
-            print('Invalid message format: $data');
-          }
-        } catch (e) {
-          print('Error processing message: $e');
-        }
-      },
-      'newPost': (data) => _handleNewPost(data),
-      'newReply': (data) => _handleNewReply(data),
-      'newReplyToReply': (data) => _handleNewReplyToReply(data),
-      'postViewed': (data) => _handlePostAction(data, 'postViewed'),
-      'postLiked': (data) => _handlePostAction(data, 'postLiked'),
-      'postUnliked': (data) => _handlePostAction(data, 'postUnliked'),
-      'postReposted': (data) => _handlePostAction(data, 'postReposted'),
-      'replyLiked': (data) => _handleReplyAction(data, 'replyLiked'),
-      'replyUnliked': (data) => _handleReplyAction(data, 'replyUnliked'),
-      'replyReposted': (data) => _handleReplyAction(data, 'replyReposted'),
-      'replyViewed': (data) => _handleReplyAction(data, 'replyViewed'),
-      'newMessage': (data) => _handleNewMessage(data),
-      'typing:start': (data) => _handleTyping(data, true),
-      'typing:stop': (data) => _handleTyping(data, false),
-      'userFollowed': (data) => _handleUserAction(data, 'userFollowed'),
-      'userUnfollowed': (data) => _handleUserAction(data, 'userUnfollowed'),
+      'user:online': (data) => _handleUserAction(data, 'user:online'),
+      'user:offline': (data) => _handleUserAction(data, 'user:offline'),
+      'user:new': (data) => _handleUserAction(data, 'user:new'),
+      'post:new': (data) => _handleNewPost(data),
+      'post:reply': (data) => _handleNewReply(data),
+      'post:repost': (data) => _handlePostAction(data, 'post:repost'),
+      'post:like': (data) => _handlePostAction(data, 'post:like'),
+      'post:unlike': (data) => _handlePostAction(data, 'post:unlike'),
+      'post:view': (data) => _handlePostAction(data, 'post:view'),
+      'reply:new': (data) => _handleNewReplyToReply(data),
+      'reply:like': (data) => _handleReplyAction(data, 'reply:like'),
+      'reply:unlike': (data) => _handleReplyAction(data, 'reply:unlike'),
+      'reply:repost': (data) => _handleReplyAction(data, 'reply:repost'),
+      'reply:view': (data) => _handleReplyAction(data, 'reply:view'),
+      'chat:new': (data) => _handleNewChat(data),
+      'chat:updated': (data) => _handleNewMessage(data),
+      'message:new': (data) => _handleNewMessage(data),
+      'message:edited': (data) => _handleNewMessage(data),
+      'message:deleted': (data) => _handleMessageDeleted(data),
+      'message:statusUpdate': (data) => _handleMessageStatusUpdate(data),
+      'message:reaction': (data) => _handleNewMessage(data),
+      'typing:started': (data) => _handleTyping(data, true),
+      'typing:stopped': (data) => _handleTyping(data, false),
     };
 
     eventHandlers.forEach((event, handler) {
-      _socket!.on(event, handler);
+      _socket!.on(event, (data) {
+        print('SocketService: Received event $event with data: $data');
+        handler(data);
+      });
     });
+  }
+
+  // Fetch and join active chat rooms (aligns with backend's Chat.find)
+  void _joinChatRooms() async {
+    try {
+      List<String> chatIds = await _dataController.getActiveChatIds(); // Assume DataController fetches chat IDs
+      for (String chatId in chatIds) {
+        _socket!.emit('join', {'chatId': chatId});
+        print('SocketService: Joined chat room $chatId');
+      }
+    } catch (e) {
+      print('SocketService: Failed to join chat rooms: $e');
+    }
   }
 
   void _handleNewPost(dynamic data) {
     if (data is Map<String, dynamic>) {
       _dataController.addNewPost(data);
-      _eventController.add({'event': 'newPost', 'data': data});
+      _eventController.add({'event': 'post:new', 'data': data});
     } else {
-      print('Invalid newPost data format: ${data.runtimeType}');
+      print('SocketService: Invalid post:new data format: ${data.runtimeType}');
     }
   }
 
   void _handleNewReply(dynamic data) {
-    if (data is Map<String, dynamic>) {
-      final parentPostId = data['parentPostId'] as String?;
-      final reply = data['reply'] as Map<String, dynamic>?;
-      if (parentPostId != null && reply != null) {
-        _dataController.handleNewReply(parentPostId, reply);
-        _eventController.add({'event': 'newReply', 'data': data});
-      } else {
-        print('Invalid newReply data: $data');
-      }
+    if (data is Map<String, dynamic> &&
+        data['parentPostId'] is String &&
+        data['reply'] is Map<String, dynamic>) {
+      _dataController.handleNewReply(data['parentPostId'], data['reply']);
+      _eventController.add({'event': 'post:reply', 'data': data});
     } else {
-      print('Invalid newReply data format: ${data.runtimeType}');
+      print('SocketService: Invalid post:reply data format: ${data.runtimeType}');
     }
   }
 
   void _handleNewReplyToReply(dynamic data) {
-    if (data is Map<String, dynamic>) {
-      final postId = data['postId'] as String?;
-      final parentReplyId = data['parentReplyId'] as String?;
-      final reply = data['reply'] as Map<String, dynamic>?;
-      if (postId != null && parentReplyId != null && reply != null) {
-        _dataController.handleNewReplyToReply(postId, parentReplyId, reply);
-        _eventController.add({'event': 'newReplyToReply', 'data': data});
-      } else {
-        print('Invalid newReplyToReply data: $data');
-      }
+    if (data is Map<String, dynamic> &&
+        data['postId'] is String &&
+        data['parentReplyId'] is String &&
+        data['reply'] is Map<String, dynamic>) {
+      _dataController.handleNewReplyToReply(data['postId'], data['parentReplyId'], data['reply']);
+      _eventController.add({'event': 'reply:new', 'data': data});
     } else {
-      print('Invalid newReplyToReply data format: ${data.runtimeType}');
+      print('SocketService: Invalid reply:new data format: ${data.runtimeType}');
     }
   }
 
   void _handlePostAction(dynamic data, String event) {
-    if (data is Map<String, dynamic>) {
-      final postId = data['postId'] as String? ?? data['_id'] as String?;
-      if (postId != null) {
-        _dataController.fetchSinglePost(postId);
-        _eventController.add({'event': event, 'data': data});
-      } else {
-        print('Invalid $event data: missing postId or _id');
-      }
+    if (data is Map<String, dynamic> &&
+        data['postId'] is String &&
+        data['userId'] is String) {
+      _dataController.fetchSinglePost(data['postId']);
+      _eventController.add({'event': event, 'data': data});
     } else {
-      print('Invalid $event data format: ${data.runtimeType}');
+      print('SocketService: Invalid $event data format: ${data.runtimeType}');
     }
   }
 
   void _handleReplyAction(dynamic data, String event) {
-    if (data is Map<String, dynamic>) {
-      final rootPostId = data['postId'] as String?;
-      if (rootPostId != null) {
-        _dataController.fetchSinglePost(rootPostId);
-        _eventController.add({'event': event, 'data': data});
-      } else {
-        print('Invalid $event data: missing postId');
-      }
+    if (data is Map<String, dynamic> &&
+        data['postId'] is String &&
+        data['replyId'] is String &&
+        data['userId'] is String) {
+      _dataController.fetchSinglePost(data['postId']);
+      _eventController.add({'event': event, 'data': data});
     } else {
-      print('Invalid $event data format: ${data.runtimeType}');
+      print('SocketService: Invalid $event data format: ${data.runtimeType}');
+    }
+  }
+
+  void _handleNewChat(dynamic data) {
+    if (data is Map<String, dynamic> && data['chatId'] is String) {
+      _dataController.handleNewChat(data);
+      // Join the new chat room
+      _socket!.emit('join', {'chatId': data['chatId']});
+      _eventController.add({'event': 'chat:new', 'data': data});
+    } else {
+      print('SocketService: Invalid chat:new data format: ${data.runtimeType}');
     }
   }
 
   void _handleNewMessage(dynamic data) {
-    if (data is Map<String, dynamic>) {
+    if (data is Map<String, dynamic> && data['chatId'] is String) {
       _dataController.handleNewMessage(data);
-      _eventController.add({'event': 'newMessage', 'data': data});
+      // Emit message:delivered to backend
+      if (data['messageId'] is String && _userId != null) {
+        _socket!.emit('message:delivered', {
+          'messageId': data['messageId'],
+          'userId': _userId,
+        });
+      }
+      _eventController.add({'event': 'message:new', 'data': data});
     } else {
-      print('Invalid newMessage data format: ${data.runtimeType}');
+      print('SocketService: Invalid message event data format: ${data.runtimeType}');
+    }
+  }
+
+  void _handleMessageStatusUpdate(dynamic data) {
+    if (data is Map<String, dynamic> &&
+        data['messageId'] is String &&
+        data['userId'] is String &&
+        data['status'] is String) {
+      _dataController.handleMessageStatusUpdate(data);
+      _eventController.add({'event': 'message:statusUpdate', 'data': data});
+    } else {
+      print('SocketService: Invalid message:statusUpdate data format: ${data.runtimeType}');
+    }
+  }
+
+  void _handleMessageDeleted(dynamic data) {
+    if (data is Map<String, dynamic> && data['messageId'] is String) {
+      _dataController.handleMessageDeleted(data);
+      _eventController.add({'event': 'message:deleted', 'data': data});
+    } else {
+      print('SocketService: Invalid message:deleted data format: ${data.runtimeType}');
     }
   }
 
   void _handleTyping(dynamic data, bool isStart) {
-    if (data is Map<String, dynamic>) {
+    if (data is Map<String, dynamic> &&
+        data['chatId'] is String &&
+        data['userId'] is String) {
       if (isStart) {
         _dataController.handleTypingStart(data);
       } else {
         _dataController.handleTypingStop(data);
       }
-      _eventController.add({'event': isStart ? 'typing:start' : 'typing:stop', 'data': data});
+      _eventController.add({'event': isStart ? 'typing:started' : 'typing:stopped', 'data': data});
     } else {
-      print('Invalid typing:${isStart ? 'start' : 'stop'} data format: ${data.runtimeType}');
+      print('SocketService: Invalid typing:${isStart ? 'started' : 'stopped'} data format: ${data.runtimeType}');
     }
   }
 
   void _handleUserAction(dynamic data, String event) {
-    if (data is Map<String, dynamic>) {
-      if (event == 'userFollowed') {
-        _dataController.handleUserFollowedSocket(data);
-      } else {
-        _dataController.handleUserUnfollowedSocket(data);
+    if (data is Map<String, dynamic> && data['userId'] is String) {
+      if (event == 'user:new' &&
+          data['_id'] is String &&
+          data['name'] is String &&
+          data['avatar'] is String &&
+          data['createdAt'] != null) {
+        _dataController.handleNewUser(data); // Ensure this is implemented in DataController
       }
       _eventController.add({'event': event, 'data': data});
     } else {
-      print('Invalid $event data format: ${data.runtimeType}');
+      print('SocketService: Invalid $event data format: ${data.runtimeType}');
     }
   }
 
   void connect() {
+    if (_socket == null) {
+      print('SocketService: Cannot connect, socket is null. Reinitializing...');
+      _initializeSocket();
+    }
     if (_socket != null && !_socket!.connected) {
+      print('SocketService: Attempting to connect to ws://192.168.1.104:3000');
       _socket!.connect();
+    } else {
+      print('SocketService: Socket is already connected or null');
     }
   }
 
   void disconnect() {
     if (_socket != null && _socket!.connected) {
+      print('SocketService: Disconnecting socket');
       _socket!.disconnect();
+    } else {
+      print('SocketService: Cannot disconnect, socket is null or not connected');
     }
   }
 
   void emitEvent(String event, dynamic data) {
     if (_socket != null && _socket!.connected && data != null) {
+      print('SocketService: Emitting event $event with data: $data');
       _socket!.emit(event, data);
     } else {
-      print('Cannot emit event: Socket not connected or data is null');
+      print('SocketService: Cannot emit event: Socket not connected or data is null');
     }
   }
 
-  void sendMessage(String message) {
-    emitEvent('message', message);
+  void sendMessage(String chatId, String message, String clientMessageId) {
+    if (_userId != null) {
+      emitEvent('message:new', {
+        'chatId': chatId,
+        'content': message,
+        'userId': _userId,
+        'clientMessageId': clientMessageId, // Include clientMessageId for correlation
+      });
+    } else {
+      print('SocketService: Cannot send message, userId is null');
+    }
+  }
+
+  void sendMessageDelivered(String messageId) {
+    if (_userId != null) {
+      emitEvent('message:delivered', {
+        'messageId': messageId,
+        'userId': _userId,
+      });
+    } else {
+      print('SocketService: Cannot send message:delivered, userId is null');
+    }
+  }
+
+  void sendMessageRead(String messageId) {
+    if (_userId != null) {
+      emitEvent('message:read', {
+        'messageId': messageId,
+        'userId': _userId,
+      });
+    } else {
+      print('SocketService: Cannot send message:read, userId is null');
+    }
   }
 
   void sendTypingStart(String chatId) {
-    emitEvent('typing:start', {'chatId': chatId});
+    if (_userId != null) {
+      emitEvent('typing:start', {'chatId': chatId, 'userId': _userId});
+    } else {
+      print('SocketService: Cannot send typing:start, userId is null');
+    }
   }
 
   void sendTypingStop(String chatId) {
-    emitEvent('typing:stop', {'chatId': chatId});
+    if (_userId != null) {
+      emitEvent('typing:stop', {'chatId': chatId, 'userId': _userId});
+    } else {
+      print('SocketService: Cannot send typing:stop, userId is null');
+    }
+  }
+
+  void joinChatRoom(String chatId) {
+    emitEvent('join', {'chatId': chatId});
+    print('SocketService: Joined chat room $chatId');
   }
 
   Stream<Map<String, dynamic>> get events => _eventController.stream;
 
   void addListener(String event, void Function(dynamic) handler) {
     if (_socket != null) {
+      print('SocketService: Adding listener for event $event');
       _socket!.on(event, handler);
+    } else {
+      print('SocketService: Cannot add listener, socket is null');
     }
   }
 
   void removeListener(String event, void Function(dynamic) handler) {
     if (_socket != null) {
+      print('SocketService: Removing listener for event $event');
       _socket!.off(event, handler);
+    } else {
+      print('SocketService: Cannot remove listener, socket is null');
     }
   }
 
   void dispose() {
+    print('SocketService: Disposing socket service');
     disconnect();
     _socket?.clearListeners();
     _socket?.dispose();
@@ -250,5 +376,6 @@ class SocketService {
       _eventController.close();
     }
     _isInitialized = false;
+    _userId = null;
   }
 }
