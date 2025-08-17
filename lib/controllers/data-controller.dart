@@ -2685,6 +2685,12 @@ void clearUserPosts() {
   }
 
   void handleNewMessage(Map<String, dynamic> messageData) {
+    // If the message is from the current user, ignore it, as it's already handled optimistically.
+    final senderId = messageData['senderId'] is Map ? messageData['senderId']['_id'] : messageData['senderId'];
+    if (senderId == getUserId()) {
+      return;
+    }
+
     // Add to the current conversation if it's the one being viewed
     if (currentConversationMessages.isNotEmpty && currentConversationMessages.first['chatId'] == messageData['chatId']) {
       // Check for duplicates before adding

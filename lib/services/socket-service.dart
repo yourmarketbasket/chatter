@@ -182,10 +182,10 @@ class SocketService {
 
   void _handleNewChat(dynamic data) {
     print('SocketService: Received chat:new event with data: $data');
-    if (data is Map<String, dynamic> && data['chatId'] is String) {
+    if (data is Map<String, dynamic> && data['_id'] is String) {
       _dataController.handleNewChat(data);
       // Join the new chat room
-      _socket!.emit('join', {'chatId': data['chatId']});
+      _socket!.emit('join', {'chatId': data['_id']});
       _eventController.add({'event': 'chat:new', 'data': data});
     } else {
         print('SocketService: Invalid chat:new data format: ${data.runtimeType}');
