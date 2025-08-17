@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:audio_waveforms/audio_waveforms.dart';
+import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
 
 class AudioWaveformWidget extends StatefulWidget {
   final String audioPath;
@@ -15,6 +18,7 @@ class AudioWaveformWidget extends StatefulWidget {
 class _AudioWaveformWidgetState extends State<AudioWaveformWidget> {
   final PlayerController _playerController = PlayerController();
   bool _isPlaying = false;
+  bool _isPreparing = true;
 
   @override
   void initState() {
@@ -36,9 +40,24 @@ class _AudioWaveformWidgetState extends State<AudioWaveformWidget> {
         shouldExtractWaveform: true,
       );
     } else {
-      // TODO: Handle network audio. This requires downloading the file first.
-      // For now, this will not work for network audio.
-      // We can use dio to download to a temp path and then prepare.
+      try {
+        final dio = Dio();
+        final tempDir = await getTemporaryDirectory();
+        final tempPath = '${tempDir.path}/${widget.audioPath.split('/').last}';
+        await dio.download(widget.audioPath, tempPath);
+        await _playerController.preparePlayer(
+          path: tempPath,
+          shouldExtractWaveform: true,
+        );
+      } catch (e) {
+        print('Error preparing network audio: $e');
+        // Handle error, e.g., show a snackbar
+      }
+    }
+    if (mounted) {
+      setState(() {
+        _isPreparing = false;
+      });
     }
   }
 
@@ -60,14 +79,22 @@ class _AudioWaveformWidgetState extends State<AudioWaveformWidget> {
         mainAxisSize: MainAxisSize.min,
         children: [
           IconButton(
-            icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.white),
-            onPressed: () {
-              if (_isPlaying) {
-                _playerController.pausePlayer();
-              } else {
-                _playerController.startPlayer();
-              }
-            },
+            icon: _isPreparing
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
+                : Icon(_isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.white),
+            onPressed: _isPreparing
+                ? null
+                : () {
+                    if (_isPlaying) {
+                      _playerController.pausePlayer();
+                    } else {
+                      _playerController.startPlayer();
+                    }
+                  },
           ),
           Expanded(
             child: AudioFileWaveforms(
