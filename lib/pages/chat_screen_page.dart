@@ -335,11 +335,19 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  String _mapToSimpleType(String detailedType) {
+    if (detailedType.startsWith('image')) return 'image';
+    if (detailedType.startsWith('video')) return 'video';
+    if (detailedType.startsWith('audio') || detailedType == 'voice') return 'audio';
+    if (detailedType.startsWith('application/pdf')) return 'pdf';
+    return 'unknown';
+  }
+
   void _openMediaView(Map<String, dynamic> message, int initialIndex) {
     final attachmentsForViewer = (message['files'] as List)
         .map((att) => {
               'url': att['url'],
-              'type': att['type'],
+              'type': _mapToSimpleType(att['type']),
               'filename': att['filename'],
             })
         .toList();
@@ -447,6 +455,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildAttachmentContent(Map<String, dynamic> attachment, bool isLocalFile, {Key? key}) {
     final attachmentType = attachment['type']?.toLowerCase();
+    final simpleType = _mapToSimpleType(attachmentType ?? '');
 
     final uploadOverlay = (attachment['isUploading'] ?? false)
         ? Positioned.fill(
@@ -567,12 +576,31 @@ class _ChatScreenState extends State<ChatScreen> {
           )
         : const SizedBox.shrink();
 
+    final fullViewIcon = simpleType != 'image'
+        ? Positioned(
+            top: 4,
+            right: 4,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.5),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.open_in_full,
+                color: Colors.white,
+                size: 18,
+              ),
+            ),
+          )
+        : const SizedBox.shrink();
+
     return Stack(
       fit: StackFit.expand,
       children: [
         content,
         uploadOverlay,
         downloadOverlay,
+        fullViewIcon,
       ],
     );
   }
