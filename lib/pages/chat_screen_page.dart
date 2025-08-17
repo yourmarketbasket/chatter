@@ -456,13 +456,13 @@ class _ChatScreenState extends State<ChatScreen> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Center(
-                child: Obx(() => CircularProgressIndicator(
-                      value: attachment['uploadProgress'],
-                      strokeWidth: 2,
-                      backgroundColor: Colors.grey.withOpacity(0.5),
-                      valueColor:
-                          const AlwaysStoppedAnimation<Color>(Colors.white),
-                    )),
+                child: CircularProgressIndicator(
+                  value: attachment['uploadProgress'],
+                  strokeWidth: 2,
+                  backgroundColor: Colors.grey.withOpacity(0.5),
+                  valueColor:
+                      const AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
               ),
             ),
           )
@@ -473,6 +473,7 @@ class _ChatScreenState extends State<ChatScreen> {
       case 'image/jpeg':
       case 'image/png':
         content = Container(
+          key: key,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
             image: DecorationImage(
