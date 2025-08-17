@@ -1,5 +1,4 @@
 import 'package:chatter/controllers/data-controller.dart';
-import 'package:chatter/models/feed_models.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io';
@@ -14,6 +13,7 @@ import 'package:chatter/widgets/audio_waveform_widget.dart';
 import 'package:chatter/widgets/all_attachments_dialog.dart';
 import 'package:chatter/widgets/reply_message_snippet.dart';
 import 'package:chatter/helpers/time_helper.dart';
+import 'package:uuid/uuid.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -31,29 +31,47 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    // Fetch messages for this chat when the screen loads
     dataController.fetchMessages(dataController.currentChat.value['_id']);
   }
 
   @override
   void dispose() {
     _messageController.dispose();
-    // Clear the messages for the current conversation when leaving the screen
     dataController.currentConversationMessages.clear();
     super.dispose();
   }
-  // force
 
-  void _sendMessage() {
-    if (_messageController.text.trim().isNotEmpty) {
+  void _sendMessage(String? text, List<PlatformFile>? files, {bool isVoiceNote = false}) {
+    if ((text?.trim().isNotEmpty ?? false) || (files?.isNotEmpty ?? false)) {
+      final attachments = files?.map((file) => {
+            'url': file.path!,
+            'type': isVoiceNote ? 'voice' : _getMediaType(file.extension ?? ''),
+            'size': file.size,
+            'filename': file.name,
+          }).toList() ?? [];
+
+      final messageType = isVoiceNote
+          ? 'voice'
+          : attachments.isNotEmpty
+              ? 'attachment'
+              : 'text';
+
       final message = {
-        '_id': DateTime.now().millisecondsSinceEpoch.toString(),
+        'clientMessageId': const Uuid().v4(),
         'chatId': dataController.currentChat.value['_id'],
-        'senderId': dataController.user.value['user']['_id'],
-        'text': _messageController.text.trim(),
-        'createdAt': DateTime.now().toIso8601String(),
+        'senderId': {
+          '_id': dataController.user.value['user']['_id'],
+          'name': dataController.user.value['user']['name'],
+          'avatar': dataController.user.value['user']['avatar'],
+        },
+        'content': text?.trim() ?? '',
+        'type': messageType,
+        'files': attachments,
         'replyTo': _replyingTo?['_id'],
+        'viewOnce': false, // Default as per schema, can be adjusted based on UI logic
+        'createdAt': DateTime.now().toIso8601String(),
       };
+
       dataController.sendChatMessage(message);
       _messageController.clear();
       setState(() {
@@ -63,7 +81,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _editMessage(Map<String, dynamic> message) {
-    final editController = TextEditingController(text: message['text']);
+    final editController = TextEditingController(text: message['content']);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -140,6 +158,8 @@ class _ChatScreenState extends State<ChatScreen> {
     Widget preview;
 
     switch (extension) {
+      case 'image/jpeg':
+      case 'image/png':
       case 'image':
         preview = Image(
           image: isLocalFile
@@ -148,11 +168,17 @@ class _ChatScreenState extends State<ChatScreen> {
           fit: BoxFit.cover,
         );
         break;
+      case 'video/mp4':
       case 'video':
         preview = const Icon(Icons.videocam, size: 24, color: Colors.white);
         break;
-      case 'audio':
+      case 'audio/mp3':
+      case 'voice':
         preview = const Icon(Icons.audiotrack, size: 24, color: Colors.white);
+        break;
+      case 'application/pdf':
+        preview =
+            const Icon(Icons.picture_as_pdf, size: 24, color: Colors.white);
         break;
       default:
         preview =
@@ -166,27 +192,26 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildReplyPreview(Map<String, dynamic> replyTo) {
-    final sender = (dataController.currentChat.value['participants'] as List).firstWhere(
-      (p) => p['_id'] == replyTo['senderId'],
-      orElse: () => {'_id': replyTo['senderId'], 'name': 'Unknown User'},
+    final sender = (dataController.currentChat.value['participants'] as List)
+        .firstWhere(
+      (p) => p['_id'] == replyTo['senderId']['_id'],
+      orElse: () => {'_id': replyTo['senderId']['_id'], 'name': 'Unknown User'},
     );
-    final senderName = replyTo['senderId'] ==
+    final senderName = replyTo['senderId']['_id'] ==
             dataController.user.value['user']['_id']
         ? 'You'
         : sender['name'];
 
     Widget contentPreview;
-    if (replyTo['attachments'] != null && (replyTo['attachments'] as List).isNotEmpty) {
-      final firstAttachment = (replyTo['attachments'] as List).first;
+    if (replyTo['files'] != null && (replyTo['files'] as List).isNotEmpty) {
+      final firstAttachment = (replyTo['files'] as List).first;
       contentPreview = Row(
         children: [
           _buildReplyAttachmentPreview(firstAttachment),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              firstAttachment['type'] == 'image'
-                  ? 'Image'
-                  : firstAttachment['filename'],
+              firstAttachment['type'].startsWith('image') ? 'Image' : firstAttachment['filename'],
               style: TextStyle(color: Colors.grey[300]),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -194,7 +219,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ],
       );
-    } else if (replyTo['voiceNote'] != null) {
+    } else if (replyTo['type'] == 'voice') {
       contentPreview = Row(
         children: [
           const Icon(Icons.audiotrack, size: 24, color: Colors.white),
@@ -207,7 +232,7 @@ class _ChatScreenState extends State<ChatScreen> {
       );
     } else {
       contentPreview = Text(
-        replyTo['text'] ?? '',
+        replyTo['content'] ?? '',
         style: TextStyle(color: Colors.grey[300]),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
@@ -259,7 +284,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _openMediaView(Map<String, dynamic> message, int initialIndex) {
-    final attachmentsForViewer = (message['attachments'] as List)
+    final attachmentsForViewer = (message['files'] as List)
         .map((att) => {
               'url': att['url'],
               'type': att['type'],
@@ -267,9 +292,9 @@ class _ChatScreenState extends State<ChatScreen> {
             })
         .toList();
 
-    final sender = (dataController.currentChat.value['participants'] as List).firstWhere(
+    final sender = (dataController.currentChat.value['participants'] as List)
+        .firstWhere(
       (p) => p['_id'] == message['senderId'],
-      // Fallback for safety, though sender should always be in participants
       orElse: () => {'_id': message['senderId'], 'name': 'Unknown User'},
     );
 
@@ -279,7 +304,7 @@ class _ChatScreenState extends State<ChatScreen> {
         builder: (context) => MediaViewPage(
           attachments: attachmentsForViewer,
           initialIndex: initialIndex,
-          message: message['text'] ?? '',
+          message: message['content'] ?? '',
           userName: sender['name'],
           userAvatarUrl: sender['avatar'],
           timestamp: DateTime.parse(message['createdAt']),
@@ -292,17 +317,15 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildAttachment(Map<String, dynamic> message) {
-    if (message['attachments'] == null || (message['attachments'] as List).isEmpty) {
+    if (message['files'] == null || (message['files'] as List).isEmpty) {
       return const SizedBox.shrink();
     }
 
-    final attachments = message['attachments'] as List;
+    final attachments = message['files'] as List;
     const maxVisible = 4;
     final hasMore = attachments.length > maxVisible;
     final gridItemCount = hasMore ? maxVisible : attachments.length;
-    // Dynamic cross-axis count for better layout
     final crossAxisCount = attachments.length == 1 ? 1 : 2;
-    // For a single image, use a portrait-ish aspect ratio. For a grid, use squares.
     final aspectRatio = attachments.length == 1 ? 3 / 4 : 1.0;
 
     return GridView.builder(
@@ -319,7 +342,6 @@ class _ChatScreenState extends State<ChatScreen> {
         final attachment = attachments[index];
         final isLocalFile = !(attachment['url'] as String).startsWith('http');
 
-        // The last grid item, if there are more attachments to show
         if (hasMore && index == maxVisible - 1) {
           final remainingCount = attachments.length - maxVisible + 1;
           return GestureDetector(
@@ -355,7 +377,6 @@ class _ChatScreenState extends State<ChatScreen> {
           );
         }
 
-        // Regular attachment item
         return GestureDetector(
           onTap: () => _openMediaView(message, index),
           child: _buildAttachmentContent(attachment, isLocalFile),
@@ -389,7 +410,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
     Widget content;
     switch (attachmentType) {
-      case 'image':
+      case 'image/jpeg':
+      case 'image/png':
         content = Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
@@ -402,19 +424,20 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         );
         break;
-      case 'video':
+      case 'video/mp4':
         content = VideoPlayerWidget(
           url: isLocalFile ? null : attachment['url'],
           file: isLocalFile ? File(attachment['url']) : null,
         );
         break;
-      case 'audio':
+      case 'audio/mp3':
+      case 'voice':
         content = AudioWaveformWidget(
           audioPath: attachment['url'],
           isLocal: isLocalFile,
         );
         break;
-      case 'pdf':
+      case 'application/pdf':
         content = Container(
           padding: const EdgeInsets.all(8.0),
           decoration: BoxDecoration(
@@ -438,7 +461,6 @@ class _ChatScreenState extends State<ChatScreen> {
         );
         break;
       default:
-        // Generic file attachment
         content = Container(
           padding: const EdgeInsets.all(8.0),
           decoration: BoxDecoration(
@@ -493,169 +515,244 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildMessageContent(Map<String, dynamic> message, int index) {
-    final isYou =
-        message['senderId'] == dataController.user.value['user']['_id'];
-    final messages = dataController.currentConversationMessages;
-    final isSameSenderAsNext =
-        index > 0 && messages[index - 1]['senderId'] == message['senderId'];
-    final bottomMargin = isSameSenderAsNext ? 2.0 : 8.0;
-    final hasAttachment =
-        message['attachments'] != null && (message['attachments'] as List).isNotEmpty;
+ Widget _buildMessageContent(Map<String, dynamic> message, int index) {
+  final isYou = message['senderId']['_id'] == dataController.user.value['user']['_id'];
+  final messages = dataController.currentConversationMessages;
+  final isSameSenderAsNext = index > 0 && messages[index - 1]['senderId']['_id'] == message['senderId']['_id'];
+  final bottomMargin = isSameSenderAsNext ? 2.0 : 8.0;
+  final hasAttachment = message['files'] != null && (message['files'] as List).isNotEmpty;
 
-    return GestureDetector(
-      onLongPress: () {
-        if (!(message['deleted'] ?? false)) _showMessageOptions(message);
+  // Determine sender name for display
+  final sender = (dataController.currentChat.value['participants'] as List).firstWhere(
+    (p) => p['_id'] == message['senderId']['_id'],
+    orElse: () => {'_id': message['senderId']['_id'], 'name': 'Unknown User'},
+  );
+  final senderName = isYou ? 'You' : sender['name'];
+
+  return GestureDetector(
+    onLongPress: () {
+      if (!(message['deletedForEveryone'] ?? false)) _showMessageOptions(message);
+    },
+    child: Dismissible(
+      key: Key(message['_id']),
+      direction: (message['deletedForEveryone'] ?? false)
+          ? DismissDirection.none
+          : DismissDirection.startToEnd,
+      confirmDismiss: (direction) async {
+        setState(() {
+          _replyingTo = message;
+        });
+        return false;
       },
-      child: Dismissible(
-        key: Key(message['_id']),
-        direction: (message['deleted'] ?? false)
-            ? DismissDirection.none
-            : DismissDirection.startToEnd,
-        confirmDismiss: (direction) async {
-          setState(() {
-            _replyingTo = message;
-          });
-          return false;
-        },
-        background: Container(
-          color: Colors.tealAccent.withOpacity(0.5),
-          alignment: Alignment.centerLeft,
-          padding: const EdgeInsets.only(left: 16.0),
-          child: const Icon(Icons.reply, color: Colors.white),
+      background: Container(
+        color: Colors.tealAccent.withOpacity(0.5),
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.only(left: 16.0),
+        child: const Icon(Icons.reply, color: Colors.white),
+      ),
+      child: Container(
+        margin: EdgeInsets.only(bottom: bottomMargin),
+        padding: const EdgeInsets.all(12.0),
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.7,
         ),
-        child: Container(
-          margin: EdgeInsets.only(bottom: bottomMargin),
-          padding: const EdgeInsets.all(12.0),
-          constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.7,
-          ),
-          decoration: BoxDecoration(
-            color:
-                isYou ? Colors.tealAccent.withOpacity(0.2) : Colors.grey[800],
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            crossAxisAlignment:
-                isYou ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-            children: [
-              if (message['deleted'] ?? false)
-                Text(
-                  'Message deleted',
-                  style: TextStyle(
-                    color: Colors.grey[400],
-                    fontStyle: FontStyle.italic,
+        decoration: BoxDecoration(
+          color: isYou ? Colors.tealAccent.withOpacity(0.2) : Colors.grey[800],
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: isYou ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          children: [
+            // Display sender name for group chats
+            if (dataController.currentChat.value['type'] == 'group' && !isYou)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4.0),
+                child: Text(
+                  senderName,
+                  style: const TextStyle(
+                    color: Colors.tealAccent,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
                   ),
-                )
-              else ...[
-                if (message['replyTo'] != null)
-                  Obx(() {
-                    final originalMessage = dataController
-                        .currentConversationMessages
-                        .firstWhere(
-                      (m) => m['_id'] == message['replyTo'],
-                      orElse: () => {
-                          '_id': '',
-                          'senderId': '',
-                          'text': 'Original message not found.'},
-                    );
-                    // A message with an empty ID is our signal that the original message wasn't found
-                    if (originalMessage['_id'].isEmpty) {
-                      return const SizedBox.shrink();
-                    }
-                    return ReplyMessageSnippet(
-                      originalMessage: originalMessage,
-                      chat: dataController.currentChat.value,
-                      currentUserId: dataController.user.value['user']['_id'],
-                    );
-                  }),
-                if (message['voiceNote'] != null)
-                  GestureDetector(
-                    onTap: () {
-                      final attachmentsForViewer = [
-                        {
-                          'url': message['voiceNote']['url'],
-                          'type': 'audio',
-                          'filename': message['voiceNote']['url'].split('/').last,
-                        }
-                      ];
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => MediaViewPage(
-                            attachments: attachmentsForViewer,
-                            initialIndex: 0,
-                            message: '',
-                            userName: dataController.currentChat.value['isGroup']
-                                ? message['senderId']
-                                : (dataController.currentChat.value['participants'] as List)
-                                    .firstWhere((p) =>
-                                        p['_id'] !=
-                                        dataController
-                                            .user.value['user']['_id'])['name'],
-                            userAvatarUrl: null,
-                            timestamp: DateTime.parse(message['createdAt']),
-                            viewsCount: 0,
-                            likesCount: 0,
-                            repostsCount: 0,
-                          ),
-                        ),
-                      );
+                ),
+              ),
+            if (message['deletedForEveryone'] ?? false)
+              Text(
+                'Message deleted',
+                style: TextStyle(
+                  color: Colors.grey[400],
+                  fontStyle: FontStyle.italic,
+                ),
+              )
+            else ...[
+              if (message['replyTo'] != null)
+                Obx(() {
+                  final originalMessage = dataController.currentConversationMessages.firstWhere(
+                    (m) => m['_id'] == message['replyTo'],
+                    orElse: () => {
+                      '_id': '',
+                      'senderId': {'_id': '', 'name': 'Unknown User'},
+                      'content': 'Original message not found.',
+                      'files': [],
+                      'type': 'text',
                     },
-                    child: AudioWaveformWidget(
-                      audioPath: message['voiceNote']['url'],
-                      isLocal: true,
-                    ),
-                  ),
-                if (hasAttachment) ...[
-                  _buildAttachment(message),
-                  if (message['text'] != null && message['text']!.isNotEmpty)
-                    const SizedBox(height: 8),
-                ],
-                if (message['text'] != null && message['text']!.isNotEmpty)
-                  Text(
-                    message['text']!,
-                    style: TextStyle(
-                        color: isYou ? Colors.white : Colors.grey[200]),
-                  ),
-              ],
-              const SizedBox(height: 4),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (message['edited'] ?? false)
-                    Text(
-                      '(edited) ',
-                      style: TextStyle(
-                        color: Colors.grey[400],
-                        fontSize: 10,
-                        fontStyle: FontStyle.italic,
+                  );
+                  if (originalMessage['_id'].isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8.0),
+                    padding: const EdgeInsets.all(8.0),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[900]?.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(8),
+                      border: const Border(
+                        left: BorderSide(color: Colors.tealAccent, width: 4),
                       ),
                     ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          originalMessage['senderId']['_id'] == dataController.user.value['user']['_id']
+                              ? 'You'
+                              : (dataController.currentChat.value['participants'] as List).firstWhere(
+                                  (p) => p['_id'] == originalMessage['senderId']['_id'],
+                                  orElse: () => {'name': 'Unknown User'},
+                                )['name'],
+                          style: const TextStyle(
+                            color: Colors.tealAccent,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        if (originalMessage['files'] != null && (originalMessage['files'] as List).isNotEmpty)
+                          Row(
+                            children: [
+                              _buildReplyAttachmentPreview(originalMessage['files'][0]),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  originalMessage['files'][0]['type'].startsWith('image')
+                                      ? 'Image'
+                                      : originalMessage['files'][0]['filename'],
+                                  style: TextStyle(color: Colors.grey[300]),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          )
+                        else if (originalMessage['type'] == 'voice')
+                          Row(
+                            children: [
+                              const Icon(Icons.audiotrack, size: 24, color: Colors.white),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Voice note',
+                                style: TextStyle(color: Colors.grey[300]),
+                              ),
+                            ],
+                          )
+                        else
+                          Text(
+                            originalMessage['content'] ?? '',
+                            style: TextStyle(color: Colors.grey[300]),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                      ],
+                    ),
+                  );
+                }),
+              if (message['type'] == 'voice')
+                GestureDetector(
+                  onTap: () {
+                    final attachmentsForViewer = [
+                      {
+                        'url': message['files'][0]['url'],
+                        'type': 'voice',
+                        'filename': message['files'][0]['url'].split('/').last,
+                      }
+                    ];
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => MediaViewPage(
+                          attachments: attachmentsForViewer,
+                          initialIndex: 0,
+                          message: '',
+                          userName: dataController.currentChat.value['type'] == 'group'
+                              ? senderName
+                              : (dataController.currentChat.value['participants'] as List)
+                                  .firstWhere(
+                                    (p) => p['_id'] != dataController.user.value['user']['_id'],
+                                    orElse: () => {'name': 'Unknown User'},
+                                  )['name'],
+                          userAvatarUrl: sender['avatar'],
+                          timestamp: DateTime.parse(message['createdAt']),
+                          viewsCount: 0,
+                          likesCount: 0,
+                          repostsCount: 0,
+                        ),
+                      ),
+                    );
+                  },
+                  child: AudioWaveformWidget(
+                    audioPath: message['files'][0]['url'],
+                    isLocal: !(message['files'][0]['url'] as String).startsWith('http'),
+                  ),
+                ),
+              if (hasAttachment && message['type'] != 'voice') ...[
+                _buildAttachment(message),
+                if (message['content'] != null && message['content']!.isNotEmpty)
+                  const SizedBox(height: 8),
+              ],
+              if (message['content'] != null && message['content']!.isNotEmpty)
+                Text(
+                  message['content']!,
+                  style: TextStyle(color: isYou ? Colors.white : Colors.grey[200]),
+                ),
+            ],
+            const SizedBox(height: 4),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (message['edited'] ?? false)
                   Text(
-                    '${DateTime.parse(message['createdAt']).hour}:${DateTime.parse(message['createdAt']).minute}',
+                    '(edited) ',
                     style: TextStyle(
                       color: Colors.grey[400],
                       fontSize: 10,
+                      fontStyle: FontStyle.italic,
                     ),
                   ),
-                  if (isYou) ...[
-                    const SizedBox(width: 4),
-                    Icon(
-                      _getStatusIcon(message['status']),
-                      size: 12,
-                      color: _getStatusColor(message['status']),
-                    ),
-                  ],
+                Text(
+                  '${DateTime.parse(message['createdAt']).hour}:${DateTime.parse(message['createdAt']).minute}',
+                  style: TextStyle(
+                    color: Colors.grey[400],
+                    fontSize: 10,
+                  ),
+                ),
+                if (isYou) ...[
+                  const SizedBox(width: 4),
+                  Icon(
+                    _getStatusIcon(message['readReceipts']?.isNotEmpty ?? false
+                        ? message['readReceipts'][0]['status']
+                        : 'sent'),
+                    size: 12,
+                    color: _getStatusColor(message['readReceipts']?.isNotEmpty ?? false
+                        ? message['readReceipts'][0]['status']
+                        : 'sent'),
+                  ),
                 ],
-              ),
-            ],
-          ),
+              ],
+            ),
+          ],
         ),
       ),
-    );
+    ));
   }
-
   IconData _getStatusIcon(String? status) {
     switch (status) {
       case 'sending':
@@ -690,19 +787,19 @@ class _ChatScreenState extends State<ChatScreen> {
       case 'jpeg':
       case 'png':
       case 'gif':
-        return 'image';
+        return 'image/jpeg';
       case 'mp4':
       case 'mov':
       case 'avi':
-        return 'video';
+        return 'video/mp4';
       case 'mp3':
       case 'wav':
       case 'm4a':
-        return 'audio';
+        return 'audio/mp3';
       case 'pdf':
-        return 'pdf';
+        return 'application/pdf';
       default:
-        return 'file';
+        return 'application/octet-stream';
     }
   }
 
@@ -717,7 +814,6 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       }
 
-      // print('Chat data: $chat');
       final otherUser = chat['type'] == 'group'
           ? null
           : (chat['participants'] as List<dynamic>).firstWhere(
@@ -736,9 +832,6 @@ class _ChatScreenState extends State<ChatScreen> {
               (u) => u['_id'] == otherUser,
               orElse: () => {'name': 'Unknown', 'avatar': ''},
             );
-
-            // print(otherUserMap);
-                  print(otherUserMap['online']);
 
       return Scaffold(
         backgroundColor: Colors.black,
@@ -821,7 +914,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     final message =
                         dataController.currentConversationMessages[index];
                     return Align(
-                      alignment: message['senderId'] ==
+                      alignment: message['senderId']['_id'] ==
                               dataController.user.value['user']['_id']
                           ? Alignment.centerRight
                           : Alignment.centerLeft,
@@ -834,35 +927,9 @@ class _ChatScreenState extends State<ChatScreen> {
             if (_replyingTo != null) _buildReplyPreview(_replyingTo!),
             MessageInputArea(
               onSend: (text, files) {
-                final attachments = files
-                    .map((file) => {
-                          'filename': file.name,
-                          'url': file.path!,
-                          'size': file.size,
-                          'type': _getMediaType(file.extension ?? ''),
-                        })
-                    .toList();
-
-                final isVoiceNote = attachments.isNotEmpty &&
-                    attachments.first['type'] == 'audio';
-
-                    
-
-                final message = {
-                  'clientMessageId': dataController.newClientMessageId,
-                  'chatId': chat['_id'],
-                  'senderId': dataController.user.value['user']['_id'],
-                  'content': text,
-                  'createdAt': DateTime.now().toIso8601String(),
-                  'files': isVoiceNote ? null : attachments,
-                  'replyTo': _replyingTo?['_id'],
-                };
-
-                dataController.sendChatMessage(message);
-
-                setState(() {
-                  _replyingTo = null;
-                });
+                final isVoiceNote = files.isNotEmpty &&
+                    _getMediaType(files.first.extension ?? '') == 'audio/mp3';
+                _sendMessage(text, files, isVoiceNote: isVoiceNote);
               },
             ),
           ],

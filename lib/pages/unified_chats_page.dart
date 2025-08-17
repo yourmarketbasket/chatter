@@ -95,7 +95,7 @@ class _UnifiedChatsPageState extends State<UnifiedChatsPage> {
               );
             }
 
-            String preview = '...';
+            String preview = '';
             if (lastMessageData != null && lastMessageData is Map<String, dynamic>) {
               if (lastMessageData['attachments'] != null &&
                   (lastMessageData['attachments'] as List).isNotEmpty) {

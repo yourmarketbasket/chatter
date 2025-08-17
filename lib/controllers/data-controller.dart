@@ -140,8 +140,8 @@ class DataController extends GetxController {
         ),
       );
 
-      print('[DataController] fetchAllUsers API Response Status Code: ${response.statusCode}');
-      print('[DataController] fetchAllUsers API Response Data: ${response.data.toString()}');
+      // print('[DataController] fetchAllUsers API Response Status Code: ${response.statusCode}');
+      // print('[DataController] fetchAllUsers API Response Data: ${response.data.toString()}');
 
       if (response.statusCode == 200 && response.data['success'] == true) {
         if (response.data['users'] != null && response.data['users'] is List) {
@@ -1017,7 +1017,7 @@ class DataController extends GetxController {
         throw Exception('User not authenticated');
       }
       final response = await _dio.get(
-        'api/chats/$conversationId/messages',
+        'api/messages/$conversationId',
         options: dio.Options(
           headers: {'Authorization': 'Bearer $token'},
         ),
