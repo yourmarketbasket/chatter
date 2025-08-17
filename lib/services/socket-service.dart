@@ -363,7 +363,7 @@ class SocketService {
         // print('SocketService: Cannot add listener, socket is null');
     }
   }
-
+// more
   void removeListener(String event, void Function(dynamic) handler) {
     if (_socket != null) {
         // print('SocketService: Removing listener for event $event');
