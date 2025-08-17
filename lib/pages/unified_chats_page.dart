@@ -98,9 +98,22 @@ class _UnifiedChatsPageState extends State<UnifiedChatsPage> {
               } else {
                 preview = lastMessageData['content'] ?? '';
               }
-              if (lastMessageData['senderId'] == currentUserId) {
-                preview = 'You: $preview';
+              final senderId = lastMessageData['senderId'];
+              String senderName;
+              if (senderId == currentUserId) {
+                senderName = 'You';
+              } else {
+                if (isGroup) {
+                  final sender = (chat['participants'] as List).firstWhere(
+                    (p) => p['_id'] == senderId,
+                    orElse: () => {'name': '...'},
+                  );
+                  senderName = sender['name'];
+                } else {
+                  senderName = title; // In 1-on-1 chat, the title is the other user's name
+                }
               }
+              preview = '$senderName: $preview';
             }
 
             IconData statusIcon = Icons.access_time;

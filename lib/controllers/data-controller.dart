@@ -1075,7 +1075,9 @@ class DataController extends GetxController {
       );
       if (response.statusCode == 200 && response.data['success'] == true) {
         final List<dynamic> messageData = response.data['messages'];
-        currentConversationMessages.value = List<Map<String, dynamic>>.from(messageData);
+        final messages = List<Map<String, dynamic>>.from(messageData);
+        messages.sort((a, b) => DateTime.parse(a['createdAt']).compareTo(DateTime.parse(b['createdAt'])));
+        currentConversationMessages.value = messages;
       } else {
         throw Exception('Failed to fetch messages');
       }
@@ -2640,7 +2642,10 @@ void clearUserPosts() {
   void handleNewMessage(Map<String, dynamic> messageData) {
     // Add to the current conversation if it's the one being viewed
     if (currentConversationMessages.isNotEmpty && currentConversationMessages.first['chatId'] == messageData['chatId']) {
-      currentConversationMessages.insert(0, messageData);
+      // Check for duplicates before adding
+      if (!currentConversationMessages.any((m) => m['_id'] == messageData['_id'])) {
+        currentConversationMessages.add(messageData);
+      }
     }
 
     // Update the last message in the chats map
