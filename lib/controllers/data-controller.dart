@@ -106,9 +106,13 @@ class DataController extends GetxController {
       });
       final String? currentUserId = user.value['user']?['_id'];
       if (currentUserId != null && currentUserId.isNotEmpty) {
-          // print('[DataController.init] User loaded from storage. Fetching initial network data for $currentUserId');
-        fetchFollowers(currentUserId).catchError((e) =>   // print('Error fetching followers in init: $e'));
-        fetchFollowing(currentUserId).catchError((e) =>   // print('Error fetching following in init: $e'));
+        // print('[DataController.init] User loaded from storage. Fetching initial network data for $currentUserId');
+        fetchFollowers(currentUserId).catchError((e) {
+          // print('Error fetching followers in init: $e');
+        });
+        fetchFollowing(currentUserId).catchError((e) {
+          // print('Error fetching following in init: $e');
+        });
       }
 
       // For chat functionality, we need all users before we can correctly display chats.
@@ -949,9 +953,13 @@ class DataController extends GetxController {
             // Fetch user's network data (followers/following) for AppDrawer and Network page
             final String? currentUserId = user.value['user']?['_id'];
             if (currentUserId != null && currentUserId.isNotEmpty) {
-                // print('[DataController.loginUser] Fetching initial network data for $currentUserId');
-              fetchFollowers(currentUserId).catchError((e) =>   // print('Error fetching followers post-login: $e'));
-              fetchFollowing(currentUserId).catchError((e) =>   // print('Error fetching following post-login: $e'));
+              // print('[DataController.loginUser] Fetching initial network data for $currentUserId');
+              fetchFollowers(currentUserId).catchError((e) {
+                // print('Error fetching followers post-login: $e');
+              });
+              fetchFollowing(currentUserId).catchError((e) {
+                // print('Error fetching following post-login: $e');
+              });
             }
 
           } catch (feedError) {

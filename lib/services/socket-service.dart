@@ -261,7 +261,7 @@ class SocketService {
   void connect() {
     if (_socket == null) {
       print('SocketService: Cannot connect, socket is null. Reinitializing...');
-      _initializeSocket();
+      initSocket();
     }
     if (_socket != null && !_socket!.connected) {
       print('SocketService: Attempting to connect to ws://192.168.1.104:3000');
