@@ -23,6 +23,19 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
   @override
   void initState() {
     super.initState();
+    _initializeController();
+  }
+
+  @override
+  void didUpdateWidget(covariant VideoPlayerWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.url != oldWidget.url || widget.file != oldWidget.file) {
+      _controller.dispose();
+      _initializeController();
+    }
+  }
+
+  void _initializeController() {
     if (widget.file != null) {
       _controller = VideoPlayerController.file(widget.file!);
     } else {
