@@ -1069,7 +1069,7 @@ class DataController extends GetxController {
   }
 
   void addTemporaryMessage(Map<String, dynamic> message) {
-    currentConversationMessages.insert(0, message);
+    currentConversationMessages.add(message);
   }
 
   void updateUploadProgress(String clientMessageId, double progress) {

@@ -80,9 +80,7 @@ class _ChatScreenState extends State<ChatScreen> {
     // Add the temporary message to the UI
     dataController.addTemporaryMessage(tempMessage);
     _messageController.clear();
-    setState(() {
-      _replyingTo = null;
-    });
+    
 
     List<Map<String, dynamic>> uploadedFiles = [];
     if (files != null && files.isNotEmpty) {
@@ -131,6 +129,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
     // Send the final message to the backend
     await dataController.sendChatMessage(finalMessage, clientMessageId);
+    setState(() {
+      _replyingTo = null;
+    });
   }
 
   void _editMessage(Map<String, dynamic> message) {
@@ -992,7 +993,7 @@ class _ChatScreenState extends State<ChatScreen> {
             Expanded(
               child: Obx(() {
                 return ListView.builder(
-                  reverse: true,
+                  reverse: false,
                   padding: const EdgeInsets.symmetric(
                       vertical: 8.0, horizontal: 16.0),
                   itemCount: dataController.currentConversationMessages.length,
