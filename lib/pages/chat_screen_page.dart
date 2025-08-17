@@ -79,7 +79,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
     // Create a temporary message for optimistic UI update
     final tempMessage = {
-      '_id': clientMessageId, // Use clientMessageId as a temporary unique key
       'clientMessageId': clientMessageId,
       'chatId': dataController.currentChat.value['_id'],
       'senderId': {
@@ -662,7 +661,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (!(message['deletedForEveryone'] ?? false)) _showMessageOptions(message);
     },
     child: Dismissible(
-      key: Key(message['_id']),
+      key: Key(message['clientMessageId'] ?? message['_id']),
       direction: (message['deletedForEveryone'] ?? false)
           ? DismissDirection.none
           : DismissDirection.startToEnd,
