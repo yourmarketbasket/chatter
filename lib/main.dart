@@ -15,6 +15,7 @@ import 'package:get/get.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:logging/logging.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import 'package:chatter/helpers/timeago_helpers.dart';
 // import 'package:device_info_plus/device_info_plus.dart'; // No longer needed for player selection
 // import 'dart:io'; // No longer needed for player selection (Platform check)
 
@@ -23,8 +24,8 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Set timeago locale
-  timeago.setLocaleMessages('en_short', timeago.EnShortMessages());
-  timeago.setDefaultLocale('en_short');
+  timeago.setLocaleMessages('en_short_hr_ago', EnShortHrAgoMessages());
+  timeago.setDefaultLocale('en_short_hr_ago');
 
   // Suppress logging
   Logger.root.level = Level.OFF;
