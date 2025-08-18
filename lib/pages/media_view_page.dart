@@ -203,6 +203,7 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
         ],
       ),
       body: Stack(
+        clipBehavior: Clip.none, // This is the crucial fix to prevent the root stack from clipping
         children: [
           Column(
             children: [
@@ -266,7 +267,7 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
                           iconColor: Colors.grey[600],
                         );
                     }
-                    return Center(child: mediaWidget);
+                    return mediaWidget;
                   },
                 ),
               ),
@@ -305,20 +306,19 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
     // Retrieve width and height from attachment
     final num? imageWidth = attachment['width'] as num?;
     final num? imageHeight = attachment['height'] as num?;
-    double? originalAspectRatio;
-
-    if (imageWidth != null && imageHeight != null && imageWidth > 0 && imageHeight > 0) {
-      originalAspectRatio = imageWidth / imageHeight;
-    }
+    // Provide a fallback aspect ratio of 1.0 (square) if dimensions are invalid
+    final double originalAspectRatio = (imageWidth != null && imageHeight != null && imageWidth > 0 && imageHeight > 0)
+        ? imageWidth / imageHeight
+        : 1.0;
 
     _transformationController?.value = Matrix4.identity();
 
     final imageContentWidget = optimizedUrl?.isNotEmpty == true
         ? CachedNetworkImage(
             imageUrl: optimizedUrl!,
-            fit: BoxFit.contain,
-            memCacheWidth: 1080, // Cap memory for full-screen images
-            placeholder: (context, url) =>  Center(child: CircularProgressIndicator(strokeWidth: 1.0, valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent))),
+            fit: BoxFit.contain, // Contain ensures the image fits within the AspectRatio box
+            memCacheWidth: 1080,
+            placeholder: (context, url) => Center(child: CircularProgressIndicator(strokeWidth: 1.0, valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent))),
             errorWidget: (context, url, error) => buildError(context, message: 'Error loading image: $error'),
             cacheKey: url,
           )
@@ -326,23 +326,24 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
             ? Image.file(
                 file,
                 fit: BoxFit.contain,
-                // Width and alignment are handled by AspectRatio and InteractiveViewer
                 errorBuilder: (context, error, stackTrace) => buildError(context, message: 'Error loading image file: $error'),
               )
             : buildError(context, message: 'No image source available for $displayPath');
 
     Widget interactiveImage = InteractiveViewer(
       transformationController: _transformationController,
-      minScale: 0.5, // Allow zooming out slightly
+      minScale: 1.0, // Start at 1.0 to fill the AspectRatio box
       maxScale: 4.0,
-      constrained: false, // Allow panning beyond the screen boundaries
-      child: imageContentWidget,
+      constrained: false,
+      // The child is now an AspectRatio widget, which enforces the initial shape.
+      child: AspectRatio(
+        aspectRatio: originalAspectRatio,
+        child: imageContentWidget,
+      ),
     );
 
     return GestureDetector(
       onDoubleTapDown: (details) => _handleDoubleTap(details.localPosition),
-      // The InteractiveViewer will now be the direct child of GestureDetector (and thus Center from PageView's itemBuilder).
-      // It will use the screen space. The child (CachedNetworkImage with BoxFit.contain) will fit itself initially.
       child: interactiveImage,
     );
   }
