@@ -185,10 +185,13 @@ class _PostContentState extends State<PostContent> {
 
   Future<void> _handleBookmark(String currentEntryId, bool isBookmarkedByCurrentUser) async {
     Map<String, dynamic> result;
+    final String postId = widget.pageOriginalPostId ?? currentEntryId;
+    final String? replyId = widget.isReply ? currentEntryId : null;
+
     if (isBookmarkedByCurrentUser) {
-      result = await _dataController.unbookmarkPost(currentEntryId);
+      result = await _dataController.unbookmarkPost(postId, replyId: replyId);
     } else {
-      result = await _dataController.bookmarkPost(currentEntryId);
+      result = await _dataController.bookmarkPost(postId, replyId: replyId);
     }
 
     if (result['success'] == true) {

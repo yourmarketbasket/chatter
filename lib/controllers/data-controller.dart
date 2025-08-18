@@ -520,8 +520,11 @@ class DataController extends GetxController {
   }
 
   // Bookmark a post or reply
-  Future<Map<String, dynamic>> bookmarkPost(String itemId) async {
-    print('[DataController] Bookmarking item $itemId');
+  Future<Map<String, dynamic>> bookmarkPost(String postId, {String? replyId}) async {
+    final String endpoint = replyId != null
+        ? 'api/posts/$postId/replies/$replyId/bookmark'
+        : 'api/posts/$postId/bookmark';
+    print('[DataController] Bookmarking item: $endpoint');
     try {
       String? token = user.value['token'];
       if (token == null) {
@@ -529,7 +532,7 @@ class DataController extends GetxController {
       }
 
       var response = await _dio.post(
-        'api/posts/$itemId/bookmark',
+        endpoint,
         options: dio.Options(
           headers: {
             'Authorization': 'Bearer $token',
@@ -538,22 +541,25 @@ class DataController extends GetxController {
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
-        print('[DataController] Bookmarked item $itemId successfully');
+        print('[DataController] Bookmarked item successfully');
         // The socket event will handle the update.
         return {'success': true, 'message': response.data['message'] ?? 'Bookmarked successfully'};
       } else {
-        print('[DataController] Failed to bookmark item $itemId: ${response.data['message']}');
+        print('[DataController] Failed to bookmark item: ${response.data['message']}');
         return {'success': false, 'message': response.data['message'] ?? 'Failed to bookmark'};
       }
     } catch (e) {
-      print('[DataController] Error bookmarking item $itemId: $e');
+      print('[DataController] Error bookmarking item: $e');
       return {'success': false, 'message': e.toString()};
     }
   }
 
   // Unbookmark a post or reply
-  Future<Map<String, dynamic>> unbookmarkPost(String itemId) async {
-    print('[DataController] Unbookmarking item $itemId');
+  Future<Map<String, dynamic>> unbookmarkPost(String postId, {String? replyId}) async {
+    final String endpoint = replyId != null
+        ? 'api/posts/$postId/replies/$replyId/bookmark'
+        : 'api/posts/$postId/bookmark';
+    print('[DataController] Unbookmarking item: $endpoint');
     try {
       String? token = user.value['token'];
       if (token == null) {
@@ -561,7 +567,7 @@ class DataController extends GetxController {
       }
 
       var response = await _dio.delete(
-        'api/posts/$itemId/bookmark',
+        endpoint,
         options: dio.Options(
           headers: {
             'Authorization': 'Bearer $token',
@@ -570,15 +576,15 @@ class DataController extends GetxController {
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
-        print('[DataController] Unbookmarked item $itemId successfully');
+        print('[DataController] Unbookmarked item successfully');
         // The socket event will handle the update.
         return {'success': true, 'message': response.data['message'] ?? 'Unbookmarked successfully'};
       } else {
-        print('[DataController] Failed to unbookmark item $itemId: ${response.data['message']}');
+        print('[DataController] Failed to unbookmark item: ${response.data['message']}');
         return {'success': false, 'message': response.data['message'] ?? 'Failed to unbookmark'};
       }
     } catch (e) {
-      print('[DataController] Error unbookmarking item $itemId: $e');
+      print('[DataController] Error unbookmarking item: $e');
       return {'success': false, 'message': e.toString()};
     }
   }
