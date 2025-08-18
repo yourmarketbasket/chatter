@@ -132,10 +132,9 @@ class _UsersListPageState extends State<UsersListPage> {
                 participantIds.add(currentUserId);
                 // print(participantIds);
 
-                final newChat = await _dataController.createChat(
+                final newChat = await _dataController.createGroupChat(
                   participantIds,
-                  isGroup: true,
-                  groupName: groupNameController.text,
+                  groupNameController.text,
                 );
 
                 Get.back(); // Close dialog
@@ -327,16 +326,17 @@ class _UsersListPageState extends State<UsersListPage> {
                     _dataController.currentChat.value = existingChat;
                     Get.to(() => const ChatScreen());
                   } else {
-                    // Chat does not exist, create it
-                    final newChat = await _dataController
-                        .createChat([currentUserId, userId]);
-                    if (newChat != null) {
-                      _dataController.currentChat.value = newChat;
-                      Get.to(() => const ChatScreen());
-                    } else {
-                      Get.snackbar('Error', 'Could not create chat.',
-                          snackPosition: SnackPosition.BOTTOM);
-                    }
+                    // For a new DM, don't create the chat here.
+                    // Instead, navigate to ChatScreen and pass the potential participant.
+                    // The ChatScreen will be responsible for creating the chat on the first message.
+                    final tempChat = {
+                      'participants': [_dataController.user.value['user'], user],
+                      'type': 'dm',
+                      // No '_id' yet
+                    };
+
+                    _dataController.currentChat.value = tempChat;
+                    Get.to(() => const ChatScreen());
                   }
                 }
               },
