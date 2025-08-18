@@ -195,8 +195,7 @@ class DataController extends GetxController {
         ),
       );
 
-      print('[DataController] fetchAllUsers API Response Status Code: ${response.statusCode}');
-      print('[DataController] fetchAllUsers API Response Data: ${response.data.toString()}');
+      
 
       if (response.statusCode == 200 && response.data['success'] == true) {
         if (response.data['users'] != null && response.data['users'] is List) {
@@ -2961,7 +2960,7 @@ void clearUserPosts() {
         // print("Sending createChat request with data: $requestData");
 
       final response = await _dio.post(
-        'api/chats',
+        'api/messages',
         data: requestData,
         options: dio.Options(
           headers: {'Authorization': 'Bearer $token'},

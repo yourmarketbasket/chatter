@@ -576,12 +576,12 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                       children: [
                         // Part 1: Display Name, Yellow Checkmark //
                         Text(
-                          '@'+username, // This is the display name
+                          '@$username', // This is the display name
                           style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: isReply ? 10 : 12, color: Colors.white),
                           overflow: TextOverflow.ellipsis,
                         ),
-                        
                         Icon(Icons.verified, color: Colors.amber, size: isReply ? 13 : 15), // Yellow checkmark
+                        
                         
 
                         // Part 2: @username · Time · Time Ago · Date (dot separated)
@@ -665,8 +665,9 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                         _buildActionButton(isLikedByCurrentUser ? Icons.favorite : FeatherIcons.heart, '$likesCount', () => _toggleLikeStatus(postId, isLikedByCurrentUser), isLiked: isLikedByCurrentUser),
                         const SizedBox(width: 12),
                         _buildActionButton(isBookmarkedByCurrentUser ? Icons.bookmark : FeatherIcons.bookmark, '$bookmarksCount', () => _handleBookmark(postId, isBookmarkedByCurrentUser), isBookmarked: isBookmarkedByCurrentUser),
+                        // share
                         const SizedBox(width: 12),
-                        _buildActionButton(FeatherIcons.share, '', () { print("Share action triggered for post $postId"); }),
+                        _buildActionButton(Icons.share_outlined, '', () {}),
                       ],
                     ),
                   ],
@@ -708,32 +709,31 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       iconColor = Colors.amber;
     }
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      mainAxisAlignment: MainAxisAlignment.start,
-      children: [
-        IconButton(
-          icon: Icon(
-            icon,
-            color: iconColor,
-            size: 14, // Reduced icon size
-          ),
-          constraints: const BoxConstraints(), // Remove IconButton default padding
-          padding: const EdgeInsets.only(right: 2.0, left: 5.0), // Minimal horizontal padding for the icon button itself
-          onPressed: onPressed,
-        ),
-        if (text.isNotEmpty) // Conditionally display text
-          Padding(
-            padding: const EdgeInsets.only(right: 5.0), // Add some padding to the right of the text if it exists
-            child: Text(
-              text,
-              style: GoogleFonts.roboto(
-                color: const Color.fromARGB(255, 255, 255, 255),
-                fontSize: 12, // Reduced text size
-              ),
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+
+        margin: EdgeInsets.only(right: 15.0, top: 12.0, bottom: 12.0),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            Icon(
+              icon,
+              color: iconColor,
+              size: 14, // Reduced icon size
             ),
-          ),
-      ],
+            if (text.isNotEmpty) // Conditionally display text
+              Text(
+                text,
+                style: GoogleFonts.roboto(
+                  color: const Color.fromARGB(255, 255, 255, 255),
+                  fontSize: 10, // Reduced text size
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 
