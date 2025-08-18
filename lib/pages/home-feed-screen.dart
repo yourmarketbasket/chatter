@@ -712,7 +712,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       onTap: onPressed,
       child: Container(
 
-        margin: EdgeInsets.only(right: 15.0, top: 12.0, bottom: 12.0),
+        margin: EdgeInsets.only(right: 15.0, top: 15.0, bottom: 12.0),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.start,
