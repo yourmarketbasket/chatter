@@ -1,23 +1,20 @@
 import 'package:chatter/controllers/data-controller.dart';
 import 'package:chatter/pages/reply_page.dart';
 import 'package:chatter/widgets/app_drawer.dart';
-import 'package:chatter/widgets/reply/post_content.dart'; // Assuming this can be reused/adapted
-import 'package:chatter/widgets/reply/reply_attachment_grid.dart'; // For image grids
-import 'package:chatter/widgets/reply/stat_button.dart';
-import 'package:chatter/widgets/video_attachment_widget.dart';
-import 'package:chatter/widgets/audio_attachment_widget.dart';
-import 'package:chatter/widgets/realtime_timeago_text.dart';
-import 'package:flutter/material.dart';
-import 'package:get/get.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:feather_icons/feather_icons.dart';
+import 'package:chatter/pages/profile_page.dart';
 import 'package:chatter/services/media_visibility_service.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:chatter/pages/media_view_page.dart';
 import 'dart:io';
 import 'package:intl/intl.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import 'package:chatter/widgets/video_attachment_widget.dart';
+import 'package:chatter/widgets/audio_attachment_widget.dart';
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:feather_icons/feather_icons.dart';
 
 class UserPostsPage extends StatefulWidget {
   final String userId;
@@ -255,7 +252,7 @@ class _UserPostsPageState extends State<UserPostsPage> {
   }
 
   Widget _buildAttachmentGrid(List<Map<String, dynamic>> attachmentsArg, Map<String, dynamic> post, String postId) {
-    const double itemSpacing = 4.0;
+    double itemSpacing = 4.0;
     List<Map<String, dynamic>> videoAttachmentsInGrid = attachmentsArg.where((att) => att['type'] == 'video').toList();
     bool isVideoGrid = videoAttachmentsInGrid.length > 1;
 
@@ -297,7 +294,7 @@ class _UserPostsPageState extends State<UserPostsPage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(child: _buildAttachmentWidget(attachmentsArg[0], 0, post, BorderRadius.zero, fit: BoxFit.cover, postId: postId, isVideoGrid: isVideoGrid && attachmentsArg[0]['type'] == 'video')),
-          const SizedBox(width: itemSpacing),
+          SizedBox(width: itemSpacing),
           Expanded(child: _buildAttachmentWidget(attachmentsArg[1], 1, post, BorderRadius.zero, fit: BoxFit.cover, postId: postId, isVideoGrid: isVideoGrid && attachmentsArg[1]['type'] == 'video')),
         ],
       );
@@ -306,14 +303,14 @@ class _UserPostsPageState extends State<UserPostsPage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(flex: 2, child: _buildAttachmentWidget(attachmentsArg[0], 0, post, BorderRadius.zero, fit: BoxFit.cover, postId: postId, isVideoGrid: isVideoGrid && attachmentsArg[0]['type'] == 'video')),
-          const SizedBox(width: itemSpacing),
+          SizedBox(width: itemSpacing),
           Expanded(
             flex: 1,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Expanded(child: _buildAttachmentWidget(attachmentsArg[1], 1, post, BorderRadius.zero, fit: BoxFit.cover, postId: postId, isVideoGrid: isVideoGrid && attachmentsArg[1]['type'] == 'video')),
-                const SizedBox(height: itemSpacing),
+                SizedBox(height: itemSpacing),
                 Expanded(child: _buildAttachmentWidget(attachmentsArg[2], 2, post, BorderRadius.zero, fit: BoxFit.cover, postId: postId, isVideoGrid: isVideoGrid && attachmentsArg[2]['type'] == 'video')),
               ],
             ),
@@ -323,8 +320,8 @@ class _UserPostsPageState extends State<UserPostsPage> {
     } else if (attachmentsArg.length == 4) {
       return GridView.builder(
         shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: itemSpacing, mainAxisSpacing: itemSpacing, childAspectRatio: 1),
+        physics: NeverScrollableScrollPhysics(),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: itemSpacing, mainAxisSpacing: itemSpacing, childAspectRatio: 1),
         itemCount: 4,
         itemBuilder: (context, index) => _buildAttachmentWidget(attachmentsArg[index], index, post, BorderRadius.zero, fit: BoxFit.cover, postId: postId, isVideoGrid: isVideoGrid && attachmentsArg[index]['type'] == 'video'),
       );
@@ -336,20 +333,20 @@ class _UserPostsPageState extends State<UserPostsPage> {
             child: Column(
               children: [
                 Expanded(child: _buildAttachmentWidget(attachmentsArg[0], 0, post, BorderRadius.zero, fit: BoxFit.cover, postId: postId, isVideoGrid: isVideoGrid && attachmentsArg[0]['type'] == 'video')),
-                const SizedBox(height: itemSpacing),
+                SizedBox(height: itemSpacing),
                 Expanded(child: _buildAttachmentWidget(attachmentsArg[1], 1, post, BorderRadius.zero, fit: BoxFit.cover, postId: postId, isVideoGrid: isVideoGrid && attachmentsArg[1]['type'] == 'video')),
               ],
             )
           ),
-          const SizedBox(width: itemSpacing),
+          SizedBox(width: itemSpacing),
           Expanded(
             flex: 1,
             child: Column(
               children: [
                 Expanded(child: _buildAttachmentWidget(attachmentsArg[2], 2, post, BorderRadius.zero, fit: BoxFit.cover, postId: postId, isVideoGrid: isVideoGrid && attachmentsArg[2]['type'] == 'video')),
-                const SizedBox(height: itemSpacing),
+                SizedBox(height: itemSpacing),
                 Expanded(child: _buildAttachmentWidget(attachmentsArg[3], 3, post, BorderRadius.zero, fit: BoxFit.cover, postId: postId, isVideoGrid: isVideoGrid && attachmentsArg[3]['type'] == 'video')),
-                const SizedBox(height: itemSpacing),
+                SizedBox(height: itemSpacing),
                 Expanded(child: _buildAttachmentWidget(attachmentsArg[4], 4, post, BorderRadius.zero, fit: BoxFit.cover, postId: postId, isVideoGrid: isVideoGrid && attachmentsArg[4]['type'] == 'video')),
               ],
             )
@@ -439,10 +436,12 @@ class _UserPostsPageState extends State<UserPostsPage> {
       if (displayUrl != null && displayUrl.isNotEmpty) {
         contentWidget = AspectRatio(
           aspectRatio: pdfAspectRatio,
-          child: PdfView(
-            controller: PdfController(
-              document: PdfDocument.openUri(Uri.parse(displayUrl)),
-            ),
+          child: PdfThumbnailWidget(
+            pdfUrl: displayUrl,
+            aspectRatio: pdfAspectRatio,
+            onTap: () {
+              _navigateToMediaViewPage(context, correctlyTypedPostAttachments, attachmentMap, post, idx);
+            },
           ),
         );
       } else {
@@ -475,16 +474,13 @@ class _UserPostsPageState extends State<UserPostsPage> {
     );
   }
 
-
   void _navigateToReplyPage(Map<String, dynamic> post) {
     Get.to(() => ReplyPage(post: post, postDepth: 0));
   }
 
-
   @override
   void initState() {
     super.initState();
-    // Clear previous user posts if any, and fetch new ones.
     _dataController.clearUserPosts();
     _dataController.fetchUserPosts(widget.userId).catchError((error) {
       if (mounted) {
@@ -497,80 +493,6 @@ class _UserPostsPageState extends State<UserPostsPage> {
         );
       }
     });
-  }
-
-  // Helper to build attachment widgets based on type (simplified)
-  Widget _buildAttachmentView(Map<String, dynamic> attachment, Map<String, dynamic> postData) {
-    String type = attachment['type'] ?? 'unknown';
-    String url = attachment['url'] ?? '';
-    final BorderRadius defaultBorderRadius = BorderRadius.circular(12.0);
-
-    // Add more specific widgets as needed, mirroring home_feed_screen.dart
-    if (type.startsWith('image/')) {
-      // For single images, directly use CachedNetworkImage or similar.
-      return ClipRRect( // Ensure images also respect border radius if they are standalone
-        borderRadius: defaultBorderRadius,
-        child: CachedNetworkImage(
-          imageUrl: url,
-          placeholder: (context, url) => Container(
-            height: 150, // Example height, adjust as needed
-            decoration: BoxDecoration(
-              color: Colors.grey[800],
-              borderRadius: defaultBorderRadius,
-            ),
-            child: Center(child: Icon(FeatherIcons.image, color: Colors.grey[600])),
-          ),
-          errorWidget: (context, url, error) => Container(
-            height: 150, // Example height
-            decoration: BoxDecoration(
-              color: Colors.grey[800],
-              borderRadius: defaultBorderRadius,
-            ),
-            child: Center(child: Icon(FeatherIcons.alertCircle, color: Colors.red[400])),
-          ),
-          fit: BoxFit.cover,
-        ),
-      );
-    } else if (type.startsWith('video/')) {
-      return VideoAttachmentWidget(
-        key: ValueKey(attachment['url'] ?? attachment['_id'] ?? UniqueKey().toString()), // Unique key
-        attachment: attachment,
-        post: postData, // Use postData parameter
-        borderRadius: defaultBorderRadius,
-        // isFeedContext can be true if you want feed-like constraints, or false for native aspect ratio
-        // enforceFeedConstraints might be relevant here if UserPostsPage should behave like a feed
-      );
-    } else if (type.startsWith('audio/')) {
-      return AudioAttachmentWidget(
-        key: ValueKey(attachment['url'] ?? attachment['_id'] ?? UniqueKey().toString()), // Unique key
-        attachment: attachment,
-        post: postData, // Use postData parameter
-        borderRadius: defaultBorderRadius,
-      );
-    } else if (type == 'application/pdf') {
-      return Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.grey[850],
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.grey[700]!)
-        ),
-        child: Row(
-          children: [
-            Icon(FeatherIcons.fileText, color: Colors.redAccent[100], size: 24),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                attachment['filename'] ?? 'PDF Document',
-                style: GoogleFonts.roboto(color: Colors.white, fontSize: 14),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-    return Text('Unsupported attachment: ${attachment['filename'] ?? type}', style: GoogleFonts.roboto(color: Colors.grey[500]));
   }
 
   Widget _buildPostContent(Map<String, dynamic> post, {required bool isReply}) {
@@ -622,7 +544,7 @@ class _UserPostsPageState extends State<UserPostsPage> {
         // top spacing
         const SizedBox(height: 5),
         GestureDetector(
-          onTap: () => _handleReplyToItem(postId),
+          onTap: () => _navigateToReplyPage(post),
           behavior: HitTestBehavior.opaque,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -725,7 +647,7 @@ class _UserPostsPageState extends State<UserPostsPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.start,
                       children: [
-                        _buildActionButton(FeatherIcons.messageCircle, '$replyCount', () => _handleReplyToItem(postId)),
+                        _buildActionButton(FeatherIcons.messageCircle, '$replyCount', () => _navigateToReplyPage(post)),
                         const SizedBox(width: 12),
                         _buildActionButton(FeatherIcons.eye, '$views', () { print("View action triggered for post $postId"); }),
                         const SizedBox(width: 12),
@@ -797,5 +719,95 @@ class _UserPostsPageState extends State<UserPostsPage> {
         );
       }),
     );
+  }
+}
+
+class PdfThumbnailWidget extends StatefulWidget {
+  final String pdfUrl;
+  final double aspectRatio;
+  final VoidCallback onTap;
+
+  const PdfThumbnailWidget({
+    Key? key,
+    required this.pdfUrl,
+    required this.aspectRatio,
+    required this.onTap,
+  }) : super(key: key);
+
+  @override
+  _PdfThumbnailWidgetState createState() => _PdfThumbnailWidgetState();
+}
+
+class _PdfThumbnailWidgetState extends State<PdfThumbnailWidget> {
+  Future<Widget>? _pdfViewerFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPdf();
+  }
+
+  void _loadPdf() {
+  }
+
+  Widget _buildFallback() {
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.grey[850],
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                FeatherIcons.fileText,
+                color: Colors.white.withOpacity(0.7),
+                size: 40,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                "Open PDF",
+                style: GoogleFonts.roboto(
+                  color: Colors.white.withOpacity(0.7),
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    try {
+      final pdfWidget = PdfViewer.uri(
+        Uri.parse(widget.pdfUrl),
+        params: PdfViewerParams(
+          margin: 0,
+          maxScale: 0.8,
+          minScale: 0.5,
+          loadingBannerBuilder: (context, bytesLoaded, totalBytes) {
+            return Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent.withOpacity(0.5)), strokeWidth: 2,));
+          },
+          errorBannerBuilder: (context, error, stackTrace, documentRef) {
+            print("PdfViewer errorBannerBuilder: $error");
+            return _buildFallback();
+          },
+          backgroundColor: Colors.grey[800] ?? Colors.grey,
+        ),
+      );
+
+      return GestureDetector(
+        onTap: widget.onTap,
+        child: pdfWidget,
+      );
+    } catch (e, s) {
+      print("Error creating PdfViewer.uri for thumbnail: $e\n$s");
+      return _buildFallback();
+    }
   }
 }
