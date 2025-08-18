@@ -35,21 +35,21 @@ class _ContactsPageState extends State<ContactsPage> {
       });
     } else {
       final currentUserId = _dataController.user.value['user']['_id'];
+      final currentUserData = _dataController.user.value['user'];
 
       // Look for an existing chat
       Map<String, dynamic>? existingChat;
       try {
         existingChat = _dataController.chats.values.firstWhere(
           (chat) {
-            if (chat['isGroup'] == true) return false;
+            if (chat['type'] == 'group') return false;
 
             final participantIds = (chat['participants'] as List).map((p) {
               if (p is Map<String, dynamic>) return p['_id'] as String;
               return p as String;
             }).toSet(); // Use a Set for efficient lookup
 
-            return participantIds.contains(currentUserId) &&
-                participantIds.contains(user['_id']);
+            return participantIds.length == 2 && participantIds.contains(currentUserId) && participantIds.contains(user['_id']);
           },
         );
       } catch (e) {
@@ -64,26 +64,20 @@ class _ContactsPageState extends State<ContactsPage> {
           MaterialPageRoute(builder: (context) => const ChatScreen()),
         );
       } else {
-        // Chat does not exist, create it
-        final currentUserData = _dataController.user.value['user'];
-        // print([currentUserId, user['_id']]);
-        _dataController
-            .createChat([user['_id']], isGroup: false)
-            .then((chat) {
-          if (chat != null) {
-            final hydratedChat = Map<String, dynamic>.from(chat);
-            hydratedChat['participants'] = [currentUserData, user];
-            _dataController.chats[chat['_id']] = hydratedChat;
-            _dataController.currentChat.value = hydratedChat;
+        // For a new DM, don't create the chat here.
+        // Instead, navigate to ChatScreen and pass the potential participant.
+        // The ChatScreen will be responsible for creating the chat on the first message.
+        final tempChat = {
+          'participants': [currentUserData, user],
+          'type': 'dm',
+          // No '_id' yet
+        };
 
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const ChatScreen()),
-            );
-          } else {
-            Get.snackbar('Error', 'Could not create chat.');
-          }
-        });
+        _dataController.currentChat.value = tempChat;
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const ChatScreen()),
+        );
       }
     }
   }

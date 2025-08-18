@@ -506,15 +506,20 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         ? DateTime.parse(post['createdAt'] as String).toUtc()
         : DateTime.now().toUtc();
 
+    final String currentUserId = dataController.user.value['user']?['_id'] ?? '';
+
     final List<dynamic> likesList = post['likes'] as List<dynamic>? ?? [];
     final int likesCount = likesList.length;
-    final String currentUserId = dataController.user.value['user']?['_id'] ?? '';
     final bool isLikedByCurrentUser = likesList.any((like) => (like is Map ? like['_id'] == currentUserId : like.toString() == currentUserId));
 
     final List<dynamic> repostsDynamicList = post['reposts'] as List<dynamic>? ?? [];
     final List<String> repostsList = repostsDynamicList.map((e) => e.toString()).toList();
     final int repostsCount = repostsList.length;
     final bool isRepostedByCurrentUser = repostsList.contains(currentUserId);
+
+    final List<dynamic> bookmarkedByList = post['bookmarkedBy'] as List<dynamic>? ?? [];
+    final bool isBookmarkedByCurrentUser = bookmarkedByList.any((bookmark) => (bookmark is Map ? bookmark['_id'] == currentUserId : bookmark.toString() == currentUserId));
+    final int bookmarksCount = post['bookmarksCount'] as int? ?? bookmarkedByList.length;
 
     int views;
     if (post.containsKey('viewsCount') && post['viewsCount'] is int) {
@@ -649,13 +654,19 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                       _buildAttachmentGrid(attachments, post, postId),
                     ],
                     Row( // Action Buttons
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      mainAxisAlignment: MainAxisAlignment.start,
                       children: [
-                        _buildActionButton(isLikedByCurrentUser ? Icons.favorite : FeatherIcons.heart, '$likesCount', () => _toggleLikeStatus(postId, isLikedByCurrentUser), isLiked: isLikedByCurrentUser),
                         _buildActionButton(FeatherIcons.messageCircle, '$replyCount', () => _navigateToReplyPage(post)),
-                        _buildActionButton(FeatherIcons.repeat, '$repostsCount', () => _handleRepostAction(post), isReposted: isRepostedByCurrentUser),
+                        const SizedBox(width: 12),
                         _buildActionButton(FeatherIcons.eye, '$views', () { print("View action triggered for post $postId"); }),
-                        _buildActionButton(FeatherIcons.bookmark, '', () { print("Bookmark action triggered for post $postId (UI only)"); }),
+                        const SizedBox(width: 12),
+                        _buildActionButton(FeatherIcons.repeat, '$repostsCount', () => _handleRepostAction(post), isReposted: isRepostedByCurrentUser),
+                        const SizedBox(width: 12),
+                        _buildActionButton(isLikedByCurrentUser ? Icons.favorite : FeatherIcons.heart, '$likesCount', () => _toggleLikeStatus(postId, isLikedByCurrentUser), isLiked: isLikedByCurrentUser),
+                        const SizedBox(width: 12),
+                        _buildActionButton(isBookmarkedByCurrentUser ? Icons.bookmark : FeatherIcons.bookmark, '$bookmarksCount', () => _handleBookmark(postId, isBookmarkedByCurrentUser), isBookmarked: isBookmarkedByCurrentUser),
+                        const SizedBox(width: 12),
+                        _buildActionButton(FeatherIcons.share, '', () { print("Share action triggered for post $postId"); }),
                       ],
                     ),
                   ],
@@ -678,12 +689,23 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     // and _buildPostContent will be called again with updated post data.
   }
 
-  Widget _buildActionButton(IconData icon, String text, VoidCallback onPressed, {bool isLiked = false, bool isReposted = false}) {
+  void _handleBookmark(String postId, bool isCurrentlyBookmarked) async {
+    if (isCurrentlyBookmarked) {
+      await dataController.unbookmarkPost(postId);
+    } else {
+      await dataController.bookmarkPost(postId);
+    }
+    // The Obx will rebuild the list with updated post data.
+  }
+
+  Widget _buildActionButton(IconData icon, String text, VoidCallback onPressed, {bool isLiked = false, bool isReposted = false, bool isBookmarked = false}) {
     Color iconColor = const Color.fromARGB(255, 255, 255, 255); // Default color
     if (isLiked) {
       iconColor = Colors.redAccent;
     } else if (isReposted) {
-      iconColor = Colors.tealAccent; // Color for reposted state
+      iconColor = Colors.tealAccent;
+    } else if (isBookmarked) {
+      iconColor = Colors.amber;
     }
 
     return Row(

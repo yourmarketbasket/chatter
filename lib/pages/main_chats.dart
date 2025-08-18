@@ -303,59 +303,83 @@ class _MainChatsPageState extends State<MainChatsPage> {
                           }
                         }
 
-                        return ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                          leading: Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              CircleAvatar(
-                                radius: 24,
-                                backgroundColor: Colors.tealAccent.withOpacity(0.2),
-                                backgroundImage: avatarUrl.isNotEmpty ? CachedNetworkImageProvider(avatarUrl) : null,
-                                child: avatarUrl.isEmpty ? Text(avatarLetter, style: const TextStyle(color: Colors.tealAccent, fontWeight: FontWeight.bold)) : null,
-                              ),
-                              if (isGroup)
-                                const Positioned(
-                                  right: -4,
-                                  bottom: -4,
-                                  child: CircleAvatar(
-                                    radius: 12,
-                                    backgroundColor: Colors.black,
-                                    child: Icon(Icons.group, size: 16, color: Colors.tealAccent),
+                        return GestureDetector(
+                          onLongPress: () {
+                            showDialog(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: const Text('Delete Chat'),
+                                content: const Text('Are you sure you want to permanently delete this chat and all its messages?'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    child: const Text('Cancel'),
                                   ),
-                                ),
-                            ],
-                          ),
-                          title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
-                          subtitle: Text(
-                            preview,
-                            style: TextStyle(color: Colors.grey[400], fontSize: 14),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          trailing: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              if (!isGroup) trailingWidget,
-                              if (lastMessageData != null && lastMessageData is Map<String, dynamic>)
-                                Text(
-                                  formatLastSeen(DateTime.parse(lastMessageData['createdAt'] as String).toLocal()),
-                                  style: TextStyle(color: Colors.grey[400], fontSize: 12),
-                                ),
-                              if (lastMessageData != null && lastMessageData is Map<String, dynamic> && lastMessageData['senderId'] == currentUserId)
-                                Icon(statusIcon, size: 16, color: statusColor),
-                            ],
-                          ),
-                          onTap: () {
-                            _dataController.currentChat.value = chat;
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const ChatScreen(),
+                                  TextButton(
+                                    onPressed: () async {
+                                      Navigator.pop(context);
+                                      await _dataController.deleteChat(chat['_id']);
+                                    },
+                                    child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                                  ),
+                                ],
                               ),
                             );
                           },
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                            leading: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                CircleAvatar(
+                                  radius: 24,
+                                  backgroundColor: Colors.tealAccent.withOpacity(0.2),
+                                  backgroundImage: avatarUrl.isNotEmpty ? CachedNetworkImageProvider(avatarUrl) : null,
+                                  child: avatarUrl.isEmpty ? Text(avatarLetter, style: const TextStyle(color: Colors.tealAccent, fontWeight: FontWeight.bold)) : null,
+                                ),
+                                if (isGroup)
+                                  const Positioned(
+                                    right: -4,
+                                    bottom: -4,
+                                    child: CircleAvatar(
+                                      radius: 12,
+                                      backgroundColor: Colors.black,
+                                      child: Icon(Icons.group, size: 16, color: Colors.tealAccent),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+                            subtitle: Text(
+                              preview,
+                              style: TextStyle(color: Colors.grey[400], fontSize: 14),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            trailing: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                if (!isGroup) trailingWidget,
+                                if (lastMessageData != null && lastMessageData is Map<String, dynamic>)
+                                  Text(
+                                    formatLastSeen(DateTime.parse(lastMessageData['createdAt'] as String).toLocal()),
+                                    style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                                  ),
+                                if (lastMessageData != null && lastMessageData is Map<String, dynamic> && lastMessageData['senderId'] == currentUserId)
+                                  Icon(statusIcon, size: 16, color: statusColor),
+                              ],
+                            ),
+                            onTap: () {
+                              _dataController.currentChat.value = chat;
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const ChatScreen(),
+                                ),
+                              );
+                            },
+                          ),
                         );
                       },
                       childCount: allChats.length,

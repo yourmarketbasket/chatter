@@ -183,6 +183,36 @@ class _PostContentState extends State<PostContent> {
     }
   }
 
+  Future<void> _handleBookmark(String currentEntryId, String threadOriginalPostId, bool isBookmarkedByCurrentUser) async {
+    Map<String, dynamic> result;
+    final String? replyId = widget.isReply ? currentEntryId : null;
+    if (isBookmarkedByCurrentUser) {
+      result = await _dataController.unbookmarkPost(threadOriginalPostId, replyId: replyId);
+    } else {
+      result = await _dataController.bookmarkPost(threadOriginalPostId, replyId: replyId);
+    }
+
+    if (result['success'] == true) {
+      if (mounted) {
+        setState(() {
+          var newBookmarkedByList = List<dynamic>.from(_currentPostData['bookmarkedBy'] ?? []);
+          final currentUserId = _dataController.user.value['user']['_id'];
+          if (isBookmarkedByCurrentUser) {
+            newBookmarkedByList.removeWhere((id) => id is String ? id == currentUserId : id['_id'] == currentUserId);
+          } else if (!newBookmarkedByList.any((bookmark) => bookmark is String ? bookmark == currentUserId : bookmark['_id'] == currentUserId)) {
+            newBookmarkedByList.add(currentUserId);
+          }
+          _currentPostData['bookmarkedBy'] = newBookmarkedByList;
+          // The API does not return a count, so we manage it locally.
+          _currentPostData['bookmarksCount'] = newBookmarkedByList.length;
+        });
+        widget.onReplyDataUpdated(_currentPostData);
+      }
+    } else {
+      widget.showSnackBar('Error', result['message'] ?? 'Failed to update bookmark.', Colors.red[700]!);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final String currentEntryId = _currentPostData['_id'] as String? ?? '';
@@ -212,6 +242,10 @@ class _PostContentState extends State<PostContent> {
     final String currentUserId = _dataController.user.value['user']?['_id'] ?? '';
     final List<dynamic> likesList = _currentPostData['likes'] is List ? _currentPostData['likes'] as List<dynamic> : [];
     final bool isLikedByCurrentUser = likesList.any((like) => (like is Map ? like['_id'] == currentUserId : like.toString() == currentUserId));
+
+    final List<dynamic> bookmarkedByList = _currentPostData['bookmarkedBy'] is List ? _currentPostData['bookmarkedBy'] as List<dynamic> : [];
+    final bool isBookmarkedByCurrentUser = bookmarkedByList.any((bookmark) => (bookmark is Map ? bookmark['_id'] == currentUserId : bookmark.toString() == currentUserId));
+    final int bookmarksCount = _currentPostData['bookmarksCount'] as int? ?? bookmarkedByList.length;
 
     final int likesCount = _currentPostData['likesCount'] as int? ?? likesList.length;
     final int repostsCount = _currentPostData['repostsCount'] as int? ?? (_currentPostData['reposts']?.length ?? 0);
@@ -412,6 +446,17 @@ class _PostContentState extends State<PostContent> {
                           ],
                         ),
                         const SizedBox(height: 6),
+                        if (widget.isReply && _currentPostData.containsKey('replyingTo'))
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4.0),
+                            child: Text(
+                              'Replying to @${_currentPostData['replyingTo']}',
+                              style: GoogleFonts.roboto(
+                                fontSize: 12,
+                                color: Colors.tealAccent,
+                              ),
+                            ),
+                          ),
                         RichText(
                           text: TextSpan(
                             style: GoogleFonts.roboto(
@@ -436,7 +481,7 @@ class _PostContentState extends State<PostContent> {
                   Padding(
                     padding: const EdgeInsets.only(left: 0),
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      mainAxisAlignment: MainAxisAlignment.start,
                       children: [
                         if (itemDepth < 9)
                           StatButton(
@@ -447,6 +492,7 @@ class _PostContentState extends State<PostContent> {
                           )
                         else
                           const SizedBox(width: 24 + 8),
+                        const SizedBox(width: 12),
                         StatButton(
                           icon: FeatherIcons.eye,
                           text: '$viewsCount',
@@ -455,30 +501,28 @@ class _PostContentState extends State<PostContent> {
                             print("Views button tapped for post/reply $currentEntryId - $viewsCount views");
                           },
                         ),
+                        const SizedBox(width: 12),
                         StatButton(
                           icon: FeatherIcons.repeat,
                           text: '$repostsCount',
                           color: Colors.greenAccent,
                           onPressed: () => _handleRepost(currentEntryId, threadOriginalPostId, currentUserId),
                         ),
+                        const SizedBox(width: 12),
                         StatButton(
                           icon: isLikedByCurrentUser ? Icons.favorite : FeatherIcons.heart,
                           text: '$likesCount',
                           color: isLikedByCurrentUser ? Colors.pinkAccent : Colors.pinkAccent.withOpacity(0.7),
                           onPressed: () => _handleLike(currentEntryId, threadOriginalPostId, isLikedByCurrentUser, currentUserId),
                         ),
-                        // Common Bookmark Button for both reply and non-reply
+                        const SizedBox(width: 12),
                         StatButton(
-                          icon: FeatherIcons.bookmark,
-                          text: '', // No text for bookmark
-                          color: Colors.white70, // Default color, can be changed based on state
-                          onPressed: () {
-                            // Placeholder for bookmark logic
-                            print('Bookmark action triggered for Post/Reply ID: $currentEntryId (UI only, no snackbar)');
-                            // In a real scenario, you would update bookmark state here
-                            // and potentially call widget.onReplyDataUpdated or a specific bookmark update callback
-                          },
+                          icon: isBookmarkedByCurrentUser ? Icons.bookmark : FeatherIcons.bookmark,
+                          text: '$bookmarksCount',
+                          color: isBookmarkedByCurrentUser ? Colors.amber : Colors.white70,
+                          onPressed: () => _handleBookmark(currentEntryId, threadOriginalPostId, isBookmarkedByCurrentUser),
                         ),
+                        const SizedBox(width: 12),
                         StatButton(
                           icon: FeatherIcons.share2,
                           text: '',

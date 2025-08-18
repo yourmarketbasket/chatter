@@ -145,6 +145,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final finalMessage = {
       'clientMessageId': clientMessageId,
       'chatId': dataController.currentChat.value['_id'],
+      'participants': dataController.currentChat.value['participants'],
       'senderId': {
         '_id': dataController.user.value['user']['_id'],
         'name': dataController.user.value['user']['name'],
@@ -173,6 +174,7 @@ class _ChatScreenState extends State<ChatScreen> {
         content: TextField(
           controller: editController,
           decoration: const InputDecoration(hintText: 'Edit your message'),
+          autofocus: true,
         ),
         actions: [
           TextButton(
@@ -182,8 +184,7 @@ class _ChatScreenState extends State<ChatScreen> {
           TextButton(
             onPressed: () {
               if (editController.text.trim().isNotEmpty) {
-                dataController.editChatMessage(
-                    message['_id'], editController.text.trim());
+                dataController.editChatMessage(message['_id'], editController.text.trim());
               }
               Navigator.pop(context);
             },
@@ -194,8 +195,8 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  void _deleteMessage(Map<String, dynamic> message) {
-    dataController.deleteChatMessage(message['_id']);
+  void _deleteMessage(Map<String, dynamic> message, {required bool forEveryone}) {
+    dataController.deleteChatMessage(message['_id'], forEveryone: forEveryone);
   }
 
   void _showMessageOptions(Map<String, dynamic> message) {
@@ -204,25 +205,32 @@ class _ChatScreenState extends State<ChatScreen> {
       builder: (context) => Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          ListTile(
-            leading: const Icon(Icons.edit),
-            title: const Text('Edit'),
-            onTap: () {
-              Navigator.pop(context);
-              if (message['senderId'] ==
-                  dataController.user.value['user']['_id']) {
+          if (message['senderId']['_id'] == dataController.user.value['user']['_id'])
+            ListTile(
+              leading: const Icon(Icons.edit),
+              title: const Text('Edit'),
+              onTap: () {
+                Navigator.pop(context);
                 _editMessage(message);
-              }
-            },
-          ),
+              },
+            ),
           ListTile(
             leading: const Icon(Icons.delete),
-            title: const Text('Delete'),
+            title: const Text('Delete for me'),
             onTap: () {
               Navigator.pop(context);
-              _deleteMessage(message);
+              _deleteMessage(message, forEveryone: false);
             },
           ),
+          if (message['senderId']['_id'] == dataController.user.value['user']['_id'])
+            ListTile(
+              leading: const Icon(Icons.delete_forever),
+              title: const Text('Delete for everyone'),
+              onTap: () {
+                Navigator.pop(context);
+                _deleteMessage(message, forEveryone: true);
+              },
+            ),
           ListTile(
             leading: const Icon(Icons.thumb_up),
             title: const Text('React'),

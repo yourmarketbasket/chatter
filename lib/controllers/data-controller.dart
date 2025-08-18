@@ -187,7 +187,7 @@ class DataController extends GetxController {
       // The route is users/get-all-users, parameters: userid
       // Assuming userid is the current user's ID to contextualize follow status
       final response = await _dio.get(
-        'api/users/get-all-users', // Appending currentUserId as per common REST practice for parameters in path
+        'api/users', // Appending currentUserId as per common REST practice for parameters in path
         options: dio.Options(
           headers: {
             'Authorization': 'Bearer $token',
@@ -195,13 +195,13 @@ class DataController extends GetxController {
         ),
       );
 
-      //   // print('[DataController] fetchAllUsers API Response Status Code: ${response.statusCode}');
-      //   // print('[DataController] fetchAllUsers API Response Data: ${response.data.toString()}');
+      print('[DataController] fetchAllUsers API Response Status Code: ${response.statusCode}');
+      print('[DataController] fetchAllUsers API Response Data: ${response.data.toString()}');
 
       if (response.statusCode == 200 && response.data['success'] == true) {
         if (response.data['users'] != null && response.data['users'] is List) {
           List<dynamic> fetchedUsersDynamic = response.data['users'];
-            // print('[DataController] fetchAllUsers: Successfully fetched ${fetchedUsersDynamic.length} raw user entries.');
+          print('[DataController] fetchAllUsers: Successfully fetched ${fetchedUsersDynamic.length} raw user entries.');
           // Process users: ensure all necessary fields are present and correctly typed.
           // Add 'isFollowingCurrentUser' based on the main user's following list.
           final List<String> currentUserFollowingIds = List<String>.from(
@@ -246,26 +246,26 @@ class DataController extends GetxController {
           }).where((userMap) => userMap.isNotEmpty && userMap['_id'] != currentUserId).toList(); // Filter out empty maps and the current user
 
           allUsers.assignAll(fetchedUsers);
-            // print('[DataController] Fetched all users successfully. Count: ${allUsers.length}');
+          print('[DataController] Fetched all users successfully. Count: ${allUsers.length}');
         } else {
           allUsers.clear();
-            // print('[DataController] Fetched all users but the user list is null or not a list.');
+          print('[DataController] Fetched all users but the user list is null or not a list.');
           throw Exception('User list not found in response or invalid format.');
         }
       } else {
         allUsers.clear();
-          // print('[DataController] Failed to fetch all users. Status: ${response.statusCode}, Message: ${response.data?['message']}');
+        print('[DataController] Failed to fetch all users. Status: ${response.statusCode}, Message: ${response.data?['message']}');
         throw Exception('Failed to fetch all users: ${response.data?['message'] ?? "Unknown server error"}');
       }
     } catch (e) {
       allUsers.clear(); // Clear on error
-        // print('[DataController] Error in fetchAllUsers: ${e.toString()}');
+      print('[DataController] Error in fetchAllUsers: ${e.toString()}');
       // Optionally rethrow or handle as per UI requirements (e.g., show snackbar)
-        // print('[DataController] fetchAllUsers caught error: ${e.toString()}');
+      print('[DataController] fetchAllUsers caught error: ${e.toString()}');
       // For now, UsersListPage will show an error based on allUsers being empty + isLoading false.
     } finally {
       isLoading.value = false; // Reset loading state
-        // print('[DataController] fetchAllUsers finally block. isLoading: ${isLoading.value}, allUsers count: ${allUsers.length}');
+      print('[DataController] fetchAllUsers finally block. isLoading: ${isLoading.value}, allUsers count: ${allUsers.length}');
     }
   }
 
@@ -516,6 +516,103 @@ class DataController extends GetxController {
         return {'success': false, 'message': response.data['message'] ?? 'Post like failed'};
       }
     } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  // Bookmark a post or reply
+  Future<Map<String, dynamic>> bookmarkPost(String postId, {String? replyId}) async {
+    print('[DataController] Bookmarking post $postId');
+    try {
+      String? token = user.value['token'];
+      if (token == null) {
+        return {'success': false, 'message': 'User not authenticated'};
+      }
+
+      var response = await _dio.post(
+        'api/posts/$postId/bookmark',
+        data: replyId != null ? {'replyId': replyId} : {},
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        print('[DataController] Bookmarked post $postId successfully');
+        // Optionally, update local state
+        return {'success': true, 'message': response.data['message'] ?? 'Bookmarked successfully'};
+      } else {
+        print('[DataController] Failed to bookmark post $postId: ${response.data['message']}');
+        return {'success': false, 'message': response.data['message'] ?? 'Failed to bookmark'};
+      }
+    } catch (e) {
+      print('[DataController] Error bookmarking post $postId: $e');
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  // Unbookmark a post or reply
+  Future<Map<String, dynamic>> unbookmarkPost(String postId, {String? replyId}) async {
+    print('[DataController] Unbookmarking post $postId');
+    try {
+      String? token = user.value['token'];
+      if (token == null) {
+        return {'success': false, 'message': 'User not authenticated'};
+      }
+
+      var response = await _dio.delete(
+        'api/posts/$postId/bookmark',
+        data: replyId != null ? {'replyId': replyId} : {},
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        print('[DataController] Unbookmarked post $postId successfully');
+        // Optionally, update local state
+        return {'success': true, 'message': response.data['message'] ?? 'Unbookmarked successfully'};
+      } else {
+        print('[DataController] Failed to unbookmark post $postId: ${response.data['message']}');
+        return {'success': false, 'message': response.data['message'] ?? 'Failed to unbookmark'};
+      }
+    } catch (e) {
+      print('[DataController] Error unbookmarking post $postId: $e');
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  // Get bookmarked posts
+  Future<Map<String, dynamic>> getBookmarkedPosts() async {
+    print('[DataController] Fetching bookmarked posts');
+    try {
+      String? token = user.value['token'];
+      if (token == null) {
+        return {'success': false, 'message': 'User not authenticated'};
+      }
+
+      var response = await _dio.get(
+        'api/posts/bookmarked',
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        print('[DataController] Fetched bookmarked posts successfully');
+        return {'success': true, 'posts': response.data['posts']};
+      } else {
+        print('[DataController] Failed to fetch bookmarked posts: ${response.data['message']}');
+        return {'success': false, 'message': response.data['message'] ?? 'Failed to fetch bookmarks'};
+      }
+    } catch (e) {
+      print('[DataController] Error fetching bookmarked posts: $e');
       return {'success': false, 'message': e.toString()};
     }
   }
@@ -1100,21 +1197,35 @@ class DataController extends GetxController {
 
   // Send a new chat message
   Future<void> sendChatMessage(Map<String, dynamic> message, String clientMessageId) async {
+    print('[DataController] Sending message: $message');
     try {
       final token = user.value['token'];
       if (token == null) {
         throw Exception('User not authenticated');
       }
 
+      final Map<String, dynamic> messageToSend = Map<String, dynamic>.from(message);
+
+      // If chatId is not present, it's a new chat
+      if (messageToSend['chatId'] == null || (messageToSend['chatId'] as String).isEmpty) {
+        final List<dynamic> participants = messageToSend['participants'];
+        final List<String> participantIds = participants.map((p) => p['_id'] as String).toList();
+        // Remove the current user from the list of participants to send to the backend
+        participantIds.remove(user.value['user']['_id']);
+        messageToSend['participants'] = participantIds;
+      }
+
+
       final response = await _dio.post(
         'api/messages',
-        data: message,
+        data: messageToSend,
         options: dio.Options(
           headers: {'Authorization': 'Bearer $token'},
         ),
       );
 
       if (response.statusCode == 201 && response.data['success'] == true) {
+        print('[DataController] Sent message successfully');
         final responseData = response.data;
         final sentMessage = responseData['message'];
 
@@ -1137,10 +1248,11 @@ class DataController extends GetxController {
           currentConversationMessages[messageIndex] = sentMessage;
         }
       } else {
+        print('[DataController] Failed to send message: ${response.data?['message']}');
         throw Exception('Failed to send message: ${response.data?['message']}');
       }
     } catch (e) {
-        // print('Error sending message: $e');
+      print('[DataController] Error sending message: $e');
       updateMessageStatus(clientMessageId, 'failed');
     }
   }
@@ -1187,28 +1299,91 @@ class DataController extends GetxController {
   }
 
   Future<void> editChatMessage(String messageId, String newText) async {
-    final int index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
-    if (index != -1) {
-      final originalMessage = currentConversationMessages[index];
-      originalMessage['text'] = newText;
-      originalMessage['edited'] = true;
-      currentConversationMessages[index] = originalMessage;
-
-      // TODO: API call to edit message on backend
+    print('[DataController] Editing message $messageId');
+    try {
+      final token = user.value['token'];
+      if (token == null) {
+        throw Exception('User not authenticated');
+      }
+      final response = await _dio.patch(
+        'api/messages/$messageId',
+        data: {'content': newText},
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        print('[DataController] Edited message $messageId successfully');
+        final index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
+        if (index != -1) {
+          final originalMessage = currentConversationMessages[index];
+          originalMessage['content'] = newText;
+          originalMessage['edited'] = true;
+          currentConversationMessages[index] = originalMessage;
+        }
+      } else {
+        print('[DataController] Failed to edit message $messageId');
+        throw Exception('Failed to edit message');
+      }
+    } catch (e) {
+      print('[DataController] Error editing message $messageId: $e');
     }
   }
 
-  Future<void> deleteChatMessage(String messageId) async {
-    final int index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
-    if (index != -1) {
-      final originalMessage = currentConversationMessages[index];
-      originalMessage['text'] = 'Message deleted';
-      originalMessage['attachments'] = null;
-      originalMessage['voiceNote'] = null;
-      originalMessage['deleted'] = true;
-      currentConversationMessages[index] = originalMessage;
+  Future<void> deleteChatMessage(String messageId, {bool forEveryone = false}) async {
+    print('[DataController] Deleting message $messageId');
+    try {
+      final token = user.value['token'];
+      if (token == null) {
+        throw Exception('User not authenticated');
+      }
+      final response = await _dio.delete(
+        'api/messages/$messageId',
+        queryParameters: forEveryone ? {'for': 'everyone'} : null,
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        print('[DataController] Deleted message $messageId successfully');
+        currentConversationMessages.removeWhere((m) => m['_id'] == messageId);
+      } else {
+        print('[DataController] Failed to delete message $messageId');
+        throw Exception('Failed to delete message');
+      }
+    } catch (e) {
+      print('[DataController] Error deleting message $messageId: $e');
+    }
+  }
 
-      // TODO: API call to delete message on backend
+  Future<Map<String, dynamic>> deleteChat(String chatId) async {
+    print('[DataController] Deleting chat $chatId');
+    try {
+      String? token = user.value['token'];
+      if (token == null) {
+        return {'success': false, 'message': 'User not authenticated'};
+      }
+
+      var response = await _dio.delete(
+        'api/chats/$chatId/permanent',
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        print('[DataController] Deleted chat $chatId successfully');
+        chats.remove(chatId);
+        return {'success': true, 'message': response.data['message'] ?? 'Chat deleted successfully'};
+      } else {
+        print('[DataController] Failed to delete chat $chatId: ${response.data['message']}');
+        return {'success': false, 'message': response.data['message'] ?? 'Failed to delete chat'};
+      }
+    } catch (e) {
+      print('[DataController] Error deleting chat $chatId: $e');
+      return {'success': false, 'message': e.toString()};
     }
   }
 
