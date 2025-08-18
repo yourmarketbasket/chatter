@@ -88,6 +88,8 @@ class SocketService {
       'post:like': (data) => _handlePostAction(data, 'post:like'),
       'post:unlike': (data) => _handlePostAction(data, 'post:unlike'),
       'post:view': (data) => _handlePostAction(data, 'post:view'),
+      'post:bookmark': (data) => _handleBookmarkAction(data, 'post:bookmark'),
+      'post:unbookmark': (data) => _handleBookmarkAction(data, 'post:unbookmark'),
       'reply:new': (data) => _handleNewReplyToReply(data),
       'reply:like': (data) => _handleReplyAction(data, 'reply:like'),
       'reply:unlike': (data) => _handleReplyAction(data, 'reply:unlike'),
@@ -165,6 +167,16 @@ class SocketService {
         data['postId'] is String &&
         data['userId'] is String) {
       _dataController.fetchSinglePost(data['postId']);
+      _eventController.add({'event': event, 'data': data});
+    } else {
+        // print('SocketService: Invalid $event data format: ${data.runtimeType}');
+    }
+  }
+
+  void _handleBookmarkAction(dynamic data, String event) {
+    if (data is Map<String, dynamic> &&
+        data['post'] is Map<String, dynamic>) {
+      _dataController.updatePostFromSocket(data['post']);
       _eventController.add({'event': event, 'data': data});
     } else {
         // print('SocketService: Invalid $event data format: ${data.runtimeType}');

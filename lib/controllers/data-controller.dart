@@ -520,8 +520,8 @@ class DataController extends GetxController {
   }
 
   // Bookmark a post or reply
-  Future<Map<String, dynamic>> bookmarkPost(String postId, {String? replyId}) async {
-    print('[DataController] Bookmarking post $postId');
+  Future<Map<String, dynamic>> bookmarkPost(String itemId) async {
+    print('[DataController] Bookmarking item $itemId');
     try {
       String? token = user.value['token'];
       if (token == null) {
@@ -529,8 +529,7 @@ class DataController extends GetxController {
       }
 
       var response = await _dio.post(
-        'api/posts/$postId/bookmark',
-        data: replyId != null ? {'replyId': replyId} : {},
+        'api/posts/$itemId/bookmark',
         options: dio.Options(
           headers: {
             'Authorization': 'Bearer $token',
@@ -539,22 +538,22 @@ class DataController extends GetxController {
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
-        print('[DataController] Bookmarked post $postId successfully');
-        // Optionally, update local state
+        print('[DataController] Bookmarked item $itemId successfully');
+        // The socket event will handle the update.
         return {'success': true, 'message': response.data['message'] ?? 'Bookmarked successfully'};
       } else {
-        print('[DataController] Failed to bookmark post $postId: ${response.data['message']}');
+        print('[DataController] Failed to bookmark item $itemId: ${response.data['message']}');
         return {'success': false, 'message': response.data['message'] ?? 'Failed to bookmark'};
       }
     } catch (e) {
-      print('[DataController] Error bookmarking post $postId: $e');
+      print('[DataController] Error bookmarking item $itemId: $e');
       return {'success': false, 'message': e.toString()};
     }
   }
 
   // Unbookmark a post or reply
-  Future<Map<String, dynamic>> unbookmarkPost(String postId, {String? replyId}) async {
-    print('[DataController] Unbookmarking post $postId');
+  Future<Map<String, dynamic>> unbookmarkPost(String itemId) async {
+    print('[DataController] Unbookmarking item $itemId');
     try {
       String? token = user.value['token'];
       if (token == null) {
@@ -562,8 +561,7 @@ class DataController extends GetxController {
       }
 
       var response = await _dio.delete(
-        'api/posts/$postId/bookmark',
-        data: replyId != null ? {'replyId': replyId} : {},
+        'api/posts/$itemId/bookmark',
         options: dio.Options(
           headers: {
             'Authorization': 'Bearer $token',
@@ -572,15 +570,15 @@ class DataController extends GetxController {
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
-        print('[DataController] Unbookmarked post $postId successfully');
-        // Optionally, update local state
+        print('[DataController] Unbookmarked item $itemId successfully');
+        // The socket event will handle the update.
         return {'success': true, 'message': response.data['message'] ?? 'Unbookmarked successfully'};
       } else {
-        print('[DataController] Failed to unbookmark post $postId: ${response.data['message']}');
+        print('[DataController] Failed to unbookmark item $itemId: ${response.data['message']}');
         return {'success': false, 'message': response.data['message'] ?? 'Failed to unbookmark'};
       }
     } catch (e) {
-      print('[DataController] Error unbookmarking post $postId: $e');
+      print('[DataController] Error unbookmarking item $itemId: $e');
       return {'success': false, 'message': e.toString()};
     }
   }
@@ -805,6 +803,7 @@ class DataController extends GetxController {
     processedItem['likesCount'] = (processedItem['likes'] as List?)?.length ?? 0;
     processedItem['repostsCount'] = (processedItem['reposts'] as List?)?.length ?? 0;
     processedItem['viewsCount'] = (processedItem['views'] as List?)?.length ?? 0;
+    processedItem['bookmarksCount'] = (processedItem['bookmarks'] as List?)?.length ?? 0;
 
     // Ensure attachments are correctly typed (List<Map<String, dynamic>>)
     if (processedItem['attachments'] is List) {
@@ -845,6 +844,7 @@ class DataController extends GetxController {
     processedItem['likes'] ??= [];
     processedItem['reposts'] ??= [];
     processedItem['views'] ??= [];
+    processedItem['bookmarks'] ??= [];
 
     return processedItem;
   }
@@ -2946,7 +2946,7 @@ void clearUserPosts() {
     }
   }
 
-  Future<Map<String, dynamic>?> createChat(List<String> participantIds, {bool isGroup = false, String? groupName}) async {
+  Future<Map<String, dynamic>?> createGroupChat(List<String> participantIds, String groupName) async {
     try {
       final token = user.value['token'];
       if (token == null) {
@@ -2954,31 +2954,35 @@ void clearUserPosts() {
       }
       final requestData = {
         'participants': participantIds,
-        'type': isGroup ? 'group' : 'dm',
-        if (isGroup) 'name': groupName,
+        'type': 'group',
+        'name': groupName,
       };
-        // print("Sending createChat request with data: $requestData");
+      print("Sending create group chat request with data: $requestData");
 
       final response = await _dio.post(
-        'api/messages',
+        'api/chats',
         data: requestData,
         options: dio.Options(
           headers: {'Authorization': 'Bearer $token'},
         ),
       );
 
-        // print("Received createChat response: ${response.data}");
+      print("Received create group chat response: ${response.data}");
 
-      if (response.statusCode == 201 && response.data['success'] == true) {
-        // Instead of manually handling the new chat, just refetch all chats.
-        // This will trigger the syncAllChatRooms logic and ensure UI consistency.
-        fetchChats();
-        return response.data['chat'];
+      if ((response.statusCode == 200 || response.statusCode == 201) && response.data != null) {
+        // The response is the new chat object
+        final newChat = response.data;
+        // Add to local chats list
+        chats[newChat['_id']] = newChat;
+        // Join the new socket room
+        Get.find<SocketService>().joinChatRoom(newChat['_id']);
+        chats.refresh();
+        return newChat;
       } else {
-        throw Exception('Failed to create chat');
+        throw Exception('Failed to create group chat: ${response.data?['message']}');
       }
     } catch (e) {
-        // print('Error creating chat: $e');
+      print('Error creating group chat: $e');
       return null;
     }
   }

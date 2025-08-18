@@ -115,8 +115,7 @@ class _ContactsPageState extends State<ContactsPage> {
               if (groupName.isNotEmpty) {
                 // print(participantIds);
                 _dataController
-                    .createChat(participantIds,
-                        isGroup: true, groupName: groupName)
+                    .createGroupChat(participantIds, groupName)
                     .then((chat) {
                   Get.back(); // Close dialog
                   if (chat != null) {

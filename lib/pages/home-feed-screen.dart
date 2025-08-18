@@ -517,9 +517,9 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     final int repostsCount = repostsList.length;
     final bool isRepostedByCurrentUser = repostsList.contains(currentUserId);
 
-    final List<dynamic> bookmarkedByList = post['bookmarkedBy'] as List<dynamic>? ?? [];
-    final bool isBookmarkedByCurrentUser = bookmarkedByList.any((bookmark) => (bookmark is Map ? bookmark['_id'] == currentUserId : bookmark.toString() == currentUserId));
-    final int bookmarksCount = post['bookmarksCount'] as int? ?? bookmarkedByList.length;
+    final List<dynamic> bookmarksList = post['bookmarks'] as List<dynamic>? ?? [];
+    final bool isBookmarkedByCurrentUser = bookmarksList.any((bookmark) => (bookmark is Map ? bookmark['_id'] == currentUserId : bookmark.toString() == currentUserId));
+    final int bookmarksCount = post['bookmarksCount'] as int? ?? bookmarksList.length;
 
     int views;
     if (post.containsKey('viewsCount') && post['viewsCount'] is int) {

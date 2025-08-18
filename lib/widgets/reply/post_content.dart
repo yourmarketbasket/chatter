@@ -183,28 +183,26 @@ class _PostContentState extends State<PostContent> {
     }
   }
 
-  Future<void> _handleBookmark(String currentEntryId, String threadOriginalPostId, bool isBookmarkedByCurrentUser) async {
+  Future<void> _handleBookmark(String currentEntryId, bool isBookmarkedByCurrentUser) async {
     Map<String, dynamic> result;
-    final String? replyId = widget.isReply ? currentEntryId : null;
     if (isBookmarkedByCurrentUser) {
-      result = await _dataController.unbookmarkPost(threadOriginalPostId, replyId: replyId);
+      result = await _dataController.unbookmarkPost(currentEntryId);
     } else {
-      result = await _dataController.bookmarkPost(threadOriginalPostId, replyId: replyId);
+      result = await _dataController.bookmarkPost(currentEntryId);
     }
 
     if (result['success'] == true) {
       if (mounted) {
         setState(() {
-          var newBookmarkedByList = List<dynamic>.from(_currentPostData['bookmarkedBy'] ?? []);
+          var newBookmarksList = List<dynamic>.from(_currentPostData['bookmarks'] ?? []);
           final currentUserId = _dataController.user.value['user']['_id'];
           if (isBookmarkedByCurrentUser) {
-            newBookmarkedByList.removeWhere((id) => id is String ? id == currentUserId : id['_id'] == currentUserId);
-          } else if (!newBookmarkedByList.any((bookmark) => bookmark is String ? bookmark == currentUserId : bookmark['_id'] == currentUserId)) {
-            newBookmarkedByList.add(currentUserId);
+            newBookmarksList.removeWhere((id) => id is String ? id == currentUserId : id['_id'] == currentUserId);
+          } else if (!newBookmarksList.any((bookmark) => bookmark is String ? bookmark == currentUserId : bookmark['_id'] == currentUserId)) {
+            newBookmarksList.add(currentUserId);
           }
-          _currentPostData['bookmarkedBy'] = newBookmarkedByList;
-          // The API does not return a count, so we manage it locally.
-          _currentPostData['bookmarksCount'] = newBookmarkedByList.length;
+          _currentPostData['bookmarks'] = newBookmarksList;
+          _currentPostData['bookmarksCount'] = newBookmarksList.length;
         });
         widget.onReplyDataUpdated(_currentPostData);
       }
@@ -243,9 +241,9 @@ class _PostContentState extends State<PostContent> {
     final List<dynamic> likesList = _currentPostData['likes'] is List ? _currentPostData['likes'] as List<dynamic> : [];
     final bool isLikedByCurrentUser = likesList.any((like) => (like is Map ? like['_id'] == currentUserId : like.toString() == currentUserId));
 
-    final List<dynamic> bookmarkedByList = _currentPostData['bookmarkedBy'] is List ? _currentPostData['bookmarkedBy'] as List<dynamic> : [];
-    final bool isBookmarkedByCurrentUser = bookmarkedByList.any((bookmark) => (bookmark is Map ? bookmark['_id'] == currentUserId : bookmark.toString() == currentUserId));
-    final int bookmarksCount = _currentPostData['bookmarksCount'] as int? ?? bookmarkedByList.length;
+    final List<dynamic> bookmarksList = _currentPostData['bookmarks'] is List ? _currentPostData['bookmarks'] as List<dynamic> : [];
+    final bool isBookmarkedByCurrentUser = bookmarksList.any((bookmark) => (bookmark is Map ? bookmark['_id'] == currentUserId : bookmark.toString() == currentUserId));
+    final int bookmarksCount = _currentPostData['bookmarksCount'] as int? ?? bookmarksList.length;
 
     final int likesCount = _currentPostData['likesCount'] as int? ?? likesList.length;
     final int repostsCount = _currentPostData['repostsCount'] as int? ?? (_currentPostData['reposts']?.length ?? 0);
@@ -520,7 +518,7 @@ class _PostContentState extends State<PostContent> {
                           icon: isBookmarkedByCurrentUser ? Icons.bookmark : FeatherIcons.bookmark,
                           text: '$bookmarksCount',
                           color: isBookmarkedByCurrentUser ? Colors.amber : Colors.white70,
-                          onPressed: () => _handleBookmark(currentEntryId, threadOriginalPostId, isBookmarkedByCurrentUser),
+                          onPressed: () => _handleBookmark(currentEntryId, isBookmarkedByCurrentUser),
                         ),
                         const SizedBox(width: 12),
                         StatButton(
