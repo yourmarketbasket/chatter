@@ -332,6 +332,7 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
       transformationController: _transformationController,
       minScale: 0.5, // Allow zooming out slightly
       maxScale: 4.0,
+      constrained: false, // Allow panning beyond the screen boundaries
       child: imageContentWidget,
     );
 
