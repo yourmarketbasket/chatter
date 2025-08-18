@@ -303,20 +303,18 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
     final String? url = attachment['url'] as String?;
     final File? file = attachment['file'] as File?;
 
-    // Retrieve width and height from attachment
     final num? imageWidth = attachment['width'] as num?;
     final num? imageHeight = attachment['height'] as num?;
-    // Provide a fallback aspect ratio of 1.0 (square) if dimensions are invalid
     final double originalAspectRatio = (imageWidth != null && imageHeight != null && imageWidth > 0 && imageHeight > 0)
         ? imageWidth / imageHeight
-        : 1.0;
+        : 1.0; // Fallback to a square if dimensions are missing
 
     _transformationController?.value = Matrix4.identity();
 
     final imageContentWidget = optimizedUrl?.isNotEmpty == true
         ? CachedNetworkImage(
             imageUrl: optimizedUrl!,
-            fit: BoxFit.contain, // Contain ensures the image fits within the AspectRatio box
+            fit: BoxFit.contain,
             memCacheWidth: 1080,
             placeholder: (context, url) => Center(child: CircularProgressIndicator(strokeWidth: 1.0, valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent))),
             errorWidget: (context, url, error) => buildError(context, message: 'Error loading image: $error'),
@@ -330,21 +328,22 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
               )
             : buildError(context, message: 'No image source available for $displayPath');
 
-    Widget interactiveImage = InteractiveViewer(
-      transformationController: _transformationController,
-      minScale: 1.0, // Start at 1.0 to fill the AspectRatio box
-      maxScale: 4.0,
-      constrained: false,
-      // The child is now an AspectRatio widget, which enforces the initial shape.
+    // Correctly ordered widgets: AspectRatio creates the box, InteractiveViewer makes the content of that box zoomable.
+    // A Center widget is added to ensure the AspectRatio box itself is centered on the screen.
+    return Center(
       child: AspectRatio(
         aspectRatio: originalAspectRatio,
-        child: imageContentWidget,
+        child: GestureDetector(
+          onDoubleTapDown: (details) => _handleDoubleTap(details.localPosition),
+          child: InteractiveViewer(
+            transformationController: _transformationController,
+            minScale: 1.0,
+            maxScale: 4.0,
+            constrained: false,
+            child: imageContentWidget,
+          ),
+        ),
       ),
-    );
-
-    return GestureDetector(
-      onDoubleTapDown: (details) => _handleDoubleTap(details.localPosition),
-      child: interactiveImage,
     );
   }
 
