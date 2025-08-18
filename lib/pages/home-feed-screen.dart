@@ -32,6 +32,10 @@ import 'package:chatter/widgets/realtime_timeago_text.dart'; // Import the new w
 import 'package:flutter_expandable_fab/flutter_expandable_fab.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:chatter/pages/profile_page.dart'; // Import ProfilePage
+import 'package:share_plus/share_plus.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as path;
 
 class HomeFeedScreen extends StatefulWidget {
   const HomeFeedScreen({Key? key}) : super(key: key);
@@ -155,6 +159,81 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         ),
       ),
     );
+  }
+
+  void _showSnackBar(String title, String message, Color backgroundColor) {
+    Get.snackbar(
+      title,
+      message,
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: backgroundColor,
+      colorText: Colors.white,
+    );
+  }
+
+  Future<File?> _downloadFile(String url, String filename, String type) async {
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final directory = await getTemporaryDirectory();
+        String extension;
+        switch (type) {
+          case 'image': extension = path.extension(url).isNotEmpty ? path.extension(url) : '.jpg'; break;
+          case 'video': extension = path.extension(url).isNotEmpty ? path.extension(url) : '.mp4'; break;
+          case 'pdf': extension = '.pdf'; break;
+          case 'audio': extension = path.extension(url).isNotEmpty ? path.extension(url) : '.mp3'; break;
+          default: extension = path.extension(url).isNotEmpty ? path.extension(url) : '.bin';
+        }
+        final sanitizedFilename = filename.replaceAll(RegExp(r'[^\w\.]'), '_');
+        final filePath = '${directory.path}/$sanitizedFilename$extension';
+        final file = File(filePath);
+        await file.writeAsBytes(response.bodyBytes);
+        return file;
+      } else {
+        print('Failed to download file: $url, Status: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('Error downloading file: $e');
+      return null;
+    }
+  }
+
+  Future<void> _sharePost(Map<String, dynamic> post) async {
+    final String content = post['content'] as String? ?? "";
+    final List<String> filePaths = [];
+    List<Map<String, dynamic>> attachments = [];
+
+    final dynamic rawAttachments = post['attachments'];
+    if (rawAttachments is List && rawAttachments.isNotEmpty) {
+      attachments = rawAttachments.whereType<Map>().map((item) => Map<String, dynamic>.from(item.map((key, value) => MapEntry(key.toString(), value)))).toList();
+    }
+
+    for (var attachment in attachments) {
+      final String? url = attachment['url'] as String?;
+      final String? filename = attachment['filename'] as String? ?? 'attachment_${DateTime.now().millisecondsSinceEpoch}';
+      final String? type = attachment['type'] as String?;
+      File? file;
+
+      if (attachment['file'] is File) {
+        file = attachment['file'] as File;
+        filePaths.add(file.path);
+      } else if ((url ?? '').isNotEmpty && (type ?? '').isNotEmpty) {
+        file = await _downloadFile(url!, filename!, type!);
+        if (file != null) {
+          filePaths.add(file.path);
+        } else {
+          _showSnackBar('Error', 'Failed to download $type: $filename', Colors.red[700]!);
+        }
+      }
+    }
+
+    if (filePaths.isNotEmpty) {
+      final xFiles = filePaths.map((path) => XFile(path)).toList();
+      await Share.shareXFiles(xFiles, text: content.isNotEmpty ? content : null, subject: 'Shared from Chatter');
+    } else {
+      await Share.share(content.isNotEmpty ? content : 'Check out this post from Chatter!', subject: 'Shared from Chatter');
+    }
   }
 
   @override
@@ -666,7 +745,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                         _buildActionButton(isBookmarkedByCurrentUser ? Icons.bookmark : FeatherIcons.bookmark, '$bookmarksCount', () => _handleBookmark(postId, isBookmarkedByCurrentUser), isBookmarked: isBookmarkedByCurrentUser),
                         // share
                         const SizedBox(width: 12),
-                        _buildActionButton(Icons.share_outlined, '', () {}),
+                        _buildActionButton(Icons.share_outlined, '', () => _sharePost(post)),
                       ],
                     ),
                   ],
