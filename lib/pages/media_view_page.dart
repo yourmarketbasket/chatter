@@ -224,29 +224,28 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
                     final String optimizedUrl = type == 'video' ? _optimizeCloudinaryVideoUrl(url) : _optimizeCloudinaryUrl(url);
 
                     Widget mediaWidget;
-                    bool enforceAspectRatio = false;
                     switch (type) {
                       case 'image':
                         mediaWidget = _buildFullScreenImageViewer(context, currentAttachment, displayPath, optimizedUrl);
-                        enforceAspectRatio = true;
                         break;
                       case 'pdf':
                         mediaWidget = _buildPdfViewer(context, currentAttachment, displayPath, optimizedUrl);
-                        enforceAspectRatio = true;
                         break;
                       case 'video':
                         mediaWidget = VideoPlayerContainer(
                           url: optimizedUrl.isNotEmpty ? optimizedUrl : url,
                           file: file,
                           displayPath: displayPath,
+                          // Conditional player selection:
+                          // Android < 12 (SDK < 31) -> better_player_enhanced
+                          // Android >= 12 (SDK >= 31) -> video_player
                           preferBetterPlayer: Platform.isAndroid && _androidSdkInt != null && _androidSdkInt! < 31,
                           thumbnailUrl: currentAttachment['thumbnailUrl'] as String?,
                           aspectRatioString: currentAttachment['aspectRatio'] as String?,
                           numericAspectRatio: (currentAttachment['width'] is num && currentAttachment['height'] is num && (currentAttachment['height'] as num) > 0)
                               ? (currentAttachment['width'] as num) / (currentAttachment['height'] as num)
-                              : null,
+                              : null, // Calculate and pass numeric aspect ratio
                         );
-                        enforceAspectRatio = true;
                         break;
                       case 'audio':
                         mediaWidget = AudioPlayerWidget(
@@ -263,14 +262,6 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
                           fileName: displayPath.split('/').last,
                           iconColor: Colors.grey[600],
                         );
-                    }
-                    if (enforceAspectRatio) {
-                      return Center(
-                        child: AspectRatio(
-                          aspectRatio: 4 / 3,
-                          child: mediaWidget,
-                        ),
-                      );
                     }
                     return Center(child: mediaWidget);
                   },
