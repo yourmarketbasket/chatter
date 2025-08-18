@@ -208,9 +208,12 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
             children: [
               Expanded(
                 child: PageView.builder(
+                  clipBehavior: Clip.none, // Allow zoomed content to draw outside the PageView bounds
                   controller: _pageController,
                   itemCount: widget.attachments.length,
                   onPageChanged: (index) {
+                    // Reset zoom & pan when page changes
+                    _transformationController?.value = Matrix4.identity();
                     setState(() {
                       _currentPageIndex = index;
                     });
