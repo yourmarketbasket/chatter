@@ -570,7 +570,6 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // New Header Row Structure for Home Feed
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
