@@ -372,14 +372,14 @@ void _handleDoubleTap(Offset tapPosition) {
   final double currentScale = currentMatrix.getMaxScaleOnAxis();
 
   Matrix4 targetMatrix;
-  if (currentScale <= 1.01) { // If at initial scale (or very close)
-    const double targetScale = 5.0; // Zoom to maximum scale at tap point
+  if (currentScale <= 1.01) { 
+    const double targetScale = 5.0; 
     targetMatrix = Matrix4.identity()
       ..translate(-tapPosition.dx, -tapPosition.dy)
       ..scale(targetScale)
       ..translate(tapPosition.dx, tapPosition.dy);
   } else {
-    targetMatrix = Matrix4.identity(); // Reset to original size
+    targetMatrix = Matrix4.identity(); 
   }
 
   final animation = Matrix4Tween(
