@@ -58,6 +58,7 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
   TransformationController? _transformationController;
   final Dio _dio = Dio();
   int? _androidSdkInt; // To store Android SDK version
+  Offset? _lastTapPosition; // Store last tap position for double-tap zoom
 
   @override
   void initState() {
@@ -144,141 +145,140 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(FeatherIcons.arrowLeft, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+Widget build(BuildContext context) {
+  return Scaffold(
+    extendBodyBehindAppBar: true,
+    backgroundColor: Colors.black,
+    appBar: AppBar(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      leading: IconButton(
+        icon: const Icon(FeatherIcons.arrowLeft, color: Colors.white),
+        onPressed: () => Navigator.pop(context),
+      ),
+      title: Row(
+        children: [
+          CircleAvatar(
+            radius: 18,
+            backgroundImage: widget.userAvatarUrl != null && widget.userAvatarUrl!.isNotEmpty
+                ? CachedNetworkImageProvider(
+                    _optimizeCloudinaryUrl(widget.userAvatarUrl!),
+                    maxWidth: 100,
+                    maxHeight: 100,
+                  )
+                : null,
+            child: widget.userAvatarUrl == null || widget.userAvatarUrl!.isEmpty
+                ? const Icon(FeatherIcons.user, size: 18, color: Colors.white)
+                : null,
+          ),
+          const SizedBox(width: 12),
+          Text(
+            widget.userName,
+            style: GoogleFonts.poppins(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+      actions: [
+        if (widget.attachments.isNotEmpty && widget.attachments[_currentPageIndex]['url'] != null)
+          _isDownloading
+              ? Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      value: _downloadProgress > 0 ? _downloadProgress : null,
+                      strokeWidth: 2.0,
+                      color: Colors.white,
+                    ),
+                  ),
+                )
+              : IconButton(
+                  icon: const Icon(FeatherIcons.downloadCloud, color: Colors.white, size: 15),
+                  onPressed: () => _downloadAttachment(widget.attachments[_currentPageIndex]),
+                ),
+        IconButton(
+          icon: const Icon(FeatherIcons.moreVertical, color: Colors.white),
+          onPressed: () {},
         ),
-        title: Row(
+      ],
+    ),
+    body: Stack(
+      clipBehavior: Clip.none, // Disable clipping for the stack
+      children: [
+        Column(
           children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundImage: widget.userAvatarUrl != null && widget.userAvatarUrl!.isNotEmpty
-                  ? CachedNetworkImageProvider(
-                      _optimizeCloudinaryUrl(widget.userAvatarUrl!),
-                      maxWidth: 100, // Optimize memory for AppBar avatar
-                      maxHeight: 100,
-                    )
-                  : null,
-              child: widget.userAvatarUrl == null || widget.userAvatarUrl!.isEmpty
-                  ? const Icon(FeatherIcons.user, size: 18, color: Colors.white)
-                  : null,
-            ),
-            const SizedBox(width: 12),
-            Text(
-              widget.userName,
-              style: GoogleFonts.poppins(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
+            Expanded(
+              child: PageView.builder(
+                clipBehavior: Clip.none, // Disable clipping for PageView to allow image zoom overflow
+                controller: _pageController,
+                itemCount: widget.attachments.length,
+                onPageChanged: (index) {
+                  // Reset zoom when page changes
+                  if (_transformationController != null) {
+                    _transformationController!.value = Matrix4.identity();
+                  }
+                  setState(() {
+                    _currentPageIndex = index;
+                  });
+                },
+                itemBuilder: (context, index) {
+                  final Map<String, dynamic> currentAttachment = widget.attachments[index];
+                  final String? url = currentAttachment['url'] as String?;
+                  final File? file = currentAttachment['file'] as File?;
+                  final String type = currentAttachment['type']?.toString().toLowerCase() ?? 'unknown';
+                  final String displayPath = url ?? file?.path ?? 'Unknown attachment';
+                  final String optimizedUrl = type == 'video' ? _optimizeCloudinaryVideoUrl(url) : _optimizeCloudinaryUrl(url);
+
+                  Widget mediaWidget;
+                  switch (type) {
+                    case 'image':
+                      mediaWidget = _buildFullScreenImageViewer(context, currentAttachment, displayPath, optimizedUrl);
+                      break;
+                    case 'pdf':
+                      mediaWidget = _buildPdfViewer(context, currentAttachment, displayPath, optimizedUrl);
+                      break;
+                    case 'video':
+                      mediaWidget = VideoPlayerContainer(
+                        url: optimizedUrl.isNotEmpty ? optimizedUrl : url,
+                        file: file,
+                        displayPath: displayPath,
+                        preferBetterPlayer: Platform.isAndroid && _androidSdkInt != null && _androidSdkInt! < 31,
+                        thumbnailUrl: currentAttachment['thumbnailUrl'] as String?,
+                        aspectRatioString: currentAttachment['aspectRatio'] as String?,
+                        numericAspectRatio: (currentAttachment['width'] is num && currentAttachment['height'] is num && (currentAttachment['height'] as num) > 0)
+                            ? (currentAttachment['width'] as num) / (currentAttachment['height'] as num)
+                            : null,
+                      );
+                      break;
+                    case 'audio':
+                      mediaWidget = AudioPlayerWidget(
+                        url: optimizedUrl.isNotEmpty ? optimizedUrl : url,
+                        file: file,
+                        displayPath: displayPath,
+                      );
+                      break;
+                    default:
+                      mediaWidget = buildError(
+                        context,
+                        icon: FeatherIcons.file,
+                        message: 'Unsupported attachment type: $type',
+                        fileName: displayPath.split('/').last,
+                        iconColor: Colors.grey[600],
+                      );
+                  }
+                  return mediaWidget;
+                },
+              ),
             ),
           ],
         ),
-        actions: [
-          if (widget.attachments.isNotEmpty && widget.attachments[_currentPageIndex]['url'] != null)
-            _isDownloading
-                ? Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        value: _downloadProgress > 0 ? _downloadProgress : null,
-                        strokeWidth: 2.0,
-                        color: Colors.white,
-                      ),
-                    ),
-                  )
-                : IconButton(
-                    icon: const Icon(FeatherIcons.downloadCloud, color: Colors.white, size: 15,),
-                    onPressed: () => _downloadAttachment(widget.attachments[_currentPageIndex]),
-                  ),
-          IconButton(
-            icon: const Icon(FeatherIcons.moreVertical, color: Colors.white),
-            onPressed: () {},
-          ),
-        ],
-      ),
-      body: Stack(
-        clipBehavior: Clip.none, // This is the crucial fix to prevent the root stack from clipping
-        children: [
-          Column(
-            children: [
-              Expanded(
-                child: PageView.builder(
-                  clipBehavior: Clip.none, // Allow zoomed content to draw outside the PageView bounds
-                  controller: _pageController,
-                  itemCount: widget.attachments.length,
-                  onPageChanged: (index) {
-                    // Reset zoom & pan when page changes
-                    _transformationController?.value = Matrix4.identity();
-                    setState(() {
-                      _currentPageIndex = index;
-                    });
-                  },
-                  itemBuilder: (context, index) {
-                    final Map<String, dynamic> currentAttachment = widget.attachments[index];
-                    final String? url = currentAttachment['url'] as String?;
-                    final File? file = currentAttachment['file'] as File?;
-                    final String type = currentAttachment['type']?.toString().toLowerCase() ?? 'unknown';
-                    final String displayPath = url ?? file?.path ?? 'Unknown attachment';
-                    final String optimizedUrl = type == 'video' ? _optimizeCloudinaryVideoUrl(url) : _optimizeCloudinaryUrl(url);
-
-                    Widget mediaWidget;
-                    switch (type) {
-                      case 'image':
-                        mediaWidget = _buildFullScreenImageViewer(context, currentAttachment, displayPath, optimizedUrl);
-                        break;
-                      case 'pdf':
-                        mediaWidget = _buildPdfViewer(context, currentAttachment, displayPath, optimizedUrl);
-                        break;
-                      case 'video':
-                        mediaWidget = VideoPlayerContainer(
-                          url: optimizedUrl.isNotEmpty ? optimizedUrl : url,
-                          file: file,
-                          displayPath: displayPath,
-                          // Conditional player selection:
-                          // Android < 12 (SDK < 31) -> better_player_enhanced
-                          // Android >= 12 (SDK >= 31) -> video_player
-                          preferBetterPlayer: Platform.isAndroid && _androidSdkInt != null && _androidSdkInt! < 31,
-                          thumbnailUrl: currentAttachment['thumbnailUrl'] as String?,
-                          aspectRatioString: currentAttachment['aspectRatio'] as String?,
-                          numericAspectRatio: (currentAttachment['width'] is num && currentAttachment['height'] is num && (currentAttachment['height'] as num) > 0)
-                              ? (currentAttachment['width'] as num) / (currentAttachment['height'] as num)
-                              : null, // Calculate and pass numeric aspect ratio
-                        );
-                        break;
-                      case 'audio':
-                        mediaWidget = AudioPlayerWidget(
-                          url: optimizedUrl.isNotEmpty ? optimizedUrl : url,
-                          file: file,
-                          displayPath: displayPath,
-                        );
-                        break;
-                      default:
-                        mediaWidget = buildError(
-                          context,
-                          icon: FeatherIcons.file,
-                          message: 'Unsupported attachment type: $type',
-                          fileName: displayPath.split('/').last,
-                          iconColor: Colors.grey[600],
-                        );
-                    }
-                    return mediaWidget;
-                  },
-                ),
-              ),
-            ],
-          ),
-          _buildAppBarGradientMask(context),
-        ],
-      ),
-    );
-  }
-
+        _buildAppBarGradientMask(context),
+      ],
+    ),
+  );
+}
+ 
   Widget _buildAppBarGradientMask(BuildContext context) {
     final statusBarHeight = MediaQuery.of(context).padding.top;
     final appBarHeight = AppBar().preferredSize.height;
@@ -299,86 +299,107 @@ class _MediaViewPageState extends State<MediaViewPage> with TickerProviderStateM
     );
   }
 
-  Widget _buildFullScreenImageViewer(BuildContext context, Map<String, dynamic> attachment, String displayPath, String? optimizedUrl) {
-    final String? url = attachment['url'] as String?;
-    final File? file = attachment['file'] as File?;
+Widget _buildFullScreenImageViewer(BuildContext context, Map<String, dynamic> attachment, String displayPath, String? optimizedUrl) {
+  final String? url = attachment['url'] as String?;
+  final File? file = attachment['file'] as File?;
 
-    final num? imageWidth = attachment['width'] as num?;
-    final num? imageHeight = attachment['height'] as num?;
-    final double originalAspectRatio = (imageWidth != null && imageHeight != null && imageWidth > 0 && imageHeight > 0)
-        ? imageWidth / imageHeight
-        : 1.0; // Fallback to a square if dimensions are missing
+  final num? imageWidth = attachment['width'] as num?;
+  final num? imageHeight = attachment['height'] as num?;
+  final double originalAspectRatio = (imageWidth != null && imageHeight != null && imageWidth > 0 && imageHeight > 0)
+      ? imageWidth / imageHeight
+      : 1.0;
 
-    _transformationController?.value = Matrix4.identity();
+  // Initialize transformation controller with identity matrix
+  _transformationController ??= TransformationController();
+  _transformationController!.value = Matrix4.identity();
 
-    final imageContentWidget = optimizedUrl?.isNotEmpty == true
-        ? CachedNetworkImage(
-            imageUrl: optimizedUrl!,
-            fit: BoxFit.contain,
-            memCacheWidth: 1080,
-            placeholder: (context, url) => Center(child: CircularProgressIndicator(strokeWidth: 1.0, valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent))),
-            errorWidget: (context, url, error) => buildError(context, message: 'Error loading image: $error'),
-            cacheKey: url,
-          )
-        : file != null
-            ? Image.file(
-                file,
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) => buildError(context, message: 'Error loading image file: $error'),
-              )
-            : buildError(context, message: 'No image source available for $displayPath');
+  final imageContentWidget = optimizedUrl?.isNotEmpty == true
+      ? CachedNetworkImage(
+          imageUrl: optimizedUrl!,
+          fit: BoxFit.contain,
+          memCacheWidth: 1080,
+          placeholder: (context, url) => const Center(child: CircularProgressIndicator(strokeWidth: 1.0, valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent))),
+          errorWidget: (context, url, error) => buildError(context, message: 'Error loading image: $error'),
+          cacheKey: url,
+        )
+      : file != null
+          ? Image.file(
+              file,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => buildError(context, message: 'Error loading image file: $error'),
+            )
+          : buildError(context, message: 'No image source available for $displayPath');
 
-    // Correctly ordered widgets: AspectRatio creates the box, InteractiveViewer makes the content of that box zoomable.
-    // A Center widget is added to ensure the AspectRatio box itself is centered on the screen.
-    return Center(
-      child: AspectRatio(
-        aspectRatio: originalAspectRatio,
-        child: GestureDetector(
-          onDoubleTapDown: (details) => _handleDoubleTap(details.localPosition),
-          child: InteractiveViewer(
-            transformationController: _transformationController,
-            minScale: 1.0,
-            maxScale: 4.0,
-            constrained: false,
-            child: imageContentWidget,
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      return Center(
+        child: ClipRect(
+          clipBehavior: Clip.none, // Disable clipping for zoomed images
+          child: SizedBox(
+            width: constraints.maxWidth * 2, // Allow extra space for zoom
+            height: constraints.maxHeight * 2, // Allow extra space for zoom
+            child: GestureDetector(
+              onTapDown: (details) => _lastTapPosition = details.localPosition,
+              onDoubleTap: () => _handleDoubleTap(_lastTapPosition ?? Offset.zero),
+              child: InteractiveViewer(
+                transformationController: _transformationController,
+                minScale: 1.0, // Prevent zooming out smaller than original size
+                maxScale: 5.0, // Allow zooming in up to 5x
+                constrained: false, // Allow overflow for zoom and pan
+                panEnabled: true, // Enable panning when zoomed
+                scaleEnabled: true, // Allow pinch zooming
+                boundaryMargin: EdgeInsets.all(max(constraints.maxWidth, constraints.maxHeight) * 0.5), // Moderate margin for zoom/pan
+                child: AspectRatio(
+                  aspectRatio: originalAspectRatio,
+                  child: imageContentWidget,
+                ),
+              ),
+            ),
           ),
         ),
-      ),
-    );
-  }
-
-  void _handleDoubleTap(Offset tapPosition) {
-    if (_transformationController == null) return;
-
-    _transformationAnimationController?.reset();
-    final currentMatrix = _transformationController!.value;
-    final double currentScale = currentMatrix.getMaxScaleOnAxis();
-
-    Matrix4 targetMatrix;
-    if (currentScale <= 1.01) { // If at initial fitted scale (or very close to it)
-      const double targetScale = 2.5; // Zoom in to 2.5x
-      final Offset centeredTapPosition = Offset(
-        tapPosition.dx * (targetScale - 1),
-        tapPosition.dy * (targetScale - 1),
       );
-      targetMatrix = Matrix4.identity()
-        ..translate(-centeredTapPosition.dx, -centeredTapPosition.dy)
-        ..scale(targetScale);
-    } else {
-      targetMatrix = Matrix4.identity();
-    }
+    },
+  );
+}
 
-    final animation = Matrix4Tween(begin: currentMatrix, end: targetMatrix).animate(
-      CurveTween(curve: Curves.easeInOut).animate(_transformationAnimationController!),
-    );
+void _handleDoubleTap(Offset tapPosition) {
+  if (_transformationController == null || _transformationAnimationController == null) return;
 
-    animation.addListener(() {
-      _transformationController?.value = animation.value;
-    });
+  if (_transformationAnimationController!.isAnimating) return;
 
-    _transformationAnimationController!.forward();
+  _transformationAnimationController!.reset();
+  final currentMatrix = _transformationController!.value;
+  final double currentScale = currentMatrix.getMaxScaleOnAxis();
+
+  Matrix4 targetMatrix;
+  if (currentScale <= 1.01) { // If at initial scale (or very close)
+    const double targetScale = 5.0; // Zoom to maximum scale at tap point
+    targetMatrix = Matrix4.identity()
+      ..translate(-tapPosition.dx, -tapPosition.dy)
+      ..scale(targetScale)
+      ..translate(tapPosition.dx, tapPosition.dy);
+  } else {
+    targetMatrix = Matrix4.identity(); // Reset to original size
   }
 
+  final animation = Matrix4Tween(
+    begin: currentMatrix,
+    end: targetMatrix,
+  ).animate(
+    CurveTween(curve: Curves.easeInOut).animate(_transformationAnimationController!),
+  );
+
+  animation.addListener(() {
+    if (_transformationController != null) {
+      _transformationController!.value = animation.value;
+    }
+  });
+
+  _transformationAnimationController!.forward();
+}
+ 
+ 
+ 
   Widget _buildPdfViewer(BuildContext context, Map<String, dynamic> attachment, String displayPath, String? optimizedUrl) {
     final String? url = attachment['url'] as String?;
     final File? file = attachment['file'] as File?;
