@@ -31,7 +31,11 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    _loadMessagesAndMarkAsRead();
+    if (dataController.currentChat.value['_id'] != null) {
+      _loadMessagesAndMarkAsRead();
+    } else {
+      dataController.currentConversationMessages.clear();
+    }
     dataController.currentConversationMessages.listen((_) {
       Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
       _markVisibleMessagesAsRead();
@@ -39,7 +43,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _loadMessagesAndMarkAsRead() async {
-    await dataController.fetchMessages(dataController.currentChat.value['_id']);
+    await dataController.fetchMessages(dataController.currentChat.value['_id']!);
     _markVisibleMessagesAsRead();
   }
 

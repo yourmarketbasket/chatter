@@ -4,6 +4,7 @@ import 'package:chatter/helpers/time_helper.dart';
 import 'package:chatter/pages/chat_screen_page.dart';
 import 'package:chatter/pages/contacts_page.dart';
 import 'package:chatter/pages/followers_page.dart';
+import 'package:feather_icons/feather_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -122,8 +123,9 @@ class _MainChatsPageState extends State<MainChatsPage> {
             );
           },
           backgroundColor: Colors.tealAccent.withOpacity(0.1),
+          shape: const CircleBorder(),
           child: const Icon(
-            Icons.message,
+            FeatherIcons.messageCircle,
             color: Colors.tealAccent,
           ),
         ),

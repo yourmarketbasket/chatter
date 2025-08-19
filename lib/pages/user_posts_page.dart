@@ -759,7 +759,7 @@ class _UserPostsPageState extends State<UserPostsPage> {
       appBar: AppBar(
         title: Text(
           isMyPosts ? "My Posts" : "${widget.username}'s Posts",
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: Colors.white),
+          style: GoogleFonts.poppins(fontSize: 15, color: Colors.white),
         ),
         backgroundColor: const Color(0xFF121212),
         elevation: 0,

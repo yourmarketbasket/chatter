@@ -654,18 +654,23 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                       children: [
                         // Part 1: Display Name, Yellow Checkmark //
                         Text(
-                          '@$username', // This is the display name
-                          style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: isReply ? 10 : 12, color: Colors.white),
+                          '$username', // This is the display name
+                          style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: isReply ? 11 : 13, color: Colors.white),
                           overflow: TextOverflow.ellipsis,
                         ),
                         Icon(Icons.verified, color: Colors.amber, size: isReply ? 13 : 15), // Yellow checkmark
+                        Text(
+                          ' @$username ', // This is the display name
+                          style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: isReply ? 10 : 10, color: const Color.fromARGB(255, 143, 143, 143)),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                         
                         
 
                         // Part 2: @username · Time · Time Ago · Date (dot separated)
                         // This part will no longer be Expanded.
                         Text(
-                          '· ${DateFormat('h:mm a').format(timestamp.toLocal())} · ${timeago.format(timestamp)} · ${DateFormat('MMM d, yy').format(timestamp.toLocal())}',
+                          '· ${timeago.format(timestamp)} · ${DateFormat('MMM d, yy').format(timestamp.toLocal())}',
                           style: GoogleFonts.poppins(fontSize: isReply ? 10 : 10, color: Colors.grey[500]),
                           overflow: TextOverflow.ellipsis,
                           softWrap: false, // Try to keep it on one line
@@ -697,7 +702,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                                   _processingFollowForPostId.value = '';
                                 },
                                 style: TextButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10), // Increased padding
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 10), // Increased padding
                                   minimumSize: Size.zero,
                                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                   visualDensity: VisualDensity.compact,
@@ -709,7 +714,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                                   ? SizedBox(width: 10, height: 10, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent)))
                                   : Text(
                                       isFollowing ? 'Unfollow' : 'Follow',
-                                      style: GoogleFonts.roboto(color: isFollowing ? Colors.grey[300] : Colors.tealAccent, fontSize: 10, fontWeight: FontWeight.w500),
+                                      style: GoogleFonts.roboto(color: isFollowing ? Colors.grey[300] : Colors.tealAccent, fontSize: 9, fontWeight: FontWeight.w500),
                                     ),
                               ),
                             );
@@ -1175,7 +1180,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           FloatingActionButton.small(
             heroTag: 'fab_add_post',
             backgroundColor: Colors.black,
-            shape: RoundedRectangleBorder(side: const BorderSide(color: Colors.tealAccent, width: 1), borderRadius: BorderRadius.circular(10)),
+            shape: const CircleBorder(side: BorderSide(color: Colors.tealAccent, width: 1)),
             onPressed: () {
               _navigateToPostScreen();
               final fabState = _fabKey.currentState;
@@ -1190,10 +1195,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           FloatingActionButton.small(
             heroTag: 'fab_chats',
             backgroundColor: Colors.black,
-            shape: RoundedRectangleBorder(
-              side: const BorderSide(color: Colors.tealAccent, width: 1),
-              borderRadius: BorderRadius.circular(10.0),
-            ),
+            shape: const CircleBorder(side: BorderSide(color: Colors.tealAccent, width: 1)),
             onPressed: () {
               // Navigate to main chats page
               Navigator.push(
@@ -1206,7 +1208,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           FloatingActionButton.small(
             heroTag: 'fab_home',
             backgroundColor: Colors.black,
-            shape: RoundedRectangleBorder(side: const BorderSide(color: Colors.tealAccent, width: 1), borderRadius: BorderRadius.circular(10)),
+            shape: const CircleBorder(side: BorderSide(color: Colors.tealAccent, width: 1)),
             onPressed: () {
               _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
               dataController.fetchFeeds();
@@ -1221,7 +1223,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           FloatingActionButton.small(
             heroTag: 'fab_search',
             backgroundColor: Colors.black,
-            shape: RoundedRectangleBorder(side: const BorderSide(color: Colors.tealAccent, width: 1), borderRadius: BorderRadius.circular(10)),
+            shape: const CircleBorder(side: BorderSide(color: Colors.tealAccent, width: 1)),
             onPressed: () {
               Get.to(() => const SearchPage(), transition: Transition.rightToLeft);
               final fabState = _fabKey.currentState;
@@ -1235,7 +1237,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           FloatingActionButton.small(
             heroTag: 'fab_buy_me_a_coffee',
             backgroundColor: Colors.black,
-            shape: RoundedRectangleBorder(side: const BorderSide(color: Colors.tealAccent, width: 1), borderRadius: BorderRadius.circular(10)),
+            shape: const CircleBorder(side: BorderSide(color: Colors.tealAccent, width: 1)),
             onPressed: () {
               Get.toNamed('/buy-me-a-coffee');
               final fabState = _fabKey.currentState;

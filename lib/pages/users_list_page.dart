@@ -1,7 +1,7 @@
 import 'package:chatter/pages/chat_screen_page.dart';
 import 'package:chatter/pages/profile_page.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
+import 'package:get/Get.dart';
 import 'package:chatter/controllers/data-controller.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:feather_icons/feather_icons.dart';
@@ -28,24 +28,28 @@ class _UsersListPageState extends State<UsersListPage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        _dataController.fetchAllUsers().then((_) {
+        if (_dataController.allUsers.isEmpty) {
+          _dataController.fetchAllUsers().then((_) {
+            _filteredUsers.assignAll(_dataController.allUsers);
+          }).catchError((error) {
+            print("Error initially fetching all users from initState: $error");
+            if (mounted) {
+              WidgetsBinding.instance.addPostFrameCallback((_){
+                if (mounted) {
+                   Get.snackbar(
+                    'Error Loading Users',
+                    'Failed to load users. Please try again later.',
+                    snackPosition: SnackPosition.BOTTOM,
+                    backgroundColor: Colors.red[700],
+                    colorText: Colors.white,
+                  );
+                }
+              });
+            }
+          });
+        } else {
           _filteredUsers.assignAll(_dataController.allUsers);
-        }).catchError((error) {
-          print("Error initially fetching all users from initState: $error");
-          if (mounted) {
-            WidgetsBinding.instance.addPostFrameCallback((_){
-              if (mounted) {
-                 Get.snackbar(
-                  'Error Loading Users',
-                  'Failed to load users. Please try again later.',
-                  snackPosition: SnackPosition.BOTTOM,
-                  backgroundColor: Colors.red[700],
-                  colorText: Colors.white,
-                );
-              }
-            });
-          }
-        });
+        }
       }
     });
 
@@ -222,70 +226,45 @@ class _UsersListPageState extends State<UsersListPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            stretch: true,
-            backgroundColor: Colors.black,
-            pinned: true,
-            flexibleSpace: FlexibleSpaceBar(
-              title: Text(
-                _isGroupCreationMode ? 'Select Users' : 'Browse Users',
-                style: GoogleFonts.poppins(
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        title: Text(
+          _isGroupCreationMode ? 'Select Users' : 'Browse Users',
+          style: GoogleFonts.poppins(
+            fontSize: 16,
+            color: Colors.white,
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.more_vert, color: Colors.white),
+            onPressed: () => _showGroupMenu(context),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: TextField(
+              controller: _searchController,
+              style: GoogleFonts.roboto(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Search users...',
+                hintStyle: GoogleFonts.roboto(color: Colors.grey[500]),
+                filled: true,
+                fillColor: Colors.grey[900],
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30.0),
+                  borderSide: BorderSide.none,
                 ),
-              ),
-              stretchModes: const [
-                StretchMode.zoomBackground,
-                StretchMode.blurBackground,
-                StretchMode.fadeTitle,
-              ],
-            ),
-            leading: Builder(
-              builder: (context) => IconButton(
-                icon: const Icon(Icons.menu, color: Colors.white),
-                onPressed: () => Scaffold.of(context).openDrawer(),
-              ),
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.more_vert, color: Colors.white),
-                onPressed: () => _showGroupMenu(context),
-              ),
-            ],
-            bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(60.0),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                child: TextField(
-                  controller: _searchController,
-                  style: GoogleFonts.roboto(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: 'Search users...',
-                    hintStyle: GoogleFonts.roboto(color: Colors.grey[500]),
-                    filled: true,
-                    fillColor: Colors.grey[900],
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(30.0),
-                      borderSide: BorderSide.none,
-                    ),
-                    prefixIcon: const Icon(Icons.search, color: Colors.white),
-                  ),
-                ),
+                prefixIcon: const Icon(Icons.search, color: Colors.white),
               ),
             ),
           ),
-          SliverToBoxAdapter(
+          Expanded(
             child: Obx(() {
-              if (_dataController.isLoading.value && _filteredUsers.isEmpty) {
-                return Center(
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent[400]!),
-                  ),
-                );
-              }
-              if (!_dataController.isLoading.value && _filteredUsers.isEmpty) {
+              if (_filteredUsers.isEmpty) {
                 return Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -338,7 +317,7 @@ class _UsersListPageState extends State<UsersListPage> {
                       : (username.isNotEmpty ? username[0].toUpperCase() : '?');
 
                   return ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 3.0),
                     leading: CircleAvatar(
                       radius: 24,
                       backgroundColor: Colors.tealAccent.withOpacity(0.2),
@@ -359,9 +338,8 @@ class _UsersListPageState extends State<UsersListPage> {
                         Text(
                           name,
                           style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.w600,
                             color: Colors.white,
-                            fontSize: 16,
+                            fontSize: 13,
                           ),
                         ),
                         // golden badge
@@ -378,14 +356,14 @@ class _UsersListPageState extends State<UsersListPage> {
                       children: [
                         Text(
                           '@$username',
-                          style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 13),
+                          style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 12),
                         ),
                         const SizedBox(height: 4),
                         Row(
                           children: [
                             Text(
                               '$followersCount Followers',
-                              style: GoogleFonts.roboto(color: Colors.grey[400], fontSize: 12),
+                              style: GoogleFonts.roboto(color: Colors.grey[400], fontSize: 9),
                             ),
                             const SizedBox(width: 4),
                             Text(
@@ -395,7 +373,7 @@ class _UsersListPageState extends State<UsersListPage> {
                             const SizedBox(width: 4),
                             Text(
                               '$followingCount Following',
-                              style: GoogleFonts.roboto(color: Colors.grey[400], fontSize: 12),
+                              style: GoogleFonts.roboto(color: Colors.grey[400], fontSize: 9),
                             ),
                           ],
                         ),

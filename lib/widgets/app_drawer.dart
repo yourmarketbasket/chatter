@@ -324,10 +324,16 @@ class AppDrawer extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: 16),
-                        Text(
-                          username,
-                          style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 20, color: Colors.white),
-                          textAlign: TextAlign.center,
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              username,
+                              style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 20, color: Colors.white),
+                              textAlign: TextAlign.center,
+                            ),
+                            Icon(Icons.verified, color: Colors.amber, size: 16),
+                          ],
                         ),
                         const SizedBox(height: 4),
                         Text(

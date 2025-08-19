@@ -427,7 +427,7 @@ class _PostContentState extends State<PostContent> {
                                       if(mounted) setState(() => _isProcessingFollow = false);
                                     },
                                     style: TextButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), // Increased padding
+                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 4), // Increased padding
                                       minimumSize: Size.zero,
                                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                       visualDensity: VisualDensity.compact,

@@ -141,7 +141,7 @@ class _FollowersPageState extends State<FollowersPage> with SingleTickerProvider
       appBar: AppBar(
         title: Text(
           appBarTitle,
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: Colors.white),
+          style: GoogleFonts.poppins( color: Colors.white, fontSize: 15),
         ),
         backgroundColor: const Color(0xFF121212),
         elevation: 0,
@@ -214,7 +214,7 @@ class _FollowersPageState extends State<FollowersPage> with SingleTickerProvider
       return ListView.separated(
         itemCount: userList.length,
         separatorBuilder: (context, index) => Divider(color: Colors.grey[850], height: 1, indent: 72, endIndent: 16),
-        padding: const EdgeInsets.symmetric(vertical: 8.0),
+        
         itemBuilder: (context, index) {
           final userItem = userList[index];
           final String listedUserId = userItem['_id'] ?? '';
@@ -227,7 +227,7 @@ class _FollowersPageState extends State<FollowersPage> with SingleTickerProvider
 
 
           return ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 1.0),
             leading: CircleAvatar(
               radius: 24,
               backgroundColor: Colors.tealAccent.withOpacity(0.2),
@@ -236,11 +236,11 @@ class _FollowersPageState extends State<FollowersPage> with SingleTickerProvider
             ),
             title: Text(
               name,
-              style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: Colors.white, fontSize: 16),
+              style: GoogleFonts.poppins( color: Colors.white, fontSize: 16),
             ),
             subtitle: Text(
               '@$username',
-              style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 13),
+              style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 12),
             ),
             trailing: (loggedInUserId.isNotEmpty && listedUserId != loggedInUserId) // Only show button if not self and logged in
               ? Obx(() {
