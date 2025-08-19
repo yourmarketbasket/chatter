@@ -54,6 +54,8 @@ class DataController extends GetxController {
 
   // Add these Rx variables inside DataController class
   final RxList<Map<String, dynamic>> followers = <Map<String, dynamic>>[].obs;
+  final RxList<Map<String, dynamic>> contacts = <Map<String, dynamic>>[].obs;
+
   final RxBool isLoadingFollowers = false.obs;
   final RxList<Map<String, dynamic>> following = <Map<String, dynamic>>[].obs;
   final RxBool isLoadingFollowing = false.obs;
@@ -119,6 +121,7 @@ class DataController extends GetxController {
       // So we await these calls in sequence.
       await fetchAllUsers();
       await fetchChats();
+      await fetchContacts();
 
       // Initialize socket service after user data is loaded
       Get.find<SocketService>().initSocket();
@@ -267,6 +270,43 @@ class DataController extends GetxController {
       print('[DataController] fetchAllUsers finally block. isLoading: ${isLoading.value}, allUsers count: ${allUsers.length}');
     }
   }
+  // fetch user contacts only authtoken will be enough
+  Future<Map<String, dynamic>> fetchContacts() async {
+    try {
+      var token = user.value['token'];
+      if (token == null) {
+        throw Exception('User token not found');
+      }
+
+      var response = await _dio.get(
+        'api/users/get-contacts',
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+      // print(response.data['contacts']);
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        contacts.assignAll(List<Map<String, dynamic>>.from(response.data['contacts']));
+        
+        return {'success': true, 'contacts': contacts};
+      } else {
+        return {
+          'success': false,
+          'message': response.data['message'] ?? 'Failed to fetch contacts',
+        };
+      }
+    } catch (e) {
+      print('[DataController] Error in fetchContacts: ${e.toString()}');
+      return {
+        'success': false,
+        'message': 'Error fetching contacts',
+      };
+    }
+  }
+
 
   // Create post
   Future<Map<String, dynamic>> createPost(Map<String, dynamic> data) async {

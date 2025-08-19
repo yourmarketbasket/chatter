@@ -19,7 +19,8 @@ import 'dart:math';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:intl/intl.dart';
 import 'package:chatter/widgets/video_player_widget.dart'; // Added import
-import 'package:chatter/widgets/better_player_widget.dart'; // Added import
+import 'package:chatter/widgets/better_player_widget.dart';
+import 'package:widget_zoom/widget_zoom.dart'; 
 
 class MediaViewPage extends StatefulWidget {
   final List<Map<String, dynamic>> attachments;
@@ -299,70 +300,53 @@ Widget build(BuildContext context) {
     );
   }
 
-Widget _buildFullScreenImageViewer(BuildContext context, Map<String, dynamic> attachment, String displayPath, String? optimizedUrl) {
+Widget _buildFullScreenImageViewer(
+    BuildContext context,
+    Map<String, dynamic> attachment,
+    String displayPath,
+    String? optimizedUrl) {
   final String? url = attachment['url'] as String?;
   final File? file = attachment['file'] as File?;
-
   final num? imageWidth = attachment['width'] as num?;
   final num? imageHeight = attachment['height'] as num?;
-  final double originalAspectRatio = (imageWidth != null && imageHeight != null && imageWidth > 0 && imageHeight > 0)
+  final double originalAspectRatio = (imageWidth != null &&
+          imageHeight != null &&
+          imageWidth > 0 &&
+          imageHeight > 0)
       ? imageWidth / imageHeight
       : 1.0;
 
-  // Initialize transformation controller with identity matrix
-  _transformationController ??= TransformationController();
-  _transformationController!.value = Matrix4.identity();
-
+  // Build image widget
   final imageContentWidget = optimizedUrl?.isNotEmpty == true
       ? CachedNetworkImage(
           imageUrl: optimizedUrl!,
           fit: BoxFit.contain,
-          memCacheWidth: 1080,
-          placeholder: (context, url) => const Center(child: CircularProgressIndicator(strokeWidth: 1.0, valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent))),
-          errorWidget: (context, url, error) => buildError(context, message: 'Error loading image: $error'),
+          placeholder: (context, url) => const Center(
+              child: CircularProgressIndicator(
+                  strokeWidth: 1.0,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent))),
+          errorWidget: (context, url, error) =>
+              buildError(context, message: 'Error loading image: $error'),
           cacheKey: url,
         )
       : file != null
           ? Image.file(
               file,
               fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) => buildError(context, message: 'Error loading image file: $error'),
+              errorBuilder: (context, error, stackTrace) =>
+                  buildError(context, message: 'Error loading image file: $error'),
             )
           : buildError(context, message: 'No image source available for $displayPath');
 
-  return LayoutBuilder(
-    builder: (context, constraints) {
-      return Center(
-        child: ClipRect(
-          clipBehavior: Clip.none, // Disable clipping for zoomed images
-          child: SizedBox(
-            width: constraints.maxWidth * 2, // Allow extra space for zoom
-            height: constraints.maxHeight * 2, // Allow extra space for zoom
-            child: GestureDetector(
-              onTapDown: (details) => _lastTapPosition = details.localPosition,
-              onDoubleTap: () => _handleDoubleTap(_lastTapPosition ?? Offset.zero),
-              child: InteractiveViewer(
-                transformationController: _transformationController,
-                minScale: 1.0, // Prevent zooming out smaller than original size
-                maxScale: 5.0, // Allow zooming in up to 5x
-                constrained: false, // Allow overflow for zoom and pan
-                panEnabled: true, // Enable panning when zoomed
-                scaleEnabled: true, // Allow pinch zooming
-                boundaryMargin: EdgeInsets.all(max(constraints.maxWidth, constraints.maxHeight) * 0.5), // Moderate margin for zoom/pan
-                child: AspectRatio(
-                  aspectRatio: originalAspectRatio,
-                  child: imageContentWidget,
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    },
+  return Center(
+    child: WidgetZoom(
+      heroAnimationTag: 'tag',
+      zoomWidget: imageContentWidget,
+      // fullScreenDoubleTapZoomScale: 4,
+    ),
   );
 }
-
-void _handleDoubleTap(Offset tapPosition) {
+void _handleDoubleTap(Offset tapPosition, double displayWidth, double displayHeight) {
   if (_transformationController == null || _transformationAnimationController == null) return;
 
   if (_transformationAnimationController!.isAnimating) return;
@@ -372,14 +356,12 @@ void _handleDoubleTap(Offset tapPosition) {
   final double currentScale = currentMatrix.getMaxScaleOnAxis();
 
   Matrix4 targetMatrix;
-  if (currentScale <= 1.01) { 
-    const double targetScale = 5.0; 
-    targetMatrix = Matrix4.identity()
-      ..translate(-tapPosition.dx, -tapPosition.dy)
-      ..scale(targetScale)
-      ..translate(tapPosition.dx, tapPosition.dy);
+  if (currentScale <= 1.01) {
+    const double targetScale = 5.0;
+    // Zoom centered on the image's center to prevent movement
+    targetMatrix = Matrix4.identity()..scale(targetScale);
   } else {
-    targetMatrix = Matrix4.identity(); 
+    targetMatrix = Matrix4.identity();
   }
 
   final animation = Matrix4Tween(
@@ -397,9 +379,10 @@ void _handleDoubleTap(Offset tapPosition) {
 
   _transformationAnimationController!.forward();
 }
- 
- 
- 
+  
+  
+  
+  
   Widget _buildPdfViewer(BuildContext context, Map<String, dynamic> attachment, String displayPath, String? optimizedUrl) {
     final String? url = attachment['url'] as String?;
     final File? file = attachment['file'] as File?;

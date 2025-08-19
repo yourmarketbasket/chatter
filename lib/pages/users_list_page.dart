@@ -17,26 +17,22 @@ class UsersListPage extends StatefulWidget {
 
 class _UsersListPageState extends State<UsersListPage> {
   final DataController _dataController = Get.find<DataController>();
-  // Local state to manage button loading
   final RxMap<String, bool> _isUpdatingFollowStatus = <String, bool>{}.obs;
   bool _isGroupCreationMode = false;
   final List<Map<String, dynamic>> _selectedUsers = [];
-
+  final TextEditingController _searchController = TextEditingController();
+  final RxList<Map<String, dynamic>> _filteredUsers = <Map<String, dynamic>>[].obs;
 
   @override
   void initState() {
     super.initState();
-    // Fetch users. DataController's fetchAllUsers now handles isLoading state.
-    // No need to check if allUsers is empty here, as fetchAllUsers will be called
-    // and the Obx widget will react to isLoading and allUsers list changes.
-    // Wrap in addPostFrameCallback to ensure it runs after the first frame build.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) { // Check if widget is still mounted when callback executes
-        _dataController.fetchAllUsers().catchError((error) {
+      if (mounted) {
+        _dataController.fetchAllUsers().then((_) {
+          _filteredUsers.assignAll(_dataController.allUsers);
+        }).catchError((error) {
           print("Error initially fetching all users from initState: $error");
           if (mounted) {
-            // It's good practice to also schedule the snackbar display after the frame,
-            // especially if the error handling itself might happen very quickly.
             WidgetsBinding.instance.addPostFrameCallback((_){
               if (mounted) {
                  Get.snackbar(
@@ -52,10 +48,27 @@ class _UsersListPageState extends State<UsersListPage> {
         });
       }
     });
+
+    _searchController.addListener(() {
+      _filterUsers();
+    });
+  }
+
+  void _filterUsers() {
+    final query = _searchController.text.toLowerCase();
+    if (query.isEmpty) {
+      _filteredUsers.assignAll(_dataController.allUsers); // Revert to original list
+    } else {
+      _filteredUsers.assignAll(_dataController.allUsers.where((user) {
+        final name = (user['name'] ?? '').toLowerCase();
+        final username = (user['username'] ?? '').toLowerCase();
+        return name.contains(query) || username.contains(query);
+      }).toList());
+    }
   }
 
   Future<void> _toggleFollow(String targetUserId, bool currentFollowStatus) async {
-    if (_isUpdatingFollowStatus[targetUserId] == true) return; // Prevent multiple clicks
+    if (_isUpdatingFollowStatus[targetUserId] == true) return;
 
     _isUpdatingFollowStatus[targetUserId] = true;
 
@@ -69,21 +82,13 @@ class _UsersListPageState extends State<UsersListPage> {
       }
 
       if (mounted && result['success'] == true) {
-        // DataController's allUsers list should be updated via its own logic after follow/unfollow
-        // For immediate feedback, we can manually update the specific user item's 'isFollowingCurrentUser'
-        // This is an optimistic update for the button state.
-        // The source of truth (allUsers list) will be updated when DataController's methods complete.
          int userIndex = _dataController.allUsers.indexWhere((u) => u['_id'] == targetUserId);
          if (userIndex != -1) {
            var userToUpdate = Map<String, dynamic>.from(_dataController.allUsers[userIndex]);
            userToUpdate['isFollowingCurrentUser'] = !currentFollowStatus;
-           // Assigning to an index of an RxList will automatically trigger updates
-           // for Obx widgets listening to this list. Explicit .refresh() is often
-           // unnecessary here and can sometimes cause issues if called mid-build.
            _dataController.allUsers[userIndex] = userToUpdate;
-           // _dataController.allUsers.refresh(); // Removed this line
+           _filterUsers(); // Update filtered list to reflect follow status
          }
-
       } else if (mounted) {
         Get.snackbar(
           'Error',
@@ -130,14 +135,13 @@ class _UsersListPageState extends State<UsersListPage> {
                 final participantIds = _selectedUsers.map((u) => u['_id'] as String).toList();
                 final currentUserId = _dataController.user.value['user']['_id'];
                 participantIds.add(currentUserId);
-                // print(participantIds);
 
                 final newChat = await _dataController.createGroupChat(
                   participantIds,
                   groupNameController.text,
                 );
 
-                Get.back(); // Close dialog
+                Get.back();
 
                 if (newChat != null) {
                   _dataController.currentChat.value = newChat;
@@ -154,199 +158,335 @@ class _UsersListPageState extends State<UsersListPage> {
     );
   }
 
+  void _showGroupMenu(BuildContext context) {
+    showMenu(
+      shape: RoundedRectangleBorder(
+        side: const BorderSide(color: Colors.tealAccent),
+        borderRadius: BorderRadius.circular(8.0),
+      ),
+      context: context,
+      position: RelativeRect.fromLTRB(
+        MediaQuery.of(context).size.width - 150,
+        kToolbarHeight,
+        0,
+        0,
+      ),
+      items: [
+        PopupMenuItem(
+          value: 'select',
+          child: Row(
+            children: [
+              const Icon(Icons.person_add, color: Colors.tealAccent),
+              const SizedBox(width: 8),
+              Text(
+                _isGroupCreationMode ? 'Unselect' : 'Select',
+                style: GoogleFonts.poppins(color: Colors.white),
+              ),
+            ],
+          ),
+        ),
+        if (_isGroupCreationMode)
+          PopupMenuItem(
+            value: 'select_all',
+            child: Row(
+              children: [
+                const Icon(Icons.group, color: Colors.tealAccent),
+                const SizedBox(width: 8),
+                Text(
+                  'Select All',
+                  style: GoogleFonts.poppins(color: Colors.white),
+                ),
+              ],
+            ),
+          ),
+      ],
+      color: Colors.black,
+    ).then((value) {
+      if (value == 'select') {
+        setState(() {
+          _isGroupCreationMode = !_isGroupCreationMode;
+          if (!_isGroupCreationMode) {
+            _selectedUsers.clear();
+          }
+        });
+      } else if (value == 'select_all') {
+        setState(() {
+          _selectedUsers.clear();
+          _selectedUsers.addAll(_filteredUsers);
+        });
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF000000), // Twitter dark theme background
-      appBar: AppBar(
-        title: Text(
-          _isGroupCreationMode ? 'Select Users' : 'Browse Users',
-          style: GoogleFonts.poppins(
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
+      backgroundColor: Colors.black,
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            stretch: true,
+            backgroundColor: Colors.black,
+            pinned: true,
+            flexibleSpace: FlexibleSpaceBar(
+              title: Text(
+                _isGroupCreationMode ? 'Select Users' : 'Browse Users',
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+              stretchModes: const [
+                StretchMode.zoomBackground,
+                StretchMode.blurBackground,
+                StretchMode.fadeTitle,
+              ],
+            ),
+            leading: Builder(
+              builder: (context) => IconButton(
+                icon: const Icon(Icons.menu, color: Colors.white),
+                onPressed: () => Scaffold.of(context).openDrawer(),
+              ),
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.more_vert, color: Colors.white),
+                onPressed: () => _showGroupMenu(context),
+              ),
+            ],
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(60.0),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                child: TextField(
+                  controller: _searchController,
+                  style: GoogleFonts.roboto(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'Search users...',
+                    hintStyle: GoogleFonts.roboto(color: Colors.grey[500]),
+                    filled: true,
+                    fillColor: Colors.grey[900],
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(30.0),
+                      borderSide: BorderSide.none,
+                    ),
+                    prefixIcon: const Icon(Icons.search, color: Colors.white),
+                  ),
+                ),
+              ),
+            ),
           ),
-        ),
-        backgroundColor: const Color(0xFF121212),
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-        actions: [
-          IconButton(
-            icon: Icon(_isGroupCreationMode ? Icons.close : Icons.group_add),
-            onPressed: () {
-              setState(() {
-                _isGroupCreationMode = !_isGroupCreationMode;
-                _selectedUsers.clear();
-              });
-            },
+          SliverToBoxAdapter(
+            child: Obx(() {
+              if (_dataController.isLoading.value && _filteredUsers.isEmpty) {
+                return Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent[400]!),
+                  ),
+                );
+              }
+              if (!_dataController.isLoading.value && _filteredUsers.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(FeatherIcons.users, size: 48, color: Colors.grey[700]),
+                      const SizedBox(height: 16),
+                      Text(
+                        _searchController.text.isEmpty
+                            ? 'No users found or failed to load.'
+                            : 'No users match your search.',
+                        style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 16),
+                      ),
+                      const SizedBox(height: 8),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.tealAccent[700],
+                          foregroundColor: Colors.black,
+                        ),
+                        icon: const Icon(FeatherIcons.refreshCw, size: 18),
+                        label: const Text('Retry'),
+                        onPressed: () => _dataController.fetchAllUsers().then((_) {
+                          _filterUsers();
+                        }),
+                      )
+                    ],
+                  ),
+                );
+              }
+              return ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _filteredUsers.length,
+                separatorBuilder: (context, index) => Divider(
+                  color: Colors.grey[850],
+                  height: 1,
+                  indent: 72,
+                  endIndent: 16,
+                ),
+                itemBuilder: (context, index) {
+                  final user = _filteredUsers[index];
+                  final String userId = user['_id'] ?? '';
+                  final String avatarUrl = user['avatar'] ?? '';
+                  final String name = user['name'] ?? 'User';
+                  final String username = user['username'] ?? 'username';
+                  final int followersCount = user['followersCount'] ?? 0;
+                  final int followingCount = user['followingCount'] ?? 0;
+                  final bool isFollowing = user['isFollowingCurrentUser'] ?? false;
+                  final String avatarInitial = name.isNotEmpty
+                      ? name[0].toUpperCase()
+                      : (username.isNotEmpty ? username[0].toUpperCase() : '?');
+
+                  return ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    leading: CircleAvatar(
+                      radius: 24,
+                      backgroundColor: Colors.tealAccent.withOpacity(0.2),
+                      backgroundImage: avatarUrl.isNotEmpty ? CachedNetworkImageProvider(avatarUrl) : null,
+                      child: avatarUrl.isEmpty
+                          ? Text(
+                              avatarInitial,
+                              style: GoogleFonts.poppins(
+                                color: Colors.tealAccent,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 18,
+                              ),
+                            )
+                          : null,
+                    ),
+                    title: Row(
+                      children: [
+                        Text(
+                          name,
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                            fontSize: 16,
+                          ),
+                        ),
+                        // golden badge
+                        
+                          const Icon(
+                            Icons.verified,
+                            color: Colors.amber,
+                            size: 12,
+                          )
+                      ],
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '@$username',
+                          style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 13),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Text(
+                              '$followersCount Followers',
+                              style: GoogleFonts.roboto(color: Colors.grey[400], fontSize: 12),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '·',
+                              style: GoogleFonts.roboto(color: Colors.grey[600], fontSize: 12),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '$followingCount Following',
+                              style: GoogleFonts.roboto(color: Colors.grey[400], fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    trailing: Obx(() {
+                      final bool isLoadingFollowAction = _isUpdatingFollowStatus[userId] ?? false;
+                      return ElevatedButton(
+                        onPressed: isLoadingFollowAction
+                            ? null
+                            : () => _toggleFollow(userId, isFollowing),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isFollowing ? Colors.transparent : Colors.white,
+                          foregroundColor: isFollowing ? Colors.white : Colors.black,
+                          side: isFollowing ? BorderSide(color: Colors.grey[700]!) : null,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          minimumSize: const Size(90, 36),
+                        ),
+                        child: isLoadingFollowAction
+                            ? SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    isFollowing ? Colors.white : Colors.black,
+                                  ),
+                                ),
+                              )
+                            : Text(
+                                isFollowing ? 'Unfollow' : 'Follow',
+                                style: GoogleFonts.roboto(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                      );
+                    }),
+                    onTap: () async {
+                      if (_isGroupCreationMode) {
+                        setState(() {
+                          if (_selectedUsers.any((u) => u['_id'] == userId)) {
+                            _selectedUsers.removeWhere((u) => u['_id'] == userId);
+                          } else {
+                            _selectedUsers.add(user);
+                          }
+                        });
+                      } else {
+                        final currentUserId = _dataController.user.value['user']['_id'];
+                        Map<String, dynamic>? existingChat;
+                        try {
+                          existingChat = _dataController.chats.values.firstWhere(
+                            (chat) {
+                              if (chat['isGroup'] == true) return false;
+                              final participantIds = (chat['participants'] as List).map((p) {
+                                if (p is Map<String, dynamic>) return p['_id'] as String;
+                                return p as String;
+                              }).toSet();
+                              return participantIds.contains(currentUserId) &&
+                                  participantIds.contains(userId);
+                            },
+                          );
+                        } catch (e) {
+                          existingChat = null;
+                        }
+
+                        if (existingChat != null) {
+                          _dataController.currentChat.value = existingChat;
+                          Get.to(() => const ChatScreen());
+                        } else {
+                          final tempChat = {
+                            'participants': [_dataController.user.value['user'], user],
+                            'type': 'dm',
+                          };
+                          _dataController.currentChat.value = tempChat;
+                          Get.to(() => const ChatScreen());
+                        }
+                      }
+                    },
+                    selected: _isGroupCreationMode && _selectedUsers.any((u) => u['_id'] == userId),
+                    selectedTileColor: Colors.teal.withOpacity(0.2),
+                  );
+                },
+                padding: const EdgeInsets.only(bottom: 16),
+              );
+            }),
           ),
         ],
       ),
       drawer: const AppDrawer(),
-      body: Obx(() {
-        if (_dataController.isLoading.value && _dataController.allUsers.isEmpty) {
-          return Center(
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent[400]!),
-            ),
-          );
-        }
-        if (!_dataController.isLoading.value && _dataController.allUsers.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(FeatherIcons.users, size: 48, color: Colors.grey[700]),
-                const SizedBox(height: 16),
-                Text(
-                  'No users found or failed to load.',
-                  style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 16),
-                ),
-                const SizedBox(height: 8),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.tealAccent[700],
-                    foregroundColor: Colors.black,
-                  ),
-                  icon: const Icon(FeatherIcons.refreshCw, size: 18),
-                  label: const Text('Retry'),
-                  onPressed: () => _dataController.fetchAllUsers(),
-                )
-              ],
-            ),
-          );
-        }
-        return ListView.separated(
-          itemCount: _dataController.allUsers.length,
-          separatorBuilder: (context, index) => Divider(color: Colors.grey[850], height: 1, indent: 72, endIndent: 16),
-          itemBuilder: (context, index) {
-            final user = _dataController.allUsers[index];
-            final String userId = user['_id'] ?? '';
-            final String avatarUrl = user['avatar'] ?? '';
-            final String name = user['name'] ?? 'User'; // Display name
-            final String username = user['username'] ?? 'username'; // Handle
-            final int followersCount = user['followersCount'] ?? 0;
-            final int followingCount = user['followingCount'] ?? 0;
-            final bool isFollowing = user['isFollowingCurrentUser'] ?? false;
-            final String avatarInitial = name.isNotEmpty ? name[0].toUpperCase() : (username.isNotEmpty ? username[0].toUpperCase() : '?');
-
-            return ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              leading: CircleAvatar(
-                radius: 24,
-                backgroundColor: Colors.tealAccent.withOpacity(0.2),
-                backgroundImage: avatarUrl.isNotEmpty ? CachedNetworkImageProvider(avatarUrl) : null,
-                child: avatarUrl.isEmpty ? Text(avatarInitial, style: GoogleFonts.poppins(color: Colors.tealAccent, fontWeight: FontWeight.w600, fontSize: 18)) : null,
-              ),
-              title: Text(
-                name,
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: Colors.white, fontSize: 16),
-              ),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '@$username',
-                    style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 13),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Text('$followersCount Followers', style: GoogleFonts.roboto(color: Colors.grey[400], fontSize: 12)),
-                      const SizedBox(width: 4),
-                      Text('·', style: GoogleFonts.roboto(color: Colors.grey[600], fontSize: 12)),
-                      const SizedBox(width: 4),
-                      Text('$followingCount Following', style: GoogleFonts.roboto(color: Colors.grey[400], fontSize: 12)),
-                    ],
-                  ),
-                ],
-              ),
-              trailing: Obx(() {
-                // Listen to changes in the loading state for this specific user's button
-                final bool isLoadingFollowAction = _isUpdatingFollowStatus[userId] ?? false;
-
-                return ElevatedButton(
-                  onPressed: isLoadingFollowAction ? null : () => _toggleFollow(userId, isFollowing),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isFollowing ? Colors.transparent : Colors.white,
-                    foregroundColor: isFollowing ? Colors.white : Colors.black,
-                    side: isFollowing ? BorderSide(color: Colors.grey[700]!) : null,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    minimumSize: const Size(90, 36), // Ensure button has a decent size
-                  ),
-                  child: isLoadingFollowAction
-                      ? SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(isFollowing ? Colors.white : Colors.black),
-                          ),
-                        )
-                      : Text(isFollowing ? 'Unfollow' : 'Follow', style: GoogleFonts.roboto(fontWeight: FontWeight.bold, fontSize: 13)),
-                );
-              }),
-              onTap: () async {
-                if (_isGroupCreationMode) {
-                  setState(() {
-                    if (_selectedUsers.any((u) => u['_id'] == userId)) {
-                      _selectedUsers.removeWhere((u) => u['_id'] == userId);
-                    } else {
-                      _selectedUsers.add(user);
-                    }
-                  });
-                } else {
-                  final currentUserId =
-                      _dataController.user.value['user']['_id'];
-
-                  // Look for an existing chat
-                  Map<String, dynamic>? existingChat;
-                  try {
-                    existingChat = _dataController.chats.values.firstWhere(
-                      (chat) {
-                        if (chat['isGroup'] == true) return false;
-
-                        final participantIds =
-                            (chat['participants'] as List).map((p) {
-                          if (p is Map<String, dynamic>)
-                            return p['_id'] as String;
-                          return p as String;
-                        }).toSet(); // Use a Set for efficient lookup
-
-                        return participantIds.contains(currentUserId) &&
-                            participantIds.contains(userId);
-                      },
-                    );
-                  } catch (e) {
-                    existingChat = null;
-                  }
-
-                  if (existingChat != null) {
-                    // Chat already exists, just open it
-                    _dataController.currentChat.value = existingChat;
-                    Get.to(() => const ChatScreen());
-                  } else {
-                    // For a new DM, don't create the chat here.
-                    // Instead, navigate to ChatScreen and pass the potential participant.
-                    // The ChatScreen will be responsible for creating the chat on the first message.
-                    final tempChat = {
-                      'participants': [_dataController.user.value['user'], user],
-                      'type': 'dm',
-                      // No '_id' yet
-                    };
-
-                    _dataController.currentChat.value = tempChat;
-                    Get.to(() => const ChatScreen());
-                  }
-                }
-              },
-              selected: _isGroupCreationMode && _selectedUsers.any((u) => u['_id'] == userId),
-              selectedTileColor: Colors.teal.withOpacity(0.2),
-            );
-          },
-          padding: const EdgeInsets.only(bottom: 16), // Add padding at the bottom
-        );
-      }),
       floatingActionButton: _isGroupCreationMode && _selectedUsers.isNotEmpty
           ? FloatingActionButton.extended(
               onPressed: _createGroup,
@@ -356,5 +496,11 @@ class _UsersListPageState extends State<UsersListPage> {
             )
           : null,
     );
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 }

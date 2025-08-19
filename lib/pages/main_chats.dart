@@ -3,6 +3,7 @@ import 'package:chatter/controllers/data-controller.dart';
 import 'package:chatter/helpers/time_helper.dart';
 import 'package:chatter/pages/chat_screen_page.dart';
 import 'package:chatter/pages/contacts_page.dart';
+import 'package:chatter/pages/followers_page.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -12,7 +13,6 @@ class MainChatsPage extends StatefulWidget {
   @override
   _MainChatsPageState createState() => _MainChatsPageState();
 }
-// force
 
 class _MainChatsPageState extends State<MainChatsPage> {
   final TextEditingController _searchController = TextEditingController();
@@ -55,10 +55,10 @@ class _MainChatsPageState extends State<MainChatsPage> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const ContactsPage(isCreatingGroup: false),
+                      builder: (context) => const ContactsPage(),
                     ),
                   );
-                },
+                  },
               ),
               ListTile(
                 leading: const Icon(Icons.group_add, color: Colors.tealAccent),
@@ -68,7 +68,7 @@ class _MainChatsPageState extends State<MainChatsPage> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const ContactsPage(isCreatingGroup: true),
+                      builder: (context) => const ContactsPage(),
                     ),
                   );
                 },
@@ -111,6 +111,22 @@ class _MainChatsPageState extends State<MainChatsPage> {
       ),
       child: Scaffold(
         extendBody: true,
+        floatingActionButton: FloatingActionButton(
+          onPressed: (){
+            // go to contacts page
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const ContactsPage(),
+              ),
+            );
+          },
+          backgroundColor: Colors.tealAccent.withOpacity(0.1),
+          child: const Icon(
+            Icons.message,
+            color: Colors.tealAccent,
+          ),
+        ),
         body: Obx(() {
           if (_dataController.isLoadingChats.value && _dataController.chats.isEmpty) {
             return const Center(child: CircularProgressIndicator());
@@ -149,14 +165,21 @@ class _MainChatsPageState extends State<MainChatsPage> {
                   title: const Text('Chats'),
                   pinned: true,
                   floating: true,
-                  expandedHeight: 120.0,
-                  bottom: PreferredSize(
-                    preferredSize: const Size.fromHeight(60.0),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                      child: Row(
+                  snap: true,
+                  stretch: true,
+                  expandedHeight: 160.0,
+                  flexibleSpace: FlexibleSpaceBar(
+                    stretchModes: const [
+                      StretchMode.zoomBackground,
+                      StretchMode.blurBackground,
+                    ],
+                    background: Container(
+                      color: Colors.black,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
                         children: [
-                          Expanded(
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                             child: TextField(
                               controller: _searchController,
                               decoration: InputDecoration(
@@ -174,34 +197,7 @@ class _MainChatsPageState extends State<MainChatsPage> {
                               style: const TextStyle(color: Colors.white),
                             ),
                           ),
-                          Padding(
-                            padding: const EdgeInsets.only(left: 8.0),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.tealAccent.withOpacity(0.1),
-                                shape: BoxShape.circle,
-                              ),
-                              child: IconButton(
-                                icon: const Icon(Icons.refresh, color: Colors.tealAccent),
-                                onPressed: () {
-                                  _dataController.fetchChats();
-                                },
-                              ),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.only(left: 8.0),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.tealAccent.withOpacity(0.1),
-                                shape: BoxShape.circle,
-                              ),
-                              child: IconButton(
-                                icon: const Icon(Icons.add, color: Colors.tealAccent),
-                                onPressed: _showCreateChatDialog,
-                              ),
-                            ),
-                          ),
+                          const SizedBox(height: 8.0),
                         ],
                       ),
                     ),
