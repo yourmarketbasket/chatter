@@ -217,6 +217,7 @@ class _FollowersPageState extends State<FollowersPage> with SingleTickerProvider
         
         itemBuilder: (context, index) {
           final userItem = userList[index];
+          print(userItem);
           final String listedUserId = userItem['_id'] ?? '';
           final String avatarUrl = userItem['avatar'] ?? '';
           final String username = userItem['username'] ?? 'username';
@@ -234,13 +235,32 @@ class _FollowersPageState extends State<FollowersPage> with SingleTickerProvider
               backgroundImage: avatarUrl.isNotEmpty ? CachedNetworkImageProvider(avatarUrl) : null,
               child: avatarUrl.isEmpty ? Text(avatarInitial, style: GoogleFonts.poppins(color: Colors.tealAccent, fontWeight: FontWeight.w600, fontSize: 18)) : null,
             ),
-            title: Text(
-              name,
-              style: GoogleFonts.poppins( color: Colors.white, fontSize: 16),
+            title: Row(
+              children: [
+                Text(
+                  name,
+                  style: GoogleFonts.poppins( color: Colors.white, fontSize: 13),
+                ),
+                Icon(Icons.verified, color:Colors.amber, size:14)
+              ],
             ),
-            subtitle: Text(
-              '@$username',
-              style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 12),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '@$username',
+                  style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 10),
+                ),
+                Row(
+                  children: [
+                    Text('Followers ${userItem['followersCount'].toString()}', style: GoogleFonts.poppins(color: Colors.grey[500], fontSize: 10)),
+                    const SizedBox(width: 10),
+                    Text('Following ${userItem['followingCount'].toString()}', style: GoogleFonts.poppins(color: Colors.grey[500], fontSize: 10)),
+
+
+                  ],
+                )
+              ],
             ),
             trailing: (loggedInUserId.isNotEmpty && listedUserId != loggedInUserId) // Only show button if not self and logged in
               ? Obx(() {
@@ -256,8 +276,8 @@ class _FollowersPageState extends State<FollowersPage> with SingleTickerProvider
                     ),
                     onPressed: isLoadingAction ? null : () => _toggleFollow(listedUserId, isFollowingListedUser),
                     child: isLoadingAction
-                        ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(isFollowingListedUser ? Colors.white : Colors.black)))
-                        : Text(isFollowingListedUser ? 'Unfollow' : 'Follow', style: GoogleFonts.roboto(fontWeight: FontWeight.bold, fontSize: 13)),
+                        ? SizedBox(width: 10, height: 10, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(isFollowingListedUser ? Colors.white : Colors.black)))
+                        : Text(isFollowingListedUser ? 'Unfollow' : 'Follow', style: GoogleFonts.roboto( fontSize: 13)),
                   );
                 })
               : null, // No button for self or if not logged in

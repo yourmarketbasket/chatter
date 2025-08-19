@@ -1147,7 +1147,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       drawer: const AppDrawer(),
       body: Obx(() {
         if (dataController.posts.isEmpty && dataController.isLoading.value) { // Check isLoading as well
-          return const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent)));
+          return const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent), strokeWidth: 1, backgroundColor: Colors.grey,));
         }
         if (dataController.posts.isEmpty && !dataController.isLoading.value) {
              return Center(

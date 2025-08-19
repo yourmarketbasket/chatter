@@ -438,7 +438,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.tealAccent,
                             foregroundColor: Colors.black,
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -457,7 +457,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.tealAccent,
                             foregroundColor: Colors.black,
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                           ),
                         ),
                       ],

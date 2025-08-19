@@ -409,21 +409,27 @@ class _ContactsPageState extends State<ContactsPage> {
                           )
                       ],
                     ),
-                    subtitle: Row(
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          '$followersCount Followers',
-                          style: GoogleFonts.roboto(color: Colors.grey[400], fontSize: 10),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '·',
-                          style: GoogleFonts.roboto(color: Colors.grey[600], fontSize: 12),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '$followingCount Following',
-                          style: GoogleFonts.roboto(color: Colors.grey[400], fontSize: 10),
+                        Text('@${user['name']}', style: GoogleFonts.roboto(color: Colors.grey[400], fontSize: 10)),
+                        Row(
+                          children: [
+                            Text(
+                              '$followersCount Followers',
+                              style: GoogleFonts.roboto(color: Colors.grey[400], fontSize: 10),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '·',
+                              style: GoogleFonts.roboto(color: Colors.grey[600], fontSize: 12),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '$followingCount Following',
+                              style: GoogleFonts.roboto(color: Colors.grey[400], fontSize: 10),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -523,7 +529,7 @@ class _ContactsPageState extends State<ContactsPage> {
                     selectedTileColor: Colors.teal.withOpacity(0.2),
                   );
                 },
-                padding: const EdgeInsets.only(bottom: 4),
+                // padding: const EdgeInsets.only(bottom: 4),
               );
             }),
           ),
