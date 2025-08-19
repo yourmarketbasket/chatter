@@ -1139,10 +1139,21 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF000000),
       appBar: AppBar(
-        title: Text('Chatter', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 24, letterSpacing: 1.5, color: Colors.white)),
+        title: Row(
+          children: [
+            // asset image logo
+            Image.asset(
+              'images/1024px.png',
+              height: 50,
+              width: 50,  
+            ),
+            const SizedBox(width: 10),
+            Text('Chatter', style: GoogleFonts.passionsConflict( fontSize: 30, letterSpacing: 1.5, color: const Color.fromARGB(255, 255, 255, 255))),
+          ],
+        ),
         backgroundColor: const Color(0xFF000000),
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white), // Set AppDrawer icon color to white
+        iconTheme: const IconThemeData(color: Color.fromARGB(255, 31, 30, 30)), // Set AppDrawer icon color to white
       ),
       drawer: const AppDrawer(),
       body: Obx(() {
