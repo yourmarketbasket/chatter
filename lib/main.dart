@@ -52,8 +52,7 @@ void main() async {
   Get.put(SocketService());
 
   // Initialize NotificationService
-  final NotificationService notificationService = Get.put(NotificationService());
-  await notificationService.init();
+  Get.put(NotificationService());
 
 
   runApp(const ChatterApp());

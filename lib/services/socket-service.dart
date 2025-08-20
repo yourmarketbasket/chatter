@@ -102,8 +102,10 @@ class SocketService {
       'message:deleted': (data) => _handleMessageDeleted(data),
       'message:statusUpdate': (data) => _handleMessageStatusUpdate(data),
       'message:reaction': (data) => _handleNewMessage(data),
-      'typing:start': (data) => _handleTyping(data, true),
-      'typing:stop': (data) => _handleTyping(data, false),
+      'chat:deletedForMe': (data) => _handleChatDeleted(data, 'chat:deletedForMe'),
+      'chat:hardDeleted': (data) => _handleChatDeleted(data, 'chat:hardDeleted'),
+      'typing:started': (data) => _handleTyping(data, true),
+      'typing:stopped': (data) => _handleTyping(data, false),
     };
 
     eventHandlers.forEach((event, handler) {
@@ -250,6 +252,15 @@ class SocketService {
       _eventController.add({'event': 'message:deleted', 'data': data});
     } else {
         // print('SocketService: Invalid message:deleted data format: ${data.runtimeType}');
+    }
+  }
+
+  void _handleChatDeleted(dynamic data, String event) {
+    if (data is Map<String, dynamic> && data['chatId'] is String) {
+      _dataController.handleChatDeleted(data['chatId']);
+      _eventController.add({'event': event, 'data': data});
+    } else {
+      print('SocketService: Invalid $event data format: ${data.runtimeType}');
     }
   }
 
