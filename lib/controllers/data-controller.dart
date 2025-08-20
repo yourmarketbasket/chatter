@@ -1251,10 +1251,14 @@ class DataController extends GetxController {
 
       final Map<String, dynamic> messageToSend = Map<String, dynamic>.from(message);
 
-      // If chatId is not present, it's a new chat
-      if (messageToSend['chatId'] == null || (messageToSend['chatId'] as String).isEmpty) {
+      // If chatId is present, it's an existing chat. We don't need to send the full participants list.
+      if (messageToSend['chatId'] != null && (messageToSend['chatId'] as String).isNotEmpty) {
+        messageToSend.remove('participants'); // Remove participants if chatId exists
+      }
+      // If chatId is not present, it's a new chat. Format the participants list correctly.
+      else {
         final List<dynamic> participants = messageToSend['participants'];
-        final List<String> participantIds = participants.map((p) => p['_id'] as String).toList();
+        final List<String> participantIds = participants.map((p) => (p is Map ? p['_id'] : p) as String).toList();
         // Remove the current user from the list of participants to send to the backend
         participantIds.remove(user.value['user']['_id']);
         messageToSend['participants'] = participantIds;
@@ -1266,6 +1270,7 @@ class DataController extends GetxController {
         data: messageToSend,
         options: dio.Options(
           headers: {'Authorization': 'Bearer $token'},
+           validateStatus: (status) => status != null && status < 500,
         ),
       );
 
@@ -1291,6 +1296,9 @@ class DataController extends GetxController {
         final messageIndex = currentConversationMessages.indexWhere((m) => m['clientMessageId'] == clientMessageId);
         if (messageIndex != -1) {
           currentConversationMessages[messageIndex] = sentMessage;
+        } else {
+          // if the message is not in the list, add it
+          currentConversationMessages.add(sentMessage);
         }
       } else {
         print('[DataController] Failed to send message: ${response.data?['message']}');
@@ -3000,24 +3008,26 @@ void clearUserPosts() {
       }
       final requestData = {
         'participants': participantIds,
-        'type': 'group',
         'name': groupName,
+        // 'about' is optional, so it's omitted.
       };
       print("Sending create group chat request with data: $requestData");
 
       final response = await _dio.post(
-        'api/chats',
+        'api/chats/group', // Corrected endpoint
         data: requestData,
         options: dio.Options(
           headers: {'Authorization': 'Bearer $token'},
+          validateStatus: (status) {
+            return status != null && status < 500; // Accept all statuses under 500
+          },
         ),
       );
 
       print("Received create group chat response: ${response.data}");
 
-      if ((response.statusCode == 200 || response.statusCode == 201) && response.data != null) {
-        // The response is the new chat object
-        final newChat = response.data;
+      if (response.statusCode == 201 && response.data['success'] == true) {
+        final newChat = response.data['group']; // Corrected key based on docs
         // Add to local chats list
         chats[newChat['_id']] = newChat;
         // Join the new socket room
@@ -3025,6 +3035,7 @@ void clearUserPosts() {
         chats.refresh();
         return newChat;
       } else {
+        print('Failed to create group chat: ${response.data?['message']}');
         throw Exception('Failed to create group chat: ${response.data?['message']}');
       }
     } catch (e) {
