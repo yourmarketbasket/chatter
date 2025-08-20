@@ -55,17 +55,6 @@ void main() async {
   final NotificationService notificationService = Get.put(NotificationService());
   await notificationService.init();
 
-  // Show a test notification on app startup
-  // Ensure this is called after notificationService.init()
-  // This is a direct approach for "app first runs".
-  // Consider if only for debug or after a delay for production.
-  try {
-    await notificationService.showTestNotification();
-  } catch (e) {
-    if (kDebugMode) {
-      print("Error showing test notification from main.dart: $e");
-    }
-  }
 
   runApp(const ChatterApp());
 }
