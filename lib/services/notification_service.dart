@@ -37,7 +37,7 @@ class NotificationService {
       print('FCM Token: $fcmToken');
       _dataController.updateFcmToken(fcmToken);
     }
-
+// yolo
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('ic_status_16px');
 
