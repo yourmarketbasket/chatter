@@ -164,14 +164,20 @@ class NotificationService {
       final filePath = '${tempDir.path}/${avatarUrl.split('/').last}.png';
       final file = File(filePath);
 
-      if (await file.exists()) {
-        return filePath;
-      }
+      // if (await file.exists()) {
+      //   return filePath;
+      // }
 
       final response = await http.get(Uri.parse(avatarUrl));
       if (response.statusCode == 200) {
-        await file.writeAsBytes(response.bodyBytes);
-        return filePath;
+        final image = img.decodeImage(response.bodyBytes);
+        if (image != null) {
+          // Create a circular cropped version of the image.
+          final circularImage = img.copyCropCircle(image);
+          final pngBytes = img.encodePng(circularImage);
+          await file.writeAsBytes(pngBytes);
+          return filePath;
+        }
       }
       return null;
     } catch (e) {
