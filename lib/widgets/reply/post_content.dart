@@ -365,13 +365,26 @@ class _PostContentState extends State<PostContent> {
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
+                            Text(
+                              username, // This is _currentPostData['username']
+                              style: GoogleFonts.poppins(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                                fontSize: widget.isReply ? 12 : 12,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Icon(
+                              Icons.verified, // Standard verified icon
+                              color: Colors.amber, // Yellow color as specified
+                              size: widget.isReply ? 13 : 15, // Size based on context
+                            ),
                             // Display Name (using 'username' from postData, which might be the handle or a display name)
                             Text(
                               '@'+username, // This is _currentPostData['username']
                               style: GoogleFonts.poppins(
-                                color: Colors.white,
-                                fontSize: widget.isReply ? 12 : 12, // Size based on context
-                                fontWeight: FontWeight.w600,
+                                color: const Color.fromARGB(255, 136, 136, 136),
+                                fontSize: widget.isReply ? 10 : 10,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -379,15 +392,10 @@ class _PostContentState extends State<PostContent> {
                             // Yellow Checkmark (assuming 'isVerified' is a property or can be derived)
                             // For now, let's assume it's always shown for consistency with home feed if user is "verified"
                             // This part might need adjustment if verification status is available in _currentPostData
-                            Icon(
-                              Icons.verified, // Standard verified icon
-                              color: Colors.amber, // Yellow color as specified
-                              size: widget.isReply ? 13 : 15, // Size based on context
-                            ),
                             const SizedBox(width: 4.0),
                                                         // Expanded has been removed from the Text widget below
                             Text(
-                              '· ${DateFormat('h:mm a').format(timestamp.toLocal())} · ${timeago.format(timestamp)} · ${DateFormat('MMM d, yy').format(timestamp.toLocal())}',
+                              '· ${timeago.format(timestamp)} · ${DateFormat('MMM d, yy').format(timestamp.toLocal())}',
                               style: GoogleFonts.roboto(
                                 fontSize: widget.isReply ? 10 : 10,
                                 color: Colors.grey[400],
