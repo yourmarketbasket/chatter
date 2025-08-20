@@ -1137,6 +1137,8 @@ class DataController extends GetxController {
       );
       if (response.statusCode == 200 && response.data['success'] == true) {
         try {
+          // notification service
+          NotificationService().init();
           // Save token and user data to secure storage
           String? tokenValue = response.data['user']['token']?.toString();
           String userJson = jsonEncode(response.data['user']);
@@ -1150,6 +1152,7 @@ class DataController extends GetxController {
 
           // Now, fetch feeds
           try {
+            // update the fcm token and send to database by calling init
               // print('[DataController] Login successful. Fetching initial feeds...');
             await fetchFeeds(); // Fetches main content feed
               // print('[DataController] Initial feeds fetched successfully after login.');
