@@ -145,7 +145,7 @@ class _ChatScreenState extends State<ChatScreen> {
       }).toList();
     }
 
-    // Create the final message object with uploaded file URLs
+    
     final finalMessage = {
       'clientMessageId': clientMessageId,
       'chatId': dataController.currentChat.value['_id'],
