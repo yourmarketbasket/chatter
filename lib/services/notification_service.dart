@@ -167,14 +167,6 @@ class NotificationService {
     }
 
     if (data['type'] == 'new_message') {
-      if (Get.isRegistered<DataController>()) {
-        final dataController = Get.find<DataController>();
-        if (dataController.currentChat.value['_id'] == data['chatId']) {
-          print("User is already in the chat. Suppressing notification.");
-          return;
-        }
-      }
-
       final String chatId = data['chatId'];
       final String groupKey = chatId;
       final String? messageBody = notification.body;
