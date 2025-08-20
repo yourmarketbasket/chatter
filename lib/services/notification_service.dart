@@ -154,6 +154,15 @@ class NotificationService {
     }
 
     if (data['type'] == 'new_message') {
+      // Don't show notification if user is already in the chat
+      if (Get.isRegistered<DataController>()) {
+        final dataController = Get.find<DataController>();
+        if (dataController.currentChat.value['_id'] == data['chatId']) {
+          print("User is already in the chat. Suppressing notification.");
+          return;
+        }
+      }
+
       final largeIconPath = await _generateAvatar(data['senderAvatar'], notification.title ?? '?');
 
       final androidDetails = AndroidNotificationDetails(
