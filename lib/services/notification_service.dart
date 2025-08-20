@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:chatter/controllers/data-controller.dart';
@@ -198,7 +199,7 @@ class NotificationService {
       final payload = jsonEncode({'chatId': chatId, 'messageId': data['messageId']});
 
       await _flutterLocalNotificationsPlugin.show(
-        DateTime.now().millisecondsSinceEpoch, // Unique ID for each notification
+        Random().nextInt(2147483647), // Use a random 32-bit integer ID
         messageTitle,
         messageBody,
         notificationDetails,
@@ -260,7 +261,7 @@ class NotificationService {
         final payload = jsonEncode({'chatId': data['chatId']});
 
         await _flutterLocalNotificationsPlugin.show(
-            message.hashCode,
+            Random().nextInt(2147483647), // Use a random 32-bit integer ID
             notification.title,
             notification.body,
             notificationDetails,
