@@ -1363,20 +1363,21 @@ class DataController extends GetxController {
         data: {'content': newText},
         options: dio.Options(
           headers: {'Authorization': 'Bearer $token'},
+          validateStatus: (status) => status != null && status < 500,
         ),
       );
       if (response.statusCode == 200 && response.data['success'] == true) {
         print('[DataController] Edited message $messageId successfully');
+        // The API documentation states the updated message object is returned.
+        // Assuming the key is 'message' based on other similar responses.
+        final updatedMessage = response.data['message'];
         final index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
         if (index != -1) {
-          final originalMessage = currentConversationMessages[index];
-          originalMessage['content'] = newText;
-          originalMessage['edited'] = true;
-          currentConversationMessages[index] = originalMessage;
+          currentConversationMessages[index] = updatedMessage;
         }
       } else {
-        print('[DataController] Failed to edit message $messageId');
-        throw Exception('Failed to edit message');
+        print('[DataController] Failed to edit message $messageId: ${response.data?['message']}');
+        throw Exception('Failed to edit message: ${response.data?['message']}');
       }
     } catch (e) {
       print('[DataController] Error editing message $messageId: $e');
@@ -2997,6 +2998,18 @@ void clearUserPosts() {
         // print('FCM token updated successfully');
     } catch (e) {
         // print('Error updating FCM token: $e');
+    }
+  }
+
+  void handleMessageEdited(Map<String, dynamic> updatedMessage) {
+    final messageId = updatedMessage['_id'];
+    if (messageId == null) return;
+
+    final index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
+    if (index != -1) {
+      // Replace the old message with the updated one from the socket event
+      currentConversationMessages[index] = updatedMessage;
+      print('[DataController] Handled message:edited event for message $messageId');
     }
   }
 

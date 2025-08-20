@@ -450,7 +450,7 @@ class _ContactsPageState extends State<ContactsPage> {
                               try {
                                 existingChat = _dataController.chats.values.firstWhere(
                                   (chat) {
-                                    if (chat['isGroup'] == true) return false;
+                                    if (chat['type'] == 'group') return false;
                                     final participantIds = (chat['participants'] as List).map((p) {
                                       if (p is Map<String, dynamic>) return p['_id'] as String;
                                       return p as String;
@@ -491,7 +491,7 @@ class _ContactsPageState extends State<ContactsPage> {
                         try {
                           existingChat = _dataController.chats.values.firstWhere(
                             (chat) {
-                              if (chat['isGroup'] == true) return false;
+                              if (chat['type'] == 'group') return false;
                               final participantIds = (chat['participants'] as List).map((p) {
                                 if (p is Map<String, dynamic>) return p['_id'] as String;
                                 return p as String;

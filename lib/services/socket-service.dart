@@ -98,7 +98,7 @@ class SocketService {
       'chat:new': (data) => _handleNewChat(data),
       'chat:updated': (data) => _handleNewMessage(data),
       'message:new': (data) => _handleNewMessage(data),
-      'message:edited': (data) => _handleNewMessage(data),
+      'message:edited': (data) => _handleMessageEdited(data),
       'message:deleted': (data) => _handleMessageDeleted(data),
       'message:statusUpdate': (data) => _handleMessageStatusUpdate(data),
       'message:reaction': (data) => _handleNewMessage(data),
@@ -204,6 +204,15 @@ class SocketService {
       _eventController.add({'event': 'chat:new', 'data': data});
     } else {
         print('SocketService: Invalid chat:new data format: ${data.runtimeType}');
+    }
+  }
+
+  void _handleMessageEdited(dynamic data) {
+    if (data is Map<String, dynamic> && data['_id'] is String) {
+      _dataController.handleMessageEdited(data);
+      _eventController.add({'event': 'message:edited', 'data': data});
+    } else {
+        print('SocketService: Invalid message:edited data format: ${data.runtimeType}');
     }
   }
 
