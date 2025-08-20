@@ -162,7 +162,52 @@ class DataController extends GetxController {
   }
 
   void handleMessageDeleted(Map<String, dynamic> data) {
-    // Not implemented
+    final messageId = data['messageId'];
+    final chatId = data['chatId'];
+
+    if (messageId == null) {
+      print('[DataController] Invalid message:deleted data received (missing messageId): $data');
+      return;
+    }
+
+    // If the deleted message belongs to the currently active chat, update it.
+    if (currentChat.value['_id'] != null && currentChat.value['_id'] == chatId) {
+      final index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
+      if (index != -1) {
+        // Assuming the event implies deletion for everyone.
+        // The UI will show "Message deleted" based on this flag.
+        var message = currentConversationMessages[index];
+        message['deletedForEveryone'] = true;
+        // Clearing content and files to ensure they don't accidentally appear.
+        message['content'] = '';
+        message['files'] = [];
+        currentConversationMessages[index] = message;
+        print('[DataController] Marked message $messageId as deleted in chat $chatId.');
+      }
+    }
+
+    // Also update the last message in the main chats list if it was the one deleted.
+    if (chatId != null && chats.containsKey(chatId)) {
+      final chat = chats[chatId]!;
+      if (chat['lastMessage'] != null && chat['lastMessage']['_id'] == messageId) {
+        // Backend should ideally send the new last message.
+        // For now, we'll fetch the chat again to get the updated state.
+        // This is a safe fallback to ensure consistency.
+        fetchChats(); // This re-fetches all chats, which is inefficient but safe.
+                       // A more targeted API to get a single chat's summary would be better.
+        print('[DataController] Deleted message was the last message of chat $chatId. Refreshing chats list.');
+      }
+    }
+  }
+
+  void markMessageAsReadById(String messageId) {
+    if (messageId.isEmpty) return;
+    // This is called from a notification, so we don't have the message object.
+    // We can just send the event to the server. The server will then broadcast
+    // the message:statusUpdate event, which will be handled by handleMessageStatusUpdate.
+    // This assumes handleMessageStatusUpdate is correctly implemented.
+    Get.find<SocketService>().sendMessageRead(messageId);
+    print('[DataController] Sent mark as read event for message $messageId');
   }
 
   String? getUserId() {
@@ -1385,12 +1430,14 @@ class DataController extends GetxController {
   }
 
   Future<void> deleteChatMessage(String messageId, {bool forEveryone = false}) async {
-    print('[DataController] Deleting message $messageId');
+    print('[DataController] Deleting message $messageId with forEveryone=$forEveryone');
     try {
       final token = user.value['token'];
       if (token == null) {
         throw Exception('User not authenticated');
       }
+      // The API call will trigger a socket event that other clients will receive.
+      // The current client (who initiated the deletion) will perform an optimistic update.
       final response = await _dio.delete(
         'api/messages/$messageId',
         queryParameters: forEveryone ? {'for': 'everyone'} : null,
@@ -1398,15 +1445,33 @@ class DataController extends GetxController {
           headers: {'Authorization': 'Bearer $token'},
         ),
       );
+
       if (response.statusCode == 200 && response.data['success'] == true) {
-        print('[DataController] Deleted message $messageId successfully');
-        currentConversationMessages.removeWhere((m) => m['_id'] == messageId);
+        print('[DataController] API call to delete message $messageId successful.');
+
+        // Optimistic UI update for the user who performed the action.
+        final index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
+        if (index != -1) {
+          if (forEveryone) {
+            // Mark as deleted for everyone. The UI will show "Message deleted".
+            var message = Map<String, dynamic>.from(currentConversationMessages[index]);
+            message['deletedForEveryone'] = true;
+            message['content'] = ''; // Clear content
+            message['files'] = []; // Clear files
+            currentConversationMessages[index] = message;
+          } else {
+            // "Delete for me" just removes it from the local user's view.
+            currentConversationMessages.removeAt(index);
+          }
+        }
       } else {
-        print('[DataController] Failed to delete message $messageId');
-        throw Exception('Failed to delete message');
+        print('[DataController] Failed to delete message $messageId on the server.');
+        // Optionally show an error to the user.
+        throw Exception('Failed to delete message on the server');
       }
     } catch (e) {
       print('[DataController] Error deleting message $messageId: $e');
+      // Optionally show an error to the user.
     }
   }
 

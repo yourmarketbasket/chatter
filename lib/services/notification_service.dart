@@ -1,62 +1,69 @@
+import 'dart:io';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:chatter/controllers/data-controller.dart';
+import 'package:chatter/pages/chat_screen_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'dart:io' show Platform;
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:image/image.dart' as img;
+import 'dart:convert';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
   print("Handling a background message: ${message.messageId}");
-  NotificationService().showNotification(message);
+  await NotificationService().showNotification(message);
+}
+
+@pragma('vm:entry-point')
+void onDidReceiveBackgroundNotificationResponse(NotificationResponse response) {
+    print('onDidReceiveBackgroundNotificationResponse: payload=${response.payload}');
+    // Here you can handle the background notification response.
+    // This is a static function, so you can't access instance members.
+    // A common pattern is to save the payload and handle it when the app starts.
 }
 
 class NotificationService {
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
-  final DataController _dataController = Get.find<DataController>();
+  DataController get _dataController => Get.find<DataController>();
+
 
   static const String _channelId = 'chatter_default_channel';
   static const String _channelName = 'Chatter Notifications';
   static const String _channelDescription = 'Default channel for Chatter app notifications';
 
-  // Use the specific 16px icon name for the status bar
-  // This static const is no longer strictly needed here if only used for initialization,
-  // but can be kept if used elsewhere or for clarity.
-  // static const String _notificationIconName = '@drawable/ic_status_16px'; // Original problematic line
-
   Future<void> init() async {
-    await _firebaseMessaging.requestPermission();
+    await _requestPermissions();
     final fcmToken = await _firebaseMessaging.getToken();
     if (fcmToken != null) {
       print('FCM Token: $fcmToken');
-      _dataController.updateFcmToken(fcmToken);
+      if(Get.isRegistered<DataController>()) {
+        _dataController.updateFcmToken(fcmToken);
+      }
     }
-// yolo
+
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('ic_status_16px');
 
-    const InitializationSettings initializationSettings =
+    final InitializationSettings initializationSettings =
         InitializationSettings(
       android: initializationSettingsAndroid,
     );
 
     await _flutterLocalNotificationsPlugin.initialize(
       initializationSettings,
-      onDidReceiveNotificationResponse: (response) async {
-        if (response.payload != null) {
-          print('notification payload: ${response.payload}');
-          // This is a simplified navigation. In a real app, you'd want to
-          // check if the user is already on the chat screen, etc.
-          // Also, you'd need the other chat details like username and avatar.
-          // For now, we'll just print.
-        }
-      },
+      onDidReceiveNotificationResponse: onDidReceiveNotificationResponse,
+      onDidReceiveBackgroundNotificationResponse: onDidReceiveBackgroundNotificationResponse,
     );
 
     await _createAndroidNotificationChannel();
@@ -64,34 +71,142 @@ class NotificationService {
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       print('Got a message whilst in the foreground!');
       print('Message data: ${message.data}');
-
-      if (message.notification != null) {
-        print('Message also contained a notification: ${message.notification}');
-      }
-
       showNotification(message);
     });
 
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   }
 
-  void showNotification(RemoteMessage message) {
-    final notification = message.data;
-    if (notification['type'] == 'NEW_MESSAGE') {
-      _flutterLocalNotificationsPlugin.show(
-        notification.hashCode,
-        notification['senderName'],
-        notification['messageText'],
-        NotificationDetails(
-          android: AndroidNotificationDetails(
+  void onDidReceiveNotificationResponse(NotificationResponse response) async {
+    final payloadString = response.payload;
+    if (payloadString != null) {
+      print('notification payload: $payloadString, actionId: ${response.actionId}');
+
+      final payload = jsonDecode(payloadString);
+      final chatId = payload['chatId'];
+      final messageId = payload['messageId'];
+
+      if (!Get.isRegistered<DataController>()) {
+          print("DataController not registered. Cannot handle notification action.");
+          return;
+      }
+      final dataController = Get.find<DataController>();
+
+      if (response.actionId == 'REPLY') {
+        print('Reply action tapped for chat ID: $chatId');
+        navigateToChat(chatId, dataController);
+      } else if (response.actionId == 'MARK_AS_READ') {
+        print('Mark as Read action tapped for message ID: $messageId');
+        if (messageId != null) {
+            dataController.markMessageAsReadById(messageId);
+        }
+      } else {
+        print('Notification tapped. Navigating to chat ID: $chatId');
+        navigateToChat(chatId, dataController);
+      }
+    }
+  }
+
+  void navigateToChat(String chatId, DataController dataController) {
+    final chat = dataController.chats[chatId];
+    if (chat != null) {
+        dataController.currentChat.value = chat;
+        Get.to(() => const ChatScreen());
+    } else {
+        print("Chat with id $chatId not found in dataController.chats");
+        // Fallback: maybe navigate to the main chats page
+        Get.toNamed('/chats');
+    }
+  }
+
+  Future<String?> _generateAvatar(String? avatarUrl, String senderName) async {
+    if (avatarUrl == null || avatarUrl.isEmpty) {
+      return null;
+    }
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final filePath = '${tempDir.path}/${avatarUrl.split('/').last}.png';
+      final file = File(filePath);
+
+      if (await file.exists()) {
+        return filePath;
+      }
+
+      final response = await http.get(Uri.parse(avatarUrl));
+      if (response.statusCode == 200) {
+        await file.writeAsBytes(response.bodyBytes);
+        return filePath;
+      }
+      return null;
+    } catch (e) {
+      print('Error generating avatar: $e');
+      return null;
+    }
+  }
+
+  Future<void> showNotification(RemoteMessage message) async {
+    final data = message.data;
+    final notification = message.notification;
+
+    if (notification == null) {
+      print("showNotification: Received message without a notification part.");
+      return;
+    }
+
+    if (data['type'] == 'new_message') {
+      final largeIconPath = await _generateAvatar(data['senderAvatar'], notification.title ?? '?');
+
+      final androidDetails = AndroidNotificationDetails(
+        _channelId,
+        _channelName,
+        channelDescription: _channelDescription,
+        icon: 'ic_status_16px',
+        importance: Importance.max,
+        priority: Priority.high,
+        largeIcon: largeIconPath != null ? FilePathAndroidBitmap(largeIconPath) : null,
+        actions: [
+          const AndroidNotificationAction('REPLY', 'Reply', showsUserInterface: true),
+          const AndroidNotificationAction('MARK_AS_READ', 'Mark as Read'),
+        ],
+        styleInformation: BigTextStyleInformation(notification.body ?? ''),
+      );
+
+      final notificationDetails = NotificationDetails(android: androidDetails);
+
+      final payload = jsonEncode({
+        'chatId': data['chatId'],
+        'messageId': data['messageId']
+      });
+
+      await _flutterLocalNotificationsPlugin.show(
+        message.hashCode,
+        notification.title,
+        notification.body,
+        notificationDetails,
+        payload: payload,
+      );
+    } else if (data['type'] == 'group_invitation') {
+        final largeIconPath = await _generateAvatar(data['adderAvatar'], data['addedBy'] ?? '?');
+        final androidDetails = AndroidNotificationDetails(
             _channelId,
             _channelName,
             channelDescription: _channelDescription,
             icon: 'ic_status_16px',
-          ),
-        ),
-        payload: notification['chatId'],
-      );
+            importance: Importance.max,
+            priority: Priority.high,
+            largeIcon: largeIconPath != null ? FilePathAndroidBitmap(largeIconPath) : null,
+            styleInformation: BigTextStyleInformation(notification.body ?? ''),
+        );
+        final notificationDetails = NotificationDetails(android: androidDetails);
+        final payload = jsonEncode({'chatId': data['chatId']});
+
+        await _flutterLocalNotificationsPlugin.show(
+            message.hashCode,
+            notification.title,
+            notification.body,
+            notificationDetails,
+            payload: payload,
+        );
     }
   }
 
@@ -130,51 +245,5 @@ class NotificationService {
       }
     }
     return true;
-  }
-
-  Future<void> showTestNotification() async {
-    if (kDebugMode) {
-      print("Attempting to show test notification...");
-    }
-    bool hasPermission = await _requestPermissions();
-    if (!hasPermission) {
-      if (kDebugMode) {
-        print("Cannot show notification due to missing permissions.");
-      }
-      return;
-    }
-
-    // Ensure the icon name here matches the one used in initialization
-    // and is the name of your monochrome drawable resource.
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
-        AndroidNotificationDetails(
-      _channelId,
-      _channelName,
-      channelDescription: _channelDescription,
-      icon: 'ic_status_16px', // Correct: Just the name of the drawable resource
-      importance: Importance.max,
-      priority: Priority.high,
-    );
-
-    const NotificationDetails platformChannelSpecifics = NotificationDetails(
-      android: androidPlatformChannelSpecifics,
-      // iOS: iOSPlatformChannelSpecifics,
-    );
-
-    try {
-      // await _flutterLocalNotificationsPlugin.show(
-      //   0,
-      //   'Test Notification',
-      //   'This is a test notification from Chatter!',
-      //   platformChannelSpecifics,
-      // );
-      if (kDebugMode) {
-        print("Test notification shown successfully.");
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print("Error showing notification: $e");
-      }
-    }
   }
 }
