@@ -15,6 +15,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:image/image.dart' as img;
 import 'dart:convert';
+import 'package:uuid/uuid.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -26,9 +27,10 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 @pragma('vm:entry-point')
 void onDidReceiveBackgroundNotificationResponse(NotificationResponse response) {
     print('onDidReceiveBackgroundNotificationResponse: payload=${response.payload}');
-    // Here you can handle the background notification response.
-    // This is a static function, so you can't access instance members.
-    // A common pattern is to save the payload and handle it when the app starts.
+    // This is where you would handle background notification actions.
+    // Since this is a separate isolate, you can't easily access GetX controllers.
+    // A common pattern is to use a different mechanism like shared_preferences
+    // to store the action and handle it when the app starts.
 }
 
 class NotificationService {
@@ -93,8 +95,19 @@ class NotificationService {
       final dataController = Get.find<DataController>();
 
       if (response.actionId == 'REPLY') {
-        print('Reply action tapped for chat ID: $chatId');
-        navigateToChat(chatId, dataController);
+        final repliedText = response.input;
+        if (repliedText != null && repliedText.isNotEmpty) {
+          print('Replying with: "$repliedText" to chat ID: $chatId');
+          final clientMessageId = const Uuid().v4();
+          final message = {
+            'chatId': chatId,
+            'content': repliedText,
+            'type': 'text',
+            'senderId': {'_id': dataController.getUserId()},
+            'participants': dataController.chats[chatId]?['participants'],
+          };
+          await dataController.sendChatMessage(message, clientMessageId);
+        }
       } else if (response.actionId == 'MARK_AS_READ') {
         print('Mark as Read action tapped for message ID: $messageId');
         if (messageId != null) {
@@ -154,7 +167,6 @@ class NotificationService {
     }
 
     if (data['type'] == 'new_message') {
-      // Don't show notification if user is already in the chat
       if (Get.isRegistered<DataController>()) {
         final dataController = Get.find<DataController>();
         if (dataController.currentChat.value['_id'] == data['chatId']) {
@@ -163,37 +175,83 @@ class NotificationService {
         }
       }
 
-      final largeIconPath = await _generateAvatar(data['senderAvatar'], notification.title ?? '?');
+      final String chatId = data['chatId'];
+      final String groupKey = chatId;
+      final String? messageBody = notification.body;
+      final String? messageTitle = notification.title;
+
+      final largeIconPath = await _generateAvatar(data['senderAvatar'], messageTitle ?? '?');
 
       final androidDetails = AndroidNotificationDetails(
         _channelId,
         _channelName,
         channelDescription: _channelDescription,
+        groupKey: groupKey,
         icon: 'ic_status_16px',
         importance: Importance.max,
         priority: Priority.high,
         largeIcon: largeIconPath != null ? FilePathAndroidBitmap(largeIconPath) : null,
         actions: [
-          const AndroidNotificationAction('REPLY', 'Reply', showsUserInterface: true),
+          AndroidNotificationAction(
+            'REPLY',
+            'Reply',
+            showsUserInterface: true,
+            inputs: [AndroidNotificationActionInput(label: 'Your reply...')],
+          ),
           const AndroidNotificationAction('MARK_AS_READ', 'Mark as Read'),
         ],
-        styleInformation: BigTextStyleInformation(notification.body ?? ''),
       );
 
       final notificationDetails = NotificationDetails(android: androidDetails);
-
-      final payload = jsonEncode({
-        'chatId': data['chatId'],
-        'messageId': data['messageId']
-      });
+      final payload = jsonEncode({'chatId': chatId, 'messageId': data['messageId']});
 
       await _flutterLocalNotificationsPlugin.show(
-        message.hashCode,
-        notification.title,
-        notification.body,
+        DateTime.now().millisecondsSinceEpoch, // Unique ID for each notification
+        messageTitle,
+        messageBody,
         notificationDetails,
         payload: payload,
       );
+
+      // --- Group Summary Notification ---
+      final List<ActiveNotification> activeNotifications =
+          await _flutterLocalNotificationsPlugin
+              .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+              ?.getActiveNotifications() ?? [];
+
+      final List<ActiveNotification> chatNotifications = activeNotifications
+          .where((n) => n.groupKey == groupKey && n.id != 0) // Exclude summary notification itself
+          .toList();
+
+      if (chatNotifications.length > 1) {
+        final List<String> lines = chatNotifications.map((n) => n.body ?? '').toList();
+        final InboxStyleInformation inboxStyleInformation = InboxStyleInformation(
+          lines,
+          contentTitle: messageTitle,
+          summaryText: '${chatNotifications.length} new messages',
+        );
+
+        final AndroidNotificationDetails summaryAndroidDetails = AndroidNotificationDetails(
+          _channelId,
+          _channelName,
+          channelDescription: _channelDescription,
+          groupKey: groupKey,
+          setAsGroupSummary: true,
+          styleInformation: inboxStyleInformation,
+        );
+
+        final NotificationDetails summaryNotificationDetails =
+            NotificationDetails(android: summaryAndroidDetails);
+
+        final int summaryId = chatId.hashCode;
+        await _flutterLocalNotificationsPlugin.show(
+          summaryId,
+          messageTitle,
+          '${chatNotifications.length} new messages',
+          summaryNotificationDetails,
+        );
+      }
+
     } else if (data['type'] == 'group_invitation') {
         final largeIconPath = await _generateAvatar(data['adderAvatar'], data['addedBy'] ?? '?');
         final androidDetails = AndroidNotificationDetails(
