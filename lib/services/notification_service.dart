@@ -100,14 +100,36 @@ class NotificationService {
         if (repliedText != null && repliedText.isNotEmpty) {
           print('Replying with: "$repliedText" to chat ID: $chatId');
           final clientMessageId = const Uuid().v4();
-          final message = {
+          final currentUser = dataController.user.value['user'];
+
+          // Create a temporary message for optimistic UI update, mimicking the format from ChatScreen
+          final tempMessage = {
+            'clientMessageId': clientMessageId,
+            'chatId': chatId,
+            'senderId': {
+              '_id': currentUser['_id'],
+              'name': currentUser['name'],
+              'avatar': currentUser['avatar'],
+            },
+            'content': repliedText,
+            'type': 'text',
+            'files': [],
+            'replyTo': messageId, // The ID of the message from the notification payload
+            'viewOnce': false,
+            'createdAt': DateTime.now().toUtc().toIso8601String(),
+            'status': 'sending',
+          };
+          dataController.addTemporaryMessage(tempMessage);
+
+          // Prepare and send the final message to the backend
+          final finalMessage = {
+            'clientMessageId': clientMessageId,
             'chatId': chatId,
             'content': repliedText,
             'type': 'text',
-            'senderId': {'_id': dataController.getUserId()},
-            'participants': dataController.chats[chatId]?['participants'],
+            'replyTo': messageId,
           };
-          await dataController.sendChatMessage(message, clientMessageId);
+          await dataController.sendChatMessage(finalMessage, clientMessageId);
         }
       } else if (response.actionId == 'MARK_AS_READ') {
         print('Mark as Read action tapped for message ID: $messageId');
