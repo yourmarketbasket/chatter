@@ -3055,7 +3055,7 @@ void clearUserPosts() {
     }
 
     // Add to the current conversation if it's the one being viewed
-    if (currentConversationMessages.isNotEmpty && currentConversationMessages.first['chatId'] == messageData['chatId']) {
+    if (currentChat.value['_id'] != null && currentChat.value['_id'] == messageData['chatId']) {
       // Check for duplicates before adding
       if (!currentConversationMessages.any((m) => m['_id'] == messageData['_id'])) {
         currentConversationMessages.add(messageData);
