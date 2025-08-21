@@ -1,11 +1,15 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:chatter/widgets/voice_note_preview_dialog.dart';
 import 'package:chatter/widgets/attachment_preview_dialog.dart';
+import 'package:chatter/services/socket-service.dart';
+import 'package:chatter/controllers/data-controller.dart';
 
 class MessageInputArea extends StatefulWidget {
   final Function(String text, List<PlatformFile> files) onSend;
@@ -22,30 +26,67 @@ class MessageInputArea extends StatefulWidget {
 class _MessageInputAreaState extends State<MessageInputArea> {
   final TextEditingController _messageController = TextEditingController();
   final AudioRecorder _audioRecorder = AudioRecorder();
+  final SocketService _socketService = Get.find<SocketService>();
+  final DataController _dataController = Get.find<DataController>();
+
   bool _isTyping = false;
   bool _isRecording = false;
+  Timer? _typingTimer;
+  bool _isTypingEventSent = false;
 
   @override
   void initState() {
     super.initState();
-    _messageController.addListener(() {
-      if (mounted) {
+    _messageController.addListener(_onTextChanged);
+  }
+
+  @override
+  void dispose() {
+    _messageController.removeListener(_onTextChanged);
+    _messageController.dispose();
+    _audioRecorder.dispose();
+    _typingTimer?.cancel();
+    super.dispose();
+  }
+
+  void _onTextChanged() {
+    if (mounted) {
+      setState(() {
+        _isTyping = _messageController.text.trim().isNotEmpty;
+      });
+    }
+
+    final chatId = _dataController.currentChat.value['_id'];
+    if (chatId == null) return;
+
+    if (!_isTypingEventSent && _isTyping) {
+      _socketService.sendTypingStart(chatId);
+      setState(() {
+        _isTypingEventSent = true;
+      });
+    }
+
+    _typingTimer?.cancel();
+    _typingTimer = Timer(const Duration(seconds: 2), () {
+      if (_isTypingEventSent) {
+        _socketService.sendTypingStop(chatId);
         setState(() {
-          _isTyping = _messageController.text.trim().isNotEmpty;
+          _isTypingEventSent = false;
         });
       }
     });
   }
 
-  @override
-  void dispose() {
-    _messageController.dispose();
-    _audioRecorder.dispose();
-    super.dispose();
-  }
-
   void _handleSend() {
     if (_isTyping) {
+      final chatId = _dataController.currentChat.value['_id'];
+      if (chatId != null) {
+        _typingTimer?.cancel();
+        if (_isTypingEventSent) {
+          _socketService.sendTypingStop(chatId);
+          _isTypingEventSent = false;
+        }
+      }
       widget.onSend(_messageController.text.trim(), []);
       _messageController.clear();
     }
