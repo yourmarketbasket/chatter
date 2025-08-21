@@ -286,7 +286,10 @@ class DataController extends GetxController {
     if (index != -1) {
         final message = Map<String, dynamic>.from(currentConversationMessages[index]);
         updateReceipts(message);
-        currentConversationMessages[index] = message;
+
+        var newList = List<Map<String, dynamic>>.from(currentConversationMessages);
+        newList[index] = message;
+        currentConversationMessages.assignAll(newList);
     }
 
     for (var chat in chats.values) {
