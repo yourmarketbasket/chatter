@@ -1034,12 +1034,31 @@ class _ChatScreenState extends State<ChatScreen> {
           color: Colors.grey[850]?.withOpacity(0.5),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Text(
-          'Message deleted',
-          style: TextStyle(
-            color: Colors.grey[400],
-            fontStyle: FontStyle.italic,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.block, // A "deleted" or "blocked" icon
+              color: Colors.grey[400],
+              size: 14,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Message deleted',
+              style: TextStyle(
+                color: Colors.grey[400],
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              formatTime(DateTime.parse(message['createdAt']).toLocal()),
+              style: TextStyle(
+                color: Colors.grey[500],
+                fontSize: 10,
+              ),
+            ),
+          ],
         ),
       ),
     );

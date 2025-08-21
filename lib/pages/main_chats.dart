@@ -260,14 +260,10 @@ class _MainChatsPageState extends State<MainChatsPage> {
 
                         String preview = '';
                         if (lastMessageData != null && lastMessageData is Map<String, dynamic>) {
-                          if ((lastMessageData['files'] as List?)?.isNotEmpty ?? false) {
-                            preview = 'Attachment';
-                          } else {
-                            preview = lastMessageData['content'] ?? '';
-                          }
                           final senderId = lastMessageData['senderId'];
                           final senderIdString = senderId is Map ? senderId['_id'] : senderId;
                           String senderName;
+
                           if (senderIdString == currentUserId) {
                             senderName = 'You';
                           } else {
@@ -277,6 +273,14 @@ class _MainChatsPageState extends State<MainChatsPage> {
                             } else {
                               senderName = title;
                             }
+                          }
+
+                          if (lastMessageData['deletedForEveryone'] == true) {
+                            preview = 'Message deleted';
+                          } else if ((lastMessageData['files'] as List?)?.isNotEmpty ?? false) {
+                            preview = 'Attachment';
+                          } else {
+                            preview = lastMessageData['content'] ?? '';
                           }
                           preview = '$senderName: $preview';
                         }
