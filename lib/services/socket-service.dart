@@ -245,13 +245,8 @@ class SocketService {
   }
 
   void _handleMessageStatusUpdate(dynamic data) {
-    // The payload for status updates is just { messageId, userId, status, chatId }
-    // It does not have _id, so the original check was correct.
-    // However, the controller needs the full message object.
-    // The event from the server should be the full message object.
-    // Assuming the server sends the full message object, we check for _id.
     if (data is Map<String, dynamic> &&
-        data['_id'] is String &&
+        data['messageId'] is String &&
         data['userId'] is String &&
         data['status'] is String) {
       _dataController.handleMessageStatusUpdate(data);
