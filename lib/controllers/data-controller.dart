@@ -166,13 +166,11 @@ class DataController extends GetxController {
     }
   }
 
-    void handleNewMessage(Map<String, dynamic> data) {
-    final chatData = data.containsKey('lastMessage') ? data : {'lastMessage': data};
-    final chatId = chatData['chatId'] ?? chatData['_id'];
-    final newMessage = chatData['lastMessage'] as Map<String, dynamic>?;
+    void handleNewMessage(Map<String, dynamic> newMessage) {
+    final chatId = newMessage['chatId'] as String?;
 
-    if (newMessage == null || chatId == null || newMessage['_id'] == null) {
-      // print('[DataController] Invalid message:new data received: $data');
+    if (chatId == null || newMessage['_id'] == null) {
+      // print('[DataController] Invalid message:new data received: $newMessage');
       return;
     }
 
