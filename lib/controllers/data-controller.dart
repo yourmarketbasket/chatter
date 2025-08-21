@@ -167,54 +167,57 @@ class DataController extends GetxController {
   }
 
     void handleNewMessage(Map<String, dynamic> data) {
-    // Handle case where data is a full chat object with lastMessage
     final chatData = data.containsKey('lastMessage') ? data : {'lastMessage': data};
     final chatId = chatData['chatId'] ?? chatData['_id'];
-    final newMessage = chatData['lastMessage'] as Map?;
+    final newMessage = chatData['lastMessage'] as Map<String, dynamic>?;
 
     if (newMessage == null || chatId == null || newMessage['_id'] == null) {
       // print('[DataController] Invalid message:new data received: $data');
       return;
     }
 
-    // Define senderId at method level
-    final senderId = newMessage['senderId'] is Map
-        ? newMessage['senderId']['_id'] as String?
-        : newMessage['senderId'] as String?;
+    // --- De-duplication & Update Logic ---
+    final newMsgId = newMessage['_id'] as String?;
+    final newClientMsgId = newMessage['clientMessageId'] as String?;
 
-    // Skip if the message is from the current user (already handled optimistically)
-    if (senderId == getUserId()) {
-      // print('[DataController] Ignoring own message from socket.');
-      return;
-    }
-
-    // Add to current conversation if it's the one being viewed
     if (currentChat.value['_id'] == chatId) {
-      if (!currentConversationMessages.any((m) => m['_id'] == newMessage['_id'])) {
-        final fullMessage = <String, dynamic>{
-          '_id': newMessage['_id'] as String?,
-          'chatId': chatId as String?,
-          'senderId': newMessage['senderId'], // Preserve as is (map or string)
-          'content': newMessage['content']?.toString() ?? '',
-          'createdAt': newMessage['createdAt']?.toString() ?? DateTime.now().toUtc().toIso8601String(),
-          'type': newMessage['type']?.toString() ?? 'text',
-          'files': (newMessage['files'] as List?)?.cast<Map<String, dynamic>>() ?? [],
-          'replyTo': newMessage['replyTo'],
-          'readReceipts': (newMessage['readReceipts'] as List?)?.cast<Map<String, dynamic>>() ?? [],
-          'edited': newMessage['edited'] as bool? ?? false,
-        };
-        currentConversationMessages.add(fullMessage);
-        // Emit delivered for non-self messages
-        if (senderId != null && senderId != getUserId()) {
-          Get.find<SocketService>().sendMessageDelivered(newMessage['_id'] as String);
+      final existingMsgIndex = currentConversationMessages.indexWhere((m) {
+        final bool hasRealId = newMsgId != null && m['_id'] == newMsgId;
+        final bool hasClientId = newClientMsgId != null && m['clientMessageId'] == newClientMsgId;
+        return hasRealId || hasClientId;
+      });
+
+      if (existingMsgIndex != -1) {
+        // Match found. This is the finalized version of an optimistic message.
+        // Replace the temporary message with the full one from the socket.
+        currentConversationMessages[existingMsgIndex] = newMessage;
+        currentConversationMessages.refresh();
+        // Update the chat list's last message as well, then stop.
+        if (chats.containsKey(chatId)) {
+            final chat = chats[chatId]!;
+            chat['lastMessage'] = newMessage;
+            chats[chatId] = chat;
+            chats.refresh();
         }
+        return; // Stop to prevent adding a duplicate.
       }
     }
 
-    // Update the chats map
+    // --- Add New Message to Conversation ---
+    // No duplicate was found, so it's a new message.
+    if (currentChat.value['_id'] == chatId) {
+      currentConversationMessages.add(newMessage);
+      final senderId = newMessage['senderId'] is Map ? newMessage['senderId']['_id'] : newMessage['senderId'];
+      if (senderId != null && senderId != getUserId()) {
+        Get.find<SocketService>().sendMessageDelivered(newMessage['_id'] as String);
+      }
+    }
+
+    // --- Update Chat List ---
     if (chats.containsKey(chatId)) {
       final chat = chats[chatId]!;
       chat['lastMessage'] = newMessage;
+      final senderId = newMessage['senderId'] is Map ? newMessage['senderId']['_id'] : newMessage['senderId'];
       if (senderId != null && senderId != getUserId()) {
         chat['unreadCount'] = (chat['unreadCount'] ?? 0) + 1;
       }
