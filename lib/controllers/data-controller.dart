@@ -10,7 +10,6 @@ import 'package:uuid/uuid.dart';
 import '../models/feed_models.dart';
 import '../services/socket-service.dart';
 import '../services/notification_service.dart';
-import '../services/dio_interceptor.dart';
 import '../services/upload_service.dart'; // Import the UploadService
 
 class DataController extends GetxController {
@@ -84,7 +83,6 @@ class DataController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    _dio.interceptors.add(RateLimitInterceptor());
     init();
   }
 

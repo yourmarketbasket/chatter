@@ -1229,7 +1229,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
                       // Priority 3: Render the normal message
                       return VisibilityDetector(
-                        key: Key(message['_id']),
+                        key: Key(message['_id'] ?? message['clientMessageId']),
                         onVisibilityChanged: (visibilityInfo) {
                           if (visibilityInfo.visibleFraction > 0.5) {
                             dataController.markMessageAsRead(message);
