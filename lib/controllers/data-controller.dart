@@ -1524,16 +1524,13 @@ class DataController extends GetxController {
 
     if (messageId == null || chatId == null || currentUserId == null) return;
 
-    // Check sender to prevent marking own messages as read
     final senderId = message['senderId'] is Map ? message['senderId']['_id'] : message['senderId'];
     if (senderId == currentUserId) return;
 
-    // Check if it's already marked as read to avoid redundant API calls
     final receipts = (message['readReceipts'] as List?)?.cast<Map<String, dynamic>>() ?? [];
     final alreadyRead = receipts.any((r) => r['userId'] == currentUserId && r['status'] == 'read');
     if (alreadyRead) return;
 
-    // Only make the API call. The UI will update when the socket event comes back.
     _updateMessageStatusOnBackend(messageId, chatId, 'read');
   }
 
