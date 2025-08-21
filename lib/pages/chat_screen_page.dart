@@ -1156,7 +1156,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   if (chat['type'] != 'group')
                     Obx(() {
-                      final isTyping = dataController.isTyping[chat['_id']] ?? false;
+                      final isTyping = dataController.isTyping[chat['_id']] != null;
                       if (isTyping) {
                         return const Text(
                           'typing...',
