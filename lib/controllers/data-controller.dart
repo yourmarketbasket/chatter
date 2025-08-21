@@ -207,7 +207,8 @@ class DataController extends GetxController {
       currentConversationMessages.add(newMessage);
       final senderId = newMessage['senderId'] is Map ? newMessage['senderId']['_id'] : newMessage['senderId'];
       if (senderId != null && senderId != getUserId()) {
-        Get.find<SocketService>().sendMessageDelivered(newMessage['_id'] as String);
+        // Mark the message as 'delivered' as soon as it's received.
+        markMessageAsDelivered(newMessage);
       }
     }
 
@@ -261,35 +262,41 @@ class DataController extends GetxController {
 
   void handleMessageStatusUpdate(Map<String, dynamic> data) {
     final messageId = data['messageId'] as String?;
-    final newStatus = data['status'] as String?; // e.g., 'delivered' or 'read'
+    final status = data['status'] as String?;
+    final userId = data['userId'] as String?;
 
-    if (messageId == null || newStatus == null) return;
+    if (messageId == null || status == null || userId == null) return;
 
-    const statusOrder = {
-      'sending': 0,
-      'sent': 1,
-      'delivered': 2,
-      'read': 3,
-    };
+    void updateReceipts(Map<String, dynamic> message) {
+        var receipts = List<Map<String, dynamic>>.from(message['readReceipts'] ?? []);
+        final receiptIndex = receipts.indexWhere((r) => r['userId'] == userId);
 
-    void updateStatus(Map<String, dynamic> message) {
-        final currentStatus = message['status'] as String? ?? 'sending';
-        if ((statusOrder[newStatus] ?? -1) > (statusOrder[currentStatus] ?? -1)) {
-            message['status'] = newStatus;
+        final newReceipt = {
+            'userId': userId,
+            'status': status,
+            'timestamp': DateTime.now().toUtc().toIso8601String(),
+        };
+
+        if (receiptIndex != -1) {
+            if(receipts[receiptIndex]['status'] == 'read' && status == 'delivered') return;
+            receipts[receiptIndex] = newReceipt;
+        } else {
+            receipts.add(newReceipt);
         }
+        message['readReceipts'] = receipts;
     }
 
     final index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
     if (index != -1) {
         final message = Map<String, dynamic>.from(currentConversationMessages[index]);
-        updateStatus(message);
+        updateReceipts(message);
         currentConversationMessages[index] = message;
     }
 
     for (var chat in chats.values) {
         if (chat['lastMessage'] != null && chat['lastMessage']['_id'] == messageId) {
             final lastMessage = Map<String, dynamic>.from(chat['lastMessage'] as Map);
-            updateStatus(lastMessage);
+            updateReceipts(lastMessage);
             chat['lastMessage'] = lastMessage;
             chats[chat['_id']] = chat;
             break;
@@ -327,56 +334,29 @@ class DataController extends GetxController {
     }
   }
 
-  void handleMessageDelete(Map<String, dynamic> data) {
-    final messageId = data['messageId'] as String?;
-    final chatId = data['chatId'] as String?;
-    final deletedForEveryone = data['deletedForEveryone'] as bool? ?? false;
+  void handleMessageDelete(Map<String, dynamic> deletedMessage) {
+    final messageId = deletedMessage['_id'] as String?;
+    final chatId = deletedMessage['chatId'] as String?;
 
-    if (messageId == null || chatId == null) {
-      // print('[DataController] Invalid message:delete data received: $data');
-      return;
-    }
+    if (messageId == null || chatId == null) return;
 
-    // --- Update the message in the currently open conversation ---
+    // Update the message in the currently open conversation
     if (currentChat.value['_id'] == chatId) {
       final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
       if (messageIndex != -1) {
-        if (deletedForEveryone) {
-          // "Delete for everyone": Tombstone the message by creating a new list
-          var newList = List<Map<String, dynamic>>.from(currentConversationMessages);
-          var updatedMessage = Map<String, dynamic>.from(newList[messageIndex]);
-          updatedMessage['content'] = 'This message was deleted';
-          updatedMessage['files'] = [];
-          updatedMessage['deletedForEveryone'] = true;
-          newList[messageIndex] = updatedMessage;
-          currentConversationMessages.assignAll(newList); // Use assignAll to replace the list
-        } else {
-          // "Delete for me": Remove locally by creating a new list
-          var newList = List<Map<String, dynamic>>.from(currentConversationMessages);
-          newList.removeAt(messageIndex);
-          currentConversationMessages.assignAll(newList);
-        }
+        // Simply replace the old message with the new one from the server.
+        // The UI will be responsible for interpreting the 'deletedFor' flags.
+        currentConversationMessages[messageIndex] = deletedMessage;
+        currentConversationMessages.refresh();
       }
     }
 
-    // --- Update the chat list's last message ---
+    // Update the chat list's last message if it's the one that was deleted
     if (chats.containsKey(chatId) && chats[chatId]!['lastMessage']?['_id'] == messageId) {
-      if (deletedForEveryone) {
-        // If deleted for everyone, the server has a new "last message" for the chat.
-        // The most reliable way to get this is to fetch the updated chat state.
-        // For now, we tombstone it locally. A better solution is to fetch the new last message.
         final chat = chats[chatId]!;
-        var lastMessage = Map<String, dynamic>.from(chat['lastMessage'] as Map);
-        lastMessage['content'] = 'This message was deleted';
-        lastMessage['files'] = [];
-        lastMessage['deletedForEveryone'] = true;
-        chat['lastMessage'] = lastMessage;
+        chat['lastMessage'] = deletedMessage;
         chats[chatId] = chat;
         chats.refresh();
-      }
-      // For "delete for me", the last message in the chat list for this user should
-      // ideally update to the previous message. This is complex and best handled by
-      // fetching the new state from the server, so we'll leave it as is for now.
     }
   }
 
@@ -1680,7 +1660,7 @@ class DataController extends GetxController {
       }
 
       var response = await _dio.delete(
-        'api/chats/$chatId/permanent',
+        'api/chats/$chatId',
         options: dio.Options(
           headers: {
             'Authorization': 'Bearer $token',
@@ -3180,49 +3160,74 @@ void clearUserPosts() {
     }
   }
 
+  Future<void> _updateMessageStatusOnBackend(String messageId, String chatId, String status) async {
+    try {
+      final token = getAuthToken();
+      if (token == null) throw Exception('User not authenticated');
+
+      await _dio.post(
+        'api/messages/status',
+        data: {
+          'messageId': messageId,
+          'chatId': chatId,
+          'status': status,
+        },
+        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+    } catch (e) {
+      // print('Error updating message status on backend: $e');
+    }
+  }
+
   void markMessageAsRead(Map<String, dynamic> message) {
     final messageId = message['_id'] as String?;
+    final chatId = message['chatId'] as String?;
     final currentUserId = getUserId();
 
-    if (messageId == null || currentUserId == null) return;
+    if (messageId == null || chatId == null || currentUserId == null) return;
 
-    // Correctly extract senderId from the message object
-    final senderId = message['senderId'] is Map
-        ? message['senderId']['_id'] as String?
-        : message['senderId'] as String?;
+    final senderId = message['senderId'] is Map ? message['senderId']['_id'] : message['senderId'];
+    if (senderId == currentUserId) return;
 
-    // Do not mark own messages as read.
-    if (senderId == currentUserId) {
-      return;
-    }
+    final receipts = (message['readReceipts'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final alreadyRead = receipts.any((r) => r['userId'] == currentUserId && r['status'] == 'read');
+    if (alreadyRead) return;
 
-    // Check the new 'status' field. Do not proceed if already 'read'.
-    final currentStatus = message['status'] as String?;
-    if (currentStatus == 'read') {
-      return;
-    }
+    _updateMessageStatusOnBackend(messageId, chatId, 'read');
 
-    // Send the 'read' event to the server.
-    Get.find<SocketService>().sendMessageRead(messageId);
-
-    // Optimistically update the status to 'read' in the local state.
     final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
     if (messageIndex != -1) {
       final msgToUpdate = Map<String, dynamic>.from(currentConversationMessages[messageIndex]);
-      msgToUpdate['status'] = 'read';
+      var updatedReceipts = List<Map<String, dynamic>>.from(msgToUpdate['readReceipts'] ?? []);
+      updatedReceipts.removeWhere((r) => r['userId'] == currentUserId);
+      updatedReceipts.add({'userId': currentUserId, 'status': 'read', 'timestamp': DateTime.now().toUtc().toIso8601String()});
+      msgToUpdate['readReceipts'] = updatedReceipts;
       currentConversationMessages[messageIndex] = msgToUpdate;
       currentConversationMessages.refresh();
     }
+  }
 
-    // Also update the lastMessage in the chats list if it's the one that was read
+  void markMessageAsDelivered(Map<String, dynamic> message) {
+    final messageId = message['_id'] as String?;
     final chatId = message['chatId'] as String?;
-    if (chatId != null && chats.containsKey(chatId) && chats[chatId]!['lastMessage']?['_id'] == messageId) {
-        final chat = chats[chatId]!;
-        final lastMessage = Map<String, dynamic>.from(chat['lastMessage'] as Map);
-        lastMessage['status'] = 'read';
-        chat['lastMessage'] = lastMessage;
-        chats[chatId] = chat;
-        chats.refresh();
+    final currentUserId = getUserId();
+
+    if (messageId == null || chatId == null || currentUserId == null) return;
+
+    _updateMessageStatusOnBackend(messageId, chatId, 'delivered');
+
+    final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
+    if (messageIndex != -1) {
+      final msgToUpdate = Map<String, dynamic>.from(currentConversationMessages[messageIndex]);
+      var updatedReceipts = List<Map<String, dynamic>>.from(msgToUpdate['readReceipts'] ?? []);
+      final userReceiptIndex = updatedReceipts.indexWhere((r) => r['userId'] == currentUserId);
+
+      if (userReceiptIndex == -1) {
+          updatedReceipts.add({'userId': currentUserId, 'status': 'delivered', 'timestamp': DateTime.now().toUtc().toIso8601String()});
+          msgToUpdate['readReceipts'] = updatedReceipts;
+          currentConversationMessages[messageIndex] = msgToUpdate;
+          currentConversationMessages.refresh();
+      }
     }
   }
 

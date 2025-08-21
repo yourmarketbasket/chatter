@@ -116,7 +116,6 @@ class _ChatScreenState extends State<ChatScreen> {
       'replyTo': _replyingTo?['_id'],
       'viewOnce': false,
       'createdAt': now.toIso8601String(),
-      'status': 'sending',
     };
     // force
 
@@ -879,9 +878,9 @@ class _ChatScreenState extends State<ChatScreen> {
                 if (isYou) ...[
                   const SizedBox(width: 4),
                   Icon(
-                    _getStatusIcon(message['status']),
+                    _getStatusIcon(_getAggregateStatus(message['readReceipts'])),
                     size: 12,
-                    color: _getStatusColor(message['status']),
+                    color: _getStatusColor(_getAggregateStatus(message['readReceipts'])),
                   ),
                 ],
               ],
@@ -891,12 +890,26 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
     ));
   }
+  String _getAggregateStatus(List<dynamic>? receiptsData) {
+    if (receiptsData == null || receiptsData.isEmpty) {
+      return 'sent';
+    }
+
+    final receipts = receiptsData.cast<Map<String, dynamic>>();
+
+    if (receipts.every((r) => r['status'] == 'read')) {
+      return 'read';
+    }
+    if (receipts.any((r) => r['status'] == 'delivered' || r['status'] == 'read')) {
+      return 'delivered';
+    }
+    return 'sent';
+  }
+
   IconData _getStatusIcon(String? status) {
     switch (status) {
-      case 'sending':
-        return Icons.access_time;
       case 'sent':
-        return Icons.check;
+        return Icons.access_time; // Clock icon for sent
       case 'delivered':
         return Icons.done_all;
       case 'read':
@@ -904,7 +917,7 @@ class _ChatScreenState extends State<ChatScreen> {
       case 'failed':
         return Icons.error_outline;
       default:
-        return Icons.access_time;
+        return Icons.access_time; // Default to clock
     }
   }
 
