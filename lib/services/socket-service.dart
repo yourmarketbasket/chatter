@@ -37,8 +37,8 @@ class SocketService {
 
       _setupSocketListeners();
       _isInitialized = true;
-      // print('SocketService: Initialization complete.');
-      connect();
+      // print('SocketService: Initialization complete. Ready to connect.');
+      // connect() will be called explicitly by the DataController after data is ready.
     } catch (e) {
       // print('SocketService: Failed to initialize socket: $e');
     }

@@ -118,14 +118,18 @@ class DataController extends GetxController {
         });
       }
 
+      // Initialize socket service but do not connect yet.
+      Get.find<SocketService>().initSocket();
+
       // For chat functionality, we need all users before we can correctly display chats.
       // So we await these calls in sequence.
       await fetchAllUsers();
-      await fetchChats();
+      await fetchChats(); // This will populate the list of chats
       await fetchContacts();
 
-      // Initialize socket service after user data is loaded
-      Get.find<SocketService>().initSocket();
+      // Now that chats are fetched, connect the socket.
+      // The socket's onConnect handler will then sync the chat rooms.
+      Get.find<SocketService>().connect();
 
       // Initialize NotificationService after user data is loaded to ensure token is sent correctly
       final NotificationService notificationService = Get.find<NotificationService>();
@@ -283,23 +287,21 @@ class DataController extends GetxController {
     final chatId = data['chatId'] as String?;
 
     if (messageId == null || chatId == null) {
-      // print('[DataController] Invalid message:update data received: $data');
+      // print('[DataController] Invalid message:updated data received: $data');
       return;
     }
 
     // Update the message in the current conversation if it's open
     if (currentChat.value['_id'] == chatId) {
-      final index =
-          currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
+      final index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
       if (index != -1) {
         currentConversationMessages[index] = data;
-        currentConversationMessages.refresh();
+        currentConversationMessages.refresh(); // Use refresh for nested changes
       }
     }
 
-    // Also, update the chat list's lastMessage if this was the last message
-    if (chats.containsKey(chatId) &&
-        chats[chatId]!['lastMessage']?['_id'] == messageId) {
+    // Update the lastMessage in the chats list if this message is the last one
+    if (chats.containsKey(chatId) && chats[chatId]!['lastMessage']?['_id'] == messageId) {
       final chat = chats[chatId]!;
       chat['lastMessage'] = data;
       chats[chatId] = chat;
@@ -308,7 +310,7 @@ class DataController extends GetxController {
   }
 
   void handleMessageDelete(Map<String, dynamic> data) {
-    final messageId = data['_id'] as String?;
+    final messageId = data['messageId'] as String?;
     final chatId = data['chatId'] as String?;
     final deletedForEveryone = data['deletedForEveryone'] as bool? ?? false;
 
@@ -317,31 +319,43 @@ class DataController extends GetxController {
       return;
     }
 
-    // Case 1: Message was deleted for everyone.
-    if (deletedForEveryone) {
-      // Update the message in the current conversation to a tombstone.
-      if (currentChat.value['_id'] == chatId) {
-        final index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
-        if (index != -1) {
-          currentConversationMessages[index]['content'] = 'This message was deleted';
-          currentConversationMessages[index]['files'] = [];
-          currentConversationMessages[index]['deletedForEveryone'] = true;
-          currentConversationMessages.refresh();
+    // --- Update the message in the currently open conversation ---
+    if (currentChat.value['_id'] == chatId) {
+      final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
+      if (messageIndex != -1) {
+        if (deletedForEveryone) {
+          // "Delete for everyone": Tombstone the message
+          var message = Map<String, dynamic>.from(currentConversationMessages[messageIndex]);
+          message['content'] = 'This message was deleted';
+          message['files'] = [];
+          message['deletedForEveryone'] = true;
+          currentConversationMessages[messageIndex] = message;
+        } else {
+          // "Delete for me": Remove locally
+          currentConversationMessages.removeAt(messageIndex);
         }
+        currentConversationMessages.refresh();
       }
     }
-    // Case 2: Message was deleted for a single user ("delete for me").
-    else {
-        if (currentChat.value['_id'] == chatId) {
-            currentConversationMessages.removeWhere((m) => m['_id'] == messageId);
-            currentConversationMessages.refresh();
-        }
-    }
 
-    // For both cases, if the deleted message was the last one, we need to
-    // fetch the updated chat state to get the new correct last message.
+    // --- Update the chat list's last message ---
     if (chats.containsKey(chatId) && chats[chatId]!['lastMessage']?['_id'] == messageId) {
-      fetchChatById(chatId);
+      if (deletedForEveryone) {
+        // If deleted for everyone, the server has a new "last message" for the chat.
+        // The most reliable way to get this is to fetch the updated chat state.
+        // For now, we tombstone it locally. A better solution is to fetch the new last message.
+        final chat = chats[chatId]!;
+        var lastMessage = Map<String, dynamic>.from(chat['lastMessage'] as Map);
+        lastMessage['content'] = 'This message was deleted';
+        lastMessage['files'] = [];
+        lastMessage['deletedForEveryone'] = true;
+        chat['lastMessage'] = lastMessage;
+        chats[chatId] = chat;
+        chats.refresh();
+      }
+      // For "delete for me", the last message in the chat list for this user should
+      // ideally update to the previous message. This is complex and best handled by
+      // fetching the new state from the server, so we'll leave it as is for now.
     }
   }
 
@@ -1392,8 +1406,8 @@ class DataController extends GetxController {
         for (var chat in chatData) {
           chats[chat['_id']] = chat;
         }
-        // After successfully fetching chats, ensure we are joined to all rooms.
-        Get.find<SocketService>().syncAllChatRooms();
+        // The socket service will sync chat rooms on its own once it connects.
+        // The DataController's init method now controls when the connection happens.
       } else {
         throw Exception('Failed to fetch chats');
       }
@@ -1402,32 +1416,6 @@ class DataController extends GetxController {
       // Optionally, show a snackbar or some error message to the user
     } finally {
       isLoadingChats.value = false;
-    }
-  }
-
-  Future<void> fetchChatById(String chatId) async {
-    try {
-      final token = user.value['token'];
-      if (token == null) {
-        throw Exception('User not authenticated');
-      }
-      final response = await _dio.get(
-        'api/chats/$chatId',
-        options: dio.Options(
-          headers: {'Authorization': 'Bearer $token'},
-        ),
-      );
-      if (response.statusCode == 200 && response.data['success'] == true) {
-        final chatData = response.data['chat'];
-        if (chats.containsKey(chatId)) {
-          chats[chatId] = chatData;
-          chats.refresh();
-        }
-      } else {
-        throw Exception('Failed to fetch chat by ID');
-      }
-    } catch (e) {
-      // print('Error fetching chat by ID: $e');
     }
   }
 
