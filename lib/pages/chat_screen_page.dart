@@ -40,6 +40,7 @@ class _ChatScreenState extends State<ChatScreen> {
       Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
       _markVisibleMessagesAsRead();
     });
+    _scrollController.addListener(_markVisibleMessagesAsRead);
   }
 
   void _loadMessagesAndMarkAsRead() async {
@@ -48,8 +49,19 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _markVisibleMessagesAsRead() {
-    final messages = dataController.currentConversationMessages;
-    for (var message in messages) {
+    final currentUserId = dataController.getUserId();
+    if (currentUserId == null) return;
+
+    final unreadMessages = dataController.currentConversationMessages.where((msg) {
+      final senderId = msg['senderId'] is Map ? msg['senderId']['_id'] : msg['senderId'];
+      if (senderId == currentUserId) return false;
+
+      final receipts = (msg['readReceipts'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      final isRead = receipts.any((r) => r['userId'] == currentUserId && r['status'] == 'read');
+      return !isRead;
+    }).toList();
+
+    for (final message in unreadMessages) {
       dataController.markMessageAsRead(message);
     }
   }
@@ -57,6 +69,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     _messageController.dispose();
+    _scrollController.removeListener(_markVisibleMessagesAsRead);
     _scrollController.dispose();
     dataController.currentConversationMessages.clear();
     super.dispose();
@@ -932,6 +945,63 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  String _formatDateForChip(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final dateToCompare = DateTime(date.year, date.month, date.day);
+
+    if (dateToCompare == today) {
+      return 'Today';
+    } else if (dateToCompare == yesterday) {
+      return 'Yesterday';
+    } else {
+      // Assuming a simple format, can be replaced with intl package for more robust formatting
+      return '${date.month}/${date.day}/${date.year}';
+    }
+  }
+
+  Widget _buildDateChip(DateTime date) {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 8.0),
+        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
+        decoration: BoxDecoration(
+          color: Colors.grey[850],
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          _formatDateForChip(date),
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 12,
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<dynamic> _buildGroupedMessageList() {
+    final messages = dataController.currentConversationMessages;
+    if (messages.isEmpty) return [];
+
+    List<dynamic> groupedList = [];
+    DateTime? lastDate;
+
+    for (var message in messages) {
+      final messageDate = DateTime.parse(message['createdAt']).toLocal();
+      if (lastDate == null ||
+          lastDate.year != messageDate.year ||
+          lastDate.month != messageDate.month ||
+          lastDate.day != messageDate.day) {
+        groupedList.add(messageDate);
+      }
+      groupedList.add(message);
+      lastDate = messageDate;
+    }
+    return groupedList;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Obx(() {
@@ -1034,22 +1104,27 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             Expanded(
               child: Obx(() {
+                final groupedMessages = _buildGroupedMessageList();
                 return ListView.builder(
                   controller: _scrollController,
                   reverse: false,
                   padding: const EdgeInsets.symmetric(
                       vertical: 8.0, horizontal: 16.0),
-                  itemCount: dataController.currentConversationMessages.length,
+                  itemCount: groupedMessages.length,
                   itemBuilder: (context, index) {
-                    final message =
-                        dataController.currentConversationMessages[index];
-                    return Align(
-                      alignment: message['senderId']['_id'] ==
-                              dataController.user.value['user']['_id']
-                          ? Alignment.centerRight
-                          : Alignment.centerLeft,
-                      child: _buildMessageContent(message, index),
-                    );
+                    final item = groupedMessages[index];
+                    if (item is DateTime) {
+                      return _buildDateChip(item);
+                    } else {
+                      final message = item as Map<String, dynamic>;
+                      return Align(
+                        alignment: message['senderId']['_id'] ==
+                                dataController.user.value['user']['_id']
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
+                        child: _buildMessageContent(message, index),
+                      );
+                    }
                   },
                 );
               }),

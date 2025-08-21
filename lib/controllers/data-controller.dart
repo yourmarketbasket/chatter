@@ -260,7 +260,54 @@ class DataController extends GetxController {
   }
 
   void handleMessageStatusUpdate(Map<String, dynamic> data) {
-    // Not implemented
+    final messageId = data['messageId'] as String?;
+    final status = data['status'] as String?;
+    final userId = data['userId'] as String?;
+
+    if (messageId == null || status == null) return;
+
+    // Helper function to update the readReceipts list for a given message
+    void updateReceipts(Map<String, dynamic> message) {
+        var receipts = List<Map<String, dynamic>>.from(message['readReceipts'] ?? []);
+        final receiptIndex = receipts.indexWhere((r) => r['userId'] == userId);
+
+        final newReceipt = {
+            'userId': userId,
+            'status': status,
+            'timestamp': DateTime.now().toUtc().toIso8601String(),
+        };
+
+        if (receiptIndex != -1) {
+            // Do not downgrade a status from 'read' to 'delivered'
+            if(receipts[receiptIndex]['status'] == 'read' && status == 'delivered') return;
+            receipts[receiptIndex] = newReceipt;
+        } else {
+            receipts.add(newReceipt);
+        }
+        message['readReceipts'] = receipts;
+    }
+
+    // Update the message in the current conversation
+    final index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
+    if (index != -1) {
+        final message = Map<String, dynamic>.from(currentConversationMessages[index]);
+        updateReceipts(message);
+        currentConversationMessages[index] = message;
+    }
+
+    // Find the relevant chat and update its lastMessage if necessary
+    for (var chat in chats.values) {
+        if (chat['lastMessage'] != null && chat['lastMessage']['_id'] == messageId) {
+            final lastMessage = Map<String, dynamic>.from(chat['lastMessage'] as Map);
+            updateReceipts(lastMessage);
+            chat['lastMessage'] = lastMessage;
+            chats[chat['_id']] = chat; // Re-assign to trigger update
+            break; // Found it, no need to continue looping
+        }
+    }
+    // Manually trigger updates for both lists
+    currentConversationMessages.refresh();
+    chats.refresh();
   }
 
   void handleMessageUpdate(Map<String, dynamic> data) {
