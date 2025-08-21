@@ -3181,35 +3181,48 @@ void clearUserPosts() {
   }
 
   void markMessageAsRead(Map<String, dynamic> message) {
-    final messageId = message['_id'];
-    final currentUserId = user.value['user']['_id'];
+    final messageId = message['_id'] as String?;
+    final currentUserId = getUserId();
 
-    // Avoid marking own messages as read or if there's no messageId
-    if (message['senderId'] == currentUserId || messageId == null) {
+    if (messageId == null || currentUserId == null) return;
+
+    // Correctly extract senderId from the message object
+    final senderId = message['senderId'] is Map
+        ? message['senderId']['_id'] as String?
+        : message['senderId'] as String?;
+
+    // Do not mark own messages as read.
+    if (senderId == currentUserId) {
       return;
     }
 
-    // Check if the message is already marked as read by the current user
-    final readReceipts = (message['readReceipts'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-    final alreadyRead = readReceipts.any((receipt) => receipt['userId'] == currentUserId && receipt['status'] == 'read');
+    // Check the new 'status' field. Do not proceed if already 'read'.
+    final currentStatus = message['status'] as String?;
+    if (currentStatus == 'read') {
+      return;
+    }
 
-    if (!alreadyRead) {
-      Get.find<SocketService>().sendMessageRead(messageId);
+    // Send the 'read' event to the server.
+    Get.find<SocketService>().sendMessageRead(messageId);
 
-      // Optimistic UI update
-      final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
-      if (messageIndex != -1) {
-        final msg = currentConversationMessages[messageIndex];
-        final receipts = (msg['readReceipts'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    // Optimistically update the status to 'read' in the local state.
+    final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
+    if (messageIndex != -1) {
+      final msgToUpdate = Map<String, dynamic>.from(currentConversationMessages[messageIndex]);
+      msgToUpdate['status'] = 'read';
+      currentConversationMessages[messageIndex] = msgToUpdate;
+      currentConversationMessages.refresh();
+    }
 
-        // Remove old receipt for this user if it exists
-        receipts.removeWhere((r) => r['userId'] == currentUserId);
-        // Add new 'read' receipt
-        receipts.add({'userId': currentUserId, 'status': 'read', 'timestamp': DateTime.now().toUtc().toIso8601String()});
-
-        msg['readReceipts'] = receipts;
-        currentConversationMessages[messageIndex] = msg;
-      }
+    // Also update the lastMessage in the chats list if it's the one that was read
+    final chatId = message['chatId'] as String?;
+    if (chatId != null && chats.containsKey(chatId) && chats[chatId]!['lastMessage']?['_id'] == messageId) {
+        final chat = chats[chatId]!;
+        final lastMessage = Map<String, dynamic>.from(chat['lastMessage'] as Map);
+        lastMessage['status'] = 'read';
+        chat['lastMessage'] = lastMessage;
+        chats[chatId] = chat;
+        chats.refresh();
     }
   }
 
