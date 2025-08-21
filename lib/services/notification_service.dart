@@ -21,13 +21,13 @@ import 'package:uuid/uuid.dart';
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
-  print("Handling a background message: ${message.messageId}");
+  // print("Handling a background message: ${message.messageId}");
   await NotificationService().showNotification(message);
 }
 
 @pragma('vm:entry-point')
 void onDidReceiveBackgroundNotificationResponse(NotificationResponse response) {
-    print('onDidReceiveBackgroundNotificationResponse: payload=${response.payload}');
+    // print('onDidReceiveBackgroundNotificationResponse: payload=${response.payload}');
     // This is where you would handle background notification actions.
     // Since this is a separate isolate, you can't easily access GetX controllers.
     // A common pattern is to use a different mechanism like shared_preferences
@@ -49,7 +49,7 @@ class NotificationService {
     await _requestPermissions();
     final fcmToken = await _firebaseMessaging.getToken();
     if (fcmToken != null) {
-      print('FCM Token: $fcmToken');
+      // print('FCM Token: $fcmToken');
       if(Get.isRegistered<DataController>()) {
         _dataController.updateFcmToken(fcmToken);
       }
@@ -74,8 +74,8 @@ class NotificationService {
     await _createAndroidNotificationChannel();
 
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print('Got a message whilst in the foreground!');
-      print('Message data: ${message.data}');
+      // print('Got a message whilst in the foreground!');
+      // print('Message data: ${message.data}');
       showNotification(message);
     });
 
@@ -85,14 +85,14 @@ class NotificationService {
   void onDidReceiveNotificationResponse(NotificationResponse response) async {
     final payloadString = response.payload;
     if (payloadString != null) {
-      print('notification payload: $payloadString, actionId: ${response.actionId}');
+      // print('notification payload: $payloadString, actionId: ${response.actionId}');
 
       final payload = jsonDecode(payloadString);
       final chatId = payload['chatId'];
       final messageId = payload['messageId'];
 
       if (!Get.isRegistered<DataController>()) {
-          print("DataController not registered. Cannot handle notification action.");
+          // print("DataController not registered. Cannot handle notification action.");
           return;
       }
       final dataController = Get.find<DataController>();
@@ -100,7 +100,7 @@ class NotificationService {
       if (response.actionId == 'REPLY') {
         final repliedText = response.input;
         if (repliedText != null && repliedText.isNotEmpty) {
-          print('Replying with: "$repliedText" to chat ID: $chatId');
+          // print('Replying with: "$repliedText" to chat ID: $chatId');
           final clientMessageId = const Uuid().v4();
           final currentUser = dataController.user.value['user'];
 
@@ -134,12 +134,12 @@ class NotificationService {
           await dataController.sendChatMessage(finalMessage, clientMessageId);
         }
       } else if (response.actionId == 'MARK_AS_READ') {
-        print('Mark as Read action tapped for message ID: $messageId');
+        // print('Mark as Read action tapped for message ID: $messageId');
         if (messageId != null) {
             dataController.markMessageAsReadById(messageId);
         }
       } else {
-        print('Notification tapped. Navigating to chat ID: $chatId');
+        // print('Notification tapped. Navigating to chat ID: $chatId');
         navigateToChat(chatId, dataController);
       }
     }
@@ -151,7 +151,7 @@ class NotificationService {
         dataController.currentChat.value = chat;
         Get.to(() => const ChatScreen());
     } else {
-        print("Chat with id $chatId not found in dataController.chats");
+        // print("Chat with id $chatId not found in dataController.chats");
         // Fallback: maybe navigate to the main chats page
         Get.toNamed('/chats');
     }
@@ -183,7 +183,7 @@ class NotificationService {
       }
       return null;
     } catch (e) {
-      print('Error generating avatar: $e');
+      // print('Error generating avatar: $e');
       return null;
     }
   }
@@ -193,7 +193,7 @@ class NotificationService {
     final notification = message.notification;
 
     if (notification == null) {
-      print("showNotification: Received message without a notification part.");
+      // print("showNotification: Received message without a notification part.");
       return;
     }
 
@@ -313,7 +313,7 @@ class NotificationService {
             AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(channel);
     if (kDebugMode) {
-      print("Notification channel '$_channelId' created.");
+      // print("Notification channel '$_channelId' created.");
     }
   }
 
@@ -323,14 +323,14 @@ class NotificationService {
       if (deviceInfo.version.sdkInt >= 33) { // Android 13+
         PermissionStatus status = await Permission.notification.request();
         if (status.isGranted) {
-          if (kDebugMode) print("Notification permission granted.");
+          // if (kDebugMode) print("Notification permission granted.");
           return true;
         } else {
-          if (kDebugMode) print("Notification permission denied.");
+          // if (kDebugMode) print("Notification permission denied.");
           return false;
         }
       } else {
-        if (kDebugMode) print("Notification permission not required for Android SDK ${deviceInfo.version.sdkInt}.");
+        // if (kDebugMode) print("Notification permission not required for Android SDK ${deviceInfo.version.sdkInt}.");
         return true;
       }
     }

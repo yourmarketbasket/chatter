@@ -162,13 +162,115 @@ class DataController extends GetxController {
     }
   }
 
-  void handleChatUpdated(Map<String, dynamic> data) {
-    final chatId = data['_id'];
-    if (chatId != null && chats.containsKey(chatId)) {
+    void handleNewMessage(Map<String, dynamic> data) {
+    // Handle case where data is a full chat object with lastMessage
+    final chatData = data.containsKey('lastMessage') ? data : {'lastMessage': data};
+    final chatId = chatData['chatId'] ?? chatData['_id'];
+    final newMessage = chatData['lastMessage'] as Map?;
+
+    if (newMessage == null || chatId == null || newMessage['_id'] == null) {
+      // print('[DataController] Invalid message:new data received: $data');
+      return;
+    }
+
+    // Define senderId at method level
+    final senderId = newMessage['senderId'] is Map
+        ? newMessage['senderId']['_id'] as String?
+        : newMessage['senderId'] as String?;
+
+    // Skip if the message is from the current user (already handled optimistically)
+    if (senderId == getUserId()) {
+      // print('[DataController] Ignoring own message from socket.');
+      return;
+    }
+
+    // Add to current conversation if it's the one being viewed
+    if (currentChat.value['_id'] == chatId) {
+      if (!currentConversationMessages.any((m) => m['_id'] == newMessage['_id'])) {
+        final fullMessage = <String, dynamic>{
+          '_id': newMessage['_id'] as String?,
+          'chatId': chatId as String?,
+          'senderId': newMessage['senderId'], // Preserve as is (map or string)
+          'content': newMessage['content']?.toString() ?? '',
+          'createdAt': newMessage['createdAt']?.toString() ?? DateTime.now().toUtc().toIso8601String(),
+          'type': newMessage['type']?.toString() ?? 'text',
+          'files': (newMessage['files'] as List?)?.cast<Map<String, dynamic>>() ?? [],
+          'replyTo': newMessage['replyTo'],
+          'readReceipts': (newMessage['readReceipts'] as List?)?.cast<Map<String, dynamic>>() ?? [],
+          'edited': newMessage['edited'] as bool? ?? false,
+        };
+        currentConversationMessages.add(fullMessage);
+        // Emit delivered for non-self messages
+        if (senderId != null && senderId != getUserId()) {
+          Get.find<SocketService>().sendMessageDelivered(newMessage['_id'] as String);
+        }
+      }
+    }
+
+    // Update the chats map
+    if (chats.containsKey(chatId)) {
       final chat = chats[chatId]!;
-      chat['lastMessage'] = data['lastMessage'];
+      chat['lastMessage'] = newMessage;
+      if (senderId != null && senderId != getUserId()) {
+        chat['unreadCount'] = (chat['unreadCount'] ?? 0) + 1;
+      }
       chats[chatId] = chat;
       chats.refresh();
+    } else {
+      // print('[DataController] Received message for unknown chat: $chatId. Fetching chats.');
+      fetchChats();
+    }
+  }
+
+  void handleChatUpdated(Map<String, dynamic> data) {
+    final chatId = data['_id'] as String?;
+    final newMessage = data['lastMessage'] as Map?;
+
+    if (chatId == null || newMessage == null || newMessage['_id'] == null) {
+      // print('[DataController] Invalid chat:updated data received: $data');
+      return;
+    }
+
+    // Define senderId at method level
+    final senderId = newMessage['senderId'] is Map
+        ? newMessage['senderId']['_id'] as String?
+        : newMessage['senderId'] as String?;
+
+    // Update the chats map
+    if (chats.containsKey(chatId)) {
+      final chat = chats[chatId]!;
+      chat['lastMessage'] = newMessage;
+      if (senderId != null && senderId != getUserId()) {
+        chat['unreadCount'] = (chat['unreadCount'] ?? 0) + 1;
+      }
+      chats[chatId] = chat;
+      chats.refresh();
+    } else {
+      // print('[DataController] Received chat:updated for unknown chat: $chatId. Fetching chats.');
+      fetchChats();
+    }
+
+    // Add the new message to the current conversation if this is the open chat
+    if (currentChat.value['_id'] == chatId) {
+      if (!currentConversationMessages.any((m) => m['_id'] == newMessage['_id'])) {
+        final fullMessage = <String, dynamic>{
+          '_id': newMessage['_id'] as String?,
+          'chatId': chatId,
+          'senderId': newMessage['senderId'], // Preserve as is (map or string)
+          'content': newMessage['content']?.toString() ?? '',
+          'createdAt': newMessage['createdAt']?.toString() ?? DateTime.now().toUtc().toIso8601String(),
+          'type': newMessage['type']?.toString() ?? 'text',
+          'files': (newMessage['files'] as List?)?.cast<Map<String, dynamic>>() ?? [],
+          'replyTo': newMessage['replyTo'],
+          'readReceipts': (newMessage['readReceipts'] as List?)?.cast<Map<String, dynamic>>() ?? [],
+          'edited': newMessage['edited'] as bool? ?? false,
+        };
+        currentConversationMessages.add(fullMessage);
+        // Emit delivered for non-self messages
+        if (senderId != null && senderId != getUserId()) {
+          Get.find<SocketService>().sendMessageDelivered(newMessage['_id'] as String);
+        }
+      }
     }
   }
 
@@ -187,41 +289,39 @@ class DataController extends GetxController {
   }
 
   void handleMessageDelete(Map<String, dynamic> data) {
-    final messageId = data['messageId'];
-    final chatId = data['chatId'];
-    final deletedForEveryone = data['deletedForEveryone'] ?? false;
+    final messageId = data['_id'] as String?;
+    final chatId = data['chatId'] as String?;
 
     if (messageId == null || chatId == null) {
-      print('[DataController] Invalid message:deleted data received: $data');
+      // print('[DataController] Invalid message:deleted data received: $data');
       return;
     }
 
-    if (!deletedForEveryone) {
-      // If a message was deleted only for the sender, other clients
-      // should not be affected. So we do nothing.
-      return;
-    }
-
-    // If the deleted message belongs to the currently active chat, update it.
+    // Update currentConversationMessages if the chat is open
     if (currentChat.value['_id'] == chatId) {
-      final index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
-      if (index != -1) {
-        var message = Map<String, dynamic>.from(currentConversationMessages[index]);
-        message['deletedForEveryone'] = true;
-        message['content'] = '';
-        message['files'] = [];
-        currentConversationMessages[index] = message;
+      final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
+      if (messageIndex != -1) {
+        final message = Map<String, dynamic>.from(currentConversationMessages[messageIndex]);
+        final deletedFor = (message['deletedFor'] as List?)?.cast<String>() ?? [];
+        final userId = getUserId();
+        if (!deletedFor.contains(userId)) {
+          deletedFor.add(userId!);
+          message['deletedFor'] = deletedFor;
+          currentConversationMessages[messageIndex] = message;
+          currentConversationMessages.refresh();
+        }
       }
     }
 
-    // Also update the last message in the main chats list if it was the one deleted.
-    if (chats.containsKey(chatId)) {
-      final chat = chats[chatId]!;
-      if (chat['lastMessage'] != null && chat['lastMessage']['_id'] == messageId) {
-        // The backend should send the new last message in a `chat:updated` event.
-        // For now, we will just update the preview text.
-        final lastMessage = Map<String, dynamic>.from(chat['lastMessage']);
-        lastMessage['content'] = 'Message deleted';
+    // Update chats map if the deleted message is the lastMessage
+    if (chats.containsKey(chatId) && chats[chatId]!['lastMessage']?['_id'] == messageId) {
+      final chat = Map<String, dynamic>.from(chats[chatId]!);
+      final lastMessage = Map<String, dynamic>.from(chat['lastMessage'] as Map);
+      final deletedFor = (lastMessage['deletedFor'] as List?)?.cast<String>() ?? [];
+      final userId = getUserId();
+      if (!deletedFor.contains(userId)) {
+        deletedFor.add(userId!);
+        lastMessage['deletedFor'] = deletedFor;
         chat['lastMessage'] = lastMessage;
         chats[chatId] = chat;
         chats.refresh();
@@ -236,7 +336,7 @@ class DataController extends GetxController {
     // the message:statusUpdate event, which will be handled by handleMessageStatusUpdate.
     // This assumes handleMessageStatusUpdate is correctly implemented.
     Get.find<SocketService>().sendMessageRead(messageId);
-    print('[DataController] Sent mark as read event for message $messageId');
+    // print('[DataController] Sent mark as read event for message $messageId');
   }
 
   String? getUserId() {
@@ -277,7 +377,7 @@ class DataController extends GetxController {
       if (response.statusCode == 200 && response.data['success'] == true) {
         if (response.data['users'] != null && response.data['users'] is List) {
           List<dynamic> fetchedUsersDynamic = response.data['users'];
-          print('[DataController] fetchAllUsers: Successfully fetched ${fetchedUsersDynamic.length} raw user entries.');
+          // print('[DataController] fetchAllUsers: Successfully fetched ${fetchedUsersDynamic.length} raw user entries.');
           // Process users: ensure all necessary fields are present and correctly typed.
           // Add 'isFollowingCurrentUser' based on the main user's following list.
           final List<String> currentUserFollowingIds = List<String>.from(
@@ -322,26 +422,26 @@ class DataController extends GetxController {
           }).where((userMap) => userMap.isNotEmpty && userMap['_id'] != currentUserId).toList(); // Filter out empty maps and the current user
 
           allUsers.assignAll(fetchedUsers);
-          print('[DataController] Fetched all users successfully. Count: ${allUsers.length}');
+          // print('[DataController] Fetched all users successfully. Count: ${allUsers.length}');
         } else {
           allUsers.clear();
-          print('[DataController] Fetched all users but the user list is null or not a list.');
+          // print('[DataController] Fetched all users but the user list is null or not a list.');
           throw Exception('User list not found in response or invalid format.');
         }
       } else {
         allUsers.clear();
-        print('[DataController] Failed to fetch all users. Status: ${response.statusCode}, Message: ${response.data?['message']}');
+        // print('[DataController] Failed to fetch all users. Status: ${response.statusCode}, Message: ${response.data?['message']}');
         throw Exception('Failed to fetch all users: ${response.data?['message'] ?? "Unknown server error"}');
       }
     } catch (e) {
       allUsers.clear(); // Clear on error
-      print('[DataController] Error in fetchAllUsers: ${e.toString()}');
+      // print('[DataController] Error in fetchAllUsers: ${e.toString()}');
       // Optionally rethrow or handle as per UI requirements (e.g., show snackbar)
-      print('[DataController] fetchAllUsers caught error: ${e.toString()}');
+      // print('[DataController] fetchAllUsers caught error: ${e.toString()}');
       // For now, UsersListPage will show an error based on allUsers being empty + isLoading false.
     } finally {
       isLoading.value = false; // Reset loading state
-      print('[DataController] fetchAllUsers finally block. isLoading: ${isLoading.value}, allUsers count: ${allUsers.length}');
+      // print('[DataController] fetchAllUsers finally block. isLoading: ${isLoading.value}, allUsers count: ${allUsers.length}');
     }
   }
   // fetch user contacts only authtoken will be enough
@@ -373,7 +473,7 @@ class DataController extends GetxController {
         };
       }
     } catch (e) {
-      print('[DataController] Error in fetchContacts: ${e.toString()}');
+      // print('[DataController] Error in fetchContacts: ${e.toString()}');
       return {
         'success': false,
         'message': 'Error fetching contacts',
@@ -638,7 +738,7 @@ class DataController extends GetxController {
     final String endpoint = replyId != null
         ? 'api/posts/$postId/replies/$replyId/bookmark'
         : 'api/posts/$postId/bookmark';
-    print('[DataController] Bookmarking item: $endpoint');
+    // print('[DataController] Bookmarking item: $endpoint');
     try {
       String? token = user.value['token'];
       if (token == null) {
@@ -655,15 +755,15 @@ class DataController extends GetxController {
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
-        print('[DataController] Bookmarked item successfully');
+        // print('[DataController] Bookmarked item successfully');
         // The socket event will handle the update.
         return {'success': true, 'message': response.data['message'] ?? 'Bookmarked successfully'};
       } else {
-        print('[DataController] Failed to bookmark item: ${response.data['message']}');
+        // print('[DataController] Failed to bookmark item: ${response.data['message']}');
         return {'success': false, 'message': response.data['message'] ?? 'Failed to bookmark'};
       }
     } catch (e) {
-      print('[DataController] Error bookmarking item: $e');
+      // print('[DataController] Error bookmarking item: $e');
       return {'success': false, 'message': e.toString()};
     }
   }
@@ -673,7 +773,7 @@ class DataController extends GetxController {
     final String endpoint = replyId != null
         ? 'api/posts/$postId/replies/$replyId/bookmark'
         : 'api/posts/$postId/bookmark';
-    print('[DataController] Unbookmarking item: $endpoint');
+    // print('[DataController] Unbookmarking item: $endpoint');
     try {
       String? token = user.value['token'];
       if (token == null) {
@@ -690,22 +790,22 @@ class DataController extends GetxController {
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
-        print('[DataController] Unbookmarked item successfully');
+        // print('[DataController] Unbookmarked item successfully');
         // The socket event will handle the update.
         return {'success': true, 'message': response.data['message'] ?? 'Unbookmarked successfully'};
       } else {
-        print('[DataController] Failed to unbookmark item: ${response.data['message']}');
+        // print('[DataController] Failed to unbookmark item: ${response.data['message']}');
         return {'success': false, 'message': response.data['message'] ?? 'Failed to unbookmark'};
       }
     } catch (e) {
-      print('[DataController] Error unbookmarking item: $e');
+      // print('[DataController] Error unbookmarking item: $e');
       return {'success': false, 'message': e.toString()};
     }
   }
 
   // Get bookmarked posts
   Future<Map<String, dynamic>> getBookmarkedPosts() async {
-    print('[DataController] Fetching bookmarked posts');
+    // print('[DataController] Fetching bookmarked posts');
     try {
       String? token = user.value['token'];
       if (token == null) {
@@ -722,14 +822,14 @@ class DataController extends GetxController {
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
-        print('[DataController] Fetched bookmarked posts successfully');
+        // print('[DataController] Fetched bookmarked posts successfully');
         return {'success': true, 'posts': response.data['posts']};
       } else {
-        print('[DataController] Failed to fetch bookmarked posts: ${response.data['message']}');
+        // print('[DataController] Failed to fetch bookmarked posts: ${response.data['message']}');
         return {'success': false, 'message': response.data['message'] ?? 'Failed to fetch bookmarks'};
       }
     } catch (e) {
-      print('[DataController] Error fetching bookmarked posts: $e');
+      // print('[DataController] Error fetching bookmarked posts: $e');
       return {'success': false, 'message': e.toString()};
     }
   }
@@ -1319,7 +1419,7 @@ class DataController extends GetxController {
 
   // Send a new chat message
   Future<void> sendChatMessage(Map<String, dynamic> message, String clientMessageId) async {
-    print('[DataController] Sending message: $message');
+    // print('[DataController] Sending message: $message');
     try {
       final token = user.value['token'];
       if (token == null) {
@@ -1352,7 +1452,7 @@ class DataController extends GetxController {
       );
 
       if (response.statusCode == 201 && response.data['success'] == true) {
-        print('[DataController] Sent message successfully');
+        // print('[DataController] Sent message successfully');
         final responseData = response.data;
         final sentMessage = responseData['message'];
 
@@ -1378,11 +1478,11 @@ class DataController extends GetxController {
           currentConversationMessages.add(sentMessage);
         }
       } else {
-        print('[DataController] Failed to send message: ${response.data?['message']}');
+        // print('[DataController] Failed to send message: ${response.data?['message']}');
         throw Exception('Failed to send message: ${response.data?['message']}');
       }
     } catch (e) {
-      print('[DataController] Error sending message: $e');
+      // print('[DataController] Error sending message: $e');
       updateMessageStatus(clientMessageId, 'failed');
     }
   }
@@ -1429,7 +1529,7 @@ class DataController extends GetxController {
   }
 
   Future<void> editChatMessage(String messageId, String newText) async {
-    print('[DataController] Editing message $messageId');
+    // print('[DataController] Editing message $messageId');
     try {
       final token = user.value['token'];
       if (token == null) {
@@ -1444,7 +1544,7 @@ class DataController extends GetxController {
         ),
       );
       if (response.statusCode == 200 && response.data['success'] == true) {
-        print('[DataController] Edited message $messageId successfully');
+        // print('[DataController] Edited message $messageId successfully');
         // The API documentation states the updated message object is returned.
         // Assuming the key is 'message' based on other similar responses.
         final updatedMessage = response.data['message'];
@@ -1453,16 +1553,16 @@ class DataController extends GetxController {
           currentConversationMessages[index] = updatedMessage;
         }
       } else {
-        print('[DataController] Failed to edit message $messageId: ${response.data?['message']}');
+        // print('[DataController] Failed to edit message $messageId: ${response.data?['message']}');
         throw Exception('Failed to edit message: ${response.data?['message']}');
       }
     } catch (e) {
-      print('[DataController] Error editing message $messageId: $e');
+      // print('[DataController] Error editing message $messageId: $e');
     }
   }
 
   Future<void> deleteChatMessage(String messageId, {bool forEveryone = false}) async {
-    print('[DataController] Deleting message $messageId with forEveryone=$forEveryone');
+    // print('[DataController] Deleting message $messageId with forEveryone=$forEveryone');
     try {
       final token = user.value['token'];
       if (token == null) {
@@ -1477,7 +1577,7 @@ class DataController extends GetxController {
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
-        print('[DataController] API call to delete message $messageId successful.');
+        // print('[DataController] API call to delete message $messageId successful.');
         final responseData = response.data;
         final wasDeletedForEveryone = responseData['deletedForEveryone'] ?? false;
 
@@ -1496,16 +1596,16 @@ class DataController extends GetxController {
           }
         }
       } else {
-        print('[DataController] Failed to delete message $messageId on the server.');
+        // print('[DataController] Failed to delete message $messageId on the server.');
         throw Exception('Failed to delete message on the server');
       }
     } catch (e) {
-      print('[DataController] Error deleting message $messageId: $e');
+      // print('[DataController] Error deleting message $messageId: $e');
     }
   }
 
   Future<Map<String, dynamic>> deleteChat(String chatId) async {
-    print('[DataController] Deleting chat $chatId');
+    // print('[DataController] Deleting chat $chatId');
     try {
       String? token = user.value['token'];
       if (token == null) {
@@ -1522,16 +1622,16 @@ class DataController extends GetxController {
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
-        print('[DataController] Deleted chat $chatId successfully');
+        // print('[DataController] Deleted chat $chatId successfully');
         // The chat will be removed from the list via the socket event `chat:hardDeleted`.
         // So no need to remove it here optimistically, to avoid race conditions.
         return {'success': true, 'message': response.data['message'] ?? 'Chat deleted successfully'};
       } else {
-        print('[DataController] Failed to delete chat $chatId: ${response.data['message']}');
+        // print('[DataController] Failed to delete chat $chatId: ${response.data['message']}');
         return {'success': false, 'message': response.data['message'] ?? 'Failed to delete chat'};
       }
     } catch (e) {
-      print('[DataController] Error deleting chat $chatId: $e');
+      // print('[DataController] Error deleting chat $chatId: $e');
       return {'success': false, 'message': e.toString()};
     }
   }
@@ -3046,52 +3146,6 @@ void clearUserPosts() {
     }
   }
 
-  void handleNewMessage(Map<String, dynamic> messageData) {
-    // If the message is from the current user, ignore it, as it's already handled optimistically.
-    final senderId = messageData['senderId'] is Map ? messageData['senderId']['_id'] : messageData['senderId'];
-    if (senderId == getUserId()) {
-      print('[DataController] Ignoring own message from socket.');
-      return;
-    }
-
-    // Add to the current conversation if it's the one being viewed
-    if (currentChat.value['_id'] != null && currentChat.value['_id'] == messageData['chatId']) {
-      // Check for duplicates before adding
-      if (!currentConversationMessages.any((m) => m['_id'] == messageData['_id'])) {
-        // Structure the message so it can be rendered by the UI
-        final fullMessage = {
-          ...messageData,
-          'createdAt': DateTime.now().toUtc().toIso8601String(),
-          'type': messageData['type'] ?? 'text', // Assume text if not provided
-          'files': messageData['files'] ?? [],
-          'replyTo': messageData['replyTo'],
-          'readReceipts': messageData['readReceipts'] ?? [],
-          'edited': messageData['edited'] ?? false,
-        };
-        currentConversationMessages.add(fullMessage);
-      }
-    }
-
-    // Update the last message in the chats map
-    final chatId = messageData['chatId'];
-    if (chatId != null) {
-      if (chats.containsKey(chatId)) {
-        print('[DataController] Updating lastMessage for existing chat: $chatId');
-        final chat = chats[chatId]!;
-        chat['lastMessage'] = messageData;
-        chat['unreadCount'] = (chat['unreadCount'] ?? 0) + 1;
-        chats[chatId] = chat;
-        chats.refresh(); // Explicitly refresh the RxMap to ensure UI updates
-      } else {
-        print('[DataController] Received message for unknown chat: $chatId. Fetching chats.');
-        // If the chat doesn't exist locally, fetch the updated chat list
-        fetchChats();
-      }
-    } else {
-      print('[DataController] Received message without a chatId.');
-    }
-  }
-
   void handleTypingStart(Map<String, dynamic> data) {
     final chatId = data['chatId'] as String;
     isTyping[chatId] = true;
@@ -3132,7 +3186,7 @@ void clearUserPosts() {
         'name': groupName,
         // 'about' is optional, so it's omitted.
       };
-      print("Sending create group chat request with data: $requestData");
+      // print("Sending create group chat request with data: $requestData");
 
       final response = await _dio.post(
         'api/chats/group', // Corrected endpoint
@@ -3145,7 +3199,7 @@ void clearUserPosts() {
         ),
       );
 
-      print("Received create group chat response: ${response.data}");
+      // print("Received create group chat response: ${response.data}");
 
       if (response.statusCode == 201 && response.data['success'] == true) {
         final newChat = response.data['group']; // Corrected key based on docs
@@ -3156,11 +3210,11 @@ void clearUserPosts() {
         chats.refresh();
         return newChat;
       } else {
-        print('Failed to create group chat: ${response.data?['message']}');
+        // print('Failed to create group chat: ${response.data?['message']}');
         throw Exception('Failed to create group chat: ${response.data?['message']}');
       }
     } catch (e) {
-      print('Error creating group chat: $e');
+      // print('Error creating group chat: $e');
       return null;
     }
   }

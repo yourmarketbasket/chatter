@@ -11,18 +11,18 @@ class SocketService {
   String? _userId; // Store userId for joining rooms and emitting events
 
   SocketService() {
-    print('SocketService: Instance created.');
+    // print('SocketService: Instance created.');
   }
 
   void initSocket() {
     if (_isInitialized) {
-      print('SocketService: Already initialized, skipping.');
+      // print('SocketService: Already initialized, skipping.');
       return;
     }
 
     try {
-      print('SocketService: Creating socket with ws://192.168.1.104:3000');
-      _socket = IO.io('ws://192.168.1.104:3000', <String, dynamic>{
+      // print('SocketService: Creating socket with http://192.168.1.104:3000');
+      _socket = IO.io('http://192.168.1.104:3000', <String, dynamic>{
         'transports': ['websocket'],
         'autoConnect': false,
         'reconnection': true,
@@ -37,21 +37,21 @@ class SocketService {
 
       _setupSocketListeners();
       _isInitialized = true;
-      print('SocketService: Initialization complete.');
+      // print('SocketService: Initialization complete.');
       connect();
     } catch (e) {
-      print('SocketService: Failed to initialize socket: $e');
+      // print('SocketService: Failed to initialize socket: $e');
     }
   }
 
   void _setupSocketListeners() {
     if (_socket == null) {
-      print('SocketService: Cannot setup listeners, socket is null.');
+      // print('SocketService: Cannot setup listeners, socket is null.');
       return;
     }
 
     _socket!.onConnect((_) {
-      print('SocketService: Connected to server');
+      // print('SocketService: Connected to server');
       _userId = _dataController.getUserId(); // Assume DataController provides userId
       if (_userId != null) {
         // Join user's own room (matches backend's socket.join(userId))
@@ -63,17 +63,17 @@ class SocketService {
     });
 
     _socket!.onDisconnect((_) {
-      print('SocketService: Disconnected from server');
+      // print('SocketService: Disconnected from server');
       _eventController.add({'event': 'disconnect', 'data': null});
     });
 
     _socket!.onConnectError((error) {
-      print('SocketService: Connection error: $error');
+      // print('SocketService: Connection error: $error');
       _eventController.add({'event': 'connect_error', 'data': error.toString()});
     });
 
     _socket!.onError((error) {
-      print('SocketService: Socket error: $error');
+      // print('SocketService: Socket error: $error');
       _eventController.add({'event': 'error', 'data': error.toString()});
     });
 
@@ -110,7 +110,7 @@ class SocketService {
 
     eventHandlers.forEach((event, handler) {
       _socket!.on(event, (data) {
-          print('SocketService: Received event $event with data: $data');
+          // print('SocketService: Received event $event with data: $data');
         handler(data);
       });
     });
@@ -120,15 +120,15 @@ class SocketService {
   void syncAllChatRooms() async {
     if (_socket == null || !_socket!.connected) return;
     try {
-      print('[SocketService] Starting sync of all chat rooms...');
+      // print('[SocketService] Starting sync of all chat rooms...');
       List<String> chatIds = await _dataController.getActiveChatIds();
       for (String chatId in chatIds) {
-        print('[SocketService] ==> Emitting join for chatId: $chatId');
+        // print('[SocketService] ==> Emitting join for chatId: $chatId');
         _socket!.emit('join', {'chatId': chatId});
       }
-      print('[SocketService] Finished syncing all chat rooms.');
+      // print('[SocketService] Finished syncing all chat rooms.');
     } catch (e) {
-        print('[SocketService] Error during syncAllChatRooms: $e');
+        // print('[SocketService] Error during syncAllChatRooms: $e');
     }
   }
 
@@ -198,14 +198,14 @@ class SocketService {
   }
 
   void _handleNewChat(dynamic data) {
-    print('SocketService: Received chat:new event with data: $data');
+    // print('SocketService: Received chat:new event with data: $data');
     if (data is Map<String, dynamic> && data['_id'] is String) {
       _dataController.handleNewChat(data);
       // Join the new chat room
       _socket!.emit('join', {'chatId': data['_id']});
       _eventController.add({'event': 'chat:new', 'data': data});
     } else {
-        print('SocketService: Invalid chat:new data format: ${data.runtimeType}');
+        // print('SocketService: Invalid chat:new data format: ${data.runtimeType}');
     }
   }
 
@@ -214,7 +214,7 @@ class SocketService {
       _dataController.handleChatUpdated(data);
       _eventController.add({'event': 'chat:updated', 'data': data});
     } else {
-        print('SocketService: Invalid chat:updated data format: ${data.runtimeType}');
+        // print('SocketService: Invalid chat:updated data format: ${data.runtimeType}');
     }
   }
 
@@ -223,7 +223,7 @@ class SocketService {
       _dataController.handleMessageUpdate(data);
       _eventController.add({'event': 'message:update', 'data': data});
     } else {
-        print('SocketService: Invalid message:update data format: ${data.runtimeType}');
+        // print('SocketService: Invalid message:update data format: ${data.runtimeType}');
     }
   }
 
@@ -260,7 +260,7 @@ class SocketService {
       _dataController.handleMessageDelete(data);
       _eventController.add({'event': 'message:delete', 'data': data});
     } else {
-        print('SocketService: Invalid message:delete data format: ${data.runtimeType}');
+        // print('SocketService: Invalid message:delete data format: ${data.runtimeType}');
     }
   }
 
@@ -269,7 +269,7 @@ class SocketService {
       _dataController.handleChatDeleted(data['chatId']);
       _eventController.add({'event': event, 'data': data});
     } else {
-      print('SocketService: Invalid $event data format: ${data.runtimeType}');
+      // print('SocketService: Invalid $event data format: ${data.runtimeType}');
     }
   }
 
@@ -309,23 +309,23 @@ class SocketService {
 
   void connect() {
     if (_socket == null) {
-      print('SocketService: Cannot connect, socket is null. Reinitializing...');
+      // print('SocketService: Cannot connect, socket is null. Reinitializing...');
       initSocket();
     }
     if (_socket != null && !_socket!.connected) {
-      print('SocketService: Attempting to connect to ws://192.168.1.104:3000');
+      // print('SocketService: Attempting to connect to ws://192.168.1.104:3000');
       _socket!.connect();
     } else {
-      print('SocketService: Socket is already connected or null');
+      // print('SocketService: Socket is already connected or null');
     }
   }
 
   void disconnect() {
     if (_socket != null && _socket!.connected) {
-      print('SocketService: Disconnecting socket');
+      // print('SocketService: Disconnecting socket');
       _socket!.disconnect();
     } else {
-      print('SocketService: Cannot disconnect, socket is null or not connected');
+      // print('SocketService: Cannot disconnect, socket is null or not connected');
     }
   }
 
@@ -415,7 +415,7 @@ class SocketService {
   }
 
   void dispose() {
-    print('SocketService: Disposing socket service');
+    // print('SocketService: Disposing socket service');
     disconnect();
     _socket?.clearListeners();
     _socket?.dispose();
