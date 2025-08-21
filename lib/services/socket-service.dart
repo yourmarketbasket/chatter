@@ -115,6 +115,7 @@ class SocketService {
       });
     });
   }
+  // more changes
 
   // Syncs all chat rooms by joining the socket room for each chat ID.
   void syncAllChatRooms() async {
