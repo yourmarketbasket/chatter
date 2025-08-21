@@ -259,6 +259,7 @@ class SocketService {
         // print('SocketService: Invalid message:statusUpdate data format: ${data.runtimeType}');
     }
   }
+  // End of message events
 
   void _handleMessageDelete(dynamic data) {
     // The payload is the full, updated message object. Its identifier is `_id`.
