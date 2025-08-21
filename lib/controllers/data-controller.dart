@@ -162,11 +162,31 @@ class DataController extends GetxController {
     }
   }
 
+  void handleChatUpdated(Map<String, dynamic> data) {
+    final chatId = data['_id'];
+    if (chatId != null && chats.containsKey(chatId)) {
+      final chat = chats[chatId]!;
+      chat['lastMessage'] = data['lastMessage'];
+      chats[chatId] = chat;
+      chats.refresh();
+    }
+  }
+
   void handleMessageStatusUpdate(Map<String, dynamic> data) {
     // Not implemented
   }
 
-  void handleMessageDeleted(Map<String, dynamic> data) {
+  void handleMessageUpdate(Map<String, dynamic> data) {
+    final messageId = data['_id'];
+    if (messageId == null) return;
+
+    final index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
+    if (index != -1) {
+      currentConversationMessages[index] = data;
+    }
+  }
+
+  void handleMessageDelete(Map<String, dynamic> data) {
     final messageId = data['messageId'];
     final chatId = data['chatId'];
     final deletedForEveryone = data['deletedForEveryone'] ?? false;
@@ -3090,17 +3110,6 @@ void clearUserPosts() {
     }
   }
 
-  void handleMessageEdited(Map<String, dynamic> updatedMessage) {
-    final messageId = updatedMessage['_id'];
-    if (messageId == null) return;
-
-    final index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
-    if (index != -1) {
-      // Replace the old message with the updated one from the socket event
-      currentConversationMessages[index] = updatedMessage;
-      print('[DataController] Handled message:edited event for message $messageId');
-    }
-  }
 
   Future<Map<String, dynamic>?> createGroupChat(List<String> participantIds, String groupName) async {
     try {

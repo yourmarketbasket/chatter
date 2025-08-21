@@ -96,10 +96,10 @@ class SocketService {
       'reply:repost': (data) => _handleReplyAction(data, 'reply:repost'),
       'reply:view': (data) => _handleReplyAction(data, 'reply:view'),
       'chat:new': (data) => _handleNewChat(data),
-      'chat:updated': (data) => _handleNewMessage(data),
+      'chat:updated': (data) => _handleChatUpdated(data),
       'message:new': (data) => _handleNewMessage(data),
-      'message:edited': (data) => _handleMessageEdited(data),
-      'message:deleted': (data) => _handleMessageDeleted(data),
+      'message:update': (data) => _handleMessageUpdate(data),
+      'message:delete': (data) => _handleMessageDelete(data),
       'message:statusUpdate': (data) => _handleMessageStatusUpdate(data),
       'message:reaction': (data) => _handleNewMessage(data),
       'chat:deletedForMe': (data) => _handleChatDeleted(data, 'chat:deletedForMe'),
@@ -110,7 +110,7 @@ class SocketService {
 
     eventHandlers.forEach((event, handler) {
       _socket!.on(event, (data) {
-          // print('SocketService: Received event $event with data: $data');
+          print('SocketService: Received event $event with data: $data');
         handler(data);
       });
     });
@@ -209,12 +209,21 @@ class SocketService {
     }
   }
 
-  void _handleMessageEdited(dynamic data) {
+  void _handleChatUpdated(dynamic data) {
     if (data is Map<String, dynamic> && data['_id'] is String) {
-      _dataController.handleMessageEdited(data);
-      _eventController.add({'event': 'message:edited', 'data': data});
+      _dataController.handleChatUpdated(data);
+      _eventController.add({'event': 'chat:updated', 'data': data});
     } else {
-        print('SocketService: Invalid message:edited data format: ${data.runtimeType}');
+        print('SocketService: Invalid chat:updated data format: ${data.runtimeType}');
+    }
+  }
+
+  void _handleMessageUpdate(dynamic data) {
+    if (data is Map<String, dynamic> && data['_id'] is String) {
+      _dataController.handleMessageUpdate(data);
+      _eventController.add({'event': 'message:update', 'data': data});
+    } else {
+        print('SocketService: Invalid message:update data format: ${data.runtimeType}');
     }
   }
 
@@ -246,12 +255,12 @@ class SocketService {
     }
   }
 
-  void _handleMessageDeleted(dynamic data) {
+  void _handleMessageDelete(dynamic data) {
     if (data is Map<String, dynamic> && data['messageId'] is String) {
-      _dataController.handleMessageDeleted(data);
-      _eventController.add({'event': 'message:deleted', 'data': data});
+      _dataController.handleMessageDelete(data);
+      _eventController.add({'event': 'message:delete', 'data': data});
     } else {
-        // print('SocketService: Invalid message:deleted data format: ${data.runtimeType}');
+        print('SocketService: Invalid message:delete data format: ${data.runtimeType}');
     }
   }
 
