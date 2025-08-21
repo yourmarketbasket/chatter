@@ -2,6 +2,7 @@ import 'package:chatter/controllers/data-controller.dart';
 import 'package:chatter/pages/profile_page.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:visibility_detector/visibility_detector.dart';
 import 'dart:io';
 import 'package:chatter/pages/media_view_page.dart';
 import 'package:get/get.dart';
@@ -33,44 +34,22 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     if (dataController.currentChat.value['_id'] != null) {
-      _loadMessagesAndMarkAsRead();
+      _loadMessages();
     } else {
       dataController.currentConversationMessages.clear();
     }
     dataController.currentConversationMessages.listen((_) {
       Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
-      _markVisibleMessagesAsRead();
     });
-    _scrollController.addListener(_markVisibleMessagesAsRead);
   }
 
-  void _loadMessagesAndMarkAsRead() async {
+  void _loadMessages() async {
     await dataController.fetchMessages(dataController.currentChat.value['_id']!);
-    _markVisibleMessagesAsRead();
-  }
-
-  void _markVisibleMessagesAsRead() {
-    final currentUserId = dataController.getUserId();
-    if (currentUserId == null) return;
-
-    final unreadMessages = dataController.currentConversationMessages.where((msg) {
-      final senderId = msg['senderId'] is Map ? msg['senderId']['_id'] : msg['senderId'];
-      if (senderId == currentUserId) return false;
-
-      final receipts = (msg['readReceipts'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-      final isRead = receipts.any((r) => r['userId'] == currentUserId && r['status'] == 'read');
-      return !isRead;
-    }).toList();
-
-    for (final message in unreadMessages) {
-      dataController.markMessageAsRead(message);
-    }
   }
 
   @override
   void dispose() {
     _messageController.dispose();
-    _scrollController.removeListener(_markVisibleMessagesAsRead);
     _scrollController.dispose();
     dataController.currentConversationMessages.clear();
     super.dispose();
@@ -1249,12 +1228,20 @@ class _ChatScreenState extends State<ChatScreen> {
                       }
 
                       // Priority 3: Render the normal message
-                      return Align(
-                        alignment: message['senderId']['_id'] ==
-                                dataController.user.value['user']['_id']
-                            ? Alignment.centerRight
-                            : Alignment.centerLeft,
-                        child: _buildMessageContent(message, index),
+                      return VisibilityDetector(
+                        key: Key(message['_id']),
+                        onVisibilityChanged: (visibilityInfo) {
+                          if (visibilityInfo.visibleFraction > 0.5) {
+                            dataController.markMessageAsRead(message);
+                          }
+                        },
+                        child: Align(
+                          alignment: message['senderId']['_id'] ==
+                                  dataController.user.value['user']['_id']
+                              ? Alignment.centerRight
+                              : Alignment.centerLeft,
+                          child: _buildMessageContent(message, index),
+                        ),
                       );
                     }
                   },
