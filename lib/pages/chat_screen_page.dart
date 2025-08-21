@@ -1,4 +1,5 @@
 import 'package:chatter/controllers/data-controller.dart';
+import 'package:chatter/pages/profile_page.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io';
@@ -1100,60 +1101,115 @@ class _ChatScreenState extends State<ChatScreen> {
           backgroundColor: Colors.black,
           title: Row(
             children: [
-              Stack(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: Colors.tealAccent,
-                    backgroundImage: (chat['type'] == 'group'
-                                ? chat['groupAvatar']
-                                : otherUserMap?['avatar']) !=
-                            null &&
-                            (chat['type'] == 'group'
-                                ? chat['groupAvatar']
-                                : otherUserMap?['avatar'])
-                                .isNotEmpty
-                        ? NetworkImage((chat['type'] == 'group'
-                            ? chat['groupAvatar']
-                            : otherUserMap!['avatar'])!)
-                        : null,
-                    child: (chat['type'] == 'group'
-                                ? chat['groupAvatar']
-                                : otherUserMap?['avatar']) ==
-                            null ||
-                            (chat['type'] == 'group'
-                                ? chat['groupAvatar']
-                                : otherUserMap?['avatar'])
-                                .isEmpty
-                        ? Text(
-                            chat['type'] == 'group'
-                                ? (chat['name']?[0] ?? '?')
-                                : (otherUserMap?['name'][0] ?? '?'),
-                            style: const TextStyle(color: Colors.black),
-                          )
-                        : null,
-                  ),
-                  if (chat['type'] != 'group' && (otherUserMap?['online'] ?? false))
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: Colors.green,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.black, width: 2),
+              GestureDetector(
+                onTap: () {
+                  if (chat['type'] != 'group') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ProfilePage(
+                          userId: otherUserMap!['_id'],
+                          username: otherUserMap['name'],
+                          userAvatarUrl: otherUserMap['avatar'],
                         ),
                       ),
+                    );
+                  }
+                },
+                child: Stack(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: Colors.tealAccent,
+                      backgroundImage: (chat['type'] == 'group'
+                                  ? chat['groupAvatar']
+                                  : otherUserMap?['avatar']) !=
+                              null &&
+                              (chat['type'] == 'group'
+                                  ? chat['groupAvatar']
+                                  : otherUserMap?['avatar'])
+                                  .isNotEmpty
+                          ? NetworkImage((chat['type'] == 'group'
+                              ? chat['groupAvatar']
+                              : otherUserMap!['avatar'])!)
+                          : null,
+                      child: (chat['type'] == 'group'
+                                  ? chat['groupAvatar']
+                                  : otherUserMap?['avatar']) ==
+                              null ||
+                              (chat['type'] == 'group'
+                                  ? chat['groupAvatar']
+                                  : otherUserMap?['avatar'])
+                                  .isEmpty
+                          ? Text(
+                              chat['type'] == 'group'
+                                  ? (chat['name']?[0] ?? '?')
+                                  : (otherUserMap?['name'][0] ?? '?'),
+                              style: const TextStyle(color: Colors.black),
+                            )
+                          : null,
                     ),
-                ],
+                    if (chat['type'] != 'group' && (otherUserMap?['online'] ?? false))
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: Colors.green,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.black, width: 2),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
               const SizedBox(width: 10),
-              Text(
-                chat['type'] == 'group'
-                    ? chat['name']!
-                    : otherUserMap!['name'],
-                style: const TextStyle(color: Colors.white),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    chat['type'] == 'group'
+                        ? chat['name']!
+                        : otherUserMap!['name'],
+                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                  ),
+                  if (chat['type'] != 'group')
+                    Obx(() {
+                      final isTyping = dataController.isTyping[chat['_id']] ?? false;
+                      if (isTyping) {
+                        return const Text(
+                          'typing...',
+                          style: TextStyle(
+                            color: Colors.tealAccent,
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        );
+                      }
+                      final user = dataController.allUsers.firstWhere(
+                        (u) => u['_id'] == otherUserMap!['_id'],
+                        orElse: () => otherUserMap,
+                      );
+                      if (user['online'] == true) {
+                        return const Text(
+                          'online',
+                          style: TextStyle(color: Colors.green, fontSize: 12),
+                        );
+                      }
+                      if (user['lastSeen'] != null) {
+                        return Text(
+                          'last seen ${formatLastSeen(DateTime.parse(user['lastSeen']))}',
+                          style: const TextStyle(color: Colors.grey, fontSize: 12),
+                        );
+                      }
+                      return const Text(
+                        'offline',
+                        style: TextStyle(color: Colors.grey, fontSize: 12),
+                      );
+                    }),
+                ],
               ),
             ],
           ),
