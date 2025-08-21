@@ -50,7 +50,7 @@ class DataController extends GetxController {
   final RxBool isLoadingChats = false.obs;
   final RxList<Map<String, dynamic>> currentConversationMessages = <Map<String, dynamic>>[].obs;
   final RxBool isLoadingMessages = false.obs;
-  final RxMap<String, bool> isTyping = <String, bool>{}.obs;
+  final RxMap<String, String?> isTyping = <String, String?>{}.obs;
   final Rx<Map<String, dynamic>> currentChat = Rx<Map<String, dynamic>>({});
 
   // Add these Rx variables inside DataController class
@@ -3216,12 +3216,15 @@ void clearUserPosts() {
 
   void handleTypingStart(Map<String, dynamic> data) {
     final chatId = data['chatId'] as String;
-    isTyping[chatId] = true;
+    final userId = data['userId'] as String;
+    if (userId != getUserId()) {
+      isTyping[chatId] = userId;
+    }
   }
 
   void handleTypingStop(Map<String, dynamic> data) {
     final chatId = data['chatId'] as String;
-    isTyping[chatId] = false;
+    isTyping[chatId] = null;
   }
 
   Future<void> updateFcmToken(String token) async {

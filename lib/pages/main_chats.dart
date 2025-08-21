@@ -353,12 +353,24 @@ class _MainChatsPageState extends State<MainChatsPage> {
                               ],
                             ),
                             title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
-                            subtitle: Text(
-                              preview,
-                              style: TextStyle(color: Colors.grey[400], fontSize: 14),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                            subtitle: Obx(() {
+                              final typingUserId = _dataController.isTyping[chat['_id']];
+                              if (typingUserId != null) {
+                                final typingUser = _dataController.allUsers.firstWhere((u) => u['_id'] == typingUserId, orElse: () => {'name': 'Someone'});
+                                return Text(
+                                  '${typingUser['name']} is typing...',
+                                  style: const TextStyle(color: Colors.tealAccent, fontStyle: FontStyle.italic, fontSize: 14),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                );
+                              }
+                              return Text(
+                                preview,
+                                style: TextStyle(color: Colors.grey[400], fontSize: 14),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              );
+                            }),
                             trailing: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               crossAxisAlignment: CrossAxisAlignment.end,
