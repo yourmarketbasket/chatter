@@ -257,28 +257,8 @@ class DataController extends GetxController {
       fetchChats();
     }
 
-    // Add the new message to the current conversation if this is the open chat
-    if (currentChat.value['_id'] == chatId) {
-      if (!currentConversationMessages.any((m) => m['_id'] == newMessage['_id'])) {
-        final fullMessage = <String, dynamic>{
-          '_id': newMessage['_id'] as String?,
-          'chatId': chatId,
-          'senderId': newMessage['senderId'], // Preserve as is (map or string)
-          'content': newMessage['content']?.toString() ?? '',
-          'createdAt': newMessage['createdAt']?.toString() ?? DateTime.now().toUtc().toIso8601String(),
-          'type': newMessage['type']?.toString() ?? 'text',
-          'files': (newMessage['files'] as List?)?.cast<Map<String, dynamic>>() ?? [],
-          'replyTo': newMessage['replyTo'],
-          'readReceipts': (newMessage['readReceipts'] as List?)?.cast<Map<String, dynamic>>() ?? [],
-          'edited': newMessage['edited'] as bool? ?? false,
-        };
-        currentConversationMessages.add(fullMessage);
-        // Emit delivered for non-self messages
-        if (senderId != null && senderId != getUserId()) {
-          Get.find<SocketService>().sendMessageDelivered(newMessage['_id'] as String);
-        }
-      }
-    }
+    // The `message:new` event is now solely responsible for updating the conversation screen.
+    // This handler only updates the chat list preview.
   }
 
   void handleMessageStatusUpdate(Map<String, dynamic> data) {
