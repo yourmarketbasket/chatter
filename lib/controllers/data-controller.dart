@@ -3058,7 +3058,17 @@ void clearUserPosts() {
     if (currentChat.value['_id'] != null && currentChat.value['_id'] == messageData['chatId']) {
       // Check for duplicates before adding
       if (!currentConversationMessages.any((m) => m['_id'] == messageData['_id'])) {
-        currentConversationMessages.add(messageData);
+        // Structure the message so it can be rendered by the UI
+        final fullMessage = {
+          ...messageData,
+          'createdAt': DateTime.now().toUtc().toIso8601String(),
+          'type': messageData['type'] ?? 'text', // Assume text if not provided
+          'files': messageData['files'] ?? [],
+          'replyTo': messageData['replyTo'],
+          'readReceipts': messageData['readReceipts'] ?? [],
+          'edited': messageData['edited'] ?? false,
+        };
+        currentConversationMessages.add(fullMessage);
       }
     }
 
