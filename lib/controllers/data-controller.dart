@@ -1417,7 +1417,7 @@ class DataController extends GetxController {
     }
   }
 
-  // Send a new chat message
+  
   Future<void> sendChatMessage(Map<String, dynamic> message, String clientMessageId) async {
     // print('[DataController] Sending message: $message');
     try {
