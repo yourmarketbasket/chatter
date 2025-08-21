@@ -162,114 +162,75 @@ class DataController extends GetxController {
     }
   }
 
-    void handleNewMessage(Map<String, dynamic> data) {
-    // Handle case where data is a full chat object with lastMessage
-    final chatData = data.containsKey('lastMessage') ? data : {'lastMessage': data};
-    final chatId = chatData['chatId'] ?? chatData['_id'];
-    final newMessage = chatData['lastMessage'] as Map?;
-
-    if (newMessage == null || chatId == null || newMessage['_id'] == null) {
-      // print('[DataController] Invalid message:new data received: $data');
+  // This private helper centralizes the logic for updating chat summaries and message lists.
+  void _updateChatAndMessages(String chatId, Map<String, dynamic> fullMessage) {
+    // If we receive an update for a chat we don't have, fetch all chats.
+    if (!chats.containsKey(chatId)) {
+      fetchChats();
       return;
     }
 
-    // Define senderId at method level
-    final senderId = newMessage['senderId'] is Map
-        ? newMessage['senderId']['_id'] as String?
-        : newMessage['senderId'] as String?;
+    final senderId = fullMessage['senderId'] is Map
+        ? fullMessage['senderId']['_id'] as String?
+        : fullMessage['senderId'] as String?;
 
-    // Skip if the message is from the current user (already handled optimistically)
-    if (senderId == getUserId()) {
-      // print('[DataController] Ignoring own message from socket.');
-      return;
+    // Update the chat in the main chat list
+    final chat = chats[chatId]!;
+    chat['lastMessage'] = fullMessage;
+    // Increment unread count only if the message is not from the current user
+    if (senderId != null && senderId != getUserId()) {
+      chat['unreadCount'] = (chat['unreadCount'] ?? 0) + 1;
     }
+    chats[chatId] = chat;
+    chats.refresh();
 
-    // Add to current conversation if it's the one being viewed
+    // Add the new message to the conversation if it's currently open
     if (currentChat.value['_id'] == chatId) {
-      if (!currentConversationMessages.any((m) => m['_id'] == newMessage['_id'])) {
-        final fullMessage = <String, dynamic>{
-          '_id': newMessage['_id'] as String?,
-          'chatId': chatId as String?,
-          'senderId': newMessage['senderId'], // Preserve as is (map or string)
-          'content': newMessage['content']?.toString() ?? '',
-          'createdAt': newMessage['createdAt']?.toString() ?? DateTime.now().toUtc().toIso8601String(),
-          'type': newMessage['type']?.toString() ?? 'text',
-          'files': (newMessage['files'] as List?)?.cast<Map<String, dynamic>>() ?? [],
-          'replyTo': newMessage['replyTo'],
-          'readReceipts': (newMessage['readReceipts'] as List?)?.cast<Map<String, dynamic>>() ?? [],
-          'edited': newMessage['edited'] as bool? ?? false,
-        };
+      // Avoid adding duplicate messages
+      if (!currentConversationMessages.any((m) => m['_id'] == fullMessage['_id'])) {
         currentConversationMessages.add(fullMessage);
-        // Emit delivered for non-self messages
+        // Mark as delivered if it's not from the current user
         if (senderId != null && senderId != getUserId()) {
-          Get.find<SocketService>().sendMessageDelivered(newMessage['_id'] as String);
+          Get.find<SocketService>().sendMessageDelivered(fullMessage['_id'] as String);
         }
       }
     }
+  }
 
-    // Update the chats map
-    if (chats.containsKey(chatId)) {
-      final chat = chats[chatId]!;
-      chat['lastMessage'] = newMessage;
-      if (senderId != null && senderId != getUserId()) {
-        chat['unreadCount'] = (chat['unreadCount'] ?? 0) + 1;
-      }
-      chats[chatId] = chat;
-      chats.refresh();
-    } else {
-      // print('[DataController] Received message for unknown chat: $chatId. Fetching chats.');
-      fetchChats();
+  void handleNewMessage(Map<String, dynamic> data) {
+    final chatId = data['chatId'] as String?;
+    if (chatId == null || data['_id'] == null) {
+      // print('[DataController] Invalid message:new data received: $data');
+      return;
     }
+    // The `data` from `message:new` is a full message object.
+    _updateChatAndMessages(chatId, data);
   }
 
   void handleChatUpdated(Map<String, dynamic> data) {
     final chatId = data['_id'] as String?;
-    final newMessage = data['lastMessage'] as Map?;
+    final lastMessage = data['lastMessage'] as Map<String, dynamic>?;
 
-    if (chatId == null || newMessage == null || newMessage['_id'] == null) {
-      // print('[DataController] Invalid chat:updated data received: $data');
+    if (chatId == null) {
+      // print('[DataController] Invalid chat:updated data: no chatId. Data: $data');
       return;
     }
 
-    // Define senderId at method level
-    final senderId = newMessage['senderId'] is Map
-        ? newMessage['senderId']['_id'] as String?
-        : newMessage['senderId'] as String?;
-
-    // Update the chats map
-    if (chats.containsKey(chatId)) {
-      final chat = chats[chatId]!;
-      chat['lastMessage'] = newMessage;
-      if (senderId != null && senderId != getUserId()) {
-        chat['unreadCount'] = (chat['unreadCount'] ?? 0) + 1;
-      }
-      chats[chatId] = chat;
-      chats.refresh();
-    } else {
-      // print('[DataController] Received chat:updated for unknown chat: $chatId. Fetching chats.');
-      fetchChats();
+    // If the update includes a new last message, use the helper to update everything.
+    if (lastMessage != null && lastMessage['_id'] != null) {
+      _updateChatAndMessages(chatId, lastMessage);
     }
-
-    // Add the new message to the current conversation if this is the open chat
-    if (currentChat.value['_id'] == chatId) {
-      if (!currentConversationMessages.any((m) => m['_id'] == newMessage['_id'])) {
-        final fullMessage = <String, dynamic>{
-          '_id': newMessage['_id'] as String?,
-          'chatId': chatId,
-          'senderId': newMessage['senderId'], // Preserve as is (map or string)
-          'content': newMessage['content']?.toString() ?? '',
-          'createdAt': newMessage['createdAt']?.toString() ?? DateTime.now().toUtc().toIso8601String(),
-          'type': newMessage['type']?.toString() ?? 'text',
-          'files': (newMessage['files'] as List?)?.cast<Map<String, dynamic>>() ?? [],
-          'replyTo': newMessage['replyTo'],
-          'readReceipts': (newMessage['readReceipts'] as List?)?.cast<Map<String, dynamic>>() ?? [],
-          'edited': newMessage['edited'] as bool? ?? false,
-        };
-        currentConversationMessages.add(fullMessage);
-        // Emit delivered for non-self messages
-        if (senderId != null && senderId != getUserId()) {
-          Get.find<SocketService>().sendMessageDelivered(newMessage['_id'] as String);
-        }
+    // Handle other chat updates that don't involve a new message (e.g., group name change).
+    else {
+      if (chats.containsKey(chatId)) {
+        // Merge the new data into the existing chat object to preserve fields
+        // that might not be in the `chat:updated` payload (like unreadCount).
+        final existingChat = chats[chatId]!;
+        data.forEach((key, value) {
+          existingChat[key] = value;
+        });
+        chats[chatId] = existingChat;
+        chats.refresh();
       }
     }
   }
@@ -279,49 +240,71 @@ class DataController extends GetxController {
   }
 
   void handleMessageUpdate(Map<String, dynamic> data) {
-    final messageId = data['_id'];
-    if (messageId == null) return;
+    final messageId = data['_id'] as String?;
+    final chatId = data['chatId'] as String?;
 
-    final index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
-    if (index != -1) {
-      currentConversationMessages[index] = data;
+    if (messageId == null || chatId == null) {
+      // print('[DataController] Invalid message:update data received: $data');
+      return;
+    }
+
+    // Update the message in the current conversation if it's open
+    if (currentChat.value['_id'] == chatId) {
+      final index =
+          currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
+      if (index != -1) {
+        currentConversationMessages[index] = data;
+        currentConversationMessages.refresh();
+      }
+    }
+
+    // Also, update the chat list's lastMessage if this was the last message
+    if (chats.containsKey(chatId) &&
+        chats[chatId]!['lastMessage']?['_id'] == messageId) {
+      final chat = chats[chatId]!;
+      chat['lastMessage'] = data;
+      chats[chatId] = chat;
+      chats.refresh();
     }
   }
 
   void handleMessageDelete(Map<String, dynamic> data) {
     final messageId = data['_id'] as String?;
     final chatId = data['chatId'] as String?;
+    final deletedForEveryone = data['deletedForEveryone'] as bool? ?? false;
 
     if (messageId == null || chatId == null) {
-      // print('[DataController] Invalid message:deleted data received: $data');
+      // print('[DataController] Invalid message:delete data received: $data');
       return;
     }
 
-    // Update currentConversationMessages if the chat is open
-    if (currentChat.value['_id'] == chatId) {
-      final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
-      if (messageIndex != -1) {
-        final message = Map<String, dynamic>.from(currentConversationMessages[messageIndex]);
-        final deletedFor = (message['deletedFor'] as List?)?.cast<String>() ?? [];
-        final userId = getUserId();
-        if (!deletedFor.contains(userId)) {
-          deletedFor.add(userId!);
-          message['deletedFor'] = deletedFor;
-          currentConversationMessages[messageIndex] = message;
+    // If a message is deleted for everyone, we update its content to a tombstone.
+    if (deletedForEveryone) {
+      // Update the message in the current conversation if it's open
+      if (currentChat.value['_id'] == chatId) {
+        final index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
+        if (index != -1) {
+          final message = currentConversationMessages[index];
+          message['content'] = 'This message was deleted';
+          message['files'] = []; // Clear files
+          message['deletedForEveryone'] = true;
+          currentConversationMessages[index] = message;
           currentConversationMessages.refresh();
         }
       }
-    }
 
-    // Update chats map if the deleted message is the lastMessage
-    if (chats.containsKey(chatId) && chats[chatId]!['lastMessage']?['_id'] == messageId) {
-      final chat = Map<String, dynamic>.from(chats[chatId]!);
-      final lastMessage = Map<String, dynamic>.from(chat['lastMessage'] as Map);
-      final deletedFor = (lastMessage['deletedFor'] as List?)?.cast<String>() ?? [];
-      final userId = getUserId();
-      if (!deletedFor.contains(userId)) {
-        deletedFor.add(userId!);
-        lastMessage['deletedFor'] = deletedFor;
+      // If the deleted message was the last message in a chat,
+      // the server should ideally send a `chat:updated` event with the new last message.
+      // As a fallback, we update the local `lastMessage` to reflect the deletion.
+      if (chats.containsKey(chatId) && chats[chatId]!['lastMessage']?['_id'] == messageId) {
+        final chat = chats[chatId]!;
+        // We can't know the *new* last message from this event alone.
+        // So, we update the existing lastMessage to its deleted state.
+        // The `chat:updated` event is the source of truth for getting the new one.
+        final lastMessage = chat['lastMessage'] as Map<String, dynamic>;
+        lastMessage['content'] = 'This message was deleted';
+        lastMessage['files'] = [];
+        lastMessage['deletedForEveryone'] = true;
         chat['lastMessage'] = lastMessage;
         chats[chatId] = chat;
         chats.refresh();
