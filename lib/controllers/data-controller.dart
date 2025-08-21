@@ -1287,8 +1287,6 @@ class DataController extends GetxController {
       );
       if (response.statusCode == 200 && response.data['success'] == true) {
         try {
-          // notification service
-          NotificationService().init();
           // Save token and user data to secure storage
           String? tokenValue = response.data['user']['token']?.toString();
           String userJson = jsonEncode(response.data['user']);
@@ -1300,17 +1298,14 @@ class DataController extends GetxController {
           user.value = jsonDecode(userJson);
             // print('[DataController] User data saved to storage and in-memory state updated.');
 
-          // Now, fetch feeds
+          // Now, perform the full initialization sequence, similar to the main init() method
           try {
-            // update the fcm token and send to database by calling init
-              // print('[DataController] Login successful. Fetching initial feeds...');
-            await fetchFeeds(); // Fetches main content feed
-              // print('[DataController] Initial feeds fetched successfully after login.');
-
-            // Fetch user's network data (followers/following) for AppDrawer and Network page
+            // Fetch non-essential data in parallel (fire and forget)
+            fetchFeeds().catchError((e) {
+              posts.clear();
+            });
             final String? currentUserId = user.value['user']?['_id'];
             if (currentUserId != null && currentUserId.isNotEmpty) {
-              // print('[DataController.loginUser] Fetching initial network data for $currentUserId');
               fetchFollowers(currentUserId).catchError((e) {
                 // print('Error fetching followers post-login: $e');
               });
@@ -1319,9 +1314,24 @@ class DataController extends GetxController {
               });
             }
 
-          } catch (feedError) {
-              // print('[DataController] Error fetching feeds/network data immediately after login: ${feedError.toString()}. Login itself is still considered successful.');
-            // Optionally, you could set a flag here to indicate feeds/network failed to load.
+            // Initialize socket service but do not connect yet.
+            Get.find<SocketService>().initSocket();
+
+            // For chat functionality, we need all users before we can correctly display chats.
+            await fetchAllUsers();
+            await fetchChats();
+            await fetchContacts();
+
+            // Now that chats are fetched, connect the socket.
+            Get.find<SocketService>().connect();
+
+            // Initialize NotificationService after user data is loaded to ensure token is sent correctly
+            final NotificationService notificationService = Get.find<NotificationService>();
+            await notificationService.init();
+
+          } catch (initError) {
+              // print('[DataController] Error during post-login initialization: ${initError.toString()}. Login itself is still considered successful.');
+            // Optionally, you could set a flag here to indicate that post-login data fetch failed.
           }
 
           return {'success': true, 'message': 'User logged in successfully'};
