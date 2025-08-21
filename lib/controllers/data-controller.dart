@@ -118,18 +118,14 @@ class DataController extends GetxController {
         });
       }
 
-      // Initialize socket service but do not connect yet.
-      Get.find<SocketService>().initSocket();
-
       // For chat functionality, we need all users before we can correctly display chats.
       // So we await these calls in sequence.
       await fetchAllUsers();
-      await fetchChats(); // This will populate the list of chats
+      await fetchChats();
       await fetchContacts();
 
-      // Now that chats are fetched, connect the socket.
-      // The socket's onConnect handler will then sync the chat rooms.
-      Get.find<SocketService>().connect();
+      // Initialize socket service after user data is loaded
+      Get.find<SocketService>().initSocket();
 
       // Initialize NotificationService after user data is loaded to ensure token is sent correctly
       final NotificationService notificationService = Get.find<NotificationService>();
@@ -344,15 +340,18 @@ class DataController extends GetxController {
     if (currentChat.value['_id'] == chatId) {
       final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
       if (messageIndex != -1) {
-        // Create a new list with the updated message to ensure UI reactivity
         var newList = List<Map<String, dynamic>>.from(currentConversationMessages);
         newList[messageIndex] = deletedMessage;
         currentConversationMessages.assignAll(newList);
       }
     }
 
-    // Update the chat list's last message if it's the one that was deleted
+    // The `chat:updated` event will be responsible for updating the chat list preview.
+    // This handler's only job is to update the message in the conversation list if it's open.
     if (chats.containsKey(chatId) && chats[chatId]!['lastMessage']?['_id'] == messageId) {
+        // To provide a slightly faster UI update for the chat list, we can
+        // optimistically update the lastMessage here. The authoritative `chat:updated`
+        // event will soon follow from the server.
         final chat = chats[chatId]!;
         chat['lastMessage'] = deletedMessage;
         chats[chatId] = chat;
@@ -1299,14 +1298,20 @@ class DataController extends GetxController {
           user.value = jsonDecode(userJson);
             // print('[DataController] User data saved to storage and in-memory state updated.');
 
-          // Now, perform the full initialization sequence, similar to the main init() method
+          // notification service
+          NotificationService().init();
+          // ... (rest of original logic)
+          // Now, fetch feeds
           try {
-            // Fetch non-essential data in parallel (fire and forget)
-            fetchFeeds().catchError((e) {
-              posts.clear();
-            });
+            // update the fcm token and send to database by calling init
+              // print('[DataController] Login successful. Fetching initial feeds...');
+            await fetchFeeds(); // Fetches main content feed
+              // print('[DataController] Initial feeds fetched successfully after login.');
+
+            // Fetch user's network data (followers/following) for AppDrawer and Network page
             final String? currentUserId = user.value['user']?['_id'];
             if (currentUserId != null && currentUserId.isNotEmpty) {
+              // print('[DataController.loginUser] Fetching initial network data for $currentUserId');
               fetchFollowers(currentUserId).catchError((e) {
                 // print('Error fetching followers post-login: $e');
               });
@@ -1315,24 +1320,9 @@ class DataController extends GetxController {
               });
             }
 
-            // Initialize socket service but do not connect yet.
-            Get.find<SocketService>().initSocket();
-
-            // For chat functionality, we need all users before we can correctly display chats.
-            await fetchAllUsers();
-            await fetchChats();
-            await fetchContacts();
-
-            // Now that chats are fetched, connect the socket.
-            Get.find<SocketService>().connect();
-
-            // Initialize NotificationService after user data is loaded to ensure token is sent correctly
-            final NotificationService notificationService = Get.find<NotificationService>();
-            await notificationService.init();
-
-          } catch (initError) {
-              // print('[DataController] Error during post-login initialization: ${initError.toString()}. Login itself is still considered successful.');
-            // Optionally, you could set a flag here to indicate that post-login data fetch failed.
+          } catch (feedError) {
+              // print('[DataController] Error fetching feeds/network data immediately after login: ${feedError.toString()}. Login itself is still considered successful.');
+            // Optionally, you could set a flag here to indicate feeds/network failed to load.
           }
 
           return {'success': true, 'message': 'User logged in successfully'};
@@ -1417,8 +1407,8 @@ class DataController extends GetxController {
         for (var chat in chatData) {
           chats[chat['_id']] = chat;
         }
-        // The socket service will sync chat rooms on its own once it connects.
-        // The DataController's init method now controls when the connection happens.
+        // After successfully fetching chats, ensure we are joined to all rooms.
+        Get.find<SocketService>().syncAllChatRooms();
       } else {
         throw Exception('Failed to fetch chats');
       }
@@ -1500,15 +1490,12 @@ class DataController extends GetxController {
 
         if (messageIndex != -1) {
           final localMessage = currentConversationMessages[messageIndex];
-          final currentStatus = localMessage['status'];
-
           var finalMessage = Map<String, dynamic>.from(serverMessage);
-          finalMessage['clientMessageId'] = clientMessageId;
+          finalMessage['clientMessageId'] = clientMessageId; // Preserve client ID
 
-          if (currentStatus == 'delivered' || currentStatus == 'read') {
-            finalMessage['status'] = currentStatus;
-          } else {
-            finalMessage['status'] = 'sent';
+          // Preserve read receipts if they were updated by a socket event in the meantime
+          if ((localMessage['readReceipts'] as List?)?.isNotEmpty ?? false) {
+            finalMessage['readReceipts'] = localMessage['readReceipts'];
           }
 
           currentConversationMessages[messageIndex] = finalMessage;
@@ -1517,21 +1504,37 @@ class DataController extends GetxController {
         }
       } else {
         if (messageIndex != -1) {
-          final localMessage = currentConversationMessages[messageIndex];
-          localMessage['status'] = 'failed';
-          currentConversationMessages[messageIndex] = localMessage;
+          currentConversationMessages[messageIndex]['status_for_failed_only'] = 'failed';
         }
       }
     } catch (e) {
       final messageIndex = currentConversationMessages.indexWhere((m) => m['clientMessageId'] == clientMessageId);
       if (messageIndex != -1) {
-        final localMessage = currentConversationMessages[messageIndex];
-        localMessage['status'] = 'failed';
-        currentConversationMessages[messageIndex] = localMessage;
+        currentConversationMessages[messageIndex]['status_for_failed_only'] = 'failed';
       }
     } finally {
         currentConversationMessages.refresh();
     }
+  }
+
+  void markMessageAsRead(Map<String, dynamic> message) {
+    final messageId = message['_id'] as String?;
+    final chatId = message['chatId'] as String?;
+    final currentUserId = getUserId();
+
+    if (messageId == null || chatId == null || currentUserId == null) return;
+
+    // Check sender to prevent marking own messages as read
+    final senderId = message['senderId'] is Map ? message['senderId']['_id'] : message['senderId'];
+    if (senderId == currentUserId) return;
+
+    // Check if it's already marked as read to avoid redundant API calls
+    final receipts = (message['readReceipts'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final alreadyRead = receipts.any((r) => r['userId'] == currentUserId && r['status'] == 'read');
+    if (alreadyRead) return;
+
+    // Only make the API call. The UI will update when the socket event comes back.
+    _updateMessageStatusOnBackend(messageId, chatId, 'read');
   }
 
   void addTemporaryMessage(Map<String, dynamic> message) {
@@ -3179,7 +3182,7 @@ void clearUserPosts() {
     }
   }
 
-  void markMessageAsRead(Map<String, dynamic> message) {
+  void markMessageAsRead_DEPRECATED(Map<String, dynamic> message) {
     final messageId = message['_id'] as String?;
     final chatId = message['chatId'] as String?;
     final currentUserId = getUserId();
@@ -3206,21 +3209,8 @@ void clearUserPosts() {
 
     if (messageId == null || chatId == null || currentUserId == null) return;
 
+    // Only make the API call. The UI will update when the socket event comes back.
     _updateMessageStatusOnBackend(messageId, chatId, 'delivered');
-
-    final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
-    if (messageIndex != -1) {
-      final msgToUpdate = Map<String, dynamic>.from(currentConversationMessages[messageIndex]);
-      var updatedReceipts = List<Map<String, dynamic>>.from(msgToUpdate['readReceipts'] ?? []);
-      final userReceiptIndex = updatedReceipts.indexWhere((r) => r['userId'] == currentUserId);
-
-      if (userReceiptIndex == -1) {
-          updatedReceipts.add({'userId': currentUserId, 'status': 'delivered', 'timestamp': DateTime.now().toUtc().toIso8601String()});
-          msgToUpdate['readReceipts'] = updatedReceipts;
-          currentConversationMessages[messageIndex] = msgToUpdate;
-          currentConversationMessages.refresh();
-      }
-    }
   }
 
   void handleTypingStart(Map<String, dynamic> data) {

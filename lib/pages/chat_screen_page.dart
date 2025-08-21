@@ -116,6 +116,7 @@ class _ChatScreenState extends State<ChatScreen> {
       'replyTo': _replyingTo?['_id'],
       'viewOnce': false,
       'createdAt': now.toIso8601String(),
+      'status': 'sending',
     };
     // force
 
@@ -878,9 +879,9 @@ class _ChatScreenState extends State<ChatScreen> {
                 if (isYou) ...[
                   const SizedBox(width: 4),
                   Icon(
-                    _getStatusIcon(_getAggregateStatus(message['readReceipts'])),
+                    _getStatusIcon(_getAggregateStatus(message)),
                     size: 12,
-                    color: _getStatusColor(_getAggregateStatus(message['readReceipts'])),
+                    color: _getStatusColor(_getAggregateStatus(message)),
                   ),
                 ],
               ],
@@ -890,26 +891,35 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
     ));
   }
-  String _getAggregateStatus(List<dynamic>? receiptsData) {
-    if (receiptsData == null || receiptsData.isEmpty) {
-      return 'sent';
+  String _getAggregateStatus(Map<String, dynamic> message) {
+    // Priority 1: Check for a temporary/failed status first.
+    if (message['status'] == 'sending') return 'sending';
+    if (message['status_for_failed_only'] == 'failed') return 'failed';
+
+    // Priority 2: Derive status from receipts.
+    final receipts = (message['readReceipts'] as List?)?.cast<Map<String, dynamic>>();
+    if (receipts == null || receipts.isEmpty) {
+      return 'sent'; // No receipts means it's sent but not delivered/read.
     }
 
-    final receipts = receiptsData.cast<Map<String, dynamic>>();
-
+    // If all receipts are 'read'
     if (receipts.every((r) => r['status'] == 'read')) {
       return 'read';
     }
+    // If any receipt is 'delivered' or 'read'
     if (receipts.any((r) => r['status'] == 'delivered' || r['status'] == 'read')) {
       return 'delivered';
     }
+
     return 'sent';
   }
 
-  IconData _getStatusIcon(String? status) {
+  IconData _getStatusIcon(String status) {
     switch (status) {
+      case 'sending':
+        return Icons.access_time; // Clock icon for sending
       case 'sent':
-        return Icons.access_time; // Clock icon for sent
+        return Icons.check; // Single tick for sent
       case 'delivered':
         return Icons.done_all;
       case 'read':
@@ -1009,6 +1019,30 @@ class _ChatScreenState extends State<ChatScreen> {
       lastDate = messageDate;
     }
     return groupedList;
+  }
+
+  Widget _buildDeletedMessageBubble(Map<String, dynamic> message) {
+    final senderId = message['senderId'] is Map ? message['senderId']['_id'] : message['senderId'];
+    final isYou = senderId == dataController.user.value['user']['_id'];
+
+    return Align(
+      alignment: isYou ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 4.0),
+        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+        decoration: BoxDecoration(
+          color: Colors.grey[850]?.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          'Message deleted',
+          style: TextStyle(
+            color: Colors.grey[400],
+            fontStyle: FontStyle.italic,
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -1127,12 +1161,19 @@ class _ChatScreenState extends State<ChatScreen> {
                     } else {
                       final message = item as Map<String, dynamic>;
                       final currentUserId = dataController.getUserId();
-                      final deletedFor = (message['deletedFor'] as List?)?.map((e) => e.toString()).toList() ?? [];
 
-                      if (deletedFor.contains(currentUserId)) {
-                        return const SizedBox.shrink(); // Hide message if deleted for me
+                      // Priority 1: Check if message was deleted for everyone
+                      if (message['deletedForEveryone'] == true) {
+                        return _buildDeletedMessageBubble(message);
                       }
 
+                      // Priority 2: Check if message was deleted for the current user
+                      final deletedFor = (message['deletedFor'] as List?)?.map((e) => e.toString()).toList() ?? [];
+                      if (deletedFor.contains(currentUserId)) {
+                        return const SizedBox.shrink(); // Hide the message
+                      }
+
+                      // Priority 3: Render the normal message
                       return Align(
                         alignment: message['senderId']['_id'] ==
                                 dataController.user.value['user']['_id']
