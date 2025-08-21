@@ -1625,20 +1625,21 @@ class DataController extends GetxController {
 
       if (response.statusCode == 200 && response.data['success'] == true) {
         // print('[DataController] API call to delete message $messageId successful.');
-        final responseData = response.data;
-        final wasDeletedForEveryone = responseData['deletedForEveryone'] ?? false;
 
-        // UI update for the user who performed the action, based on server response.
+        // UI update for the user who performed the action.
+        // We use the `forEveryone` parameter for an immediate optimistic update,
+        // rather than waiting for the socket event or relying on the API response body.
         final index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
         if (index != -1) {
-          if (wasDeletedForEveryone) {
+          if (forEveryone) {
+            // For "Delete for everyone", show a tombstone message.
             var message = Map<String, dynamic>.from(currentConversationMessages[index]);
             message['deletedForEveryone'] = true;
-            message['content'] = '';
-            message['files'] = [];
+            message['content'] = ''; // Clear content
+            message['files'] = []; // Clear files
             currentConversationMessages[index] = message;
           } else {
-            // "Delete for me" just removes it locally.
+            // For "Delete for me", just remove it from the local list.
             currentConversationMessages.removeAt(index);
           }
         }
