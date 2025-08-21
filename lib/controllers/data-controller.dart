@@ -344,10 +344,10 @@ class DataController extends GetxController {
     if (currentChat.value['_id'] == chatId) {
       final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
       if (messageIndex != -1) {
-        // Simply replace the old message with the new one from the server.
-        // The UI will be responsible for interpreting the 'deletedFor' flags.
-        currentConversationMessages[messageIndex] = deletedMessage;
-        currentConversationMessages.refresh();
+        // Create a new list with the updated message to ensure UI reactivity
+        var newList = List<Map<String, dynamic>>.from(currentConversationMessages);
+        newList[messageIndex] = deletedMessage;
+        currentConversationMessages.assignAll(newList);
       }
     }
 
@@ -3186,25 +3186,17 @@ void clearUserPosts() {
 
     if (messageId == null || chatId == null || currentUserId == null) return;
 
+    // Check sender to prevent marking own messages as read
     final senderId = message['senderId'] is Map ? message['senderId']['_id'] : message['senderId'];
     if (senderId == currentUserId) return;
 
+    // Check if it's already marked as read to avoid redundant API calls
     final receipts = (message['readReceipts'] as List?)?.cast<Map<String, dynamic>>() ?? [];
     final alreadyRead = receipts.any((r) => r['userId'] == currentUserId && r['status'] == 'read');
     if (alreadyRead) return;
 
+    // Only make the API call. The UI will update when the socket event comes back.
     _updateMessageStatusOnBackend(messageId, chatId, 'read');
-
-    final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
-    if (messageIndex != -1) {
-      final msgToUpdate = Map<String, dynamic>.from(currentConversationMessages[messageIndex]);
-      var updatedReceipts = List<Map<String, dynamic>>.from(msgToUpdate['readReceipts'] ?? []);
-      updatedReceipts.removeWhere((r) => r['userId'] == currentUserId);
-      updatedReceipts.add({'userId': currentUserId, 'status': 'read', 'timestamp': DateTime.now().toUtc().toIso8601String()});
-      msgToUpdate['readReceipts'] = updatedReceipts;
-      currentConversationMessages[messageIndex] = msgToUpdate;
-      currentConversationMessages.refresh();
-    }
   }
 
   void markMessageAsDelivered(Map<String, dynamic> message) {

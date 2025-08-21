@@ -1126,6 +1126,13 @@ class _ChatScreenState extends State<ChatScreen> {
                       return _buildDateChip(item);
                     } else {
                       final message = item as Map<String, dynamic>;
+                      final currentUserId = dataController.getUserId();
+                      final deletedFor = (message['deletedFor'] as List?)?.map((e) => e.toString()).toList() ?? [];
+
+                      if (deletedFor.contains(currentUserId)) {
+                        return const SizedBox.shrink(); // Hide message if deleted for me
+                      }
+
                       return Align(
                         alignment: message['senderId']['_id'] ==
                                 dataController.user.value['user']['_id']
