@@ -879,13 +879,9 @@ class _ChatScreenState extends State<ChatScreen> {
                 if (isYou) ...[
                   const SizedBox(width: 4),
                   Icon(
-                    _getStatusIcon(message['readReceipts']?.isNotEmpty ?? false
-                        ? message['readReceipts'][0]['status']
-                        : 'sent'),
+                    _getStatusIcon(message['status']),
                     size: 12,
-                    color: _getStatusColor(message['readReceipts']?.isNotEmpty ?? false
-                        ? message['readReceipts'][0]['status']
-                        : 'sent'),
+                    color: _getStatusColor(message['status']),
                   ),
                 ],
               ],

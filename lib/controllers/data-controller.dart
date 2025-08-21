@@ -261,51 +261,41 @@ class DataController extends GetxController {
 
   void handleMessageStatusUpdate(Map<String, dynamic> data) {
     final messageId = data['messageId'] as String?;
-    final status = data['status'] as String?;
-    final userId = data['userId'] as String?;
+    final newStatus = data['status'] as String?; // e.g., 'delivered' or 'read'
 
-    if (messageId == null || status == null) return;
+    if (messageId == null || newStatus == null) return;
 
-    // Helper function to update the readReceipts list for a given message
-    void updateReceipts(Map<String, dynamic> message) {
-        var receipts = List<Map<String, dynamic>>.from(message['readReceipts'] ?? []);
-        final receiptIndex = receipts.indexWhere((r) => r['userId'] == userId);
+    const statusOrder = {
+      'sending': 0,
+      'sent': 1,
+      'delivered': 2,
+      'read': 3,
+    };
 
-        final newReceipt = {
-            'userId': userId,
-            'status': status,
-            'timestamp': DateTime.now().toUtc().toIso8601String(),
-        };
-
-        if (receiptIndex != -1) {
-            // Do not downgrade a status from 'read' to 'delivered'
-            if(receipts[receiptIndex]['status'] == 'read' && status == 'delivered') return;
-            receipts[receiptIndex] = newReceipt;
-        } else {
-            receipts.add(newReceipt);
+    void updateStatus(Map<String, dynamic> message) {
+        final currentStatus = message['status'] as String? ?? 'sending';
+        if ((statusOrder[newStatus] ?? -1) > (statusOrder[currentStatus] ?? -1)) {
+            message['status'] = newStatus;
         }
-        message['readReceipts'] = receipts;
     }
 
-    // Update the message in the current conversation
     final index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
     if (index != -1) {
         final message = Map<String, dynamic>.from(currentConversationMessages[index]);
-        updateReceipts(message);
+        updateStatus(message);
         currentConversationMessages[index] = message;
     }
 
-    // Find the relevant chat and update its lastMessage if necessary
     for (var chat in chats.values) {
         if (chat['lastMessage'] != null && chat['lastMessage']['_id'] == messageId) {
             final lastMessage = Map<String, dynamic>.from(chat['lastMessage'] as Map);
-            updateReceipts(lastMessage);
+            updateStatus(lastMessage);
             chat['lastMessage'] = lastMessage;
-            chats[chat['_id']] = chat; // Re-assign to trigger update
-            break; // Found it, no need to continue looping
+            chats[chat['_id']] = chat;
+            break;
         }
     }
-    // Manually trigger updates for both lists
+
     currentConversationMessages.refresh();
     chats.refresh();
   }
@@ -1490,7 +1480,6 @@ class DataController extends GetxController {
 
   
   Future<void> sendChatMessage(Map<String, dynamic> message, String clientMessageId) async {
-    // print('[DataController] Sending message: $message');
     try {
       final token = user.value['token'];
       if (token == null) {
@@ -1498,63 +1487,70 @@ class DataController extends GetxController {
       }
 
       final Map<String, dynamic> messageToSend = Map<String, dynamic>.from(message);
-
-      // If chatId is present, it's an existing chat. We don't need to send the full participants list.
       if (messageToSend['chatId'] != null && (messageToSend['chatId'] as String).isNotEmpty) {
-        messageToSend.remove('participants'); // Remove participants if chatId exists
-      }
-      // If chatId is not present, it's a new chat. Format the participants list correctly.
-      else {
+        messageToSend.remove('participants');
+      } else {
         final List<dynamic> participants = messageToSend['participants'];
         final List<String> participantIds = participants.map((p) => (p is Map ? p['_id'] : p) as String).toList();
-        // Remove the current user from the list of participants to send to the backend
         participantIds.remove(user.value['user']['_id']);
         messageToSend['participants'] = participantIds;
       }
-
 
       final response = await _dio.post(
         'api/messages',
         data: messageToSend,
         options: dio.Options(
           headers: {'Authorization': 'Bearer $token'},
-           validateStatus: (status) => status != null && status < 500,
+          validateStatus: (status) => status != null && status < 500,
         ),
       );
 
-      if (response.statusCode == 201 && response.data['success'] == true) {
-        // print('[DataController] Sent message successfully');
-        final responseData = response.data;
-        final sentMessage = responseData['message'];
+      final messageIndex = currentConversationMessages.indexWhere((m) => m['clientMessageId'] == clientMessageId);
 
-        // If a new chat was created by this message, the server sends it back
-        if (responseData.containsKey('chat')) {
-          final newChat = responseData['chat'];
-          // Add to local chats list
+      if (response.statusCode == 201 && response.data['success'] == true) {
+        final serverMessage = response.data['message'];
+
+        if (response.data.containsKey('chat')) {
+          final newChat = response.data['chat'];
           chats[newChat['_id']] = newChat;
-          // Join the new socket room
           Get.find<SocketService>().joinChatRoom(newChat['_id']);
-          // Update the current chat screen's state
           currentChat.value = newChat;
           chats.refresh();
         }
 
-        updateMessageStatus(clientMessageId, 'sent');
-        // Replace the temporary message with the confirmed one from the server
-        final messageIndex = currentConversationMessages.indexWhere((m) => m['clientMessageId'] == clientMessageId);
         if (messageIndex != -1) {
-          currentConversationMessages[messageIndex] = sentMessage;
+          final localMessage = currentConversationMessages[messageIndex];
+          final currentStatus = localMessage['status'];
+
+          var finalMessage = Map<String, dynamic>.from(serverMessage);
+          finalMessage['clientMessageId'] = clientMessageId;
+
+          if (currentStatus == 'delivered' || currentStatus == 'read') {
+            finalMessage['status'] = currentStatus;
+          } else {
+            finalMessage['status'] = 'sent';
+          }
+
+          currentConversationMessages[messageIndex] = finalMessage;
         } else {
-          // if the message is not in the list, add it
-          currentConversationMessages.add(sentMessage);
+          currentConversationMessages.add(serverMessage);
         }
       } else {
-        // print('[DataController] Failed to send message: ${response.data?['message']}');
-        throw Exception('Failed to send message: ${response.data?['message']}');
+        if (messageIndex != -1) {
+          final localMessage = currentConversationMessages[messageIndex];
+          localMessage['status'] = 'failed';
+          currentConversationMessages[messageIndex] = localMessage;
+        }
       }
     } catch (e) {
-      // print('[DataController] Error sending message: $e');
-      updateMessageStatus(clientMessageId, 'failed');
+      final messageIndex = currentConversationMessages.indexWhere((m) => m['clientMessageId'] == clientMessageId);
+      if (messageIndex != -1) {
+        final localMessage = currentConversationMessages[messageIndex];
+        localMessage['status'] = 'failed';
+        currentConversationMessages[messageIndex] = localMessage;
+      }
+    } finally {
+        currentConversationMessages.refresh();
     }
   }
 
