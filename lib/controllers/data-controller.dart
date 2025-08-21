@@ -324,17 +324,20 @@ class DataController extends GetxController {
       final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
       if (messageIndex != -1) {
         if (deletedForEveryone) {
-          // "Delete for everyone": Tombstone the message
-          var message = Map<String, dynamic>.from(currentConversationMessages[messageIndex]);
-          message['content'] = 'This message was deleted';
-          message['files'] = [];
-          message['deletedForEveryone'] = true;
-          currentConversationMessages[messageIndex] = message;
+          // "Delete for everyone": Tombstone the message by creating a new list
+          var newList = List<Map<String, dynamic>>.from(currentConversationMessages);
+          var updatedMessage = Map<String, dynamic>.from(newList[messageIndex]);
+          updatedMessage['content'] = 'This message was deleted';
+          updatedMessage['files'] = [];
+          updatedMessage['deletedForEveryone'] = true;
+          newList[messageIndex] = updatedMessage;
+          currentConversationMessages.assignAll(newList); // Use assignAll to replace the list
         } else {
-          // "Delete for me": Remove locally
-          currentConversationMessages.removeAt(messageIndex);
+          // "Delete for me": Remove locally by creating a new list
+          var newList = List<Map<String, dynamic>>.from(currentConversationMessages);
+          newList.removeAt(messageIndex);
+          currentConversationMessages.assignAll(newList);
         }
-        currentConversationMessages.refresh();
       }
     }
 
