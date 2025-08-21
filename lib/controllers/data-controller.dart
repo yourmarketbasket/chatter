@@ -270,7 +270,7 @@ class DataController extends GetxController {
         final newReceipt = {
             'userId': userId,
             'status': status,
-            'timestamp': DateTime.now().toUtc().toIso8601String(),
+            'timestamp': data['timestamp'] ?? DateTime.now().toUtc().toIso8601String(),
         };
 
         if (receiptIndex != -1) {
