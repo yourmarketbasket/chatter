@@ -107,7 +107,7 @@ class SocketService {
       'typing:started': (data) => _handleTyping(data, true),
       'typing:stopped': (data) => _handleTyping(data, false),
     };
-
+// more canges
     eventHandlers.forEach((event, handler) {
       _socket!.on(event, (data) {
           // print('SocketService: Received event $event with data: $data');
