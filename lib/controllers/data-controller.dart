@@ -1445,6 +1445,7 @@ class DataController extends GetxController {
           validateStatus: (status) => status != null && status < 500,
         ),
       );
+      print('[DataController.sendChatMessage] Received response: ${response.data}');
 
       final messageIndex = currentConversationMessages.indexWhere((m) => m['clientMessageId'] == clientMessageId);
 
@@ -1452,11 +1453,23 @@ class DataController extends GetxController {
         final serverMessage = response.data['message'];
 
         if (response.data.containsKey('chat')) {
+          print('[DataController.sendChatMessage] Response contains new/resurrected chat object.');
           final newChat = response.data['chat'];
-          chats[newChat['_id']] = newChat;
-          Get.find<SocketService>().joinChatRoom(newChat['_id']);
+          final newChatId = newChat['_id'];
+          print('[DataController.sendChatMessage] Chat ID is $newChatId. Adding to chats list and joining room.');
+          chats[newChatId] = newChat;
+          Get.find<SocketService>().joinChatRoom(newChatId);
           currentChat.value = newChat;
           chats.refresh();
+
+          // NEW LOGIC: Go through messages and update chatId
+          final updatedMessages = currentConversationMessages.map((msg) {
+            if (msg['chatId'] == null) {
+              msg['chatId'] = newChatId;
+            }
+            return msg;
+          }).toList();
+          currentConversationMessages.assignAll(updatedMessages);
         }
 
         if (messageIndex != -1) {

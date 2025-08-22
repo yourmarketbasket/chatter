@@ -65,7 +65,9 @@ class _ChatScreenState extends State<ChatScreen> {
     // after the screen has already been initialized.
     ever(dataController.currentChat, (chat) {
       final newChatId = chat['_id'] as String?;
+      print('[ChatScreen.ever] currentChat listener fired. Chat ID: $newChatId');
       if (newChatId != null) {
+        print('[ChatScreen.ever] Valid chat ID found. Joining room.');
         Get.find<SocketService>().joinChatRoom(newChatId);
       }
     });

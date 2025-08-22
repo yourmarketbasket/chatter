@@ -398,8 +398,10 @@ class SocketService {
 
   void joinChatRoom(String chatId) {
     if (_socket != null && _socket!.connected) {
-      // print('[SocketService] ==> Emitting chat:join for resurrected chat: $chatId');
+      print('[SocketService] ==> Emitting chat:join for chat ID: $chatId');
       _socket!.emit('chat:join', {'chatId': chatId});
+    } else {
+      print('[SocketService] Cannot join room. Socket is null or not connected.');
     }
   }
 
