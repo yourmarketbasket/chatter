@@ -655,9 +655,18 @@ class _ChatScreenState extends State<ChatScreen> {
   final hasAttachment = message['files'] != null && (message['files'] as List).isNotEmpty;
 
   // Determine sender name for display
-  final sender = (dataController.currentChat.value['participants'] as List).firstWhere(
-    (p) => p['_id'] == senderId,
-    orElse: () => {'_id': senderId, 'name': 'Unknown User'},
+  final sender = dataController.allUsers.firstWhere(
+    (u) => u['_id'] == senderId,
+    orElse: () {
+      final participant = (dataController.currentChat.value['participants'] as List).firstWhere(
+        (p) => (p is Map ? p['_id'] : p) == senderId,
+        orElse: () => null,
+      );
+      if (participant is Map && participant['name'] != null) {
+        return participant;
+      }
+      return {'_id': senderId, 'name': 'Unknown User'};
+    },
   );
   final senderName = isYou ? 'You' : sender['name'];
 
@@ -748,8 +757,8 @@ class _ChatScreenState extends State<ChatScreen> {
                         Text(
                           originalMessage['senderId']['_id'] == dataController.user.value['user']['_id']
                               ? 'You'
-                              : (dataController.currentChat.value['participants'] as List).firstWhere(
-                                  (p) => p['_id'] == originalMessage['senderId']['_id'],
+                              : dataController.allUsers.firstWhere(
+                                  (u) => u['_id'] == originalMessage['senderId']['_id'],
                                   orElse: () => {'name': 'Unknown User'},
                                 )['name'],
                           style: const TextStyle(
