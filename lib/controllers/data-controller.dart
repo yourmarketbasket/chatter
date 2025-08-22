@@ -219,8 +219,9 @@ class DataController extends GetxController {
       chats[chatId] = chat;
       chats.refresh();
     } else {
-      // print('[DataController] Received message for unknown chat: $chatId. Fetching chats.');
-      fetchChats();
+      // print('[DataController] Received message for unknown chat: $chatId. Ignoring.');
+      // Do nothing. The chat might have been deleted by the user.
+      // Re-fetching all chats could re-introduce a chat the user explicitly deleted.
     }
   }
 
@@ -1698,14 +1699,16 @@ class DataController extends GetxController {
   void handleChatDeleted(String chatId) {
     if (chatId.isEmpty) return;
     if (chats.containsKey(chatId)) {
-      chats.remove(chatId);
+      final newChats = Map<String, Map<String, dynamic>>.from(chats);
+      newChats.remove(chatId);
+      chats.value = newChats; // Forcefully replace the map to ensure reactivity
+
       // If the deleted chat is the current one, clear it and navigate back
       if (currentChat.value['_id'] == chatId) {
         currentChat.value = {};
         currentConversationMessages.clear();
         Get.back(); // Navigate back from the chat screen
       }
-      chats.refresh();
     }
   }
 

@@ -236,8 +236,27 @@ class _MainChatsPageState extends State<MainChatsPage> {
                           avatarLetter = title.isNotEmpty ? title[0].toUpperCase() : 'G';
                           trailingWidget = const SizedBox.shrink();
                         } else {
-                          final otherUserRaw = (chat['participants'] as List<dynamic>).firstWhere((p) => p['_id'] != currentUserId, orElse: () => (chat['participants'] as List<dynamic>).first);
-                          final otherUser = otherUserRaw is Map<String, dynamic> ? otherUserRaw : _dataController.allUsers.firstWhere((u) => u['_id'] == otherUserRaw, orElse: () => {'name': 'Unknown', 'avatar': ''});
+                          final List<dynamic> participants = chat['participants'] as List<dynamic>;
+                          final otherParticipantRaw = participants.firstWhere(
+                            (p) {
+                              final pId = (p is Map<String, dynamic>) ? p['_id'] : p;
+                              return pId != currentUserId;
+                            },
+                            orElse: () => participants.first,
+                          );
+
+                          Map<String, dynamic> otherUser;
+                          if (otherParticipantRaw is Map<String, dynamic>) {
+                            otherUser = otherParticipantRaw;
+                          } else {
+                            // It's a string ID, so we need to look it up in allUsers
+                            final otherUserId = otherParticipantRaw as String;
+                            otherUser = _dataController.allUsers.firstWhere(
+                              (u) => u['_id'] == otherUserId,
+                              orElse: () => {'name': 'Unknown', 'avatar': ''},
+                            );
+                          }
+
                           title = otherUser['name'] ?? 'User';
                           avatarUrl = otherUser['avatar'] ?? '';
                           avatarLetter = title.isNotEmpty ? title[0].toUpperCase() : 'U';
