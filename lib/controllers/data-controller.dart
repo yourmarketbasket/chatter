@@ -1712,12 +1712,12 @@ class DataController extends GetxController {
       print('[DataController] Chats count after deletion attempt: ${chats.length}');
 
 
-      // If the deleted chat is the current one, clear it and navigate back
+      // If the deleted chat is the current one, clear it.
+      // The UI (ChatScreen) will be responsible for listening to this state change and popping itself.
       if (currentChat.value['_id'] == chatId) {
-        print('[DataController] Deleted chat is the current chat. Clearing and navigating back.');
+        print('[DataController] Deleted chat is the current chat. Clearing state.');
         currentChat.value = {};
         currentConversationMessages.clear();
-        Get.back(); // Navigate back from the chat screen
       }
     } else {
       print('[DataController] Chat with ID $chatId not found in the local chats map.');

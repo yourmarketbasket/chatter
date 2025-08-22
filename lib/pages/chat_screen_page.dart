@@ -38,6 +38,21 @@ class _ChatScreenState extends State<ChatScreen> {
     } else {
       dataController.currentConversationMessages.clear();
     }
+
+    // Add a listener to the chats map to detect if the current chat is deleted.
+    dataController.chats.listen((chatsMap) {
+      final currentChatId = dataController.currentChat.value['_id'];
+      // If the chat we are currently viewing has disappeared from the map
+      if (currentChatId != null && !chatsMap.containsKey(currentChatId)) {
+        // And if this screen is still mounted
+        if (mounted) {
+          // Pop the screen
+          print('[ChatScreen] Current chat $currentChatId was deleted. Navigating back.');
+          Navigator.of(context).pop();
+        }
+      }
+    });
+
     dataController.currentConversationMessages.listen((_) {
       Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
     });
