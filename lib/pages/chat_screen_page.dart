@@ -646,12 +646,13 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
- Widget _buildMessageContent(Map<String, dynamic> message, int index) {
+ Widget _buildMessageContent(Map<String, dynamic> message) {
   final senderId = message['senderId'] is Map ? message['senderId']['_id'] : message['senderId'];
   final isYou = senderId == dataController.user.value['user']['_id'];
   final messages = dataController.currentConversationMessages;
-  final isSameSenderAsNext = index > 0 && (messages[index - 1]['senderId'] is Map ? messages[index - 1]['senderId']['_id'] : messages[index - 1]['senderId']) == senderId;
-  final bottomMargin = isSameSenderAsNext ? 2.0 : 8.0;
+  final messageIndex = messages.indexWhere((m) => (m['clientMessageId'] != null && m['clientMessageId'] == message['clientMessageId']) || (m['_id'] != null && m['_id'] == message['_id']));
+  final isSameSenderAsPrevious = messageIndex > 0 && (messages[messageIndex - 1]['senderId'] is Map ? messages[messageIndex - 1]['senderId']['_id'] : messages[messageIndex - 1]['senderId']) == senderId;
+  final bottomMargin = isSameSenderAsPrevious ? 2.0 : 8.0;
   final hasAttachment = message['files'] != null && (message['files'] as List).isNotEmpty;
 
   // Determine sender name for display
@@ -1240,7 +1241,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                   dataController.user.value['user']['_id']
                               ? Alignment.centerRight
                               : Alignment.centerLeft,
-                          child: _buildMessageContent(message, index),
+                          child: _buildMessageContent(message),
                         ),
                       );
                     }

@@ -1322,6 +1322,12 @@ class DataController extends GetxController {
                 // print('Error fetching following post-login: $e');
               });
             }
+            await fetchAllUsers();
+            await fetchChats();
+            await fetchContacts();
+
+            Get.find<SocketService>().initSocket();
+
 
           } catch (feedError) {
               // print('[DataController] Error fetching feeds/network data immediately after login: ${feedError.toString()}. Login itself is still considered successful.');

@@ -23,6 +23,7 @@ class _MainChatsPageState extends State<MainChatsPage> {
   @override
   void initState() {
     super.initState();
+    _dataController.fetchChats();
     _searchController.addListener(() {
       if (mounted) {
         setState(() {
