@@ -1452,24 +1452,44 @@ class DataController extends GetxController {
       if (response.statusCode == 201 && response.data['success'] == true) {
         final serverMessage = response.data['message'];
 
+        // --- NEW/RESURRECTED CHAT HANDLING ---
+        // If the server returns a full 'chat' object, that's the best case.
         if (response.data.containsKey('chat')) {
-          print('[DataController.sendChatMessage] Response contains new/resurrected chat object.');
+          print('[DataController.sendChatMessage] Response contains full chat object.');
           final newChat = response.data['chat'];
           final newChatId = newChat['_id'];
-          print('[DataController.sendChatMessage] Chat ID is $newChatId. Adding to chats list and joining room.');
-          chats[newChatId] = newChat;
-          Get.find<SocketService>().joinChatRoom(newChatId);
-          currentChat.value = newChat;
-          chats.refresh();
+          print('[DataController.sendChatMessage] Chat ID is $newChatId. Updating state and joining room.');
 
-          // NEW LOGIC: Go through messages and update chatId
-          final updatedMessages = currentConversationMessages.map((msg) {
-            if (msg['chatId'] == null) {
-              msg['chatId'] = newChatId;
+          chats[newChatId] = newChat;
+          currentChat.value = newChat; // This updates the whole object
+          Get.find<SocketService>().joinChatRoom(newChatId);
+          chats.refresh();
+        }
+        // --- FALLBACK for resurrected chats that don't return the full object ---
+        else {
+          final messageChatId = serverMessage['chatId'] as String?;
+          // If our currentChat doesn't have an ID yet, but the returned message does,
+          // it means this is the first message of a new/resurrected chat.
+          if (messageChatId != null && currentChat.value['_id'] == null) {
+            print('[DataController.sendChatMessage] New/resurrected chat detected via message. Chat ID: $messageChatId. Joining room.');
+
+            // We don't have the full chat object, but we have the ID.
+            // Update the currentChat object with the ID.
+            var tempChat = Map<String, dynamic>.from(currentChat.value);
+            tempChat['_id'] = messageChatId;
+            currentChat.value = tempChat;
+
+            // Join the room.
+            Get.find<SocketService>().joinChatRoom(messageChatId);
+
+            // We should probably add this partial chat to the main chats list too,
+            // so it doesn't feel like it's missing. The server will likely send a
+            // `chat:updated` event soon to fill in the details.
+            if (!chats.containsKey(messageChatId)) {
+              chats[messageChatId] = tempChat;
+              chats.refresh();
             }
-            return msg;
-          }).toList();
-          currentConversationMessages.assignAll(updatedMessages);
+          }
         }
 
         if (messageIndex != -1) {
