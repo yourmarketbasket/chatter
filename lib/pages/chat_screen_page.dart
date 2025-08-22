@@ -663,7 +663,7 @@ class _ChatScreenState extends State<ChatScreen> {
         orElse: () => null,
       );
       if (participant is Map && participant['name'] != null) {
-        return participant;
+        return Map<String, dynamic>.from(participant);
       }
       return {'_id': senderId, 'name': 'Unknown User'};
     },
