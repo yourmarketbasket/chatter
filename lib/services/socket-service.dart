@@ -268,11 +268,14 @@ class SocketService {
   }
 
   void _handleChatDeleted(dynamic data, String event) {
+    print('[SocketService] Received event $event with data: $data');
     if (data is Map<String, dynamic> && data['chatId'] is String) {
-      _dataController.handleChatDeleted(data['chatId']);
+      final chatId = data['chatId'] as String;
+      print('[SocketService] Extracted chatId: $chatId. Calling handleChatDeleted in DataController.');
+      _dataController.handleChatDeleted(chatId);
       _eventController.add({'event': event, 'data': data});
     } else {
-      // print('SocketService: Invalid $event data format: ${data.runtimeType}');
+      print('[SocketService] Invalid $event data format: ${data.runtimeType}. Full data: $data');
     }
   }
 

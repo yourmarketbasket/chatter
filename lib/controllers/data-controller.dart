@@ -1697,18 +1697,30 @@ class DataController extends GetxController {
   }
 
   void handleChatDeleted(String chatId) {
-    if (chatId.isEmpty) return;
+    print('[DataController] handleChatDeleted called for chatId: $chatId');
+    if (chatId.isEmpty) {
+      print('[DataController] ChatId is empty, returning.');
+      return;
+    }
+
+    print('[DataController] Chats count before deletion attempt: ${chats.length}');
     if (chats.containsKey(chatId)) {
+      print('[DataController] Chat found in map. Proceeding with removal.');
       final newChats = Map<String, Map<String, dynamic>>.from(chats);
       newChats.remove(chatId);
       chats.value = newChats; // Forcefully replace the map to ensure reactivity
+      print('[DataController] Chats count after deletion attempt: ${chats.length}');
+
 
       // If the deleted chat is the current one, clear it and navigate back
       if (currentChat.value['_id'] == chatId) {
+        print('[DataController] Deleted chat is the current chat. Clearing and navigating back.');
         currentChat.value = {};
         currentConversationMessages.clear();
         Get.back(); // Navigate back from the chat screen
       }
+    } else {
+      print('[DataController] Chat with ID $chatId not found in the local chats map.');
     }
   }
 
