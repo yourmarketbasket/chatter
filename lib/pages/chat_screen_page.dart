@@ -646,12 +646,11 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
- Widget _buildMessageContent(Map<String, dynamic> message) {
+ Widget _buildMessageContent(Map<String, dynamic> message, Map<String, dynamic>? prevMessage) {
   final senderId = message['senderId'] is Map ? message['senderId']['_id'] : message['senderId'];
   final isYou = senderId == dataController.user.value['user']['_id'];
-  final messages = dataController.currentConversationMessages;
-  final messageIndex = messages.indexWhere((m) => (m['clientMessageId'] != null && m['clientMessageId'] == message['clientMessageId']) || (m['_id'] != null && m['_id'] == message['_id']));
-  final isSameSenderAsPrevious = messageIndex > 0 && (messages[messageIndex - 1]['senderId'] is Map ? messages[messageIndex - 1]['senderId']['_id'] : messages[messageIndex - 1]['senderId']) == senderId;
+  final prevSenderId = prevMessage != null ? (prevMessage['senderId'] is Map ? prevMessage['senderId']['_id'] : prevMessage['senderId']) : null;
+  final isSameSenderAsPrevious = prevSenderId != null && prevSenderId == senderId;
   final bottomMargin = isSameSenderAsPrevious ? 2.0 : 8.0;
   final hasAttachment = message['files'] != null && (message['files'] as List).isNotEmpty;
 
@@ -1229,6 +1228,16 @@ class _ChatScreenState extends State<ChatScreen> {
                       }
 
                       // Priority 3: Render the normal message
+                      Map<String, dynamic>? prevMessage;
+                      if (index > 0) {
+                        for (int i = index - 1; i >= 0; i--) {
+                          if (groupedMessages[i] is Map<String, dynamic>) {
+                            prevMessage = groupedMessages[i] as Map<String, dynamic>;
+                            break;
+                          }
+                        }
+                      }
+
                       return VisibilityDetector(
                         key: Key(message['_id'] ?? message['clientMessageId']),
                         onVisibilityChanged: (visibilityInfo) {
@@ -1241,7 +1250,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                   dataController.user.value['user']['_id']
                               ? Alignment.centerRight
                               : Alignment.centerLeft,
-                          child: _buildMessageContent(message),
+                          child: _buildMessageContent(message, prevMessage),
                         ),
                       );
                     }

@@ -393,8 +393,10 @@ class SocketService {
   }
 
   void joinChatRoom(String chatId) {
-    emitEvent('join', {'chatId': chatId});
-      // print('SocketService: Joined chat room $chatId');
+    if (_socket != null && _socket!.connected) {
+      // print('[SocketService] ==> Emitting chat:join for resurrected chat: $chatId');
+      _socket!.emit('chat:join', {'chatId': chatId});
+    }
   }
 
   Stream<Map<String, dynamic>> get events => _eventController.stream;

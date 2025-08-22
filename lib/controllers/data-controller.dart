@@ -247,9 +247,11 @@ class DataController extends GetxController {
       }
       chats[chatId] = chat;
       chats.refresh();
-    } else {
-      // print('[DataController] Received chat:updated for unknown chat: $chatId. Fetching chats.');
-      fetchChats();
+    } else if (data['isResurrected'] == true) {
+      // This is a resurrected chat, add it to the list and join the room.
+      chats[chatId] = data;
+      Get.find<SocketService>().joinChatRoom(chatId);
+      chats.refresh();
     }
 
     // The `message:new` event is now solely responsible for updating the conversation screen.
