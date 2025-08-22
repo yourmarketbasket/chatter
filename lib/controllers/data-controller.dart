@@ -4,7 +4,6 @@ import 'package:get/get.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:dio/dio.dart' as dio; // Use prefix for dio to avoid conflicts
 import 'dart:convert';
-// import 'package:path/path.dart' as path; // path is used by UploadService
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import '../models/feed_models.dart';
