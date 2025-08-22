@@ -2,7 +2,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:chatter/controllers/data-controller.dart';
 import 'package:chatter/helpers/time_helper.dart';
 import 'package:chatter/pages/chat_screen_page.dart';
-import 'package:chatter/pages/contacts_page.dart';
 import 'package:chatter/pages/followers_page.dart';
 import 'package:feather_icons/feather_icons.dart';
 import 'package:flutter/material.dart';
@@ -39,50 +38,6 @@ class _MainChatsPageState extends State<MainChatsPage> {
     super.dispose();
   }
 
-  void _showCreateChatDialog() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: Colors.grey[900],
-          title: const Text('Start something new', style: TextStyle(color: Colors.white)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.person_add, color: Colors.tealAccent),
-                title: const Text('New Chat', style: TextStyle(color: Colors.white)),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const ContactsPage(),
-                    ),
-                  );
-                  },
-              ),
-              ListTile(
-                leading: const Icon(Icons.group_add, color: Colors.tealAccent),
-                title: const Text('New Group', style: TextStyle(color: Colors.white)),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const ContactsPage(),
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-  // more chatges
-
   @override
   Widget build(BuildContext context) {
     return Theme(
@@ -115,24 +70,25 @@ class _MainChatsPageState extends State<MainChatsPage> {
       child: Scaffold(
         extendBody: true,
         floatingActionButton: FloatingActionButton(
-          onPressed: (){
+          onPressed: () {
             // go to contacts page
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => const ContactsPage(),
+                builder: (context) => FollowersPage(),
               ),
             );
           },
           backgroundColor: Colors.tealAccent.withOpacity(0.1),
           shape: const CircleBorder(),
           child: const Icon(
-            FeatherIcons.messageCircle,
+            FeatherIcons.userPlus,
             color: Colors.tealAccent,
           ),
         ),
         body: Obx(() {
-          if (_dataController.isLoadingChats.value && _dataController.chats.isEmpty) {
+          if (_dataController.isLoadingChats.value &&
+              _dataController.chats.isEmpty) {
             return const Center(child: CircularProgressIndicator());
           }
 
