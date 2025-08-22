@@ -59,6 +59,16 @@ class _ChatScreenState extends State<ChatScreen> {
     dataController.currentConversationMessages.listen((_) {
       Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
     });
+
+    // Reactively join the socket room whenever the chat ID becomes available.
+    // This handles the case where a new chat is created and the ID is assigned
+    // after the screen has already been initialized.
+    ever(dataController.currentChat, (chat) {
+      final newChatId = chat['_id'] as String?;
+      if (newChatId != null) {
+        Get.find<SocketService>().joinChatRoom(newChatId);
+      }
+    });
   }
 
   void _loadMessages() async {
