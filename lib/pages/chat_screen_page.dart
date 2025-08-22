@@ -15,6 +15,7 @@ import 'package:chatter/widgets/audio_waveform_widget.dart';
 import 'package:chatter/widgets/all_attachments_dialog.dart';
 import 'package:chatter/widgets/reply_message_snippet.dart';
 import 'package:chatter/helpers/time_helper.dart';
+import 'package:chatter/services/socket-service.dart';
 import 'package:uuid/uuid.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -33,7 +34,9 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    if (dataController.currentChat.value['_id'] != null) {
+    final chatId = dataController.currentChat.value['_id'] as String?;
+    if (chatId != null) {
+      Get.find<SocketService>().joinChatRoom(chatId);
       _loadMessages();
     } else {
       dataController.currentConversationMessages.clear();
