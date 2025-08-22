@@ -1287,7 +1287,6 @@ class DataController extends GetxController {
             }
             await fetchAllUsers();
             await fetchChats();
-            await fetchContacts();
 
             Get.find<SocketService>().initSocket();
 
