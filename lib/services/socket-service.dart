@@ -106,6 +106,7 @@ class SocketService {
       'chat:hardDeleted': (data) => _handleChatDeleted(data, 'chat:hardDeleted'),
       'typing:started': (data) => _handleTyping(data, true),
       'typing:stopped': (data) => _handleTyping(data, false),
+      'user:verified': (data) => _handleUserVerified(data),
     };
 // more canges
     eventHandlers.forEach((event, handler) {
@@ -292,6 +293,12 @@ class SocketService {
       _eventController.add({'event': isStart ? 'typing:start' : 'typing:stop', 'data': data});
     } else {
         // print('SocketService: Invalid typing:${isStart ? 'start' : 'stop'} data format: ${data.runtimeType}');
+    }
+  }
+
+  void _handleUserVerified(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      _dataController.handleUserVerified(data);
     }
   }
 

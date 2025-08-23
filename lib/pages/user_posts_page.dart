@@ -557,19 +557,16 @@ class _UserPostsPageState extends State<UserPostsPage> {
     }
   }
 
+  final ScrollController _scrollController = ScrollController();
+
   @override
   void initState() {
     super.initState();
-    _dataController.clearUserPosts();
-    _dataController.fetchUserPosts(widget.userId).catchError((error) {
-      if (mounted) {
-        Get.snackbar(
-          'Error Loading Posts',
-          'Failed to load posts for ${widget.username}. Please try again later.',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red[700],
-          colorText: Colors.white,
-        );
+    _dataController.fetchUserPosts(widget.userId, isRefresh: true);
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels ==
+          _scrollController.position.maxScrollExtent) {
+        _dataController.fetchUserPosts(widget.userId);
       }
     });
   }
@@ -765,41 +762,30 @@ class _UserPostsPageState extends State<UserPostsPage> {
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: Obx(() {
-        if (_dataController.isLoadingUserPosts.value && _dataController.userPosts.isEmpty) {
-          return Center(child: CircularProgressIndicator(color: Colors.tealAccent[400]));
-        }
-        if (!_dataController.isLoadingUserPosts.value && _dataController.userPosts.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(FeatherIcons.fileText, size: 48, color: Colors.grey[700]),
-                const SizedBox(height: 16),
-                Text(
-                  '${widget.username} hasn\'t posted anything yet or posts failed to load.',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 16),
-                ),
-                const SizedBox(height: 10),
-                 ElevatedButton.icon(
-                  icon: const Icon(FeatherIcons.refreshCw, size: 18),
-                  label: const Text('Retry'),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.tealAccent[700], foregroundColor: Colors.black),
-                  onPressed: () => _dataController.fetchUserPosts(widget.userId),
-                )
-              ],
-            ),
+      body: RefreshIndicator(
+        onRefresh: () => _dataController.fetchUserPosts(widget.userId, isRefresh: true),
+        child: Obx(() {
+          if (_dataController.isLoadingUserPosts.value && _dataController.userPosts.isEmpty) {
+            return Center(child: CircularProgressIndicator(color: Colors.tealAccent[400]));
+          }
+          if (!_dataController.isLoadingUserPosts.value && _dataController.userPosts.isEmpty) {
+            return Center(
+              child: Text('${widget.username} hasn\'t posted anything yet.', style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 16)),
+            );
+          }
+          return ListView.builder(
+            controller: _scrollController,
+            itemCount: _dataController.userPosts.length + (_dataController.isLoadingUserPosts.value ? 1 : 0),
+            itemBuilder: (context, index) {
+              if (index == _dataController.userPosts.length) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final post = _dataController.userPosts[index];
+              return _buildPostContent(post, isReply: false);
+            },
           );
-        }
-        return ListView.builder(
-          itemCount: _dataController.userPosts.length,
-          itemBuilder: (context, index) {
-            final post = _dataController.userPosts[index];
-            return _buildPostContent(post, isReply: false);
-          },
-        );
-      }),
+        }),
+      ),
     );
   }
 }

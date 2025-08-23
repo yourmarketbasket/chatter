@@ -3,6 +3,7 @@ import 'package:chatter/pages/profile_page.dart';
 import 'package:chatter/widgets/app_drawer.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:chatter/helpers/verification_helper.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:feather_icons/feather_icons.dart';
@@ -29,43 +30,12 @@ class _FollowersPageState extends State<FollowersPage> with SingleTickerProvider
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-
-    // Determine whose followers/following to show
     _targetUserId = widget.viewUserId ?? _dataController.user.value['user']?['_id'] as String? ?? '';
 
-    if (_targetUserId.isEmpty) {
-      // Handle error: No user ID to fetch data for.
-      // This might happen if logged out or viewUserId is not properly passed.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          Get.snackbar('Error', 'User ID not found. Cannot load network.',
-              backgroundColor: Colors.red, colorText: Colors.white);
-        }
-      });
-      return;
+    if (_targetUserId.isNotEmpty) {
+      _dataController.fetchFollowers(_targetUserId, isRefresh: true);
+      _dataController.fetchFollowing(_targetUserId, isRefresh: true);
     }
-
-    // Fetch initial data for both tabs for the _targetUserId
-    // Clear previous lists and fetch data after the first frame to avoid build errors
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) { // Ensure the widget is still in the tree
-        _dataController.followers.clear();
-        _dataController.following.clear();
-
-        _dataController.fetchFollowers(_targetUserId).catchError((e) {
-          if (mounted) {
-            Get.snackbar('Error', 'Could not load followers: ${e.toString()}',
-                backgroundColor: Colors.red, colorText: Colors.white);
-          }
-        });
-        _dataController.fetchFollowing(_targetUserId).catchError((e) {
-          if (mounted) {
-            Get.snackbar('Error', 'Could not load following list: ${e.toString()}',
-                backgroundColor: Colors.red, colorText: Colors.white);
-          }
-        });
-      }
-    });
   }
 
   @override
@@ -160,62 +130,70 @@ class _FollowersPageState extends State<FollowersPage> with SingleTickerProvider
         ),
       ),
       drawer: isViewingOwnProfile ? const AppDrawer() : null, // Only show drawer for own network
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildUserList(_dataController.followers, _dataController.isLoadingFollowers, "No followers yet.", "Failed to load followers."),
-          _buildUserList(_dataController.following, _dataController.isLoadingFollowing, "Not following anyone yet.", "Failed to load following list."),
-        ],
+      body: RefreshIndicator(
+        onRefresh: () async {
+          if (_tabController.index == 0) {
+            await _dataController.fetchFollowers(_targetUserId, isRefresh: true);
+          } else {
+            await _dataController.fetchFollowing(_targetUserId, isRefresh: true);
+          }
+        },
+        child: TabBarView(
+          controller: _tabController,
+          children: [
+            _buildUserList(
+                _dataController.followers,
+                _dataController.isLoadingFollowers,
+                "No followers yet.",
+                "Failed to load followers.",
+                () => _dataController.fetchFollowers(_targetUserId)),
+            _buildUserList(
+                _dataController.following,
+                _dataController.isLoadingFollowing,
+                "Not following anyone yet.",
+                "Failed to load following list.",
+                () => _dataController.fetchFollowing(_targetUserId)),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildUserList(RxList<Map<String, dynamic>> userList, RxBool isLoadingController, String emptyMessage, String errorMessage) {
-    return Obx(() {
-      final bool isLoading = isLoadingController.value; // Use the specific loading controller
+  Widget _buildUserList(
+      RxList<Map<String, dynamic>> userList,
+      RxBool isLoadingController,
+      String emptyMessage,
+      String errorMessage,
+      Future<void> Function() onFetchMore) {
+    final ScrollController scrollController = ScrollController();
+    scrollController.addListener(() {
+      if (scrollController.position.pixels ==
+          scrollController.position.maxScrollExtent) {
+        onFetchMore();
+      }
+    });
 
-      if (isLoading && userList.isEmpty) { // Show loading only if list is empty and loading
+    return Obx(() {
+      final bool isLoading = isLoadingController.value;
+
+      if (isLoading && userList.isEmpty) {
         return Center(child: CircularProgressIndicator(color: Colors.tealAccent[400]));
       }
-      // After loading, if list is still empty, show empty/error message
+
       if (!isLoading && userList.isEmpty) {
         return Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(FeatherIcons.users, size: 48, color: Colors.grey[700]),
-              const SizedBox(height: 16),
-              Text(
-                // Check if it was an error or just empty due to no data
-                // This requires DataController to perhaps set an error flag, or we infer from isLoading being false + list empty
-                _dataController.followers.isEmpty && _tabController.index == 0 && !_dataController.isLoadingFollowers.value ? errorMessage :
-                _dataController.following.isEmpty && _tabController.index == 1 && !_dataController.isLoadingFollowing.value ? errorMessage : emptyMessage,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 16),
-              ),
-              const SizedBox(height: 10),
-              ElevatedButton.icon(
-                icon: const Icon(FeatherIcons.refreshCw, size: 18),
-                label: const Text('Retry'),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.tealAccent[700], foregroundColor: Colors.black),
-                onPressed: () {
-                  if (_tabController.index == 0) {
-                    _dataController.fetchFollowers(_targetUserId);
-                  } else {
-                    _dataController.fetchFollowing(_targetUserId);
-                  }
-                },
-              )
-            ],
-          )
+          child: Text(emptyMessage, style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 16)),
         );
       }
 
       return ListView.separated(
-        itemCount: userList.length,
+        controller: scrollController,
+        itemCount: userList.length + (isLoading ? 1 : 0),
         separatorBuilder: (context, index) => Divider(color: Colors.grey[850], height: 1, indent: 72, endIndent: 16),
-        
         itemBuilder: (context, index) {
+          if (index == userList.length) {
+            return const Center(child: CircularProgressIndicator());
+          }
           final userItem = userList[index];
           print(userItem);
           final String listedUserId = userItem['_id'] ?? '';
@@ -241,7 +219,15 @@ class _FollowersPageState extends State<FollowersPage> with SingleTickerProvider
                   name,
                   style: GoogleFonts.poppins( color: Colors.white, fontSize: 13),
                 ),
-                Icon(Icons.verified, color:Colors.amber, size:14)
+                if (userItem['verification'] != null)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4.0),
+                    child: Icon(Icons.verified,
+                        color: getVerificationBadgeColor(
+                            userItem['verification']['entityType'],
+                            userItem['verification']['level']),
+                        size: 14),
+                  ),
               ],
             ),
             subtitle: Column(

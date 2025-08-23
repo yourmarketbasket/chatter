@@ -58,8 +58,13 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   @override
   void initState() {
     super.initState();
-    // Potentially initialize _postVideoQueueIndex if posts are already loaded
-    // and any of them have video grids. Or do it in buildPostContent.
+    dataController.fetchFeeds(isRefresh: true);
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels ==
+          _scrollController.position.maxScrollExtent) {
+        dataController.fetchFeeds();
+      }
+    });
   }
 
   void _navigateToProfilePage(BuildContext context, String userId, String username, String? userAvatarUrl) {
@@ -1161,15 +1166,24 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                 ),
             );
         }
-        return ListView.separated(
-          padding: EdgeInsets.symmetric(horizontal: 10),
-          controller: _scrollController,
-          itemCount: dataController.posts.length,
-          separatorBuilder: (context, index) => Divider(color: Colors.grey[850], height: 1),
-          itemBuilder: (context, index) {
-            final postMap = dataController.posts[index] as Map<String, dynamic>;
-            return _buildPostContent(postMap, isReply: false);
-          },
+        return RefreshIndicator(
+          onRefresh: () => dataController.fetchFeeds(isRefresh: true),
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            controller: _scrollController,
+            itemCount: dataController.posts.length + 1,
+            separatorBuilder: (context, index) => Divider(color: Colors.grey[850], height: 1),
+            itemBuilder: (context, index) {
+              if (index < dataController.posts.length) {
+                final postMap = dataController.posts[index] as Map<String, dynamic>;
+                return _buildPostContent(postMap, isReply: false);
+              } else {
+                return Obx(() => dataController.isLoading.value
+                    ? const Center(child: CircularProgressIndicator())
+                    : const SizedBox.shrink());
+              }
+            },
+          ),
         );
       }),
       floatingActionButtonLocation: ExpandableFab.location,

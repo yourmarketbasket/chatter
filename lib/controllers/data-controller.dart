@@ -38,6 +38,9 @@ class DataController extends GetxController {
   ));
   final user = {}.obs;
   final RxList<Map<String, dynamic>> posts = <Map<String, dynamic>>[].obs;
+  final RxInt _currentPage = 1.obs;
+  final RxBool _hasMorePosts = true.obs;
+  final RxBool _isFetchingPosts = false.obs;
   String get newClientMessageId => _uuid.v4();
 
   // Placeholder for all users
@@ -54,14 +57,23 @@ class DataController extends GetxController {
 
   // Add these Rx variables inside DataController class
   final RxList<Map<String, dynamic>> followers = <Map<String, dynamic>>[].obs;
+  final RxInt _currentFollowersPage = 1.obs;
+  final RxBool _hasMoreFollowers = true.obs;
+  final RxBool _isFetchingFollowers = false.obs;
 
   final RxBool isLoadingFollowers = false.obs;
   final RxList<Map<String, dynamic>> following = <Map<String, dynamic>>[].obs;
   final RxBool isLoadingFollowing = false.obs;
+  final RxInt _currentFollowingPage = 1.obs;
+  final RxBool _hasMoreFollowing = true.obs;
+  final RxBool _isFetchingFollowing = false.obs;
 
   // For User's Posts Page
   final RxList<Map<String, dynamic>> userPosts = <Map<String, dynamic>>[].obs;
   final RxBool isLoadingUserPosts = false.obs;
+  final RxInt _currentUserPostsPage = 1.obs;
+  final RxBool _hasMoreUserPosts = true.obs;
+  final RxBool _isFetchingUserPosts = false.obs;
 
   // For managing single media playback (video or audio)
   final Rxn<String> currentlyPlayingMediaId = Rxn<String>();
@@ -532,6 +544,92 @@ class DataController extends GetxController {
         errorMessage = 'Failed to create post: ${e.message ?? e.toString()}';
       }
         // print('[DataController] Error creating post: $errorMessage');
+      return {'success': false, 'message': errorMessage};
+    }
+  }
+
+  Future<Map<String, dynamic>> verifyUser(String userId, String entityType, String level, bool paid) async {
+    try {
+      final String? token = user.value['token'];
+      if (token == null) {
+        return {'success': false, 'message': 'Authentication token not found.'};
+      }
+
+      final response = await _dio.post(
+        'api/users/verify-user',
+        data: {
+          'userId': userId,
+          'entityType': entityType,
+          'level': level,
+          'paid': paid,
+        },
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return {'success': true, 'message': 'User verified successfully'};
+      } else {
+        return {
+          'success': false,
+          'message': response.data['message'] ?? 'Failed to verify user. Status: ${response.statusCode}'
+        };
+      }
+    } catch (e) {
+      String errorMessage = 'An error occurred while verifying the user.';
+      if (e is dio.DioException) {
+        if (e.response?.data != null && e.response!.data['message'] != null) {
+          errorMessage = e.response!.data['message'];
+        } else {
+          errorMessage = e.message ?? errorMessage;
+        }
+      }
+      return {'success': false, 'message': errorMessage};
+    }
+  }
+
+  Future<Map<String, dynamic>> searchUserByName(String name) async {
+    try {
+      final String? token = user.value['token'];
+      if (token == null) {
+        return {'success': false, 'message': 'Authentication token not found.'};
+      }
+
+      final response = await _dio.get(
+        '/api/users/by-name/$name',
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        if (response.data['user'] != null) {
+          return {'success': true, 'user': response.data['user']};
+        } else {
+          return {'success': false, 'message': 'User not found in response.'};
+        }
+      } else {
+        return {
+          'success': false,
+          'message': response.data['message'] ?? 'Failed to fetch user. Status: ${response.statusCode}'
+        };
+      }
+    } catch (e) {
+      String errorMessage = 'An error occurred while fetching the user.';
+      if (e is dio.DioException) {
+        if (e.response?.statusCode == 404) {
+          errorMessage = 'User not found.';
+        } else if (e.response?.data != null && e.response!.data['message'] != null) {
+          errorMessage = e.response!.data['message'];
+        } else {
+          errorMessage = e.message ?? errorMessage;
+        }
+      }
       return {'success': false, 'message': errorMessage};
     }
   }
@@ -1066,14 +1164,28 @@ class DataController extends GetxController {
   }
 
   // fetch all feeds for timeline
-  Future<void> fetchFeeds() async {
+  Future<void> fetchFeeds({bool isRefresh = false}) async {
+    if (_isFetchingPosts.value) return;
+    _isFetchingPosts.value = true;
+
+    if (isRefresh) {
+      _currentPage.value = 1;
+      _hasMorePosts.value = true;
+      posts.clear();
+    }
+
+    if (!_hasMorePosts.value) {
+      _isFetchingPosts.value = false;
+      return;
+    }
+
     try {
       var token = user.value['token'];
       if (token == null) {
         throw Exception('User token not found');
       }
       var response = await _dio.get(
-        '/api/posts/get-all-posts',
+        '/api/posts/get-all-posts?page=${_currentPage.value}&limit=20',
         options: dio.Options(
           headers: {
             'Authorization': 'Bearer $token',
@@ -1082,19 +1194,24 @@ class DataController extends GetxController {
       );
       if (response.statusCode == 200 && response.data['success'] == true) {
         List<Map<String, dynamic>> fetchedPosts = List<Map<String, dynamic>>.from(response.data['posts']);
-        List<Map<String, dynamic>> fetchedPostsRaw = List<Map<String, dynamic>>.from(response.data['posts']);
-        List<Map<String, dynamic>> processedFetchedPosts = [];
-        for (var postData in fetchedPostsRaw) {
-          processedFetchedPosts.add(_processPostOrReply(postData));
+        if (fetchedPosts.isNotEmpty) {
+          List<Map<String, dynamic>> processedFetchedPosts = [];
+          for (var postData in fetchedPosts) {
+            processedFetchedPosts.add(_processPostOrReply(postData));
+          }
+          posts.addAll(processedFetchedPosts);
+          _currentPage.value++;
+        } else {
+          _hasMorePosts.value = false;
         }
-        posts.assignAll(processedFetchedPosts);
       } else {
         throw Exception('Failed to fetch feeds');
       }
     } catch (e) {
-        // print('Error fetching feeds: $e');
-      posts.clear();
-      rethrow; // Rethrow the exception to be handled by the caller
+      // print('Error fetching feeds: $e');
+      // On error, you might want to allow a retry
+    } finally {
+      _isFetchingPosts.value = false;
     }
   }
 
@@ -1799,21 +1916,31 @@ class DataController extends GetxController {
 
   // Add these placeholder methods inside DataController class
 
-  Future<void> fetchFollowers(String userId) async {
+  Future<void> fetchFollowers(String userId, {bool isRefresh = false}) async {
+    if (_isFetchingFollowers.value) return;
+    _isFetchingFollowers.value = true;
     isLoadingFollowers.value = true;
+
+    if (isRefresh) {
+      _currentFollowersPage.value = 1;
+      _hasMoreFollowers.value = true;
+      followers.clear();
+    }
+
+    if (!_hasMoreFollowers.value) {
+      _isFetchingFollowers.value = false;
+      isLoadingFollowers.value = false;
+      return;
+    }
+
     try {
       final String? token = user.value['token'];
-      final String? loggedInUserId = user.value['user']?['_id'];
-
-      if (token == null || loggedInUserId == null) {
-        followers.clear();
+      if (token == null) {
         throw Exception('User not authenticated. Cannot fetch followers.');
       }
 
-      // API call to users/get-followers/:userid
-      // userId is the ID of the user whose followers are being requested.
       final response = await _dio.get(
-        'api/users/get-followers/$userId',
+        'api/users/get-followers/$userId?page=${_currentFollowersPage.value}&limit=100',
         options: dio.Options(
           headers: {
             'Authorization': 'Bearer $token',
@@ -1824,72 +1951,74 @@ class DataController extends GetxController {
       if (response.statusCode == 200 && response.data['success'] == true) {
         if (response.data['followers'] != null && response.data['followers'] is List) {
           List<dynamic> fetchedFollowersDynamic = response.data['followers'];
+          if (fetchedFollowersDynamic.isNotEmpty) {
+            final List<String> loggedInUserFollowingIds = List<String>.from(
+              (user.value['user']?['following'] as List<dynamic>? ?? []).map((e) => e.toString())
+            );
 
-          final List<String> loggedInUserFollowingIds = List<String>.from(
-            (user.value['user']?['following'] as List<dynamic>? ?? []).map((e) => e.toString())
-          );
+            List<Map<String, dynamic>> processedFollowers = fetchedFollowersDynamic.map((followerData) {
+              if (followerData is Map<String, dynamic>) {
+                String followerId = followerData['_id']?.toString() ?? '';
+                bool isFollowingThisFollower = loggedInUserFollowingIds.contains(followerId);
+                return {
+                  '_id': followerId,
+                  'avatar': followerData['avatar']?.toString() ?? '',
+                  'username': followerData['name']!.toString(),
+                  'name': followerData['name']?.toString() ?? 'Unknown User',
+                  'isFollowingCurrentUser': isFollowingThisFollower,
+                  'followersCount': followerData['followersCount'] ?? 0,
+                  'followingCount': followerData['followingCount'] ?? 0,
+                };
+              }
+              return <String, dynamic>{};
+            }).where((userMap) => userMap.isNotEmpty).toList();
 
-          List<Map<String, dynamic>> processedFollowers = fetchedFollowersDynamic.map((followerData) {
-            if (followerData is Map<String, dynamic>) {
-              String followerId = followerData['_id']?.toString() ?? '';
-              // Determine if the logged-in user is following this follower.
-              bool isFollowingThisFollower = loggedInUserFollowingIds.contains(followerId);
-
-              return {
-                '_id': followerId,
-                'avatar': followerData['avatar']?.toString() ?? '',
-                'username': followerData['name']!.toString(),
-                'name': followerData['name']?.toString() ?? 'Unknown User',
-                // The backend should ideally provide 'isFollowingCurrentUser' directly
-                // This field indicates if the *currently logged-in user* is following the person in this list item.
-                'isFollowingCurrentUser': isFollowingThisFollower,
-                // followersCount and followingCount for THIS follower, if provided by backend, useful for their profile preview
-                'followersCount': followerData['followersCount'] ?? 0,
-                'followingCount': followerData['followingCount'] ?? 0,
-              };
-            }
-            return <String, dynamic>{};
-          }).where((userMap) => userMap.isNotEmpty).toList();
-
-          followers.assignAll(processedFollowers);
-          //   // print('[DataController] Fetched followers for user $userId successfully. Count: ${followers.length}');
+            followers.addAll(processedFollowers);
+            _currentFollowersPage.value++;
+          } else {
+            _hasMoreFollowers.value = false;
+          }
         } else {
-          followers.clear();
-          //   // print('[DataController] Fetched followers for user $userId but the list is null or not a list.');
-          throw Exception('Followers list not found or invalid format.');
+          _hasMoreFollowers.value = false;
         }
       } else {
-        followers.clear();
-        //   // print('[DataController] Failed to fetch followers for user $userId. Status: ${response.statusCode}, Message: ${response.data?['message']}');
         throw Exception('Failed to fetch followers: ${response.data?['message'] ?? "Unknown server error"}');
       }
     } catch (e) {
-      followers.clear();
       //   // print('[DataController] Error in fetchFollowers for user $userId: ${e.toString()}');
-      // Rethrow or handle as needed
-      rethrow;
     } finally {
       isLoadingFollowers.value = false;
+      _isFetchingFollowers.value = false;
     }
   }
 
   
 
-  Future<void> fetchFollowing(String userId) async {
+  Future<void> fetchFollowing(String userId, {bool isRefresh = false}) async {
+    if (_isFetchingFollowing.value) return;
+    _isFetchingFollowing.value = true;
     isLoadingFollowing.value = true;
+
+    if (isRefresh) {
+      _currentFollowingPage.value = 1;
+      _hasMoreFollowing.value = true;
+      following.clear();
+    }
+
+    if (!_hasMoreFollowing.value) {
+      _isFetchingFollowing.value = false;
+      isLoadingFollowing.value = false;
+      return;
+    }
+
     try {
       final String? token = user.value['token'];
-      final String? loggedInUserId = user.value['user']?['_id'];
-
-      if (token == null || loggedInUserId == null) {
-        following.clear();
+      if (token == null) {
         throw Exception('User not authenticated. Cannot fetch following list.');
       }
 
-      // API call to users/get-following/:userid
-      // userId is the ID of the user whose "following" list is being requested.
       final response = await _dio.get(
-        'api/users/get-following/$userId',
+        'api/users/get-following/$userId?page=${_currentFollowingPage.value}&limit=100',
         options: dio.Options(
           headers: {
             'Authorization': 'Bearer $token',
@@ -1900,48 +2029,44 @@ class DataController extends GetxController {
       if (response.statusCode == 200 && response.data['success'] == true) {
         if (response.data['following'] != null && response.data['following'] is List) {
           List<dynamic> fetchedFollowingDynamic = response.data['following'];
+          if (fetchedFollowingDynamic.isNotEmpty) {
+            final List<String> loggedInUserFollowingIds = List<String>.from(
+              (user.value['user']?['following'] as List<dynamic>? ?? []).map((e) => e.toString())
+            );
 
-          final List<String> loggedInUserFollowingIds = List<String>.from(
-            (user.value['user']?['following'] as List<dynamic>? ?? []).map((e) => e.toString())
-          );
+            List<Map<String, dynamic>> processedFollowing = fetchedFollowingDynamic.map((followingUserData) {
+              if (followingUserData is Map<String, dynamic>) {
+                String followingUserId = followingUserData['_id']?.toString() ?? '';
+                bool isFollowingThisUser = loggedInUserFollowingIds.contains(followingUserId);
+                return {
+                  '_id': followingUserId,
+                  'avatar': followingUserData['avatar']?.toString() ?? '',
+                  'username': followingUserData['name']?.toString() ?? 'N/A',
+                  'name': followingUserData['name']?.toString() ?? 'Unknown User',
+                  'isFollowingCurrentUser': isFollowingThisUser,
+                  'followersCount': followingUserData['followersCount'] ?? 0,
+                  'followingCount': followingUserData['followingCount'] ?? 0,
+                };
+              }
+              return <String, dynamic>{};
+            }).where((userMap) => userMap.isNotEmpty).toList();
 
-          List<Map<String, dynamic>> processedFollowing = fetchedFollowingDynamic.map((followingUserData) {
-            if (followingUserData is Map<String, dynamic>) {
-              String followingUserId = followingUserData['_id']?.toString() ?? '';
-              // Determine if the logged-in user is following this user (who is in the targetUser's following list).
-              bool isFollowingThisUser = loggedInUserFollowingIds.contains(followingUserId);
-
-              return {
-                '_id': followingUserId,
-                'avatar': followingUserData['avatar']?.toString() ?? '',
-                'username': followingUserData['name']?.toString() ?? 'N/A',
-                'name': followingUserData['name']?.toString() ?? 'Unknown User',
-                'isFollowingCurrentUser': isFollowingThisUser, // Critical for button state
-                'followersCount': followingUserData['followersCount'] ?? 0, // if available
-                'followingCount': followingUserData['followingCount'] ?? 0, // if available
-              };
-            }
-            return <String, dynamic>{};
-          }).where((userMap) => userMap.isNotEmpty).toList();
-
-          following.assignAll(processedFollowing);
-            // print('[DataController] Fetched following list for user $userId successfully. Count: ${following.length}');
+            following.addAll(processedFollowing);
+            _currentFollowingPage.value++;
+          } else {
+            _hasMoreFollowing.value = false;
+          }
         } else {
-          following.clear();
-            // print('[DataController] Fetched following list for user $userId but the list is null or not a list.');
-          throw Exception('Following list not found or invalid format.');
+          _hasMoreFollowing.value = false;
         }
       } else {
-        following.clear();
-          // print('[DataController] Failed to fetch following list for user $userId. Status: ${response.statusCode}, Message: ${response.data?['message']}');
         throw Exception('Failed to fetch following list: ${response.data?['message'] ?? "Unknown server error"}');
       }
     } catch (e) {
-      following.clear();
         // print('[DataController] Error in fetchFollowing for user $userId: ${e.toString()}');
-      rethrow;
     } finally {
       isLoadingFollowing.value = false;
+      _isFetchingFollowing.value = false;
     }
   }
 
@@ -2843,9 +2968,22 @@ void clearUserPosts() {
     // isLoadingUserPosts.value = false; // Optionally reset loading state too
   }
 
-  Future<void> fetchUserPosts(String targetUserId) async {
+  Future<void> fetchUserPosts(String targetUserId, {bool isRefresh = false}) async {
+    if (_isFetchingUserPosts.value) return;
+    _isFetchingUserPosts.value = true;
     isLoadingUserPosts.value = true;
-    userPosts.clear(); // Clear previous posts
+
+    if (isRefresh) {
+      _currentUserPostsPage.value = 1;
+      _hasMoreUserPosts.value = true;
+      userPosts.clear();
+    }
+
+    if (!_hasMoreUserPosts.value) {
+      _isFetchingUserPosts.value = false;
+      isLoadingUserPosts.value = false;
+      return;
+    }
 
     try {
       final String? token = user.value['token'];
@@ -2854,7 +2992,7 @@ void clearUserPosts() {
       }
 
       final response = await _dio.get(
-        'api/posts/fetch-user-posts/$targetUserId',
+        'api/posts/fetch-user-posts/$targetUserId?page=${_currentUserPostsPage.value}&limit=20',
         options: dio.Options(
           headers: {'Authorization': 'Bearer $token'},
         ),
@@ -2863,37 +3001,29 @@ void clearUserPosts() {
       if (response.statusCode == 200 && response.data['success'] == true) {
         if (response.data['posts'] != null && response.data['posts'] is List) {
           List<dynamic> fetchedPostsDynamic = response.data['posts'];
-            // print('[DataController.fetchUserPosts] Raw response data for $targetUserId: ${response.data.toString()}');
-          List<Map<String, dynamic>> processedPosts = fetchedPostsDynamic.map((postData) {
-            if (postData is Map<String, dynamic>) {
-              // Use the existing _processPostOrReply to ensure consistent data structure
-              return _processPostOrReply(postData);
-            }
-            return <String, dynamic>{};
-          }).where((postMap) => postMap.isNotEmpty).toList();
-
-            // print('[DataController.fetchUserPosts] Processed ${processedPosts.length} posts for user $targetUserId.');
-          userPosts.assignAll(processedPosts);
-            // print('[DataController] Assigned posts to userPosts list. Final count for $targetUserId: ${userPosts.length}');
+          if (fetchedPostsDynamic.isNotEmpty) {
+            List<Map<String, dynamic>> processedPosts = fetchedPostsDynamic.map((postData) {
+              if (postData is Map<String, dynamic>) {
+                return _processPostOrReply(postData);
+              }
+              return <String, dynamic>{};
+            }).where((postMap) => postMap.isNotEmpty).toList();
+            userPosts.addAll(processedPosts);
+            _currentUserPostsPage.value++;
+          } else {
+            _hasMoreUserPosts.value = false;
+          }
         } else {
-            // print('[DataController.fetchUserPosts] Fetched posts for user $targetUserId but the list in response.data[\'posts\'] is null or not a list.');
-          userPosts.clear(); // Ensure it's cleared if backend gives bad structure
+          _hasMoreUserPosts.value = false;
         }
       } else {
-          // print('[DataController.fetchUserPosts] Failed to fetch posts for user $targetUserId. Status: ${response.statusCode}, Message: ${response.data?['message']}');
-          // print('[DataController.fetchUserPosts] Raw error response data: ${response.data.toString()}');
-        userPosts.clear(); // Clear on failure too
         throw Exception('Failed to fetch user posts: ${response.data?['message'] ?? "Unknown server error"}');
       }
     } catch (e) {
-        // print('[DataController.fetchUserPosts] Error in fetchUserPosts for user $targetUserId: ${e.toString()}');
-      userPosts.clear(); // Clear on any exception
-      // userPosts remains empty, UI will show error/empty message.
-      // Rethrow so the calling UI can catch it for specific error messages if needed.
-      rethrow;
+      // print('[DataController.fetchUserPosts] Error in fetchUserPosts for user $targetUserId: ${e.toString()}');
     } finally {
       isLoadingUserPosts.value = false;
-        // print('[DataController.fetchUserPosts] Finally block. isLoadingUserPosts: ${isLoadingUserPosts.value}, userPosts count: ${userPosts.length}');
+      _isFetchingUserPosts.value = false;
     }
   }
 
@@ -3077,6 +3207,31 @@ void clearUserPosts() {
 
     // Notify ProfilePage if the followed user's profile might be open
     profileUpdateTrigger.value = followedId ?? DateTime.now().millisecondsSinceEpoch.toString(); // Use timestamp as unique trigger if ID is null
+  }
+
+  void handleUserVerified(Map<String, dynamic> data) {
+    final String? userId = data['userId'];
+    final dynamic verification = data['verification'];
+
+    if (userId == null || verification == null) {
+      return;
+    }
+
+    // Update user in allUsers list
+    final index = allUsers.indexWhere((u) => u['_id'] == userId);
+    if (index != -1) {
+      final userToUpdate = Map<String, dynamic>.from(allUsers[index]);
+      userToUpdate['verification'] = verification;
+      allUsers[index] = userToUpdate;
+    }
+
+    // Update current user if it's them
+    if (user.value['user']?['_id'] == userId) {
+      final updatedUser = Map<String, dynamic>.from(user.value);
+      updatedUser['user']['verification'] = verification;
+      user.value = updatedUser;
+      _storage.write(key: 'user', value: jsonEncode(updatedUser));
+    }
   }
 
   void handleUserUnfollowedSocket(Map<String, dynamic> data) {

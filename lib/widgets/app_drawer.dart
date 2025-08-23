@@ -10,6 +10,7 @@ import 'package:image_cropper/image_cropper.dart';
 import 'dart:io';
 import 'package:get/get.dart';
 import 'package:chatter/controllers/data-controller.dart';
+import 'package:chatter/helpers/verification_helper.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:feather_icons/feather_icons.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -332,7 +333,15 @@ class AppDrawer extends StatelessWidget {
                               style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 20, color: Colors.white),
                               textAlign: TextAlign.center,
                             ),
-                            Icon(Icons.verified, color: Colors.amber, size: 16),
+                            if (userMap['user']?['verification'] != null)
+                              Padding(
+                                padding: const EdgeInsets.only(left: 8.0),
+                                child: Icon(Icons.verified,
+                                    color: getVerificationBadgeColor(
+                                        userMap['user']['verification']['entityType'],
+                                        userMap['user']['verification']['level']),
+                                    size: 16),
+                              ),
                           ],
                         ),
                         const SizedBox(height: 4),
@@ -445,6 +454,21 @@ class AppDrawer extends StatelessWidget {
                     Get.to(() => const FollowersPage());
                   },
                 ),
+                Obx(() {
+                  final userRole = dataController.user.value['user']?['role'];
+                  if (userRole == 'admin' || userRole == 'superuser') {
+                    return ListTile(
+                      leading: Icon(FeatherIcons.shield, color: Colors.grey[300]),
+                      title: Text('Admin Panel', style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16)),
+                      onTap: () {
+                        Get.back();
+                        Get.toNamed('/admin');
+                      },
+                    );
+                  } else {
+                    return const SizedBox.shrink();
+                  }
+                }),
                 const Divider(color: Color(0xFF303030)),
                 ListTile(
                   leading: Icon(FeatherIcons.coffee, color: Colors.grey[300]),

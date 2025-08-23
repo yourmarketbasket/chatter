@@ -2,6 +2,7 @@ import 'package:chatter/pages/buy_me_a_coffee_page.dart';
 import 'package:chatter/pages/home-feed-screen.dart';
 import 'package:chatter/pages/landing-page.dart';
 import 'package:chatter/pages/login.dart';
+import 'package:chatter/pages/admin_page.dart';
 import 'package:chatter/pages/main_chats.dart';
 import 'package:chatter/pages/register.dart';
 import 'package:chatter/services/socket-service.dart';
@@ -131,6 +132,7 @@ class _ChatterAppState extends State<ChatterApp> {
         GetPage(name: '/buy-me-a-coffee', page: () => const BuyMeACoffeePage()),
         // main chats page
         GetPage(name: '/chats', page: () =>  MainChatsPage()),
+        GetPage(name: '/admin', page: () => const AdminPage()),
       ],
     );
   }
