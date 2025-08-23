@@ -3657,7 +3657,7 @@ void clearUserPosts() {
         throw Exception('User not authenticated');
       }
       final response = await _dio.patch(
-        'api/chats/group/$chatId',
+        'api/chats/$chatId',
         data: data,
         options: dio.Options(
           headers: {'Authorization': 'Bearer $token'},
@@ -3674,137 +3674,88 @@ void clearUserPosts() {
     }
   }
 
-  Future<bool> addParticipant(String chatId, String userId) async {
+  Future<bool> _updateGroupRequest(String chatId, Map<String, dynamic> data) async {
     try {
       final token = user.value['token'];
       if (token == null) {
         throw Exception('User not authenticated');
       }
-      final response = await _dio.post(
-        'api/chats/group/$chatId/participants',
-        data: {'userId': userId},
+      final response = await _dio.patch(
+        'api/chats/$chatId',
+        data: data,
         options: dio.Options(
           headers: {'Authorization': 'Bearer $token'},
         ),
       );
       return response.statusCode == 200 && response.data['success'] == true;
     } catch (e) {
-      // print('Error adding participant: $e');
+      // print('Error updating group: $e');
       return false;
     }
+  }
+
+  Future<bool> addParticipant(String chatId, String userId) async {
+    return _updateGroupRequest(chatId, {'addParticipants': [userId]});
   }
 
   Future<bool> removeParticipant(String chatId, String memberId) async {
-    try {
-      final token = user.value['token'];
-      if (token == null) {
-        throw Exception('User not authenticated');
-      }
-      final response = await _dio.delete(
-        'api/chats/group/$chatId/participants/$memberId',
-        options: dio.Options(
-          headers: {'Authorization': 'Bearer $token'},
-        ),
-      );
-      return response.statusCode == 200 && response.data['success'] == true;
-    } catch (e) {
-      // print('Error removing participant: $e');
-      return false;
-    }
+    return _updateGroupRequest(chatId, {'removeParticipants': [memberId]});
   }
 
   Future<bool> promoteAdmin(String chatId, String memberId) async {
-    try {
-      final token = user.value['token'];
-      if (token == null) {
-        throw Exception('User not authenticated');
-      }
-      final response = await _dio.post(
-        'api/chats/group/$chatId/admins/$memberId',
-        options: dio.Options(
-          headers: {'Authorization': 'Bearer $token'},
-        ),
-      );
-      return response.statusCode == 200 && response.data['success'] == true;
-    } catch (e) {
-      // print('Error promoting admin: $e');
-      return false;
-    }
+    return _updateGroupRequest(chatId, {'addAdmins': [memberId]});
   }
 
   Future<bool> demoteAdmin(String chatId, String memberId) async {
-    try {
-      final token = user.value['token'];
-      if (token == null) {
-        throw Exception('User not authenticated');
-      }
-      final response = await _dio.delete(
-        'api/chats/group/$chatId/admins/$memberId',
-        options: dio.Options(
-          headers: {'Authorization': 'Bearer $token'},
-        ),
-      );
-      return response.statusCode == 200 && response.data['success'] == true;
-    } catch (e) {
-      // print('Error demoting admin: $e');
-      return false;
-    }
+    return _updateGroupRequest(chatId, {'removeAdmins': [memberId]});
   }
 
   Future<bool> muteMember(String chatId, String memberId) async {
-    try {
-      final token = user.value['token'];
-      if (token == null) {
-        throw Exception('User not authenticated');
-      }
-      final response = await _dio.post(
-        'api/chats/group/$chatId/members/$memberId/mute',
-        options: dio.Options(
-          headers: {'Authorization': 'Bearer $token'},
-        ),
-      );
-      return response.statusCode == 200 && response.data['success'] == true;
-    } catch (e) {
-      // print('Error muting member: $e');
-      return false;
-    }
+    return _updateGroupRequest(chatId, {'muteMembers': [memberId]});
   }
 
   Future<bool> unmuteMember(String chatId, String memberId) async {
-    try {
-      final token = user.value['token'];
-      if (token == null) {
-        throw Exception('User not authenticated');
-      }
-      final response = await _dio.delete(
-        'api/chats/group/$chatId/members/$memberId/mute',
-        options: dio.Options(
-          headers: {'Authorization': 'Bearer $token'},
-        ),
-      );
-      return response.statusCode == 200 && response.data['success'] == true;
-    } catch (e) {
-      // print('Error unmuting member: $e');
-      return false;
-    }
+    return _updateGroupRequest(chatId, {'unmuteMembers': [memberId]});
   }
 
   Future<bool> leaveGroup(String chatId) async {
+    final currentUserId = getUserId();
+    if (currentUserId == null) return false;
+    return _updateGroupRequest(chatId, {'removeParticipants': [currentUserId]});
+  }
+
+  Future<bool> updateGroupAvatar(String chatId, String avatarUrl) async {
     try {
       final token = user.value['token'];
       if (token == null) {
         throw Exception('User not authenticated');
       }
       final response = await _dio.post(
-        'api/chats/group/$chatId/leave',
+        'api/chats/$chatId/avatar',
+        data: {'avatarUrl': avatarUrl},
         options: dio.Options(
           headers: {'Authorization': 'Bearer $token'},
         ),
       );
       return response.statusCode == 200 && response.data['success'] == true;
     } catch (e) {
-      // print('Error leaving group: $e');
+      // print('Error updating group avatar: $e');
       return false;
     }
+  }
+
+  Future<String?> uploadAvatar(File file) async {
+    final uploadResult = await _uploadService.uploadFilesToCloudinary([
+      {
+        'file': file,
+        'type': 'image',
+        'filename': file.path.split('/').last,
+      }
+    ], (sent, total) {}); // Empty progress callback
+
+    if (uploadResult.isNotEmpty && uploadResult.first['success'] == true) {
+      return uploadResult.first['url'];
+    }
+    return null;
   }
 }
