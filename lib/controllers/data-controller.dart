@@ -1833,6 +1833,196 @@ class DataController extends GetxController {
     }
   }
 
+  void handleGroupUpdated(Map<String, dynamic> data) {
+    final chatId = data['chatId'] as String?;
+    if (chatId == null) return;
+
+    if (chats.containsKey(chatId)) {
+      final chat = chats[chatId]!;
+      data.forEach((key, value) {
+        if (key != 'chatId') {
+          chat[key] = value;
+        }
+      });
+      chats[chatId] = chat;
+      if (currentChat.value['_id'] == chatId) {
+        currentChat.value = chat;
+      }
+      chats.refresh();
+      if (currentChat.value['_id'] == chatId) {
+        currentChat.refresh();
+      }
+    }
+  }
+
+  void handleGroupRemovedFrom(Map<String, dynamic> data) {
+    final chatId = data['chatId'] as String?;
+    if (chatId == null) return;
+
+    if (chats.containsKey(chatId)) {
+      chats.remove(chatId);
+      if (currentChat.value['_id'] == chatId) {
+        currentChat.value = {};
+        currentConversationMessages.clear();
+      }
+      chats.refresh();
+    }
+  }
+
+  void handleMemberJoined(Map<String, dynamic> data) {
+    final chatId = data['chatId'] as String?;
+    final memberId = data['memberId'] as String?;
+    if (chatId == null || memberId == null) return;
+
+    if (chats.containsKey(chatId)) {
+      final chat = chats[chatId]!;
+      final participants =
+          List<Map<String, dynamic>>.from(chat['participants'] ?? []);
+
+      final member = allUsers.firstWhereOrNull((u) => u['_id'] == memberId);
+
+      if (member != null) {
+        participants.add(member);
+        chat['participants'] = participants;
+        chats[chatId] = chat;
+        if (currentChat.value['_id'] == chatId) {
+          currentChat.value = chat;
+        }
+        chats.refresh();
+        if (currentChat.value['_id'] == chatId) {
+          currentChat.refresh();
+        }
+      }
+      chats.refresh();
+      if (currentChat.value['_id'] == chatId) {
+        currentChat.refresh();
+      }
+    }
+  }
+
+  void handleMemberRemoved(Map<String, dynamic> data) {
+    final chatId = data['chatId'] as String?;
+    final memberId = data['memberId'] as String?;
+    if (chatId == null || memberId == null) return;
+
+    if (chats.containsKey(chatId)) {
+      final chat = chats[chatId]!;
+      final participants =
+          List<Map<String, dynamic>>.from(chat['participants'] ?? []);
+      participants.removeWhere((p) => p['_id'] == memberId);
+      chat['participants'] = participants;
+
+      // Also remove from admins if they were an admin
+      final admins = List<Map<String, dynamic>>.from(chat['admins'] ?? []);
+      admins.removeWhere((a) => a['_id'] == memberId);
+      chat['admins'] = admins;
+
+      chats[chatId] = chat;
+      if (currentChat.value['_id'] == chatId) {
+        currentChat.value = chat;
+      }
+    }
+  }
+
+  void handleMemberPromoted(Map<String, dynamic> data) {
+    final chatId = data['chatId'] as String?;
+    final memberId = data['memberId'] as String?;
+    if (chatId == null || memberId == null) return;
+
+    if (chats.containsKey(chatId)) {
+      final chat = chats[chatId]!;
+      final participants =
+          List<Map<String, dynamic>>.from(chat['participants'] ?? []);
+      final member = participants.firstWhereOrNull((p) => p['_id'] == memberId);
+
+      if (member != null) {
+        final admins = List<Map<String, dynamic>>.from(chat['admins'] ?? []);
+        admins.add(member);
+        chat['admins'] = admins;
+        chats[chatId] = chat;
+        if (currentChat.value['_id'] == chatId) {
+          currentChat.value = chat;
+        }
+        chats.refresh();
+        if (currentChat.value['_id'] == chatId) {
+          currentChat.refresh();
+        }
+      }
+    }
+  }
+
+  void handleMemberDemoted(Map<String, dynamic> data) {
+    final chatId = data['chatId'] as String?;
+    final memberId = data['memberId'] as String?;
+    if (chatId == null || memberId == null) return;
+
+    if (chats.containsKey(chatId)) {
+      final chat = chats[chatId]!;
+      final admins = List<Map<String, dynamic>>.from(chat['admins'] ?? []);
+      admins.removeWhere((a) => a['_id'] == memberId);
+      chat['admins'] = admins;
+      chats[chatId] = chat;
+      if (currentChat.value['_id'] == chatId) {
+        currentChat.value = chat;
+      }
+      chats.refresh();
+      if (currentChat.value['_id'] == chatId) {
+        currentChat.refresh();
+      }
+    }
+  }
+
+  void handleMemberMuted(Map<String, dynamic> data) {
+    final chatId = data['chatId'] as String?;
+    final memberId = data['memberId'] as String?;
+    if (chatId == null || memberId == null) return;
+
+    if (chats.containsKey(chatId)) {
+      final chat = chats[chatId]!;
+      final member = allUsers.firstWhereOrNull((u) => u['_id'] == memberId);
+
+      if (member != null) {
+        final mutedMembers =
+            List<Map<String, dynamic>>.from(chat['mutedMembers'] ?? []);
+        mutedMembers.add({
+          'userId': member,
+          'mutedAt': DateTime.now().toIso8601String(),
+        });
+        chat['mutedMembers'] = mutedMembers;
+        chats[chatId] = chat;
+        if (currentChat.value['_id'] == chatId) {
+          currentChat.value = chat;
+        }
+        chats.refresh();
+        if (currentChat.value['_id'] == chatId) {
+          currentChat.refresh();
+        }
+      }
+    }
+  }
+
+  void handleMemberUnmuted(Map<String, dynamic> data) {
+    final chatId = data['chatId'] as String?;
+    final memberId = data['memberId'] as String?;
+    if (chatId == null || memberId == null) return;
+
+    if (chats.containsKey(chatId)) {
+      final chat = chats[chatId]!;
+      final mutedMembers =
+          List<Map<String, dynamic>>.from(chat['mutedMembers'] ?? []);
+      mutedMembers.removeWhere((m) => m['userId']?['_id'] == memberId);
+      chat['mutedMembers'] = mutedMembers;
+      chats[chatId] = chat;
+      if (currentChat.value['_id'] == chatId) {
+        currentChat.value = chat;
+      }
+      chats.refresh();
+      if (currentChat.value['_id'] == chatId) {
+        currentChat.refresh();
+      }
+    }
+  }
+
   // --- Attachment Download Logic ---
 
   void _updateMessageAttachment(String messageId, String attachmentId, Map<String, dynamic> updates) {
@@ -3457,6 +3647,164 @@ void clearUserPosts() {
     } catch (e) {
       // print('Error creating group chat: $e');
       return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> updateGroup(String chatId, Map<String, dynamic> data) async {
+    try {
+      final token = user.value['token'];
+      if (token == null) {
+        throw Exception('User not authenticated');
+      }
+      final response = await _dio.patch(
+        'api/chats/group/$chatId',
+        data: data,
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return response.data['group'];
+      } else {
+        throw Exception('Failed to update group');
+      }
+    } catch (e) {
+      // print('Error updating group: $e');
+      return null;
+    }
+  }
+
+  Future<bool> addParticipant(String chatId, String userId) async {
+    try {
+      final token = user.value['token'];
+      if (token == null) {
+        throw Exception('User not authenticated');
+      }
+      final response = await _dio.post(
+        'api/chats/group/$chatId/participants',
+        data: {'userId': userId},
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+      return response.statusCode == 200 && response.data['success'] == true;
+    } catch (e) {
+      // print('Error adding participant: $e');
+      return false;
+    }
+  }
+
+  Future<bool> removeParticipant(String chatId, String memberId) async {
+    try {
+      final token = user.value['token'];
+      if (token == null) {
+        throw Exception('User not authenticated');
+      }
+      final response = await _dio.delete(
+        'api/chats/group/$chatId/participants/$memberId',
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+      return response.statusCode == 200 && response.data['success'] == true;
+    } catch (e) {
+      // print('Error removing participant: $e');
+      return false;
+    }
+  }
+
+  Future<bool> promoteAdmin(String chatId, String memberId) async {
+    try {
+      final token = user.value['token'];
+      if (token == null) {
+        throw Exception('User not authenticated');
+      }
+      final response = await _dio.post(
+        'api/chats/group/$chatId/admins/$memberId',
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+      return response.statusCode == 200 && response.data['success'] == true;
+    } catch (e) {
+      // print('Error promoting admin: $e');
+      return false;
+    }
+  }
+
+  Future<bool> demoteAdmin(String chatId, String memberId) async {
+    try {
+      final token = user.value['token'];
+      if (token == null) {
+        throw Exception('User not authenticated');
+      }
+      final response = await _dio.delete(
+        'api/chats/group/$chatId/admins/$memberId',
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+      return response.statusCode == 200 && response.data['success'] == true;
+    } catch (e) {
+      // print('Error demoting admin: $e');
+      return false;
+    }
+  }
+
+  Future<bool> muteMember(String chatId, String memberId) async {
+    try {
+      final token = user.value['token'];
+      if (token == null) {
+        throw Exception('User not authenticated');
+      }
+      final response = await _dio.post(
+        'api/chats/group/$chatId/members/$memberId/mute',
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+      return response.statusCode == 200 && response.data['success'] == true;
+    } catch (e) {
+      // print('Error muting member: $e');
+      return false;
+    }
+  }
+
+  Future<bool> unmuteMember(String chatId, String memberId) async {
+    try {
+      final token = user.value['token'];
+      if (token == null) {
+        throw Exception('User not authenticated');
+      }
+      final response = await _dio.delete(
+        'api/chats/group/$chatId/members/$memberId/mute',
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+      return response.statusCode == 200 && response.data['success'] == true;
+    } catch (e) {
+      // print('Error unmuting member: $e');
+      return false;
+    }
+  }
+
+  Future<bool> leaveGroup(String chatId) async {
+    try {
+      final token = user.value['token'];
+      if (token == null) {
+        throw Exception('User not authenticated');
+      }
+      final response = await _dio.post(
+        'api/chats/group/$chatId/leave',
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+      return response.statusCode == 200 && response.data['success'] == true;
+    } catch (e) {
+      // print('Error leaving group: $e');
+      return false;
     }
   }
 }

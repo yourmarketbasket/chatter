@@ -107,6 +107,14 @@ class SocketService {
       'typing:started': (data) => _handleTyping(data, true),
       'typing:stopped': (data) => _handleTyping(data, false),
       'user:verified': (data) => _handleUserVerified(data),
+      'group:updated': (data) => _handleGroupUpdated(data),
+      'group:removedFrom': (data) => _handleGroupRemovedFrom(data),
+      'member:joined': (data) => _handleMemberJoined(data),
+      'member:removed': (data) => _handleMemberRemoved(data),
+      'member:promoted': (data) => _handleMemberPromoted(data),
+      'member:demoted': (data) => _handleMemberDemoted(data),
+      'member:muted': (data) => _handleMemberMuted(data),
+      'member:unmuted': (data) => _handleMemberUnmuted(data),
     };
 // more canges
     eventHandlers.forEach((event, handler) {
@@ -131,6 +139,62 @@ class SocketService {
       // print('[SocketService] Finished syncing all chat rooms.');
     } catch (e) {
         // print('[SocketService] Error during syncAllChatRooms: $e');
+    }
+  }
+
+  void _handleGroupUpdated(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      _dataController.handleGroupUpdated(data);
+      _eventController.add({'event': 'group:updated', 'data': data});
+    }
+  }
+
+  void _handleGroupRemovedFrom(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      _dataController.handleGroupRemovedFrom(data);
+      _eventController.add({'event': 'group:removedFrom', 'data': data});
+    }
+  }
+
+  void _handleMemberJoined(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      _dataController.handleMemberJoined(data);
+      _eventController.add({'event': 'member:joined', 'data': data});
+    }
+  }
+
+  void _handleMemberRemoved(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      _dataController.handleMemberRemoved(data);
+      _eventController.add({'event': 'member:removed', 'data': data});
+    }
+  }
+
+  void _handleMemberPromoted(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      _dataController.handleMemberPromoted(data);
+      _eventController.add({'event': 'member:promoted', 'data': data});
+    }
+  }
+
+  void _handleMemberDemoted(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      _dataController.handleMemberDemoted(data);
+      _eventController.add({'event': 'member:demoted', 'data': data});
+    }
+  }
+
+  void _handleMemberMuted(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      _dataController.handleMemberMuted(data);
+      _eventController.add({'event': 'member:muted', 'data': data});
+    }
+  }
+
+  void _handleMemberUnmuted(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      _dataController.handleMemberUnmuted(data);
+      _eventController.add({'event': 'member:unmuted', 'data': data});
     }
   }
 

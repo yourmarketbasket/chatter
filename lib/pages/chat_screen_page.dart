@@ -1,4 +1,5 @@
 import 'package:chatter/controllers/data-controller.dart';
+import 'package:chatter/pages/group_profile_page.dart';
 import 'package:chatter/pages/profile_page.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
@@ -1223,6 +1224,20 @@ class _ChatScreenState extends State<ChatScreen> {
             icon: const Icon(Icons.arrow_back, color: Colors.white),
             onPressed: () => Navigator.pop(context),
           ),
+          actions: [
+            if (chat['type'] == 'group')
+              IconButton(
+                icon: const Icon(Icons.info_outline, color: Colors.white),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => GroupProfilePage(chat: chat),
+                    ),
+                  );
+                },
+              ),
+          ],
         ),
         body: Column(
           children: [
