@@ -219,14 +219,11 @@ class _FollowersPageState extends State<FollowersPage> with SingleTickerProvider
                   name,
                   style: GoogleFonts.poppins( color: Colors.white, fontSize: 13),
                 ),
-                Padding(
-                  padding: const EdgeInsets.only(left: 4.0),
-                  child: Icon(Icons.verified,
-                      color: getVerificationBadgeColor(
-                          userItem['verification']?['entityType'],
-                          userItem['verification']?['level']),
-                      size: 14),
-                ),
+                Icon(Icons.verified,
+                    color: getVerificationBadgeColor(
+                        userItem['verification']?['entityType'],
+                        userItem['verification']?['level']),
+                    size: 14),
               ],
             ),
             subtitle: Column(

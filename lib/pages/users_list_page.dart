@@ -343,14 +343,11 @@ class _UsersListPageState extends State<UsersListPage> {
                             fontSize: 13,
                           ),
                         ),
-                        Padding(
-                          padding: const EdgeInsets.only(left: 4.0),
-                          child: Icon(Icons.verified,
-                              color: getVerificationBadgeColor(
-                                  user['verification']?['entityType'],
-                                  user['verification']?['level']),
-                              size: 12),
-                        )
+                        Icon(Icons.verified,
+                            color: getVerificationBadgeColor(
+                                user['verification']?['entityType'],
+                                user['verification']?['level']),
+                            size: 12)
                       ],
                     ),
                     subtitle: Column(

@@ -664,14 +664,11 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                           style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: isReply ? 11 : 13, color: Colors.white),
                           overflow: TextOverflow.ellipsis,
                         ),
-                        Padding(
-                          padding: const EdgeInsets.only(left: 4.0),
-                          child: Icon(Icons.verified,
-                              color: getVerificationBadgeColor(
-                                  post['user']?['verification']?['entityType'],
-                                  post['user']?['verification']?['level']),
-                              size: isReply ? 13 : 15),
-                        ),
+                        Icon(Icons.verified,
+                            color: getVerificationBadgeColor(
+                                post['user']?['verification']?['entityType'],
+                                post['user']?['verification']?['level']),
+                            size: isReply ? 13 : 15),
                         Text(
                           ' @$username ', // This is the display name
                           style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: isReply ? 10 : 10, color: const Color.fromARGB(255, 143, 143, 143)),

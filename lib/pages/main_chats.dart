@@ -334,14 +334,11 @@ class _MainChatsPageState extends State<MainChatsPage> {
                               children: [
                                 Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
                                 if (!isGroup)
-                                  Padding(
-                                    padding: const EdgeInsets.only(left: 8.0),
-                                    child: Icon(Icons.verified,
-                                        color: getVerificationBadgeColor(
-                                            otherUser['verification']?['entityType'],
-                                            otherUser['verification']?['level']),
-                                        size: 14),
-                                  ),
+                                  Icon(Icons.verified,
+                                      color: getVerificationBadgeColor(
+                                          otherUser['verification']?['entityType'],
+                                          otherUser['verification']?['level']),
+                                      size: 14),
                               ],
                             ),
                             subtitle: Obx(() {

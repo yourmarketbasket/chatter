@@ -348,15 +348,12 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                       ),
                       
-                      Padding(
-                        padding: const EdgeInsets.only(left: 6.0),
-                        child: Icon(
-                          Icons.verified,
-                          color: getVerificationBadgeColor(
-                              userData['verification']?['entityType'],
-                              userData['verification']?['level']),
-                          size: 20,
-                        ),
+                      Icon(
+                        Icons.verified,
+                        color: getVerificationBadgeColor(
+                            userData['verification']?['entityType'],
+                            userData['verification']?['level']),
+                        size: 20,
                       ),
                     ],
                   ),
@@ -534,14 +531,11 @@ class _ProfilePageState extends State<ProfilePage> {
                                     Row(
                                       children: [
                                         Text('$username', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 12, color: Colors.white)),
-                                        Padding(
-                                          padding: const EdgeInsets.only(left: 4.0),
-                                          child: Icon(Icons.verified,
-                                              color: getVerificationBadgeColor(
-                                                  post['user']?['verification']?['entityType'],
-                                                  post['user']?['verification']?['level']),
-                                              size: 15),
-                                        ),
+                                        Icon(Icons.verified,
+                                            color: getVerificationBadgeColor(
+                                                post['user']?['verification']?['entityType'],
+                                                post['user']?['verification']?['level']),
+                                            size: 15),
                                         const SizedBox(width: 2),
                                         Text('@$username', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 10, color: const Color.fromARGB(255, 143, 143, 143))),
 
