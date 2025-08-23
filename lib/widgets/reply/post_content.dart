@@ -375,14 +375,11 @@ class _PostContentState extends State<PostContent> {
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
-                            Padding(
-                              padding: const EdgeInsets.only(left: 4.0),
-                              child: Icon(Icons.verified,
-                                  color: getVerificationBadgeColor(
-                                      _currentPostData['user']?['verification']?['entityType'],
-                                      _currentPostData['user']?['verification']?['level']),
-                                  size: widget.isReply ? 13 : 15),
-                            ),
+                            Icon(Icons.verified,
+                                color: getVerificationBadgeColor(
+                                    _currentPostData['user']?['verification']?['entityType'],
+                                    _currentPostData['user']?['verification']?['level']),
+                                size: widget.isReply ? 13 : 15),
                             // Display Name (using 'username' from postData, which might be the handle or a display name)
                             Text(
                               '@'+username, // This is _currentPostData['username']
