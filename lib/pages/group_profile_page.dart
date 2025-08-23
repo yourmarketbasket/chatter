@@ -135,8 +135,8 @@ class GroupProfilePage extends StatelessWidget {
               ),
               // Group Name
               ListTile(
-                title: const Text('Group Name'),
-                subtitle: Text(currentChat['name'] ?? ''),
+                title: const Text('Group Name', style: TextStyle(color: Colors.white)),
+                subtitle: Text(currentChat['name'] ?? '', style: TextStyle(color: Colors.grey[400])),
                 trailing: (isSuperAdmin || isAdmin)
                     ? Icon(Icons.edit, color: Colors.grey[400])
                     : null,
@@ -172,8 +172,8 @@ class GroupProfilePage extends StatelessWidget {
               ),
               // Group Description
               ListTile(
-                title: const Text('About'),
-                subtitle: Text(currentChat['about'] ?? 'No description'),
+                title: const Text('About', style: TextStyle(color: Colors.white)),
+                subtitle: Text(currentChat['about'] ?? 'No description', style: TextStyle(color: Colors.grey[400])),
                 trailing: (isSuperAdmin || isAdmin)
                     ? Icon(Icons.edit, color: Colors.grey[400])
                     : null,
@@ -211,7 +211,7 @@ class GroupProfilePage extends StatelessWidget {
               // Participants
               ListTile(
                 title: Text(
-                    'Participants (${currentChat['participants']?.length ?? 0})'),
+                    'Participants (${currentChat['participants']?.length ?? 0})', style: TextStyle(color: Colors.white)),
                 trailing: (isSuperAdmin || isAdmin)
                     ? IconButton(
                         icon: const Icon(Icons.add),
@@ -240,7 +240,7 @@ class GroupProfilePage extends StatelessWidget {
                         ? const Icon(Icons.person)
                         : null,
                   ),
-                  title: Text(p['name'] ?? 'Unknown'),
+                  title: Text(p['name'] ?? 'Unknown', style: TextStyle(color: Colors.white)),
                   subtitle: Text(
                     isParticipantSuperAdmin
                         ? 'Super Admin'
