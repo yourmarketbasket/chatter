@@ -1185,7 +1185,7 @@ class DataController extends GetxController {
         throw Exception('User token not found');
       }
       var response = await _dio.get(
-        '/api/posts/get-all-posts?page=${_currentPage.value}&limit=20',
+        '/api/posts/get-all-posts?page=${_currentPage.value}&limit=100',
         options: dio.Options(
           headers: {
             'Authorization': 'Bearer $token',
@@ -1940,7 +1940,7 @@ class DataController extends GetxController {
       }
 
       final response = await _dio.get(
-        'api/users/get-followers/$userId?page=${_currentFollowersPage.value}&limit=100',
+        'api/users/get-followers/$userId?page=${_currentFollowersPage.value}&limit=1000',
         options: dio.Options(
           headers: {
             'Authorization': 'Bearer $token',
