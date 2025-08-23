@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:chatter/controllers/data-controller.dart';
+import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 
 class GroupProfilePage extends StatelessWidget {
@@ -118,12 +119,35 @@ class GroupProfilePage extends StatelessWidget {
                               final pickedFile = await picker.pickImage(
                                   source: ImageSource.gallery);
                               if (pickedFile != null) {
-                                final file = File(pickedFile.path);
-                                final avatarUrl =
-                                    await dataController.uploadAvatar(file);
-                                if (avatarUrl != null) {
-                                  await dataController.updateGroupAvatar(
-                                      currentChat['_id'], avatarUrl);
+                                final cropper = ImageCropper();
+                                final croppedFile = await cropper.cropImage(
+                                  sourcePath: pickedFile.path,
+                                  aspectRatioPresets: [
+                                    CropAspectRatioPreset.square,
+                                  ],
+                                  uiSettings: [
+                                    AndroidUiSettings(
+                                        toolbarTitle: 'Crop Image',
+                                        toolbarColor: Colors.teal,
+                                        toolbarWidgetColor: Colors.white,
+                                        initAspectRatio:
+                                            CropAspectRatioPreset.original,
+                                        lockAspectRatio: true),
+                                    IOSUiSettings(
+                                      title: 'Crop Image',
+                                      aspectRatioLockEnabled: true,
+                                    ),
+                                  ],
+                                );
+
+                                if (croppedFile != null) {
+                                  final file = File(croppedFile.path);
+                                  final avatarUrl =
+                                      await dataController.uploadAvatar(file);
+                                  if (avatarUrl != null) {
+                                    await dataController.updateGroupAvatar(
+                                        currentChat['_id'], avatarUrl);
+                                  }
                                 }
                               }
                             },
