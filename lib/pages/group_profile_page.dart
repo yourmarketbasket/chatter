@@ -45,8 +45,8 @@ class GroupProfilePage extends StatelessWidget {
         ),
         iconTheme: const IconThemeData(color: Colors.white),
         popupMenuTheme: PopupMenuThemeData(
-          color: Colors.grey[850],
-          textStyle: const TextStyle(color: Colors.white),
+          color: Colors.white,
+          textStyle: const TextStyle(color: Colors.black),
         ),
         dialogBackgroundColor: Colors.grey[850],
         dialogTheme: DialogThemeData(
@@ -284,6 +284,7 @@ class GroupProfilePage extends StatelessWidget {
                   trailing: (isSuperAdmin || isAdmin) &&
                           p['_id'] != dataController.user.value['user']['_id']
                       ? PopupMenuButton<String>(
+                          icon: const Icon(Icons.more_vert, color: Colors.white),
                           onSelected: (value) {
                             switch (value) {
                               case 'remove':
