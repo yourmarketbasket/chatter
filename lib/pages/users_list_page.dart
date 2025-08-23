@@ -1,5 +1,6 @@
 import 'package:chatter/pages/chat_screen_page.dart';
 import 'package:chatter/pages/profile_page.dart';
+import 'package:chatter/helpers/verification_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:get/Get.dart';
 import 'package:chatter/controllers/data-controller.dart';
@@ -342,13 +343,14 @@ class _UsersListPageState extends State<UsersListPage> {
                             fontSize: 13,
                           ),
                         ),
-                        // golden badge
-                        
-                          const Icon(
-                            Icons.verified,
-                            color: Colors.amber,
-                            size: 12,
-                          )
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4.0),
+                          child: Icon(Icons.verified,
+                              color: getVerificationBadgeColor(
+                                  user['verification']?['entityType'],
+                                  user['verification']?['level']),
+                              size: 12),
+                        )
                       ],
                     ),
                     subtitle: Column(

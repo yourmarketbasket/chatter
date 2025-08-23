@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:chatter/controllers/data-controller.dart';
 import 'package:chatter/helpers/time_helper.dart';
+import 'package:chatter/helpers/verification_helper.dart';
 import 'package:chatter/pages/chat_screen_page.dart';
 import 'package:chatter/pages/followers_page.dart';
 import 'package:feather_icons/feather_icons.dart';
@@ -328,7 +329,20 @@ class _MainChatsPageState extends State<MainChatsPage> {
                                   ),
                               ],
                             ),
-                            title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+                            title: Row(
+                              children: [
+                                Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+                                if (!isGroup)
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 8.0),
+                                    child: Icon(Icons.verified,
+                                        color: getVerificationBadgeColor(
+                                            otherUser['verification']?['entityType'],
+                                            otherUser['verification']?['level']),
+                                        size: 14),
+                                  ),
+                              ],
+                            ),
                             subtitle: Obx(() {
                               final typingUserId = _dataController.isTyping[chat['_id']];
                               if (typingUserId != null) {

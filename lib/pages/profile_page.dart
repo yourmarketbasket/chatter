@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:chatter/controllers/data-controller.dart';
+import 'package:chatter/helpers/verification_helper.dart';
 import 'package:chatter/pages/chat_screen_page.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -347,11 +348,13 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                       ),
                       
-                      const Padding(
-                        padding: EdgeInsets.only(left: 6.0),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 6.0),
                         child: Icon(
                           Icons.verified,
-                          color: Colors.amber,
+                          color: getVerificationBadgeColor(
+                              userData['verification']?['entityType'],
+                              userData['verification']?['level']),
                           size: 20,
                         ),
                       ),
@@ -531,7 +534,14 @@ class _ProfilePageState extends State<ProfilePage> {
                                     Row(
                                       children: [
                                         Text('$username', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 12, color: Colors.white)),
-                                        const Icon(Icons.verified, color: Colors.amber, size: 15),
+                                        Padding(
+                                          padding: const EdgeInsets.only(left: 4.0),
+                                          child: Icon(Icons.verified,
+                                              color: getVerificationBadgeColor(
+                                                  post['user']?['verification']?['entityType'],
+                                                  post['user']?['verification']?['level']),
+                                              size: 15),
+                                        ),
                                         const SizedBox(width: 2),
                                         Text('@$username', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 10, color: const Color.fromARGB(255, 143, 143, 143))),
 

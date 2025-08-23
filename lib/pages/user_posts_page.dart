@@ -1,4 +1,5 @@
 import 'package:chatter/controllers/data-controller.dart';
+import 'package:chatter/helpers/verification_helper.dart';
 import 'package:chatter/pages/reply_page.dart';
 import 'package:chatter/widgets/app_drawer.dart';
 import 'package:chatter/pages/profile_page.dart';
@@ -653,8 +654,14 @@ class _UserPostsPageState extends State<UserPostsPage> {
                           style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: isReply ? 10 : 12, color: Colors.white),
                           overflow: TextOverflow.ellipsis,
                         ),
-                        Icon(Icons.verified, color: Colors.amber, size: isReply ? 13 : 15),
-
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4.0),
+                          child: Icon(Icons.verified,
+                              color: getVerificationBadgeColor(
+                                  post['user']?['verification']?['entityType'],
+                                  post['user']?['verification']?['level']),
+                              size: isReply ? 13 : 15),
+                        ),
                         Text(
                           '· ${DateFormat('h:mm a').format(timestamp.toLocal())} · ${timeago.format(timestamp)} · ${DateFormat('MMM d, yy').format(timestamp.toLocal())}',
                           style: GoogleFonts.poppins(fontSize: isReply ? 10 : 10, color: Colors.grey[500]),

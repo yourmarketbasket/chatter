@@ -333,15 +333,14 @@ class AppDrawer extends StatelessWidget {
                               style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 20, color: Colors.white),
                               textAlign: TextAlign.center,
                             ),
-                            if (userMap['user']?['verification'] != null)
-                              Padding(
-                                padding: const EdgeInsets.only(left: 8.0),
-                                child: Icon(Icons.verified,
-                                    color: getVerificationBadgeColor(
-                                        userMap['user']['verification']['entityType'],
-                                        userMap['user']['verification']['level']),
-                                    size: 16),
-                              ),
+                            Padding(
+                              padding: const EdgeInsets.only(left: 8.0),
+                              child: Icon(Icons.verified,
+                                  color: getVerificationBadgeColor(
+                                      userMap['user']?['verification']?['entityType'],
+                                      userMap['user']?['verification']?['level']),
+                                  size: 16),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 4),

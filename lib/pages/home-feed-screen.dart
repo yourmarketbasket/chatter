@@ -1,5 +1,6 @@
 import 'package:better_player_enhanced/better_player.dart';
 import 'package:chatter/controllers/data-controller.dart';
+import 'package:chatter/helpers/verification_helper.dart';
 import 'package:chatter/pages/main_chats.dart';
 import 'package:chatter/pages/new-posts-page.dart';
 import 'package:chatter/pages/reply_page.dart' hide Padding; // Attempt to resolve conflict
@@ -663,7 +664,14 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
                           style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: isReply ? 11 : 13, color: Colors.white),
                           overflow: TextOverflow.ellipsis,
                         ),
-                        Icon(Icons.verified, color: Colors.amber, size: isReply ? 13 : 15), // Yellow checkmark
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4.0),
+                          child: Icon(Icons.verified,
+                              color: getVerificationBadgeColor(
+                                  post['user']?['verification']?['entityType'],
+                                  post['user']?['verification']?['level']),
+                              size: isReply ? 13 : 15),
+                        ),
                         Text(
                           ' @$username ', // This is the display name
                           style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: isReply ? 10 : 10, color: const Color.fromARGB(255, 143, 143, 143)),

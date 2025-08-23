@@ -110,6 +110,7 @@ class _AdminPageState extends State<AdminPage> {
     bool paid = user['verification']?['paid'] ?? false;
 
     final Map<String, List<String>> levels = {
+      'N/A': ['free'],
       'individual': ['basic', 'intermediate', 'premium'],
       'organization': ['basic', 'intermediate', 'premium'],
       'government': ['basic', 'intermediate', 'premium'],
@@ -129,7 +130,7 @@ class _AdminPageState extends State<AdminPage> {
                     DropdownButtonFormField<String>(
                       value: entityType,
                       hint: const Text('Entity Type'),
-                      items: ['individual', 'organization', 'government']
+                      items: ['N/A', 'individual', 'organization', 'government']
                           .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                           .toList(),
                       onChanged: (value) {
