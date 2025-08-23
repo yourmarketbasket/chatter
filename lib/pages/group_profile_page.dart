@@ -48,7 +48,7 @@ class GroupProfilePage extends StatelessWidget {
           textStyle: const TextStyle(color: Colors.white),
         ),
         dialogBackgroundColor: Colors.grey[850],
-        dialogTheme: DialogTheme(
+        dialogTheme: DialogThemeData(
           titleTextStyle: const TextStyle(color: Colors.white, fontSize: 20),
           contentTextStyle: TextStyle(color: Colors.grey[300]),
         ),
