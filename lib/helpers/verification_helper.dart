@@ -10,44 +10,44 @@ Color getColorFromHex(String hexColor) {
 
 Color getVerificationBadgeColor(String? entityType, String? level) {
   if (entityType == null || entityType == 'N/A') {
-    return getColorFromHex("#0000FF"); // Blue for Free/Unverified
+    return getColorFromHex("#94A3B8"); // Light Slate Blue
   }
 
   switch (entityType) {
     case 'individual':
       switch (level) {
         case 'basic':
-          return getColorFromHex("#008000"); // Green
+          return getColorFromHex("#E8D5A1"); // Pale Gold
         case 'intermediate':
-          return getColorFromHex("#FFD700"); // Gold
+          return getColorFromHex("#D4A017"); // Classic Gold
         case 'premium':
-          return getColorFromHex("#800080"); // Purple
+          return getColorFromHex("#475569"); // Deep Slate Blue
         default:
-          return getColorFromHex("#0000FF");
+          return getColorFromHex("#94A3B8");
       }
     case 'organization':
       switch (level) {
         case 'basic':
-          return getColorFromHex("#00008B"); // Dark Blue
+          return getColorFromHex("#2D3B45"); // Dark Greyish Blue
         case 'intermediate':
-          return getColorFromHex("#FFA500"); // Orange
+          return getColorFromHex("#B8975B"); // Burnished Gold
         case 'premium':
-          return getColorFromHex("#A52A2A"); // Brown
+          return getColorFromHex("#334155"); // Charcoal Slate
         default:
-          return getColorFromHex("#0000FF");
+          return getColorFromHex("#94A3B8");
       }
     case 'government':
       switch (level) {
         case 'basic':
-          return getColorFromHex("#FFFFFF"); // White
+          return getColorFromHex("#E2E8F0"); // Soft Greyish White
         case 'intermediate':
-          return getColorFromHex("#D3D3D3"); // Light Gray
+          return getColorFromHex("#6B7280"); // Cool Grey
         case 'premium':
-          return getColorFromHex("#808080"); // Gray
+          return getColorFromHex("#1F2937"); // Deep Charcoal
         default:
-          return getColorFromHex("#0000FF");
+          return getColorFromHex("#94A3B8");
       }
     default:
-      return getColorFromHex("#0000FF");
+      return getColorFromHex("#94A3B8");
   }
 }

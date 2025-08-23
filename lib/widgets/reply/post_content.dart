@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:chatter/controllers/data-controller.dart';
+import 'package:chatter/helpers/verification_helper.dart';
 import 'package:chatter/pages/reply_page.dart';
 import 'package:chatter/widgets/reply/reply_attachment_grid.dart';
 import 'package:chatter/widgets/reply/stat_button.dart';
@@ -374,10 +375,13 @@ class _PostContentState extends State<PostContent> {
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
-                            Icon(
-                              Icons.verified, // Standard verified icon
-                              color: Colors.amber, // Yellow color as specified
-                              size: widget.isReply ? 13 : 15, // Size based on context
+                            Padding(
+                              padding: const EdgeInsets.only(left: 4.0),
+                              child: Icon(Icons.verified,
+                                  color: getVerificationBadgeColor(
+                                      _currentPostData['user']?['verification']?['entityType'],
+                                      _currentPostData['user']?['verification']?['level']),
+                                  size: widget.isReply ? 13 : 15),
                             ),
                             // Display Name (using 'username' from postData, which might be the handle or a display name)
                             Text(
