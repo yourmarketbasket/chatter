@@ -100,9 +100,12 @@ class GroupProfilePage extends StatelessWidget {
                     children: [
                       CircleAvatar(
                         radius: 50,
-                        backgroundImage:
-                            NetworkImage(currentChat['groupAvatar'] ?? ''),
-                        child: currentChat['groupAvatar'] == null || currentChat['groupAvatar'].isEmpty
+                        backgroundImage: (currentChat['groupAvatar'] != null &&
+                                currentChat['groupAvatar'].isNotEmpty)
+                            ? NetworkImage(currentChat['groupAvatar'])
+                            : null,
+                        child: (currentChat['groupAvatar'] == null ||
+                                currentChat['groupAvatar'].isEmpty)
                             ? Icon(Icons.group, size: 50, color: Colors.grey[700])
                             : null,
                       ),
