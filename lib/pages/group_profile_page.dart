@@ -327,6 +327,7 @@ class GroupProfilePage extends StatelessWidget {
                           ? const Icon(Icons.person, size: 20)
                           : null,
                     ),
+                    // force
                     title: Text(p['name'] ?? 'Unknown'),
                     subtitle: Row(
                       children: [
