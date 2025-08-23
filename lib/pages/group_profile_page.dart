@@ -125,20 +125,25 @@ class GroupProfilePage extends StatelessWidget {
                                 final cropper = ImageCropper();
                                 final croppedFile = await cropper.cropImage(
                                   sourcePath: pickedFile.path,
-                                  aspectRatioPresets: [
-                                    CropAspectRatioPreset.square,
-                                  ],
                                   uiSettings: [
                                     AndroidUiSettings(
                                         toolbarTitle: 'Crop Image',
                                         toolbarColor: Colors.teal,
                                         toolbarWidgetColor: Colors.white,
                                         initAspectRatio:
-                                            CropAspectRatioPreset.original,
-                                        lockAspectRatio: true),
+                                            CropAspectRatioPreset.square,
+                                        lockAspectRatio: true,
+                                        aspectRatioPresets: [
+                                          CropAspectRatioPreset.square,
+                                        ]),
                                     IOSUiSettings(
                                       title: 'Crop Image',
                                       aspectRatioLockEnabled: true,
+                                      aspectRatioPickerButtonHidden: true,
+                                      resetAspectRatioEnabled: false,
+                                      aspectRatioPresets: [
+                                        CropAspectRatioPreset.square,
+                                      ],
                                     ),
                                   ],
                                 );
