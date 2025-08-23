@@ -186,6 +186,7 @@ class _MainChatsPageState extends State<MainChatsPage> {
                         String avatarUrl;
                         String avatarLetter;
                         Widget trailingWidget;
+                        Map<String, dynamic> otherUser = {};
 
                         if (isGroup) {
                           title = chat['name'] ?? 'Group Chat';
