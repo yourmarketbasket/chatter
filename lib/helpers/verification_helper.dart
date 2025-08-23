@@ -10,7 +10,7 @@ Color getColorFromHex(String hexColor) {
 
 Color getVerificationBadgeColor(String? entityType, String? level) {
   if (entityType == null || entityType == 'N/A') {
-    return getColorFromHex("#94A3B8"); // Light Slate Blue
+    return getColorFromHex("#069494"); // Light Slate Blue
   }
 
   switch (entityType) {
@@ -23,7 +23,7 @@ Color getVerificationBadgeColor(String? entityType, String? level) {
         case 'premium':
           return getColorFromHex("#475569"); // Deep Slate Blue
         default:
-          return getColorFromHex("#94A3B8");
+          return getColorFromHex("#069494");
       }
     case 'organization':
       switch (level) {
@@ -34,7 +34,7 @@ Color getVerificationBadgeColor(String? entityType, String? level) {
         case 'premium':
           return getColorFromHex("#334155"); // Charcoal Slate
         default:
-          return getColorFromHex("#94A3B8");
+          return getColorFromHex("#069494");
       }
     case 'government':
       switch (level) {
@@ -45,9 +45,9 @@ Color getVerificationBadgeColor(String? entityType, String? level) {
         case 'premium':
           return getColorFromHex("#1F2937"); // Deep Charcoal
         default:
-          return getColorFromHex("#94A3B8");
+          return getColorFromHex("#069494");
       }
     default:
-      return getColorFromHex("#94A3B8");
+      return getColorFromHex("#069494");
   }
 }
