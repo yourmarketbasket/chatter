@@ -158,8 +158,8 @@ class GroupProfilePage extends StatelessWidget {
                           ),
                           TextButton(
                             onPressed: () {
-                              dataController.updateGroup(currentChat['_id'],
-                                  {'name': textController.text});
+                              dataController.updateGroupDetails(currentChat['_id'],
+                                  name: textController.text);
                               Get.back();
                             },
                             child: const Text('Save'),
@@ -195,8 +195,8 @@ class GroupProfilePage extends StatelessWidget {
                           ),
                           TextButton(
                             onPressed: () {
-                              dataController.updateGroup(currentChat['_id'],
-                                  {'about': textController.text});
+                              dataController.updateGroupDetails(currentChat['_id'],
+                                  about: textController.text);
                               Get.back();
                             },
                             child: const Text('Save'),
@@ -255,7 +255,7 @@ class GroupProfilePage extends StatelessWidget {
                           onSelected: (value) {
                             switch (value) {
                               case 'remove':
-                                dataController.removeParticipant(
+                                dataController.removeMember(
                                     currentChat['_id'], p['_id']);
                                 break;
                               case 'promote':
