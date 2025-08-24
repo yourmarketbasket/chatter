@@ -421,7 +421,7 @@ class _MainChatsPageState extends State<MainChatsPage> {
                                         child: Icon(
                                           Icons.verified,
                                           color: getVerificationBadgeColor(verificationData['entityType'], verificationData['level']),
-                                          size: 14,
+                                          size: 20,
                                         ),
                                       ),
                                   ],
