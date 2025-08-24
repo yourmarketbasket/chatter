@@ -207,6 +207,7 @@ class NotificationService {
       }
 
       if (_dataController.isMainChatsActive.value) {
+        AudioPlayer().play(AssetSource('notification-sounds/new-message-audio.mp3'));
         return;
       }
       final String groupKey = chatId;
