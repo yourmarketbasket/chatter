@@ -278,7 +278,7 @@ class _MainChatsPageState extends State<MainChatsPage> {
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Text(
-                                otherUser['online'] == true ? 'online' : (otherUser['lastSeen'] != null ? formatLastSeen(DateTime.parse(otherUser['lastSeen'])) : 'offline'),
+                                otherUser['online'] == true ? 'online' : (otherUser['lastSeen'] != null ? 'last seen ${formatLastSeen(DateTime.parse(otherUser['lastSeen']))}' : 'offline'),
                                 style: TextStyle(
                                   color: otherUser['online'] == true ? Colors.tealAccent : Colors.grey[400],
                                   fontSize: 12,
