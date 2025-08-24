@@ -118,6 +118,7 @@ class _ChatterAppState extends State<ChatterApp> {
     return GetMaterialApp(
       routingCallback: (routing) {
         if (routing != null) {
+          print('[RoutingCallback] Current route: ${routing.current}');
           _dataController.currentRoute.value = routing.current;
         }
       },
