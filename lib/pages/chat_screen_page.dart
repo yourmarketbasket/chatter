@@ -1,8 +1,12 @@
+import 'dart:ui' as BorderType;
+
 import 'package:chatter/controllers/data-controller.dart';
 import 'package:chatter/pages/group_profile_page.dart';
 import 'package:chatter/pages/profile_page.dart';
+import 'package:dotted_border/dotted_border.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 import 'dart:io';
 import 'package:chatter/pages/media_view_page.dart';
@@ -18,6 +22,7 @@ import 'package:chatter/widgets/reply_message_snippet.dart';
 import 'package:chatter/helpers/time_helper.dart';
 import 'package:chatter/services/socket-service.dart';
 import 'package:uuid/uuid.dart';
+import 'package:intl/intl.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -189,10 +194,13 @@ class _ChatScreenState extends State<ChatScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Edit Message'),
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
+        backgroundColor: const Color.fromARGB(255, 46, 46, 46),
+        title: const Text('Edit Message', style: TextStyle(color: Colors.white)),
         content: TextField(
           controller: editController,
-          decoration: const InputDecoration(hintText: 'Edit your message'),
+          decoration: const InputDecoration(hintText: 'Edit your message', hintStyle: TextStyle(color: Colors.white)),
+          style: const TextStyle(color: Colors.white),
           autofocus: true,
         ),
         actions: [
@@ -207,7 +215,7 @@ class _ChatScreenState extends State<ChatScreen> {
               }
               Navigator.pop(context);
             },
-            child: const Text('Save'),
+            child: const Text('Save', style: TextStyle(color: Colors.tealAccent)),
           ),
         ],
       ),
@@ -220,22 +228,30 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _showMessageOptions(Map<String, dynamic> message) {
     showModalBottomSheet(
+      backgroundColor: const Color.fromARGB(255, 31, 31, 31),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20.0),
+          topRight: Radius.circular(20.0),
+        ),
+      ),
+
       context: context,
       builder: (context) => Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (message['senderId']['_id'] == dataController.user.value['user']['_id'])
             ListTile(
-              leading: const Icon(Icons.edit),
-              title: const Text('Edit'),
+              leading: const Icon(Icons.edit, color: Colors.white),
+              title: const Text('Edit', style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(context);
                 _editMessage(message);
               },
             ),
           ListTile(
-            leading: const Icon(Icons.delete),
-            title: const Text('Delete for me'),
+            leading: const Icon(Icons.delete, color: Colors.white),
+            title: const Text('Delete for me', style: TextStyle(color: Colors.white)),
             onTap: () {
               Navigator.pop(context);
               _deleteMessage(message, forEveryone: false);
@@ -243,16 +259,16 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           if (message['senderId']['_id'] == dataController.user.value['user']['_id'])
             ListTile(
-              leading: const Icon(Icons.delete_forever),
-              title: const Text('Delete for everyone'),
+              leading: const Icon(Icons.delete_forever, color: Colors.white),
+              title: const Text('Delete for everyone', style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(context);
                 _deleteMessage(message, forEveryone: true);
               },
             ),
           ListTile(
-            leading: const Icon(Icons.thumb_up),
-            title: const Text('React'),
+            leading: const Icon(Icons.thumb_up, color: Colors.white),
+            title: const Text('React', style: TextStyle(color: Colors.white)),
             onTap: () {
               Navigator.pop(context);
               // Reaction logic to be implemented
@@ -715,13 +731,19 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       child: Container(
         margin: EdgeInsets.only(bottom: bottomMargin),
-        padding: const EdgeInsets.all(12.0),
+        padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.0),
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.7,
+          maxWidth: MediaQuery.of(context).size.width * 0.5,
+          minWidth: MediaQuery.of(context).size.width * 0.25,
         ),
         decoration: BoxDecoration(
-          color: isYou ? Colors.tealAccent.withOpacity(0.2) : Colors.grey[800],
-          borderRadius: BorderRadius.circular(12),
+          color: isYou ? Colors.transparent.withOpacity(0.2) : Colors.transparent,
+          border: Border.all(color: isYou ? Colors.teal.withOpacity(0.6) : const Color.fromARGB(167, 143, 141, 141), width: 1.0),
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(12.0),
+            topRight: Radius.circular( 12.0),
+            bottomLeft: Radius.circular(isYou ?12.0: 0.0),
+            bottomRight: Radius.circular(isYou? 0.0:12.0),),
         ),
         child: Column(
           crossAxisAlignment: isYou ? CrossAxisAlignment.end : CrossAxisAlignment.start,
@@ -766,11 +788,16 @@ class _ChatScreenState extends State<ChatScreen> {
                   return Container(
                     margin: const EdgeInsets.only(bottom: 8.0),
                     padding: const EdgeInsets.all(8.0),
+                    constraints: BoxConstraints(
+                      // maxwidth should take the entire width of the message bubble
+                      maxWidth: MediaQuery.of(context).size.width * 0.5,                      
+                      minWidth: MediaQuery.of(context).size.width * 0.25,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.grey[900]?.withOpacity(0.5),
                       borderRadius: BorderRadius.circular(8),
                       border: const Border(
-                        left: BorderSide(color: Colors.tealAccent, width: 4),
+                        left: BorderSide(color: Colors.tealAccent, width: 2),
                       ),
                     ),
                     child: Column(
@@ -880,11 +907,15 @@ class _ChatScreenState extends State<ChatScreen> {
                       fontStyle: FontStyle.italic,
                     ),
                   ),
+                 // Ensure this is imported
+
                 Text(
-                  formatTime(DateTime.parse(message['createdAt']).toLocal()),
-                  style: TextStyle(
+                  DateFormat('h:mm a').format(DateTime.parse(message['createdAt']).toLocal()),
+                  // googlepoppins font
+                  style: GoogleFonts.roboto(
                     color: Colors.grey[400],
-                    fontSize: 10,
+                    fontSize: 9,
+                    fontStyle: FontStyle.italic,
                   ),
                 ),
                 if (isYou) ...[
@@ -991,22 +1022,47 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  String _capitalizeFirstLetter(String text) {
+  if (text.isEmpty) return text;
+  return text[0].toUpperCase() + text.substring(1).toLowerCase();
+}
+
   Widget _buildDateChip(DateTime date) {
     return Center(
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 8.0),
-        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
-        decoration: BoxDecoration(
-          color: Colors.grey[850],
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(
-          _formatDateForChip(date),
-          style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 12,
+      child: Row(
+        children: [
+          // horizontal line
+          Expanded(
+            child: Container(
+              height: 0.2,
+              color: Colors.grey[850],
+            ),
+            
           ),
-        ),
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 8.0),
+            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),            
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey[850]!, width: 0.5),
+              // color: Colors.grey[850],
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              _formatDateForChip(date),
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        
+          // horizontal line
+          Expanded(
+            child: Container(
+              height: 0.2,
+              color: Colors.grey[850],
+            ),
+          ),],
       ),
     );
   }
@@ -1109,11 +1165,10 @@ class _ChatScreenState extends State<ChatScreen> {
         backgroundColor: Colors.black,
         appBar: AppBar(
           backgroundColor: Colors.black,
-          title: Row(
-            children: [
-              GestureDetector(
-                onTap: () {
-                  if (chat['type'] != 'group') {
+          surfaceTintColor: Colors.black,
+          title: GestureDetector(
+            onTap: (){
+              if (chat['type'] != 'group') {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -1124,123 +1179,114 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                       ),
                     );
-                  }
-                },
-                child: Stack(
-                  children: [
-                    CircleAvatar(
-                      backgroundColor: Colors.tealAccent,
-                      backgroundImage: (chat['type'] == 'group'
-                                  ? chat['groupAvatar']
-                                  : otherUserMap?['avatar']) !=
-                              null &&
-                              (chat['type'] == 'group'
-                                  ? chat['groupAvatar']
-                                  : otherUserMap?['avatar'])
-                                  .isNotEmpty
-                          ? NetworkImage((chat['type'] == 'group'
-                              ? chat['groupAvatar']
-                              : otherUserMap!['avatar'])!)
-                          : null,
-                      child: (chat['type'] == 'group'
-                                  ? chat['groupAvatar']
-                                  : otherUserMap?['avatar']) ==
-                              null ||
-                              (chat['type'] == 'group'
-                                  ? chat['groupAvatar']
-                                  : otherUserMap?['avatar'])
-                                  .isEmpty
-                          ? Text(
-                              chat['type'] == 'group'
-                                  ? (chat['name']?[0] ?? '?')
-                                  : (otherUserMap?['name'][0] ?? '?'),
-                              style: const TextStyle(color: Colors.black),
-                            )
-                          : null,
-                    ),
-                    if (chat['type'] != 'group' && (otherUserMap?['online'] ?? false))
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: Container(
-                          width: 12,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            color: Colors.green,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.black, width: 2),
-                          ),
-                        ),
+                  }else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => GroupProfilePage(chat: chat),
                       ),
+                    );
+                  }
+            },
+            child: Row(
+              children: [
+                Stack(
+                  children: [
+                    DottedBorder(
+                      options: CircularDottedBorderOptions(
+                        gradient: LinearGradient(
+                          colors: [otherUserMap?['online'] ? Colors.teal : const BorderType.Color.fromARGB(255, 161, 161, 161), Colors.black],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        strokeWidth: 1.5,
+                      ),
+                      child: CircleAvatar(
+                        backgroundColor: Colors.tealAccent,
+                        backgroundImage: (chat['type'] == 'group'
+                                    ? chat['groupAvatar']
+                                    : otherUserMap?['avatar']) !=
+                                null &&
+                                (chat['type'] == 'group'
+                                    ? chat['groupAvatar']
+                                    : otherUserMap?['avatar'])
+                                    .isNotEmpty
+                            ? NetworkImage((chat['type'] == 'group'
+                                ? chat['groupAvatar']
+                                : otherUserMap!['avatar'])!)
+                            : null,
+                        child: (chat['type'] == 'group'
+                                    ? chat['groupAvatar']
+                                    : otherUserMap?['avatar']) ==
+                                null ||
+                                (chat['type'] == 'group'
+                                    ? chat['groupAvatar']
+                                    : otherUserMap?['avatar'])
+                                    .isEmpty
+                            ? Text(
+                                chat['type'] == 'group'
+                                    ? (chat['name']?[0] ?? '?')
+                                    : (otherUserMap?['name'][0] ?? '?'),
+                                style: const TextStyle(color: Colors.black),
+                              )
+                            : null,
+                      ),
+                    ),
                   ],
                 ),
-              ),
-              const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    chat['type'] == 'group'
-                        ? chat['name']!
-                        : otherUserMap!['name'],
-                    style: const TextStyle(color: Colors.white, fontSize: 16),
-                  ),
-                  if (chat['type'] != 'group')
-                    Obx(() {
-                      final isTyping = chat['_id'] != null && dataController.isTyping[chat['_id']] != null;
-                      if (isTyping) {
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      chat['type'] == 'group'
+                          ? _capitalizeFirstLetter(chat['name'] ?? 'Group Chat')
+                          : _capitalizeFirstLetter(otherUserMap!['name'] ?? 'User'),
+                      style: const TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                    if (chat['type'] != 'group')
+                      Obx(() {
+                        final isTyping = chat['_id'] != null && dataController.isTyping[chat['_id']] != null;
+                        if (isTyping) {
+                          return const Text(
+                            'typing...',
+                            style: TextStyle(
+                              color: Colors.tealAccent,
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          );
+                        }
+                        final user = dataController.allUsers.firstWhere(
+                          (u) => u['_id'] == otherUserMap!['_id'],
+                          orElse: () => otherUserMap,
+                        );
+                        if (otherUserMap?['online']) {
+                          return const Text(
+                            'online',
+                            style: TextStyle(color: Colors.green, fontSize: 12),
+                          );
+                        }
+                        if (user['lastSeen'] != null) {
+                          return Text(
+                            'last seen ${formatLastSeen(DateTime.parse(user['lastSeen']))}',
+                            style: const TextStyle(color: Colors.grey, fontSize: 12),
+                          );
+                        }
                         return const Text(
-                          'typing...',
-                          style: TextStyle(
-                            color: Colors.tealAccent,
-                            fontSize: 12,
-                            fontStyle: FontStyle.italic,
-                          ),
+                          'offline',
+                          style: TextStyle(color: Colors.grey, fontSize: 12),
                         );
-                      }
-                      final user = dataController.allUsers.firstWhere(
-                        (u) => u['_id'] == otherUserMap!['_id'],
-                        orElse: () => otherUserMap,
-                      );
-                      if (user['online'] == true) {
-                        return const Text(
-                          'online',
-                          style: TextStyle(color: Colors.green, fontSize: 12),
-                        );
-                      }
-                      if (user['lastSeen'] != null) {
-                        return Text(
-                          'last seen ${formatLastSeen(DateTime.parse(user['lastSeen']))}',
-                          style: const TextStyle(color: Colors.grey, fontSize: 12),
-                        );
-                      }
-                      return const Text(
-                        'offline',
-                        style: TextStyle(color: Colors.grey, fontSize: 12),
-                      );
-                    }),
-                ],
-              ),
-            ],
+                      }),
+                  ],
+                ),
+              ],
+            ),
           ),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.white),
             onPressed: () => Navigator.pop(context),
-          ),
-          actions: [
-            if (chat['type'] == 'group')
-              IconButton(
-                icon: const Icon(Icons.info_outline, color: Colors.white),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => GroupProfilePage(chat: chat),
-                    ),
-                  );
-                },
-              ),
-          ],
+          )
         ),
         body: Column(
           children: [
