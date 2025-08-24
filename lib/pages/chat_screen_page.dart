@@ -1195,7 +1195,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     DottedBorder(
                       options: CircularDottedBorderOptions(
                         gradient: LinearGradient(
-                          colors: [otherUserMap?['online'] ? Colors.teal : const BorderType.Color.fromARGB(255, 161, 161, 161), Colors.black],
+                          colors: [(otherUserMap?['online'] ?? false) ? Colors.teal : const BorderType.Color.fromARGB(255, 161, 161, 161), Colors.black],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
