@@ -322,6 +322,12 @@ class _MainChatsPageState extends State<MainChatsPage> {
                             : 'none';
                         final IconData statusIcon = _getStatusIcon(status);
                         final Color statusColor = _getStatusColor(status);
+                        final senderId = lastMessageData != null
+                            ? (lastMessageData['senderId'] is Map
+                                ? lastMessageData['senderId']['_id']
+                                : lastMessageData['senderId'])
+                            : null;
+                        final bool isMyMessage = senderId == currentUserId;
 
                         return GestureDetector(
                           onLongPress: () {
@@ -329,7 +335,8 @@ class _MainChatsPageState extends State<MainChatsPage> {
                               context: context,
                               builder: (context) => AlertDialog(
                                 title: const Text('Delete Chat'),
-                                content: const Text('Are you sure you want to permanently delete this chat and all its messages?'),
+                                content: const Text(
+                                    'Are you sure you want to permanently delete this chat and all its messages?'),
                                 actions: [
                                   TextButton(
                                     onPressed: () => Navigator.pop(context),
@@ -338,24 +345,35 @@ class _MainChatsPageState extends State<MainChatsPage> {
                                   TextButton(
                                     onPressed: () async {
                                       Navigator.pop(context);
-                                      await _dataController.deleteChat(chat['_id']);
+                                      await _dataController
+                                          .deleteChat(chat['_id']);
                                     },
-                                    child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                                    child: const Text('Delete',
+                                        style: TextStyle(color: Colors.red)),
                                   ),
                                 ],
                               ),
                             );
                           },
                           child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16.0, vertical: 8.0),
                             leading: Stack(
                               clipBehavior: Clip.none,
                               children: [
                                 CircleAvatar(
                                   radius: 24,
-                                  backgroundColor: Colors.tealAccent.withOpacity(0.2),
-                                  backgroundImage: avatarUrl.isNotEmpty ? CachedNetworkImageProvider(avatarUrl) : null,
-                                  child: avatarUrl.isEmpty ? Text(avatarLetter, style: const TextStyle(color: Colors.tealAccent, fontWeight: FontWeight.bold)) : null,
+                                  backgroundColor:
+                                      Colors.tealAccent.withOpacity(0.2),
+                                  backgroundImage: avatarUrl.isNotEmpty
+                                      ? CachedNetworkImageProvider(avatarUrl)
+                                      : null,
+                                  child: avatarUrl.isEmpty
+                                      ? Text(avatarLetter,
+                                          style: const TextStyle(
+                                              color: Colors.tealAccent,
+                                              fontWeight: FontWeight.bold))
+                                      : null,
                                 ),
                                 if (isGroup)
                                   const Positioned(
@@ -364,36 +382,49 @@ class _MainChatsPageState extends State<MainChatsPage> {
                                     child: CircleAvatar(
                                       radius: 12,
                                       backgroundColor: Colors.black,
-                                      child: Icon(Icons.group, size: 16, color: Colors.tealAccent),
+                                      child: Icon(Icons.group,
+                                          size: 16, color: Colors.tealAccent),
                                     ),
                                   ),
                               ],
                             ),
                             title: Row(
                               children: [
-                                Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+                                Text(title,
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w500)),
                                 if (!isGroup)
                                   Icon(Icons.verified,
                                       color: getVerificationBadgeColor(
-                                          otherUser['verification']?['entityType'],
+                                          otherUser['verification']
+                                              ?['entityType'],
                                           otherUser['verification']?['level']),
                                       size: 14),
                               ],
                             ),
                             subtitle: Obx(() {
-                              final typingUserId = _dataController.isTyping[chat['_id']];
+                              final typingUserId =
+                                  _dataController.isTyping[chat['_id']];
                               if (typingUserId != null) {
-                                final typingUser = _dataController.allUsers.firstWhere((u) => u['_id'] == typingUserId, orElse: () => {'name': 'Someone'});
+                                final typingUser = _dataController.allUsers
+                                    .firstWhere(
+                                        (u) => u['_id'] == typingUserId,
+                                        orElse: () => {'name': 'Someone'});
                                 return Text(
                                   '${typingUser['name']} is typing...',
-                                  style: const TextStyle(color: Colors.tealAccent, fontStyle: FontStyle.italic, fontSize: 14),
+                                  style: const TextStyle(
+                                      color: Colors.tealAccent,
+                                      fontStyle: FontStyle.italic,
+                                      fontSize: 14),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 );
                               }
                               return Text(
                                 preview,
-                                style: TextStyle(color: Colors.grey[400], fontSize: 14),
+                                style: TextStyle(
+                                    color: Colors.grey[400], fontSize: 14),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               );
@@ -403,13 +434,21 @@ class _MainChatsPageState extends State<MainChatsPage> {
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
                                 if (!isGroup) trailingWidget,
-                                if (lastMessageData != null && lastMessageData is Map<String, dynamic>)
+                                if (lastMessageData != null)
                                   Text(
-                                    formatLastSeen(DateTime.parse(lastMessageData['createdAt'] as String).toLocal()),
-                                    style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                                    formatLastSeen(DateTime.parse(
+                                            lastMessageData['createdAt']
+                                                as String)
+                                        .toLocal()),
+                                    style: TextStyle(
+                                        color: Colors.grey[400], fontSize: 12),
                                   ),
-                                if (lastMessageData != null && lastMessageData is Map<String, dynamic> && lastMessageData['senderId'] == currentUserId && status != 'none')
-                                  Icon(statusIcon, size: 16, color: statusColor),
+                                if (isMyMessage && status != 'none')
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4.0),
+                                    child: Icon(statusIcon,
+                                        size: 16, color: statusColor),
+                                  ),
                               ],
                             ),
                             onTap: () {
