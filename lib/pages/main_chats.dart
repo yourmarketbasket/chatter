@@ -414,6 +414,7 @@ class _MainChatsPageState extends State<MainChatsPage> {
                                       title,
                                       style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 15),
                                     ),
+                                    // Verification Badge
                                     if (verificationData['entityType'] != null && verificationData['level'] != null)
                                       Padding(
                                         padding: const EdgeInsets.only(left: 4.0),
@@ -463,18 +464,11 @@ class _MainChatsPageState extends State<MainChatsPage> {
                                     const SizedBox(height: 4),
                                     if (unreadCount > 0)
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: Colors.tealAccent.shade400,
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        child: Text(
-                                          '$unreadCount',
-                                          style: GoogleFonts.poppins(
-                                            color: Colors.black,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 10,
-                                          ),
+                                        width: 8,
+                                        height: 8,
+                                        decoration: const BoxDecoration(
+                                          color: Colors.tealAccent,
+                                          shape: BoxShape.circle,
                                         ),
                                       )
                                     else if (isMyMessage && status != 'none')
