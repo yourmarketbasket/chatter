@@ -56,6 +56,7 @@ class DataController extends GetxController {
   final Rx<Map<String, dynamic>> currentChat = Rx<Map<String, dynamic>>({});
   final RxnString activeChatId = RxnString();
   final RxString currentRoute = ''.obs;
+  final RxBool isMainChatsActive = false.obs;
 
   // Add these Rx variables inside DataController class
   final RxList<Map<String, dynamic>> followers = <Map<String, dynamic>>[].obs;
@@ -1383,8 +1384,7 @@ class DataController extends GetxController {
           user.value = jsonDecode(userJson);
             // print('[DataController] User data saved to storage and in-memory state updated.');
 
-          // notification service
-          NotificationService().init();
+          // notification service is already initialized in main.dart
           // ... (rest of original logic)
           // Now, fetch feeds
           try {

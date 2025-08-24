@@ -34,12 +34,16 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
   DataController get _dataController => Get.find<DataController>();
+  bool _isInitialized = false;
 
   static const String _channelId = 'chatter_default_channel';
   static const String _channelName = 'Chatter Notifications';
   static const String _channelDescription = 'Default channel for Chatter app notifications';
 
   Future<void> init() async {
+    if (_isInitialized) return;
+    _isInitialized = true;
+
     await _requestPermissions();
     final fcmToken = await _firebaseMessaging.getToken();
     if (fcmToken != null) {
@@ -202,7 +206,7 @@ class NotificationService {
 
       if ((_dataController.currentRoute.value == '/ChatScreen' &&
               _dataController.activeChatId.value == chatId) ||
-          _dataController.currentRoute.value == '/chats') {
+          _dataController.isMainChatsActive.value) {
         AudioPlayer()
             .play(AssetSource('notification-sounds/new-message-audio.mp3'));
         return;
