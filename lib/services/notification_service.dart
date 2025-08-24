@@ -33,7 +33,6 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
-  final AudioPlayer _audioPlayer = AudioPlayer();
   DataController get _dataController => Get.find<DataController>();
 
   static const String _channelId = 'chatter_default_channel';
@@ -203,8 +202,7 @@ class NotificationService {
 
       if (_dataController.isChatScreenActive.value &&
           _dataController.activeChatId.value == chatId) {
-        await _audioPlayer
-            .play(AssetSource('notification_sounds/new-message-audio.mp3'));
+        AudioCache().play('notification-sounds/new-message-audio.mp3');
         return;
       }
 
