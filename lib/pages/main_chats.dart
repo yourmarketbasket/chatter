@@ -8,6 +8,7 @@ import 'package:feather_icons/feather_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+// added som enew stuff
 
 class MainChatsPage extends StatefulWidget {
   const MainChatsPage({super.key});
