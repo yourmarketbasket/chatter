@@ -202,7 +202,7 @@ class NotificationService {
 
       if (_dataController.isChatScreenActive.value &&
           _dataController.activeChatId.value == chatId) {
-        AudioCache().play('notification-sounds/new-message-audio.mp3');
+        AudioPlayer().play(AssetSource('notification-sounds/new-message-audio.mp3'));
         return;
       }
 
