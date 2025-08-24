@@ -21,6 +21,11 @@ class _MainChatsPageState extends State<MainChatsPage> {
   final DataController _dataController = Get.find<DataController>();
   String _searchQuery = '';
 
+  String _capitalizeFirstLetter(String text) {
+    if (text.isEmpty) return text;
+    return text[0].toUpperCase() + text.substring(1).toLowerCase();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -411,7 +416,7 @@ class _MainChatsPageState extends State<MainChatsPage> {
                                 title: Row(
                                   children: [
                                     Text(
-                                      title,
+                                      _capitalizeFirstLetter(title),
                                       style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 15),
                                     ),
                                     // Verification Badge
