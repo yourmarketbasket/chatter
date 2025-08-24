@@ -200,23 +200,13 @@ class NotificationService {
     if (type == 'new_message') {
       final String chatId = data['chatId'];
 
-      print('[NotificationService] Received new message for chat $chatId.');
-      print(
-          '[NotificationService] Current route is: "${_dataController.currentRoute.value}"');
-      print(
-          '[NotificationService] Active chat ID is: "${_dataController.activeChatId.value}"');
-
-      if ((_dataController.currentRoute.value == 'ChatScreen' &&
+      if ((_dataController.currentRoute.value == '/ChatScreen' &&
               _dataController.activeChatId.value == chatId) ||
           _dataController.currentRoute.value == '/chats') {
-        print(
-            '[NotificationService] Condition met. Playing sound, suppressing notification.');
         AudioPlayer()
             .play(AssetSource('notification-sounds/new-message-audio.mp3'));
         return;
       }
-      print(
-          '[NotificationService] Condition NOT met. Proceeding to show notification.');
       final String groupKey = chatId;
       final String? messageBody = notification.body;
       final String? messageTitle = notification.title;
