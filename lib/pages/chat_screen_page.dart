@@ -1021,11 +1021,11 @@ class _ChatScreenState extends State<ChatScreen> {
       return '${date.month}/${date.day}/${date.year}';
     }
   }
-
+// capitalizing each letter
   String _capitalizeFirstLetter(String text) {
-  if (text.isEmpty) return text;
-  return text[0].toUpperCase() + text.substring(1).toLowerCase();
-}
+    if (text.isEmpty) return text;
+    return text[0].toUpperCase() + text.substring(1).toLowerCase();
+  }
 
   Widget _buildDateChip(DateTime date) {
     return Center(
