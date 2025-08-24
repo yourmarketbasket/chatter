@@ -442,7 +442,7 @@ class _MainChatsPageState extends State<MainChatsPage> {
                                     return Text(
                                       '${typingUser['name']} is typing...',
                                       style: GoogleFonts.poppins(
-                                        color: Colors.tealAccent.shade400,
+                                        color: Colors.teal.shade400,
                                         fontStyle: FontStyle.italic,
                                         fontSize: 12,
                                       ),
@@ -470,10 +470,10 @@ class _MainChatsPageState extends State<MainChatsPage> {
                                     const SizedBox(height: 4),
                                     if (unreadCount > 0)
                                       Container(
-                                        width: 8,
-                                        height: 8,
+                                        width: 10,
+                                        height: 10,
                                         decoration: const BoxDecoration(
-                                          color: Colors.tealAccent,
+                                          color: Colors.teal,
                                           shape: BoxShape.circle,
                                         ),
                                       )
