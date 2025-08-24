@@ -54,6 +54,9 @@ class DataController extends GetxController {
   final RxBool isLoadingMessages = false.obs;
   final RxMap<String, String?> isTyping = <String, String?>{}.obs;
   final Rx<Map<String, dynamic>> currentChat = Rx<Map<String, dynamic>>({});
+  final RxBool isChatScreenActive = false.obs;
+  final RxBool isMainChatsActive = false.obs;
+  final RxnString activeChatId = RxnString();
 
   // Add these Rx variables inside DataController class
   final RxList<Map<String, dynamic>> followers = <Map<String, dynamic>>[].obs;

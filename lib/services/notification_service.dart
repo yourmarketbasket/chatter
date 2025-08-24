@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
+import 'package:audioplayers/audioplayers.dart';
 import 'package:chatter/controllers/data-controller.dart';
 import 'package:chatter/pages/chat_screen_page.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -32,6 +33,7 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
+  final AudioPlayer _audioPlayer = AudioPlayer();
   DataController get _dataController => Get.find<DataController>();
 
   static const String _channelId = 'chatter_default_channel';
@@ -194,8 +196,21 @@ class NotificationService {
       return;
     }
 
-    if (data['type'] == 'new_message') {
+    final type = data['type'] as String?;
+
+    if (type == 'new_message') {
       final String chatId = data['chatId'];
+
+      if (_dataController.isChatScreenActive.value &&
+          _dataController.activeChatId.value == chatId) {
+        await _audioPlayer
+            .play(AssetSource('notification_sounds/new-message-audio.mp3'));
+        return;
+      }
+
+      if (_dataController.isMainChatsActive.value) {
+        return;
+      }
       final String groupKey = chatId;
       final String? messageBody = notification.body;
       final String? messageTitle = notification.title;
@@ -214,13 +229,15 @@ class NotificationService {
         }
       }
 
-      final largeIconPath = await _generateAvatar(data['senderAvatar'], messageTitle ?? '?');
+      final largeIconPath =
+          await _generateAvatar(data['senderAvatar'], messageTitle ?? '?');
 
       StyleInformation? styleInformation;
       if (imagePath != null && messageBody != null) {
         styleInformation = BigPictureStyleInformation(
           FilePathAndroidBitmap(imagePath),
-          largeIcon: largeIconPath != null ? FilePathAndroidBitmap(largeIconPath) : null,
+          largeIcon:
+              largeIconPath != null ? FilePathAndroidBitmap(largeIconPath) : null,
           contentTitle: messageTitle,
           summaryText: messageBody,
           htmlFormatContentTitle: true,
@@ -229,7 +246,8 @@ class NotificationService {
       } else if (imagePath != null) {
         styleInformation = BigPictureStyleInformation(
           FilePathAndroidBitmap(imagePath),
-          largeIcon: largeIconPath != null ? FilePathAndroidBitmap(largeIconPath) : null,
+          largeIcon:
+              largeIconPath != null ? FilePathAndroidBitmap(largeIconPath) : null,
           contentTitle: messageTitle,
           htmlFormatContentTitle: true,
         );
@@ -250,7 +268,8 @@ class NotificationService {
         icon: 'ic_status_16px',
         importance: Importance.max,
         priority: Priority.high,
-        largeIcon: largeIconPath != null ? FilePathAndroidBitmap(largeIconPath) : null,
+        largeIcon:
+            largeIconPath != null ? FilePathAndroidBitmap(largeIconPath) : null,
         styleInformation: styleInformation,
         actions: [
           AndroidNotificationAction(
@@ -264,7 +283,8 @@ class NotificationService {
       );
 
       final notificationDetails = NotificationDetails(android: androidDetails);
-      final payload = jsonEncode({'chatId': chatId, 'messageId': data['messageId']});
+      final payload =
+          jsonEncode({'chatId': chatId, 'messageId': data['messageId']});
 
       await _flutterLocalNotificationsPlugin.show(
         Random().nextInt(2147483647),
@@ -276,22 +296,26 @@ class NotificationService {
 
       final List<ActiveNotification> activeNotifications =
           await _flutterLocalNotificationsPlugin
-              .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-              ?.getActiveNotifications() ?? [];
+                  .resolvePlatformSpecificImplementation<
+                      AndroidFlutterLocalNotificationsPlugin>()
+                  ?.getActiveNotifications() ??
+              [];
 
       final List<ActiveNotification> chatNotifications = activeNotifications
           .where((n) => n.groupKey == groupKey && n.id != 0)
           .toList();
 
       if (chatNotifications.length > 1) {
-        final List<String> lines = chatNotifications.map((n) => n.body ?? '').toList();
+        final List<String> lines =
+            chatNotifications.map((n) => n.body ?? '').toList();
         final InboxStyleInformation inboxStyleInformation = InboxStyleInformation(
           lines,
           contentTitle: messageTitle,
           summaryText: '${chatNotifications.length} new messages',
         );
 
-        final AndroidNotificationDetails summaryAndroidDetails = AndroidNotificationDetails(
+        final AndroidNotificationDetails summaryAndroidDetails =
+            AndroidNotificationDetails(
           _channelId,
           _channelName,
           channelDescription: _channelDescription,
@@ -311,8 +335,11 @@ class NotificationService {
           summaryNotificationDetails,
         );
       }
+    } else if (type == 'new_post') {
+      return;
     } else if (data['type'] == 'group_invitation') {
-      final largeIconPath = await _generateAvatar(data['adderAvatar'], data['addedBy'] ?? '?');
+      final largeIconPath =
+          await _generateAvatar(data['adderAvatar'], data['addedBy'] ?? '?');
       final androidDetails = AndroidNotificationDetails(
         _channelId,
         _channelName,
@@ -320,7 +347,8 @@ class NotificationService {
         icon: 'ic_status_16px',
         importance: Importance.max,
         priority: Priority.high,
-        largeIcon: largeIconPath != null ? FilePathAndroidBitmap(largeIconPath) : null,
+        largeIcon:
+            largeIconPath != null ? FilePathAndroidBitmap(largeIconPath) : null,
         styleInformation: BigTextStyleInformation(notification.body ?? ''),
       );
       final notificationDetails = NotificationDetails(android: androidDetails);

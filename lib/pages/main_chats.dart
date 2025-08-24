@@ -23,6 +23,7 @@ class _MainChatsPageState extends State<MainChatsPage> {
   @override
   void initState() {
     super.initState();
+    _dataController.isMainChatsActive.value = true;
     _dataController.fetchChats();
     _searchController.addListener(() {
       if (mounted) {
@@ -36,7 +37,60 @@ class _MainChatsPageState extends State<MainChatsPage> {
   @override
   void dispose() {
     _searchController.dispose();
+    _dataController.isMainChatsActive.value = false;
     super.dispose();
+  }
+
+  String _getAggregateStatus(Map<String, dynamic> message) {
+    // Priority 1: Check for a temporary/failed status first.
+    if (message['status'] == 'sending') return 'sending';
+    if (message['status_for_failed_only'] == 'failed') return 'failed';
+
+    // Priority 2: Derive status from receipts.
+    final receipts =
+        (message['readReceipts'] as List?)?.cast<Map<String, dynamic>>();
+    if (receipts == null || receipts.isEmpty) {
+      return 'sent'; // No receipts means it's sent but not delivered/read.
+    }
+
+    // If all receipts are 'read'
+    if (receipts.every((r) => r['status'] == 'read')) {
+      return 'read';
+    }
+    // If any receipt is 'delivered' or 'read'
+    if (receipts.any((r) => r['status'] == 'delivered' || r['status'] == 'read')) {
+      return 'delivered';
+    }
+
+    return 'sent';
+  }
+
+  IconData _getStatusIcon(String status) {
+    switch (status) {
+      case 'sending':
+        return Icons.access_time; // Clock icon for sending
+      case 'sent':
+        return Icons.check; // Single tick for sent
+      case 'delivered':
+        return Icons.done_all;
+      case 'read':
+        return Icons.done_all;
+      case 'failed':
+        return Icons.error_outline;
+      default:
+        return Icons.access_time; // Default to clock
+    }
+  }
+
+  Color _getStatusColor(String? status) {
+    switch (status) {
+      case 'read':
+        return Colors.tealAccent;
+      case 'failed':
+        return Colors.red;
+      default:
+        return Colors.grey[400]!;
+    }
   }
 
   @override
@@ -263,26 +317,11 @@ class _MainChatsPageState extends State<MainChatsPage> {
                           preview = '$senderName: $preview';
                         }
 
-                        IconData statusIcon = Icons.access_time;
-                        Color statusColor = Colors.grey[400]!;
-                        if (lastMessageData != null && lastMessageData is Map<String, dynamic>) {
-                          final readReceipts = lastMessageData['readReceipts'] as List?;
-                          if (readReceipts != null && readReceipts.isNotEmpty) {
-                            final receipt = readReceipts.firstWhere((r) => r['userId'] != currentUserId, orElse: () => {'status': 'sent'});
-                            switch (receipt['status']) {
-                              case 'sent':
-                                statusIcon = Icons.check;
-                                break;
-                              case 'delivered':
-                                statusIcon = Icons.done_all;
-                                break;
-                              case 'read':
-                                statusIcon = Icons.done_all;
-                                statusColor = Colors.tealAccent;
-                                break;
-                            }
-                          }
-                        }
+                        final String status = lastMessageData != null
+                            ? _getAggregateStatus(lastMessageData)
+                            : 'none';
+                        final IconData statusIcon = _getStatusIcon(status);
+                        final Color statusColor = _getStatusColor(status);
 
                         return GestureDetector(
                           onLongPress: () {
@@ -369,7 +408,7 @@ class _MainChatsPageState extends State<MainChatsPage> {
                                     formatLastSeen(DateTime.parse(lastMessageData['createdAt'] as String).toLocal()),
                                     style: TextStyle(color: Colors.grey[400], fontSize: 12),
                                   ),
-                                if (lastMessageData != null && lastMessageData is Map<String, dynamic> && lastMessageData['senderId'] == currentUserId)
+                                if (lastMessageData != null && lastMessageData is Map<String, dynamic> && lastMessageData['senderId'] == currentUserId && status != 'none')
                                   Icon(statusIcon, size: 16, color: statusColor),
                               ],
                             ),
