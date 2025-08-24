@@ -417,7 +417,7 @@ class _MainChatsPageState extends State<MainChatsPage> {
                                   children: [
                                     Text(
                                       _capitalizeFirstLetter(title),
-                                      style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 15),
+                                      style: GoogleFonts.poppins(color: Colors.white, fontSize: 15),
                                     ),
                                     // Verification Badge
                                     if (verificationData['entityType'] != null && verificationData['level'] != null)
