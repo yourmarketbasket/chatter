@@ -340,6 +340,7 @@ class _MainChatsPageState extends State<MainChatsPage> {
                                 ? (lastMessageData['senderId'] is Map ? lastMessageData['senderId']['_id'] : lastMessageData['senderId'])
                                 : null;
                             final bool isMyMessage = senderId == currentUserId;
+                            final int unreadCount = chat['unreadCount'] as int? ?? 0;
 
                             return GestureDetector(
                               onLongPress: () {
@@ -389,6 +390,20 @@ class _MainChatsPageState extends State<MainChatsPage> {
                                           radius: 10,
                                           backgroundColor: Colors.black,
                                           child: Icon(Icons.group, size: 14, color: Colors.tealAccent.shade400),
+                                        ),
+                                      ),
+                                    if (!isGroup && (_dataController.allUsers.firstWhere((u) => u['_id'] == (chat['participants'] as List<dynamic>).firstWhere((p) => (p is Map<String, dynamic> ? p['_id'] : p) != currentUserId)['_id'], orElse: () => {'online': false})['online'] ?? false))
+                                      Positioned(
+                                        right: 0,
+                                        bottom: 0,
+                                        child: Container(
+                                          width: 12,
+                                          height: 12,
+                                          decoration: BoxDecoration(
+                                            color: Colors.green,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(color: Colors.black, width: 2),
+                                          ),
                                         ),
                                       ),
                                   ],
@@ -445,7 +460,24 @@ class _MainChatsPageState extends State<MainChatsPage> {
                                         formatLastSeen(DateTime.parse(lastMessageData['createdAt'] as String).toLocal()),
                                         style: GoogleFonts.poppins(color: Colors.grey.shade500, fontSize: 11),
                                       ),
-                                    if (isMyMessage && status != 'none')
+                                    const SizedBox(height: 4),
+                                    if (unreadCount > 0)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.tealAccent.shade400,
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Text(
+                                          '$unreadCount',
+                                          style: GoogleFonts.poppins(
+                                            color: Colors.black,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 10,
+                                          ),
+                                        ),
+                                      )
+                                    else if (isMyMessage && status != 'none')
                                       Padding(
                                         padding: const EdgeInsets.only(top: 4.0),
                                         child: Icon(statusIcon, size: 14, color: statusColor),
@@ -454,6 +486,10 @@ class _MainChatsPageState extends State<MainChatsPage> {
                                 ),
                                 onTap: () {
                                   _dataController.currentChat.value = chat;
+                                  if (unreadCount > 0) {
+                                    _dataController.chats[chat['_id']]!['unreadCount'] = 0;
+                                    _dataController.chats.refresh();
+                                  }
                                   Get.to(() => const ChatScreen());
                                 },
                               ),
