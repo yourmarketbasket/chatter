@@ -21,17 +21,11 @@ import 'package:uuid/uuid.dart';
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
-  // print("Handling a background message: ${message.messageId}");
   await NotificationService().showNotification(message);
 }
 
 @pragma('vm:entry-point')
 void onDidReceiveBackgroundNotificationResponse(NotificationResponse response) {
-    // print('onDidReceiveBackgroundNotificationResponse: payload=${response.payload}');
-    // This is where you would handle background notification actions.
-    // Since this is a separate isolate, you can't easily access GetX controllers.
-    // A common pattern is to use a different mechanism like shared_preferences
-    // to store the action and handle it when the app starts.
 }
 
 class NotificationService {
@@ -39,7 +33,6 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
   DataController get _dataController => Get.find<DataController>();
-
 
   static const String _channelId = 'chatter_default_channel';
   static const String _channelName = 'Chatter Notifications';
@@ -49,13 +42,10 @@ class NotificationService {
     await _requestPermissions();
     final fcmToken = await _firebaseMessaging.getToken();
     if (fcmToken != null) {
-      // print('FCM Token: $fcmToken');
-      if(Get.isRegistered<DataController>()) {
+      if (Get.isRegistered<DataController>()) {
         _dataController.updateFcmToken(fcmToken);
       }
     }
-    // git branch
-    
 
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('ic_status_16px');
@@ -74,8 +64,6 @@ class NotificationService {
     await _createAndroidNotificationChannel();
 
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      // print('Got a message whilst in the foreground!');
-      // print('Message data: ${message.data}');
       showNotification(message);
     });
 
@@ -85,26 +73,21 @@ class NotificationService {
   void onDidReceiveNotificationResponse(NotificationResponse response) async {
     final payloadString = response.payload;
     if (payloadString != null) {
-      // print('notification payload: $payloadString, actionId: ${response.actionId}');
-
       final payload = jsonDecode(payloadString);
       final chatId = payload['chatId'];
       final messageId = payload['messageId'];
 
       if (!Get.isRegistered<DataController>()) {
-          // print("DataController not registered. Cannot handle notification action.");
-          return;
+        return;
       }
       final dataController = Get.find<DataController>();
 
       if (response.actionId == 'REPLY') {
         final repliedText = response.input;
         if (repliedText != null && repliedText.isNotEmpty) {
-          // print('Replying with: "$repliedText" to chat ID: $chatId');
           final clientMessageId = const Uuid().v4();
           final currentUser = dataController.user.value['user'];
 
-          // Create a temporary message for optimistic UI update, mimicking the format from ChatScreen
           final tempMessage = {
             'clientMessageId': clientMessageId,
             'chatId': chatId,
@@ -116,14 +99,13 @@ class NotificationService {
             'content': repliedText,
             'type': 'text',
             'files': [],
-            'replyTo': messageId, // The ID of the message from the notification payload
+            'replyTo': messageId,
             'viewOnce': false,
             'createdAt': DateTime.now().toUtc().toIso8601String(),
             'status': 'sending',
           };
           dataController.addTemporaryMessage(tempMessage);
 
-          // Prepare and send the final message to the backend
           final finalMessage = {
             'clientMessageId': clientMessageId,
             'chatId': chatId,
@@ -134,12 +116,10 @@ class NotificationService {
           await dataController.sendChatMessage(finalMessage, clientMessageId);
         }
       } else if (response.actionId == 'MARK_AS_READ') {
-        // print('Mark as Read action tapped for message ID: $messageId');
         if (messageId != null) {
-            dataController.markMessageAsReadById(messageId);
+          dataController.markMessageAsReadById(messageId);
         }
       } else {
-        // print('Notification tapped. Navigating to chat ID: $chatId');
         navigateToChat(chatId, dataController);
       }
     }
@@ -148,12 +128,10 @@ class NotificationService {
   void navigateToChat(String chatId, DataController dataController) {
     final chat = dataController.chats[chatId];
     if (chat != null) {
-        dataController.currentChat.value = chat;
-        Get.to(() => const ChatScreen());
+      dataController.currentChat.value = chat;
+      Get.to(() => const ChatScreen());
     } else {
-        // print("Chat with id $chatId not found in dataController.chats");
-        // Fallback: maybe navigate to the main chats page
-        Get.toNamed('/chats');
+      Get.toNamed('/chats');
     }
   }
 
@@ -166,24 +144,44 @@ class NotificationService {
       final filePath = '${tempDir.path}/${avatarUrl.split('/').last}.png';
       final file = File(filePath);
 
-      // if (await file.exists()) {
-      //   return filePath;
-      // }
-
       final response = await http.get(Uri.parse(avatarUrl));
       if (response.statusCode == 200) {
         final image = img.decodeImage(response.bodyBytes);
         if (image != null) {
-          // Create a circular cropped version of the image.
           final circularImage = img.copyCropCircle(image);
-          final pngBytes = img.encodePng(circularImage);
+          final resizedImage = img.copyResize(circularImage, width: 96, height: 96);
+          final pngBytes = img.encodePng(resizedImage);
           await file.writeAsBytes(pngBytes);
           return filePath;
         }
       }
       return null;
     } catch (e) {
-      // print('Error generating avatar: $e');
+      return null;
+    }
+  }
+
+  Future<String?> _downloadImage(String? imageUrl) async {
+    if (imageUrl == null || imageUrl.isEmpty) {
+      return null;
+    }
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final filePath = '${tempDir.path}/${imageUrl.split('/').last}';
+      final file = File(filePath);
+
+      final response = await http.get(Uri.parse(imageUrl));
+      if (response.statusCode == 200) {
+        final image = img.decodeImage(response.bodyBytes);
+        if (image != null) {
+          final resizedImage = img.copyResize(image, width: 512);
+          final pngBytes = img.encodePng(resizedImage);
+          await file.writeAsBytes(pngBytes);
+          return filePath;
+        }
+      }
+      return null;
+    } catch (e) {
       return null;
     }
   }
@@ -193,7 +191,6 @@ class NotificationService {
     final notification = message.notification;
 
     if (notification == null) {
-      // print("showNotification: Received message without a notification part.");
       return;
     }
 
@@ -202,8 +199,48 @@ class NotificationService {
       final String groupKey = chatId;
       final String? messageBody = notification.body;
       final String? messageTitle = notification.title;
+      final String? files = data['files'];
+      List<dynamic>? fileList;
+      String? imagePath;
+
+      if (files != null && files.isNotEmpty) {
+        try {
+          fileList = jsonDecode(files);
+          if (fileList!.isNotEmpty) {
+            imagePath = await _downloadImage(fileList[0]['url']);
+          }
+        } catch (e) {
+          // Handle JSON parsing or download error
+        }
+      }
 
       final largeIconPath = await _generateAvatar(data['senderAvatar'], messageTitle ?? '?');
+
+      StyleInformation? styleInformation;
+      if (imagePath != null && messageBody != null) {
+        styleInformation = BigPictureStyleInformation(
+          FilePathAndroidBitmap(imagePath),
+          largeIcon: largeIconPath != null ? FilePathAndroidBitmap(largeIconPath) : null,
+          contentTitle: messageTitle,
+          summaryText: messageBody,
+          htmlFormatContentTitle: true,
+          htmlFormatSummaryText: true,
+        );
+      } else if (imagePath != null) {
+        styleInformation = BigPictureStyleInformation(
+          FilePathAndroidBitmap(imagePath),
+          largeIcon: largeIconPath != null ? FilePathAndroidBitmap(largeIconPath) : null,
+          contentTitle: messageTitle,
+          htmlFormatContentTitle: true,
+        );
+      } else if (messageBody != null) {
+        styleInformation = BigTextStyleInformation(
+          messageBody,
+          contentTitle: messageTitle,
+          htmlFormatContentTitle: true,
+          htmlFormatSummaryText: true,
+        );
+      }
 
       final androidDetails = AndroidNotificationDetails(
         _channelId,
@@ -214,6 +251,7 @@ class NotificationService {
         importance: Importance.max,
         priority: Priority.high,
         largeIcon: largeIconPath != null ? FilePathAndroidBitmap(largeIconPath) : null,
+        styleInformation: styleInformation,
         actions: [
           AndroidNotificationAction(
             'REPLY',
@@ -229,21 +267,20 @@ class NotificationService {
       final payload = jsonEncode({'chatId': chatId, 'messageId': data['messageId']});
 
       await _flutterLocalNotificationsPlugin.show(
-        Random().nextInt(2147483647), // Use a random 32-bit integer ID
+        Random().nextInt(2147483647),
         messageTitle,
         messageBody,
         notificationDetails,
         payload: payload,
       );
 
-      // --- Group Summary Notification ---
       final List<ActiveNotification> activeNotifications =
           await _flutterLocalNotificationsPlugin
               .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
               ?.getActiveNotifications() ?? [];
 
       final List<ActiveNotification> chatNotifications = activeNotifications
-          .where((n) => n.groupKey == groupKey && n.id != 0) // Exclude summary notification itself
+          .where((n) => n.groupKey == groupKey && n.id != 0)
           .toList();
 
       if (chatNotifications.length > 1) {
@@ -274,29 +311,28 @@ class NotificationService {
           summaryNotificationDetails,
         );
       }
-
     } else if (data['type'] == 'group_invitation') {
-        final largeIconPath = await _generateAvatar(data['adderAvatar'], data['addedBy'] ?? '?');
-        final androidDetails = AndroidNotificationDetails(
-            _channelId,
-            _channelName,
-            channelDescription: _channelDescription,
-            icon: 'ic_status_16px',
-            importance: Importance.max,
-            priority: Priority.high,
-            largeIcon: largeIconPath != null ? FilePathAndroidBitmap(largeIconPath) : null,
-            styleInformation: BigTextStyleInformation(notification.body ?? ''),
-        );
-        final notificationDetails = NotificationDetails(android: androidDetails);
-        final payload = jsonEncode({'chatId': data['chatId']});
+      final largeIconPath = await _generateAvatar(data['adderAvatar'], data['addedBy'] ?? '?');
+      final androidDetails = AndroidNotificationDetails(
+        _channelId,
+        _channelName,
+        channelDescription: _channelDescription,
+        icon: 'ic_status_16px',
+        importance: Importance.max,
+        priority: Priority.high,
+        largeIcon: largeIconPath != null ? FilePathAndroidBitmap(largeIconPath) : null,
+        styleInformation: BigTextStyleInformation(notification.body ?? ''),
+      );
+      final notificationDetails = NotificationDetails(android: androidDetails);
+      final payload = jsonEncode({'chatId': data['chatId']});
 
-        await _flutterLocalNotificationsPlugin.show(
-            Random().nextInt(2147483647), // Use a random 32-bit integer ID
-            notification.title,
-            notification.body,
-            notificationDetails,
-            payload: payload,
-        );
+      await _flutterLocalNotificationsPlugin.show(
+        Random().nextInt(2147483647),
+        notification.title,
+        notification.body,
+        notificationDetails,
+        payload: payload,
+      );
     }
   }
 
@@ -312,27 +348,16 @@ class NotificationService {
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(channel);
-    if (kDebugMode) {
-      // print("Notification channel '$_channelId' created.");
-    }
   }
 
   Future<bool> _requestPermissions() async {
     if (Platform.isAndroid) {
       final deviceInfo = await DeviceInfoPlugin().androidInfo;
-      if (deviceInfo.version.sdkInt >= 33) { // Android 13+
+      if (deviceInfo.version.sdkInt >= 33) {
         PermissionStatus status = await Permission.notification.request();
-        if (status.isGranted) {
-          // if (kDebugMode) print("Notification permission granted.");
-          return true;
-        } else {
-          // if (kDebugMode) print("Notification permission denied.");
-          return false;
-        }
-      } else {
-        // if (kDebugMode) print("Notification permission not required for Android SDK ${deviceInfo.version.sdkInt}.");
-        return true;
+        return status.isGranted;
       }
+      return true;
     }
     return true;
   }
