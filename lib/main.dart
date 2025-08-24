@@ -116,6 +116,11 @@ class _ChatterAppState extends State<ChatterApp> {
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
+      routingCallback: (routing) {
+        if (routing != null) {
+          _dataController.currentRoute.value = routing.current;
+        }
+      },
       title: 'Chatter',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(

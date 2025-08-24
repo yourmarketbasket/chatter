@@ -200,14 +200,11 @@ class NotificationService {
     if (type == 'new_message') {
       final String chatId = data['chatId'];
 
-      if (_dataController.isChatScreenActive.value &&
-          _dataController.activeChatId.value == chatId) {
-        AudioPlayer().play(AssetSource('notification-sounds/new-message-audio.mp3'));
-        return;
-      }
-
-      if (_dataController.isMainChatsActive.value) {
-        AudioPlayer().play(AssetSource('notification-sounds/new-message-audio.mp3'));
+      if ((_dataController.currentRoute.value == 'ChatScreen' &&
+              _dataController.activeChatId.value == chatId) ||
+          _dataController.currentRoute.value == '/chats') {
+        AudioPlayer()
+            .play(AssetSource('notification-sounds/new-message-audio.mp3'));
         return;
       }
       final String groupKey = chatId;

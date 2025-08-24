@@ -23,7 +23,6 @@ class _MainChatsPageState extends State<MainChatsPage> {
   @override
   void initState() {
     super.initState();
-    _dataController.isMainChatsActive.value = true;
     _dataController.fetchChats();
     _searchController.addListener(() {
       if (mounted) {
@@ -37,7 +36,6 @@ class _MainChatsPageState extends State<MainChatsPage> {
   @override
   void dispose() {
     _searchController.dispose();
-    _dataController.isMainChatsActive.value = false;
     super.dispose();
   }
 
@@ -414,12 +412,7 @@ class _MainChatsPageState extends State<MainChatsPage> {
                             ),
                             onTap: () {
                               _dataController.currentChat.value = chat;
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const ChatScreen(),
-                                ),
-                              );
+                              Get.to(() => const ChatScreen());
                             },
                           ),
                         );

@@ -36,7 +36,6 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     final chatId = dataController.currentChat.value['_id'] as String?;
-    dataController.isChatScreenActive.value = true;
     dataController.activeChatId.value = chatId;
 
     if (chatId != null) {
@@ -74,7 +73,6 @@ class _ChatScreenState extends State<ChatScreen> {
     _messageController.dispose();
     _scrollController.dispose();
     dataController.currentConversationMessages.clear();
-    dataController.isChatScreenActive.value = false;
     dataController.activeChatId.value = null;
     super.dispose();
   }
