@@ -199,7 +199,8 @@ class _AttachmentPreviewDialogState extends State<AttachmentPreviewDialog> {
                         ),
                       );
                     }
-                    final file = _files[index];
+                    final fileData = _files[index];
+                    final file = fileData['file'] as PlatformFile;
                     return Stack(
                       alignment: Alignment.topRight,
                       children: [
