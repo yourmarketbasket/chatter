@@ -99,7 +99,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     for (var file in files) {
       final fileType = isVoiceNote ? 'voice' : _getMediaType(file.extension ?? '');
-      double? width, height;
+      num? width, height;
 
       if (fileType.startsWith('video') && file.path != null) {
         try {
