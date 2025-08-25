@@ -394,8 +394,26 @@ class GroupProfilePage extends StatelessWidget {
                             onSelected: (value) {
                               switch (value) {
                                 case 'remove':
-                                  dataController.removeMember(
-                                      currentChat['_id'], p['_id']);
+                                  if ((currentChat['participants']?.length ??
+                                          0) <=
+                                      3) {
+                                    Get.dialog(
+                                      AlertDialog(
+                                        title: const Text('Cannot Remove User'),
+                                        content: const Text(
+                                            'A group must have at least 3 members.'),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Get.back(),
+                                            child: const Text('OK'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  } else {
+                                    dataController.removeMember(
+                                        currentChat['_id'], p['_id']);
+                                  }
                                   break;
                                 case 'promote':
                                   dataController.promoteAdmin(
