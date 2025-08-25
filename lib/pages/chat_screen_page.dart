@@ -1312,7 +1312,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           (u) => u['_id'] == otherUserMap!['_id'],
                           orElse: () => otherUserMap,
                         );
-                        if (otherUserMap?['online']) {
+                        if (otherUserMap?['online'] ?? false) {
                           return const Text(
                             'online',
                             style: TextStyle(color: Colors.green, fontSize: 12),
