@@ -1,8 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:async';
-import 'dart:io';
-import 'package:chatter/helpers/file_helper.dart';
 import 'package:chatter/pages/home-feed-screen.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:device_info_plus/device_info_plus.dart';
@@ -226,26 +223,32 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
 
   // Helper method to process a single video file and add it to attachments
   Future<void> _processAndAddVideoFile(File file) async {
-    print(
-        '[NewPostScreen] Processing Video: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
+    print('[NewPostScreen] Processing Video: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
     final int fileSize = await file.length();
+    final sizeInMB = fileSize / (1024 * 1024);
 
-    final attachment = {
-      'file': file,
-      'type': 'video',
-      'filename': file.path.split('/').last,
-      'size': fileSize,
-    };
-    final dimensions = await _getVideoDimensions(file); // This includes duration
-    if (dimensions != null) {
-      attachment.addAll(dimensions.cast<String, Object>());
+    if (sizeInMB <= 20) { // Updated file size limit
+      final attachment = {
+        'file': file,
+        'type': 'video',
+        'filename': file.path.split('/').last,
+        'size': fileSize,
+      };
+      final dimensions = await _getVideoDimensions(file); // This includes duration
+      if (dimensions != null) {
+        attachment.addAll(dimensions.cast<String, Object>());
+      } else {
+        print('[NewPostScreen] Could not get dimensions for video, will be added without them.');
+      }
+
+      print('[NewPostScreen] Adding to _selectedAttachments: $attachment');
+      _addAttachment(attachment);
     } else {
-      print(
-          '[NewPostScreen] Could not get dimensions for video, will be added without them.');
+      _showPermissionDialog(
+        'File Size Error',
+        'Video file "${file.path.split('/').last}" exceeds 20MB limit and was not added.',
+      );
     }
-
-    print('[NewPostScreen] Adding to _selectedAttachments: $attachment');
-    _addAttachment(attachment);
   }
 
   Future<void> _stopAudioRecording() async {
@@ -389,32 +392,36 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
   
   // Helper method to process a single image file and add it to attachments
   Future<void> _processAndAddImageFile(File file) async {
-    print(
-        '[NewPostScreen] Processing Image: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
+    print('[NewPostScreen] Processing Image: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
     final int fileSize = await file.length();
+    final sizeInMB = fileSize / (1024 * 1024);
 
-    final attachment = {
-      'file': file,
-      'type': 'image',
-      'filename': file.path.split('/').last,
-      'size': fileSize,
-    };
-    final dimensions = await _getImageDimensions(file);
-    if (dimensions != null) {
-      attachment.addAll(dimensions.cast<String, Object>());
+    if (sizeInMB <= 20) { // Updated file size limit
+      final attachment = {
+        'file': file,
+        'type': 'image',
+        'filename': file.path.split('/').last,
+        'size': fileSize,
+      };
+      final dimensions = await _getImageDimensions(file);
+      if (dimensions != null) {
+        attachment.addAll(dimensions.cast<String, Object>());
+      } else {
+        print('[NewPostScreen] Could not get dimensions for image, will be added without them.');
+      }
+      print('[NewPostScreen] Adding to _selectedAttachments: $attachment');
+      _addAttachment(attachment);
     } else {
-      print(
-          '[NewPostScreen] Could not get dimensions for image, will be added without them.');
+      _showPermissionDialog(
+        'File Size Error',
+        'Image file "${file.path.split('/').last}" exceeds 20MB limit and was not added.',
+      );
     }
-    print('[NewPostScreen] Adding to _selectedAttachments: $attachment');
-    _addAttachment(attachment);
   }
   
   Future<void> _pickImage({required bool fromCamera}) async {
-    const int maxFileSize = 20971520; // 20 MB
     try {
-      if (fromCamera) {
-        // Use ImagePicker for camera capture (single image)
+      if (fromCamera) { // Use ImagePicker for camera capture (single image)
         if (await _requestMediaPermissions('camera')) {
           final XFile? image = await _picker.pickImage(
             source: ImageSource.camera,
@@ -424,42 +431,22 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
           );
           if (image != null) {
             final file = File(image.path);
-            final fileSize = await file.length();
-            if (fileSize > maxFileSize) {
-              _showPermissionDialog(
-                'File Size Error',
-                'Image file "${file.path.split('/').last}" exceeds 20MB limit and was not added.',
-              );
-              return;
-            }
+            // Process single image file (similar to existing logic)
             await _processAndAddImageFile(file);
           }
         }
-      } else {
-        // Use FilePicker for gallery selection (multiple images)
+      } else { // Use FilePicker for gallery selection (multiple images)
         if (await _requestMediaPermissions('image')) {
           final result = await FilePicker.platform.pickFiles(
             type: FileType.image,
             allowMultiple: true,
           );
           if (result != null && result.files.isNotEmpty) {
-            List<String> oversizedFiles = [];
             for (var platformFile in result.files) {
-              if (platformFile.size > maxFileSize) {
-                oversizedFiles.add(platformFile.name);
-                continue;
-              }
-              final safePath = await FileHelper.getSafePath(platformFile);
-              if (safePath != null) {
-                final file = File(safePath);
+              if (platformFile.path != null) {
+                final file = File(platformFile.path!);
                 await _processAndAddImageFile(file);
               }
-            }
-            if (oversizedFiles.isNotEmpty && mounted) {
-              _showPermissionDialog(
-                'Files too large',
-                'The following files exceed the 20MB size limit and were not added:\n\n${oversizedFiles.join('\n')}',
-              );
             }
           }
         }
@@ -499,54 +486,30 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
   }
 
   Future<void> _pickVideo({required bool fromCamera}) async {
-    const int maxFileSize = 20971520; // 20 MB
     try {
-      if (fromCamera) {
-        // Use ImagePicker for camera capture (single video)
+      if (fromCamera) { // Use ImagePicker for camera capture (single video)
         if (await _requestMediaPermissions('camera')) {
           final XFile? video = await _picker.pickVideo(
             source: ImageSource.camera,
-            maxDuration:
-                const Duration(seconds: 180), // Increased max duration for camera
+            maxDuration: const Duration(seconds: 180), // Increased max duration for camera
           );
           if (video != null) {
             final file = File(video.path);
-            final fileSize = await file.length();
-            if (fileSize > maxFileSize) {
-              _showPermissionDialog(
-                'File Size Error',
-                'Video file "${file.path.split('/').last}" exceeds 20MB limit and was not added.',
-              );
-              return;
-            }
             await _processAndAddVideoFile(file);
           }
         }
-      } else {
-        // Use FilePicker for gallery selection (multiple videos)
+      } else { // Use FilePicker for gallery selection (multiple videos)
         if (await _requestMediaPermissions('video')) {
           final result = await FilePicker.platform.pickFiles(
             type: FileType.video,
             allowMultiple: true,
           );
           if (result != null && result.files.isNotEmpty) {
-            List<String> oversizedFiles = [];
             for (var platformFile in result.files) {
-              if (platformFile.size > maxFileSize) {
-                oversizedFiles.add(platformFile.name);
-                continue;
-              }
-              final safePath = await FileHelper.getSafePath(platformFile);
-              if (safePath != null) {
-                final file = File(safePath);
+              if (platformFile.path != null) {
+                final file = File(platformFile.path!);
                 await _processAndAddVideoFile(file);
               }
-            }
-            if (oversizedFiles.isNotEmpty && mounted) {
-              _showPermissionDialog(
-                'Files too large',
-                'The following files exceed the 20MB size limit and were not added:\n\n${oversizedFiles.join('\n')}',
-              );
             }
           }
         }
@@ -561,7 +524,6 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
   }
 
   Future<void> _pickPdf() async {
-    const int maxFileSize = 20971520; // 20 MB
     try {
       if (await _requestMediaPermissions('pdf')) {
         final result = await FilePicker.platform.pickFiles(
@@ -570,34 +532,28 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
           allowMultiple: true, // Allow multiple PDF files
         );
         if (result != null && result.files.isNotEmpty) {
-          List<String> oversizedFiles = [];
           for (var platformFile in result.files) {
-            if (platformFile.size > maxFileSize) {
-              oversizedFiles.add(platformFile.name);
-              continue;
-            }
-            final safePath = await FileHelper.getSafePath(platformFile);
-            if (safePath != null) {
-              final file = File(safePath);
-              print(
-                  '[NewPostScreen] PDF Picked: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
+            if (platformFile.path != null) {
+              final file = File(platformFile.path!);
+              print('[NewPostScreen] PDF Picked: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
               final int fileSize = await file.length();
-              final attachmentData = {
-                'file': file,
-                'type': 'pdf',
-                'filename': file.path.split('/').last,
-                'size': fileSize,
-              };
-              print(
-                  '[NewPostScreen] Adding to _selectedAttachments: $attachmentData');
-              _addAttachment(attachmentData);
+              final sizeInMB = fileSize / (1024 * 1024);
+              if (sizeInMB <= 20) { // Updated file size limit
+                final attachmentData = {
+                  'file': file,
+                  'type': 'pdf',
+                  'filename': file.path.split('/').last,
+                  'size': fileSize,
+                };
+                print('[NewPostScreen] Adding to _selectedAttachments: $attachmentData');
+                _addAttachment(attachmentData);
+              } else {
+                _showPermissionDialog(
+                  'File Size Error',
+                  'PDF file "${file.path.split('/').last}" exceeds 20MB limit and was not added.',
+                );
+              }
             }
-          }
-          if (oversizedFiles.isNotEmpty && mounted) {
-            _showPermissionDialog(
-              'Files too large',
-              'The following files exceed the 20MB size limit and were not added:\n\n${oversizedFiles.join('\n')}',
-            );
           }
         }
       }
@@ -610,7 +566,6 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
   }
 
   Future<void> _pickAudio() async {
-    const int maxFileSize = 20971520; // 20 MB
     try {
       if (await _requestMediaPermissions('audio')) {
         final result = await FilePicker.platform.pickFiles(
@@ -618,53 +573,44 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
           allowMultiple: true, // Allow multiple audio files
         );
         if (result != null && result.files.isNotEmpty) {
-          List<String> oversizedFiles = [];
           for (var platformFile in result.files) {
-            if (platformFile.size > maxFileSize) {
-              oversizedFiles.add(platformFile.name);
-              continue;
-            }
-            final safePath = await FileHelper.getSafePath(platformFile);
-            if (safePath != null) {
-              final file = File(safePath);
-              print(
-                  '[NewPostScreen] Audio Picked: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
+            if (platformFile.path != null) {
+              final file = File(platformFile.path!);
+              print('[NewPostScreen] Audio Picked: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
               final int fileSize = await file.length();
-              // Attempt to get duration
-              int? durationMs;
-              final tempAudioPlayer = AudioPlayer();
-              try {
-                await tempAudioPlayer.setSourceDeviceFile(file.path);
-                durationMs =
-                    (await tempAudioPlayer.getDuration())?.inMilliseconds;
-                await tempAudioPlayer.release();
-              } catch (e) {
-                print(
-                    '[NewPostScreen] Error getting audio duration for picked file: $e');
-                await tempAudioPlayer.release();
-              }
-              final durationSeconds =
-                  durationMs != null ? (durationMs / 1000).round() : null;
+              final sizeInMB = fileSize / (1024 * 1024);
+              if (sizeInMB <= 20) { // Updated file size limit
+                // Attempt to get duration
+                int? durationMs;
+                final tempAudioPlayer = AudioPlayer();
+                try {
+                  await tempAudioPlayer.setSourceDeviceFile(file.path);
+                  durationMs = (await tempAudioPlayer.getDuration())?.inMilliseconds;
+                  await tempAudioPlayer.release();
+                } catch (e) {
+                  print('[NewPostScreen] Error getting audio duration for picked file: $e');
+                  await tempAudioPlayer.release();
+                }
+                final durationSeconds = durationMs != null ? (durationMs / 1000).round() : null;
 
-              final attachmentData = {
-                'file': file,
-                'type': 'audio',
-                'filename': file.path.split('/').last,
-                'size': fileSize,
-                if (durationSeconds != null) 'duration': durationSeconds,
-              };
-              print(
-                  '[NewPostScreen] Adding to _selectedAttachments: $attachmentData');
-              _addAttachment(
-                  attachmentData); // Use a common method to add to list and update state
+                final attachmentData = {
+                  'file': file,
+                  'type': 'audio',
+                  'filename': file.path.split('/').last,
+                  'size': fileSize,
+                  if (durationSeconds != null) 'duration': durationSeconds,
+                };
+                print('[NewPostScreen] Adding to _selectedAttachments: $attachmentData');
+                _addAttachment(attachmentData); // Use a common method to add to list and update state
+              } else {
+                _showPermissionDialog(
+                  'File Size Error',
+                  'Audio file "${file.path.split('/').last}" exceeds 20MB limit and was not added.',
+                );
+              }
             }
           }
-          if (oversizedFiles.isNotEmpty && mounted) {
-            _showPermissionDialog(
-              'Files too large',
-              'The following files exceed the 20MB size limit and were not added:\n\n${oversizedFiles.join('\n')}',
-            );
-          }
+          // _addAttachment calls setState, so no explicit setState needed here after the loop.
         }
       }
     } catch (e) {

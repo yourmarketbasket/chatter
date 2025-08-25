@@ -174,7 +174,8 @@ class _MessageInputAreaState extends State<MessageInputArea> {
         }
 
         Map<String, dynamic> metadata = {
-          'file': file,
+          'file': File(file.path!),
+          'platformFile': file,
           'width': null,
           'height': null,
           'duration': null,

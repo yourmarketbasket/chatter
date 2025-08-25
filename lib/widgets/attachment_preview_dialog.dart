@@ -48,7 +48,10 @@ class _AttachmentPreviewDialogState extends State<AttachmentPreviewDialog> {
         // The parent widget is responsible for pre-filtering.
         final newFilesAsMaps = result.files
             .where((file) => file.path != null)
-            .map((file) => {'file': file})
+            .map((file) => {
+                  'file': File(file.path!),
+                  'platformFile': file,
+                })
             .toList();
         setState(() {
           _files.addAll(newFilesAsMaps);
@@ -61,8 +64,9 @@ class _AttachmentPreviewDialogState extends State<AttachmentPreviewDialog> {
   }
 
   Widget _buildPreview(Map<String, dynamic> fileData) {
-    final file = fileData['file'] as PlatformFile;
-    final extension = file.extension?.toLowerCase() ?? '';
+    final file = fileData['file'] as File;
+    final platformFile = fileData['platformFile'] as PlatformFile;
+    final extension = platformFile.extension?.toLowerCase() ?? '';
     Widget preview;
 
     switch (extension) {
@@ -73,7 +77,7 @@ class _AttachmentPreviewDialogState extends State<AttachmentPreviewDialog> {
         preview = FittedBox(
           fit: BoxFit.cover,
           clipBehavior: Clip.hardEdge,
-          child: Image.file(File(safePath)),
+          child: Image.file(file),
         );
         break;
       case 'mp4':
@@ -82,8 +86,8 @@ class _AttachmentPreviewDialogState extends State<AttachmentPreviewDialog> {
         final aspectRatio =
             double.tryParse(fileData['aspectRatio']?.toString() ?? '1.77');
         preview = BetterPlayerWidget(
-          file: File(file.path!),
-          displayPath: file.name,
+          file: file,
+          displayPath: platformFile.name,
           videoAspectRatioProp: aspectRatio,
           showSimpleControls: true,
         );
@@ -92,7 +96,7 @@ class _AttachmentPreviewDialogState extends State<AttachmentPreviewDialog> {
       case 'wav':
       case 'm4a':
         preview = AudioWaveformWidget(
-          audioPath: file.path!,
+          audioPath: file.path,
           isLocal: true,
         );
         break;
@@ -151,7 +155,6 @@ class _AttachmentPreviewDialogState extends State<AttachmentPreviewDialog> {
                       );
                     }
                     final fileData = _files[index];
-                    final file = fileData['file'] as PlatformFile;
                     return Stack(
                       alignment: Alignment.topRight,
                       children: [

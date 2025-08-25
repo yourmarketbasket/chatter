@@ -119,13 +119,15 @@ class _ChatScreenState extends State<ChatScreen> {
       'content': text?.trim() ?? '',
       'type': messageType,
       'files': files?.map((fileData) {
-            final file = fileData['file'] as PlatformFile;
+            final file = fileData['file'] as File;
+            final platformFile = fileData['platformFile'] as PlatformFile;
             return {
-              'url': file.path!,
-              'type':
-                  isVoiceNote ? 'voice' : _getMediaType(file.extension ?? ''),
-              'size': file.size,
-              'filename': file.name,
+              'url': file.path,
+              'type': isVoiceNote
+                  ? 'voice'
+                  : _getMediaType(platformFile.extension ?? ''),
+              'size': platformFile.size,
+              'filename': platformFile.name,
               'isUploading': true,
               'uploadProgress': 0.0,
               'width': fileData['width'],
@@ -150,13 +152,14 @@ class _ChatScreenState extends State<ChatScreen> {
     List<Map<String, dynamic>> uploadedFiles = [];
     if (files != null && files.isNotEmpty) {
       final attachmentsData = files.map((fileData) {
-        final file = fileData['file'] as PlatformFile;
+        final file = fileData['file'] as File;
+        final platformFile = fileData['platformFile'] as PlatformFile;
         final fileType =
-            isVoiceNote ? 'voice' : _getMediaType(file.extension ?? '');
+            isVoiceNote ? 'voice' : _getMediaType(platformFile.extension ?? '');
         return {
-          'file': File(file.path!),
+          'file': file,
           'type': fileType,
-          'filename': file.name,
+          'filename': platformFile.name,
           'width': fileData['width'],
           'height': fileData['height'],
           'aspectRatio': fileData['aspectRatio'],
