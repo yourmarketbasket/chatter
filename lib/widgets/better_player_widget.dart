@@ -179,7 +179,7 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
           autoPlay: false, // Should be false for feed, true for MediaViewPage (handled by caller)
           looping: false,
           aspectRatio: widget.videoAspectRatioProp ?? 16 / 9,
-          fit: BoxFit.fitWidth, // Ensure it covers the area
+          fit: BoxFit.contain,
           placeholder: _buildPlaceholder(), // Use the new placeholder
           controlsConfiguration: const BetterPlayerControlsConfiguration(
             showControls: false, // Custom controls are built on top usually
@@ -360,104 +360,28 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
         return _buildPlaceholder(); // Still show placeholder if not initialized and not actively loading
     }
 
-    // Controller is available and likely initialized (or BetterPlayer will show its internal placeholder from config)
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return GestureDetector(
-          onTap: _toggleControls,
-          child: Stack(
-            alignment: Alignment.bottomCenter,
-            children: [
-              Center(
-                // Removed the explicit AspectRatio widget wrapper.
-                // BetterPlayer with aspectRatio: null in its config will use intrinsic video ratio.
-                // The Center widget will handle centering if BoxFit.contain leads to letter/pillarboxing.
-                child: BetterPlayer(controller: _controller!),
-              ),
-              Positioned(
-                bottom: 20,
-                left: 20,
-                right: 20,
-                child: AnimatedOpacity(
-                  opacity: _fadeAnimation.value,
-                  duration: const Duration(milliseconds: 300),
-                  child: _showControls
-                      ? Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                          decoration: const BoxDecoration(
-                            color: Colors.transparent,
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              IconButton(
-                                icon: Icon(
-                                  _isPlaying ? Icons.pause : Icons.play_arrow,
-                                  color: Colors.tealAccent,
-                                  size: 30,
-                                ),
-                                onPressed: _isInitialized
-                                    ? () async {
-                                        if (_isPlaying) {
-                                          await _controller!.pause();
-                                        } else {
-                                          await _controller!.play();
-                                          setState(() {
-                                            _showControls = true;
-                                            _animationController.forward();
-                                          });
-                                          _hideControlsTimer?.cancel();
-                                          _hideControlsTimer = Timer(const Duration(seconds: 3), () {
-                                            if (mounted && _isPlaying) {
-                                              setState(() {
-                                                _showControls = false;
-                                                _animationController.reverse();
-                                              });
-                                            }
-                                          });
-                                        }
-                                        setState(() {});
-                                      }
-                                    : null,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                _formatDuration(_position),
-                                style: GoogleFonts.roboto(
-                                  color: Colors.white70,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Slider(
-                                  value: _duration.inMilliseconds > 0
-                                      ? _position.inMilliseconds / _duration.inMilliseconds
-                                      : 0.0,
-                                  onChanged: _isInitialized ? (value) => _seekToPosition(value) : null,
-                                  activeColor: Colors.tealAccent,
-                                  inactiveColor: Colors.grey,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                _formatDuration(_duration),
-                                style: GoogleFonts.roboto(
-                                  color: Colors.white70,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      : const SizedBox.shrink(),
-                ),
-              ),
-            ],
-          ),
-        );
+    // Controller is available and likely initialized
+    return GestureDetector(
+      onTap: () {
+        if (_controller != null) {
+          setState(() {
+            _controller!.isPlaying()! ? _controller!.pause() : _controller!.play();
+          });
+        }
       },
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          if (_controller != null)
+            BetterPlayer(controller: _controller!),
+          if (_controller != null && !_controller!.isPlaying()!)
+            Icon(
+              Icons.play_circle_filled,
+              color: Colors.white.withOpacity(0.8),
+              size: 48,
+            ),
+        ],
+      ),
     );
   }
 

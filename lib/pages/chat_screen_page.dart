@@ -579,7 +579,7 @@ class _ChatScreenState extends State<ChatScreen> {
             url: isLocalFile ? null : attachment['url'],
             file: isLocalFile ? File(attachment['url']) : null,
             displayPath: attachment['filename'] ?? 'video.mp4',
-            videoAspectRatioProp: 1.0,
+            videoAspectRatioProp: null,
             isFeedContext: false,
           ),
           builder: (context, snapshot) {

@@ -15,7 +15,7 @@ class VideoPlayerFactory {
   }) async {
     int sdkVersion = await DeviceInfoService.getAndroidSDKVersion();
 
-    if (Platform.isAndroid && sdkVersion <= 35) { // Android 15 is API level 35
+    if (Platform.isAndroid && sdkVersion < 33) { // Android 13 is API level 33
       return BetterPlayerWidget(
         url: url,
         file: file,
