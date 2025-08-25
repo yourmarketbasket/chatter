@@ -12,10 +12,9 @@ import 'dart:io';
 import 'package:chatter/pages/media_view_page.dart';
 import 'package:get/get.dart';
 import 'package:chatter/widgets/message_input_area.dart';
-import 'package:video_player/video_player.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:chatter/widgets/video_player_widget.dart';
+import 'package:chatter/widgets/better_player_widget.dart';
 import 'package:chatter/widgets/audio_waveform_widget.dart';
 import 'package:chatter/widgets/all_attachments_dialog.dart';
 import 'package:chatter/widgets/reply_message_snippet.dart';
@@ -574,10 +573,11 @@ class _ChatScreenState extends State<ChatScreen> {
         );
         break;
       case 'video/mp4':
-        content = VideoPlayerWidget(
+        content = BetterPlayerWidget(
           key: key,
           url: isLocalFile ? null : attachment['url'],
           file: isLocalFile ? File(attachment['url']) : null,
+          displayPath: attachment['filename'] ?? 'video.mp4',
         );
         break;
       case 'audio/mp3':
