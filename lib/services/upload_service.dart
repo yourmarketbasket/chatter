@@ -74,6 +74,7 @@ class UploadService {
     final Set<String> videoExtensionsForCompression = {'mp4', 'mov', 'avi', 'mkv', 'webm'};
 
     for (Map<String, dynamic> attachmentMap in attachmentsData) {
+      print('[UploadService] Processing attachment: $attachmentMap');
       final File originalFile = attachmentMap['file'] as File;
       final String? safePath = attachmentMap['safePath'] as String?;
       final originalFilePath = originalFile.path;
@@ -131,6 +132,7 @@ class UploadService {
 
         final fileExtension = path.extension(originalFilePath).toLowerCase().replaceFirst('.', '');
         final resourceType = extensionToResourceType[fileExtension] ?? 'auto'; // Cloudinary resource type
+        print('[UploadService] Cloudinary resourceType: $resourceType');
         print('[UploadService uploadFilesToCloudinary] File: $originalFilePath, extension: $fileExtension, attachmentType: $attachmentType, cloudinary_resource_type: $resourceType');
 
         // Thumbnail generation for videos. This should happen AFTER our CompressionService has run.
@@ -166,6 +168,8 @@ class UploadService {
                     validateStatus: (status) => status != null && status >= 200 && status < 500,
                  ),
               );
+              print(
+                  '[UploadService] Thumbnail upload response: ${thumbResponse.statusCode} ${thumbResponse.data}');
               if (thumbResponse.statusCode == 200 && thumbResponse.data != null) {
                 uploadedThumbnailUrl = thumbResponse.data['secure_url'] as String?;
                 print('[UploadService uploadFilesToCloudinary] Thumbnail uploaded for $originalFilePath: $uploadedThumbnailUrl');
@@ -187,6 +191,7 @@ class UploadService {
           'upload_preset': 'testpreset1',
           'resource_type': resourceType,
         });
+        print('[UploadService] Main file FormData: ${formData.fields}');
 
         // This local 'uploadProgress' variable is not used for the callback, so it can be removed.
         // double uploadProgress = 0.0;
@@ -206,6 +211,8 @@ class UploadService {
             }
           },
         );
+        print(
+            '[UploadService] Main file upload response: ${response.statusCode} ${response.data}');
         // testing comment
 
         // After this file is uploaded (successfully or not), add its total size to cumulativeSentBytes
