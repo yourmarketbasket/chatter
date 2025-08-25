@@ -3,6 +3,7 @@ import 'dart:ui' as BorderType;
 import 'package:chatter/controllers/data-controller.dart';
 import 'package:chatter/pages/group_profile_page.dart';
 import 'package:chatter/pages/profile_page.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:chatter/widgets/better_player_widget.dart';
 import 'package:dotted_border/dotted_border.dart';
 import 'package:flutter/material.dart';
@@ -593,17 +594,25 @@ class _ChatScreenState extends State<ChatScreen> {
     switch (attachmentType) {
       case 'image/jpeg':
       case 'image/png':
-        content = Container(
-          key: key,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            image: DecorationImage(
-              image: isLocalFile
-                  ? FileImage(File(attachment['url']))
-                  : NetworkImage(attachment['url']) as ImageProvider,
-              fit: BoxFit.cover,
-            ),
-          ),
+        content = ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: isLocalFile
+              ? Image.file(File(attachment['url']), fit: BoxFit.cover)
+              : CachedNetworkImage(
+                  imageUrl: attachment['url'],
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => Container(
+                    color: Colors.grey[800],
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    ),
+                  ),
+                  errorWidget: (context, url, error) =>
+                      const Icon(Icons.error),
+                ),
         );
         break;
       case 'video/mp4':

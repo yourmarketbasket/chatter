@@ -5,7 +5,6 @@ import 'package:video_compress/video_compress.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
-import 'compression_service.dart'; // Import the new compression service
 
 class UploadService {
   final dio.Dio _dio = dio.Dio(dio.BaseOptions(
@@ -15,7 +14,6 @@ class UploadService {
     receiveTimeout: const Duration(seconds: 60),
     sendTimeout: const Duration(seconds: 60),
   ));
-  final CompressionService _compressionService = CompressionService(); // Instantiate CompressionService
 
   Future<List<Map<String, dynamic>>> uploadFilesToCloudinary(
     List<Map<String, dynamic>> attachmentsData,
@@ -92,25 +90,6 @@ class UploadService {
       File? tempThumbnailFile; // To keep track of thumbnail file for deletion
 
       try {
-        // --- Call CompressionService ---
-        if (kDebugMode) {
-          print('[UploadService] Attempting compression for ${originalFile.path} of type $attachmentType');
-        }
-        File compressedFile = await _compressionService.compressFile(originalFile, attachmentType);
-        if (compressedFile.path != originalFile.path) {
-          if (kDebugMode) {
-            print('[UploadService] Compression successful. Original size: $originalFileSize, Compressed size: ${await compressedFile.length()}');
-          }
-          fileToUpload = compressedFile;
-        } else {
-          if (kDebugMode) {
-            print('[UploadService] Compression did not reduce size or was not applied. Using original file.');
-          }
-          fileToUpload = originalFile; // Ensure it's set back if no compression occurred or was worse
-        }
-        // --- End CompressionService call ---
-
-
         if (!await fileToUpload.exists()) { // Check existence of the file we intend to upload
           print('[UploadService uploadFilesToCloudinary] File does not exist: $originalFilePath');
           results.add({
