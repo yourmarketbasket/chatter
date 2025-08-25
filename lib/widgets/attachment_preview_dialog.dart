@@ -164,6 +164,7 @@ class _AttachmentPreviewDialogState extends State<AttachmentPreviewDialog> {
           file: File(safePath),
           displayPath: file.name,
           videoAspectRatioProp: aspectRatio,
+          showSimpleControls: true,
         );
         break;
       case 'mp3':

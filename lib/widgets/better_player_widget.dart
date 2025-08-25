@@ -15,6 +15,7 @@ class BetterPlayerWidget extends StatefulWidget {
   final String? thumbnailUrl;
   final bool isFeedContext;
   final double? videoAspectRatioProp; // Added to receive aspect ratio for placeholder
+  final bool showSimpleControls;
 
   const BetterPlayerWidget({
     Key? key,
@@ -24,6 +25,7 @@ class BetterPlayerWidget extends StatefulWidget {
     this.thumbnailUrl,
     this.isFeedContext = false,
     this.videoAspectRatioProp, // Added
+    this.showSimpleControls = false,
   }) : super(key: key);
 
   @override
@@ -333,6 +335,28 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
     );
   }
 
+  Widget _buildSimpleControls() {
+    return Center(
+      child: IconButton(
+        icon: Icon(
+          _isPlaying ? Icons.pause : Icons.play_arrow,
+          color: Colors.tealAccent,
+          size: 40,
+        ),
+        onPressed: _isInitialized
+            ? () {
+                if (_isPlaying) {
+                  _controller!.pause();
+                } else {
+                  _controller!.play();
+                }
+                setState(() {});
+              }
+            : null,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_errorMessage != null) {
@@ -341,13 +365,12 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
       return _buildError(
           context,
           message: _errorMessage,
-          fileName: widget.displayPath.split('/').last
-      );
+          fileName: widget.displayPath.split('/').last);
     }
 
     // If controller is null (init hasn't happened or failed very early) or still loading, show placeholder.
     // _isLoading is true initially and set to false on BetterPlayerEventType.initialized or playing.
-    if (_controller == null || (_isLoading && !_isInitialized) ) {
+    if (_controller == null || (_isLoading && !_isInitialized)) {
       return _buildPlaceholder();
     }
 
@@ -357,7 +380,32 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
     // The _errorMessage check above should catch most failure scenarios.
     // If _isInitialized is false here, it means initialization event hasn't fired or failed.
     if (!_isInitialized && !_isLoading) {
-        return _buildPlaceholder(); // Still show placeholder if not initialized and not actively loading
+      return _buildPlaceholder(); // Still show placeholder if not initialized and not actively loading
+    }
+
+    if (widget.showSimpleControls) {
+      return GestureDetector(
+        onTap: () {
+          // Toggle play/pause on tap
+          if (_isInitialized) {
+            if (_isPlaying) {
+              _controller!.pause();
+            } else {
+              _controller!.play();
+            }
+            setState(() {});
+          }
+        },
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Center(
+              child: BetterPlayer(controller: _controller!),
+            ),
+            if (!_isPlaying) _buildSimpleControls(),
+          ],
+        ),
+      );
     }
 
     // Controller is available and likely initialized (or BetterPlayer will show its internal placeholder from config)
@@ -383,7 +431,8 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
                   duration: const Duration(milliseconds: 300),
                   child: _showControls
                       ? Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8.0, vertical: 4.0),
                           decoration: const BoxDecoration(
                             color: Colors.transparent,
                           ),
@@ -408,7 +457,8 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
                                             _animationController.forward();
                                           });
                                           _hideControlsTimer?.cancel();
-                                          _hideControlsTimer = Timer(const Duration(seconds: 3), () {
+                                          _hideControlsTimer = Timer(
+                                              const Duration(seconds: 3), () {
                                             if (mounted && _isPlaying) {
                                               setState(() {
                                                 _showControls = false;
@@ -433,9 +483,12 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
                               Expanded(
                                 child: Slider(
                                   value: _duration.inMilliseconds > 0
-                                      ? _position.inMilliseconds / _duration.inMilliseconds
+                                      ? _position.inMilliseconds /
+                                          _duration.inMilliseconds
                                       : 0.0,
-                                  onChanged: _isInitialized ? (value) => _seekToPosition(value) : null,
+                                  onChanged: _isInitialized
+                                      ? (value) => _seekToPosition(value)
+                                      : null,
                                   activeColor: Colors.tealAccent,
                                   inactiveColor: Colors.grey,
                                 ),
