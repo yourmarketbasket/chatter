@@ -66,6 +66,11 @@ class Attachment {
   final num size;
   final String? type;
   final String? thumbnailUrl;
+  final String? aspectRatio;
+  final num? height;
+  final num? width;
+  final num? duration;
+  final String? orientation;
 
   Attachment({
     required this.filename,
@@ -73,6 +78,11 @@ class Attachment {
     required this.size,
     this.type,
     this.thumbnailUrl,
+    this.aspectRatio,
+    this.height,
+    this.width,
+    this.duration,
+    this.orientation,
   });
 
   factory Attachment.fromJson(Map<String, dynamic> json) {
@@ -82,6 +92,11 @@ class Attachment {
       size: json['size'] as num,
       type: json['type'] as String?,
       thumbnailUrl: json['thumbnailUrl'] as String?,
+      aspectRatio: json['aspectRatio'] as String?,
+      height: json['height'] as num?,
+      width: json['width'] as num?,
+      duration: json['duration'] as num?,
+      orientation: json['orientation'] as String?,
     );
   }
 
@@ -92,6 +107,11 @@ class Attachment {
       'size': size,
       'type': type,
       'thumbnailUrl': thumbnailUrl,
+      'aspectRatio': aspectRatio,
+      'height': height,
+      'width': width,
+      'duration': duration,
+      'orientation': orientation,
     };
   }
 }

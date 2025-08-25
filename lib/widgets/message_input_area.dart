@@ -10,9 +10,11 @@ import 'package:chatter/widgets/voice_note_preview_dialog.dart';
 import 'package:chatter/widgets/attachment_preview_dialog.dart';
 import 'package:chatter/services/socket-service.dart';
 import 'package:chatter/controllers/data-controller.dart';
+import 'package:image/image.dart' as img;
+import 'package:flutter_video_info/flutter_video_info.dart';
 
 class MessageInputArea extends StatefulWidget {
-  final Function(String text, List<PlatformFile> files) onSend;
+  final Function(String text, List<Map<String, dynamic>> files) onSend;
 
   const MessageInputArea({
     super.key,
@@ -28,6 +30,7 @@ class _MessageInputAreaState extends State<MessageInputArea> {
   final AudioRecorder _audioRecorder = AudioRecorder();
   final SocketService _socketService = Get.find<SocketService>();
   final DataController _dataController = Get.find<DataController>();
+  final FlutterVideoInfo _videoInfo = FlutterVideoInfo();
 
   bool _isTyping = false;
   bool _isRecording = false;
@@ -97,7 +100,8 @@ class _MessageInputAreaState extends State<MessageInputArea> {
     if (status.isGranted) {
       try {
         final appDocumentsDir = await getApplicationDocumentsDirectory();
-        final path = '${appDocumentsDir.path}/audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
+        final path =
+            '${appDocumentsDir.path}/audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
         await _audioRecorder.start(const RecordConfig(), path: path);
         setState(() {
           _isRecording = true;
@@ -137,7 +141,9 @@ class _MessageInputAreaState extends State<MessageInputArea> {
               path: path,
               size: 0, // Placeholder, as we don't have the size here
             );
-            widget.onSend('', [file]);
+            widget.onSend('', [
+              {'file': file}
+            ]);
             Navigator.of(context).pop();
           },
         );
@@ -150,15 +156,69 @@ class _MessageInputAreaState extends State<MessageInputArea> {
       final result = await FilePicker.platform.pickFiles(allowMultiple: true);
       if (result == null || result.files.isEmpty) return;
 
+      List<Map<String, dynamic>> filesWithMetadata = [];
+      for (var file in result.files) {
+        Map<String, dynamic> metadata = {
+          'file': file,
+          'width': null,
+          'height': null,
+          'duration': null,
+          'orientation': null,
+          'aspectRatio': null,
+        };
+
+        if (file.path != null) {
+          final extension = file.extension?.toLowerCase();
+          if (extension == 'jpg' ||
+              extension == 'jpeg' ||
+              extension == 'png' ||
+              extension == 'gif' ||
+              extension == 'bmp' ||
+              extension == 'webp') {
+            final imageFile = File(file.path!);
+            final image = img.decodeImage(await imageFile.readAsBytes());
+            if (image != null) {
+              metadata['width'] = image.width;
+              metadata['height'] = image.height;
+              metadata['aspectRatio'] =
+                  (image.width / image.height).toStringAsFixed(2);
+            }
+          } else if (extension == 'mp4' ||
+              extension == 'mov' ||
+              extension == 'avi' ||
+              extension == 'mkv' ||
+              extension == 'webm') {
+            try {
+              final info = await _videoInfo.getVideoInfo(file.path!);
+              if (info != null) {
+                metadata['width'] = info.width;
+                metadata['height'] = info.height;
+                metadata['duration'] = info.duration;
+                metadata['orientation'] = info.orientation;
+                if (info.width != null &&
+                    info.height != null &&
+                    info.height! > 0) {
+                  metadata['aspectRatio'] =
+                      (info.width! / info.height!).toStringAsFixed(2);
+                }
+              }
+            } catch (e) {
+              print("Error getting video info: $e");
+            }
+          }
+        }
+        filesWithMetadata.add(metadata);
+      }
+
       final dialogResult = await showDialog<Map<String, dynamic>>(
         context: context,
         builder: (context) => AttachmentPreviewDialog(
-          files: result.files,
+          files: filesWithMetadata,
         ),
       );
 
       if (dialogResult != null) {
-        final List<PlatformFile> files = dialogResult['files'];
+        final List<Map<String, dynamic>> files = dialogResult['files'];
         final String caption = dialogResult['caption'];
         if (files.isNotEmpty || caption.isNotEmpty) {
           widget.onSend(caption, files);

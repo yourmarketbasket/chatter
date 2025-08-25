@@ -1,23 +1,26 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:chatter/widgets/video_player_widget.dart';
 import 'package:chatter/widgets/audio_waveform_widget.dart';
+import 'package:image/image.dart' as img;
+import 'package:flutter_video_info/flutter_video_info.dart';
 
 class AttachmentPreviewDialog extends StatefulWidget {
-  final List<PlatformFile> files;
+  final List<Map<String, dynamic>> files;
 
   const AttachmentPreviewDialog({super.key, required this.files});
 
   @override
-  State<AttachmentPreviewDialog> createState() => _AttachmentPreviewDialogState();
+  State<AttachmentPreviewDialog> createState() =>
+      _AttachmentPreviewDialogState();
 }
 
 class _AttachmentPreviewDialogState extends State<AttachmentPreviewDialog> {
-  late List<PlatformFile> _files;
+  late List<Map<String, dynamic>> _files;
   final TextEditingController _captionController = TextEditingController();
+  final FlutterVideoInfo _videoInfo = FlutterVideoInfo();
 
   @override
   void initState() {
@@ -41,8 +44,61 @@ class _AttachmentPreviewDialogState extends State<AttachmentPreviewDialog> {
     try {
       final result = await FilePicker.platform.pickFiles(allowMultiple: true);
       if (result != null && result.files.isNotEmpty) {
+        List<Map<String, dynamic>> newFilesWithMetadata = [];
+        for (var file in result.files) {
+          Map<String, dynamic> metadata = {
+            'file': file,
+            'width': null,
+            'height': null,
+            'duration': null,
+            'orientation': null,
+            'aspectRatio': null,
+          };
+
+          if (file.path != null) {
+            final extension = file.extension?.toLowerCase();
+            if (extension == 'jpg' ||
+                extension == 'jpeg' ||
+                extension == 'png' ||
+                extension == 'gif' ||
+                extension == 'bmp' ||
+                extension == 'webp') {
+              final imageFile = File(file.path!);
+              final image = img.decodeImage(await imageFile.readAsBytes());
+              if (image != null) {
+                metadata['width'] = image.width;
+                metadata['height'] = image.height;
+                metadata['aspectRatio'] =
+                    (image.width / image.height).toStringAsFixed(2);
+              }
+            } else if (extension == 'mp4' ||
+                extension == 'mov' ||
+                extension == 'avi' ||
+                extension == 'mkv' ||
+                extension == 'webm') {
+              try {
+                final info = await _videoInfo.getVideoInfo(file.path!);
+                if (info != null) {
+                  metadata['width'] = info.width;
+                  metadata['height'] = info.height;
+                  metadata['duration'] = info.duration;
+                  metadata['orientation'] = info.orientation;
+                  if (info.width != null &&
+                      info.height != null &&
+                      info.height! > 0) {
+                    metadata['aspectRatio'] =
+                        (info.width! / info.height!).toStringAsFixed(2);
+                  }
+                }
+              } catch (e) {
+                print("Error getting video info: $e");
+              }
+            }
+          }
+          newFilesWithMetadata.add(metadata);
+        }
         setState(() {
-          _files.addAll(result.files);
+          _files.addAll(newFilesWithMetadata);
         });
       }
     } catch (e) {
@@ -56,7 +112,9 @@ class _AttachmentPreviewDialogState extends State<AttachmentPreviewDialog> {
     Widget preview;
 
     // Use file.path for mobile/desktop, fallback to bytes for web
-    final imageProvider = file.path != null ? FileImage(File(file.path!)) : MemoryImage(file.bytes!) as ImageProvider;
+    final imageProvider = file.path != null
+        ? FileImage(File(file.path!))
+        : MemoryImage(file.bytes!) as ImageProvider;
 
     switch (extension) {
       case 'jpg':
@@ -74,7 +132,9 @@ class _AttachmentPreviewDialogState extends State<AttachmentPreviewDialog> {
       case 'avi':
         preview = VideoPlayerWidget(
           file: file.path != null ? File(file.path!) : null,
-          url: file.path == null ? 'data:video/mp4;base64,${base64Encode(file.bytes!)}' : null,
+          url: file.path == null
+              ? 'data:video/mp4;base64,${base64Encode(file.bytes!)}'
+              : null,
         );
         break;
       case 'mp3':
@@ -86,10 +146,12 @@ class _AttachmentPreviewDialogState extends State<AttachmentPreviewDialog> {
         );
         break;
       case 'pdf':
-        preview = const Icon(Icons.picture_as_pdf, size: 50, color: Colors.white);
+        preview =
+            const Icon(Icons.picture_as_pdf, size: 50, color: Colors.white);
         break;
       default:
-        preview = const Icon(Icons.insert_drive_file, size: 50, color: Colors.white);
+        preview =
+            const Icon(Icons.insert_drive_file, size: 50, color: Colors.white);
     }
 
     return Center(child: preview);

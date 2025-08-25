@@ -3,6 +3,7 @@ import 'dart:ui' as BorderType;
 import 'package:chatter/controllers/data-controller.dart';
 import 'package:chatter/pages/group_profile_page.dart';
 import 'package:chatter/pages/profile_page.dart';
+import 'package:chatter/widgets/better_player_widget.dart';
 import 'package:dotted_border/dotted_border.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
@@ -15,7 +16,6 @@ import 'package:chatter/widgets/message_input_area.dart';
 import 'package:video_player/video_player.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:chatter/widgets/video_player_widget.dart';
 import 'package:chatter/widgets/audio_waveform_widget.dart';
 import 'package:chatter/widgets/all_attachments_dialog.dart';
 import 'package:chatter/widgets/reply_message_snippet.dart';
@@ -92,13 +92,18 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  void _sendMessage(String? text, List<PlatformFile>? files, {bool isVoiceNote = false}) async {
+  void _sendMessage(String? text, List<Map<String, dynamic>>? files,
+      {bool isVoiceNote = false}) async {
     if ((text?.trim().isEmpty ?? true) && (files?.isEmpty ?? true)) {
       return;
     }
 
     final clientMessageId = const Uuid().v4();
-    final messageType = isVoiceNote ? 'voice' : (files?.isNotEmpty ?? false) ? 'attachment' : 'text';
+    final messageType = isVoiceNote
+        ? 'voice'
+        : (files?.isNotEmpty ?? false)
+            ? 'attachment'
+            : 'text';
     final now = DateTime.now().toUtc();
 
     // Create a temporary message for optimistic UI update
@@ -112,14 +117,24 @@ class _ChatScreenState extends State<ChatScreen> {
       },
       'content': text?.trim() ?? '',
       'type': messageType,
-      'files': files?.map((file) => {
-            'url': file.path!,
-            'type': isVoiceNote ? 'voice' : _getMediaType(file.extension ?? ''),
-            'size': file.size,
-            'filename': file.name,
-            'isUploading': true,
-            'uploadProgress': 0.0,
-          }).toList() ?? [],
+      'files': files?.map((fileData) {
+            final file = fileData['file'] as PlatformFile;
+            return {
+              'url': file.path!,
+              'type':
+                  isVoiceNote ? 'voice' : _getMediaType(file.extension ?? ''),
+              'size': file.size,
+              'filename': file.name,
+              'isUploading': true,
+              'uploadProgress': 0.0,
+              'width': fileData['width'],
+              'height': fileData['height'],
+              'aspectRatio': fileData['aspectRatio'],
+              'duration': fileData['duration'],
+              'orientation': fileData['orientation'],
+            };
+          }).toList() ??
+          [],
       'replyTo': _replyingTo?['_id'],
       'viewOnce': false,
       'createdAt': now.toIso8601String(),
@@ -130,16 +145,22 @@ class _ChatScreenState extends State<ChatScreen> {
     // Add the temporary message to the UI
     dataController.addTemporaryMessage(tempMessage);
     _messageController.clear();
-    
 
     List<Map<String, dynamic>> uploadedFiles = [];
     if (files != null && files.isNotEmpty) {
-      final attachmentsData = files.map((file) {
-        final fileType = isVoiceNote ? 'voice' : _getMediaType(file.extension ?? '');
+      final attachmentsData = files.map((fileData) {
+        final file = fileData['file'] as PlatformFile;
+        final fileType =
+            isVoiceNote ? 'voice' : _getMediaType(file.extension ?? '');
         return {
           'file': File(file.path!),
           'type': fileType,
           'filename': file.name,
+          'width': fileData['width'],
+          'height': fileData['height'],
+          'aspectRatio': fileData['aspectRatio'],
+          'duration': fileData['duration'],
+          'orientation': fileData['orientation'],
         };
       }).toList();
 
@@ -157,12 +178,20 @@ class _ChatScreenState extends State<ChatScreen> {
         return;
       }
 
-      uploadedFiles = uploadResults.map((result) => {
-        'url': result['url'],
-        'type': result['type'],
-        'size': result['size'],
-        'filename': result['filename'],
-      }).toList();
+      uploadedFiles = uploadResults
+          .map((result) => {
+                'url': result['url'],
+                'type': result['type'],
+                'size': result['size'],
+                'filename': result['filename'],
+                'thumbnailUrl': result['thumbnailUrl'],
+                'width': result['width'],
+                'height': result['height'],
+                'aspectRatio': result['aspectRatio'],
+                'duration': result['duration'],
+                'orientation': result['orientation'],
+              })
+          .toList();
     }
 
     
@@ -471,7 +500,11 @@ class _ChatScreenState extends State<ChatScreen> {
       final hasMore = attachments.length > maxVisible;
       final gridItemCount = hasMore ? maxVisible : attachments.length;
       final crossAxisCount = attachments.length == 1 ? 1 : 2;
-      final aspectRatio = attachments.length == 1 ? 3 / 4 : 1.0;
+      final aspectRatio = attachments.length == 1
+          ? (double.tryParse(
+                  attachments.first['aspectRatio']?.toString() ?? '1.0') ??
+              1.0)
+          : 1.0;
 
       return GridView.builder(
         shrinkWrap: true,
@@ -574,10 +607,14 @@ class _ChatScreenState extends State<ChatScreen> {
         );
         break;
       case 'video/mp4':
-        content = VideoPlayerWidget(
+        content = BetterPlayerWidget(
           key: key,
           url: isLocalFile ? null : attachment['url'],
           file: isLocalFile ? File(attachment['url']) : null,
+          thumbnailUrl: attachment['thumbnailUrl'],
+          displayPath: attachment['filename'],
+          videoAspectRatioProp: double.tryParse(
+              attachment['aspectRatio']?.toString() ?? '1.77'),
         );
         break;
       case 'audio/mp3':
@@ -1353,7 +1390,10 @@ class _ChatScreenState extends State<ChatScreen> {
             MessageInputArea(
               onSend: (text, files) {
                 final isVoiceNote = files.isNotEmpty &&
-                    _getMediaType(files.first.extension ?? '') == 'audio/mp3';
+                    _getMediaType(
+                            (files.first['file'] as PlatformFile).extension ??
+                                '') ==
+                        'audio/mp3';
                 _sendMessage(text, files, isVoiceNote: isVoiceNote);
               },
             ),
