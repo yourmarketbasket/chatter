@@ -10,6 +10,7 @@ import 'package:chatter/widgets/voice_note_preview_dialog.dart';
 import 'package:chatter/widgets/attachment_preview_dialog.dart';
 import 'package:chatter/services/socket-service.dart';
 import 'package:chatter/controllers/data-controller.dart';
+import 'package:chatter/helpers/file_helper.dart';
 import 'package:image/image.dart' as img;
 import 'package:flutter_video_info/flutter_video_info.dart';
 
@@ -152,14 +153,31 @@ class _MessageInputAreaState extends State<MessageInputArea> {
   }
 
   Future<void> _pickAttachments() async {
+    const int maxFileSize = 20971520; // 20 MB
+
     try {
       final result = await FilePicker.platform.pickFiles(allowMultiple: true);
       if (result == null || result.files.isEmpty) return;
 
       List<Map<String, dynamic>> filesWithMetadata = [];
+      List<String> oversizedFiles = [];
+
       for (var file in result.files) {
+        if (file.size > maxFileSize) {
+          oversizedFiles.add(file.name);
+          continue;
+        }
+
+        final safePath = await FileHelper.getSafePath(file);
+        if (safePath == null) {
+          // Handle case where path could not be determined
+          print('Could not determine path for file: ${file.name}');
+          continue;
+        }
+
         Map<String, dynamic> metadata = {
           'file': file,
+          'safePath': safePath,
           'width': null,
           'height': null,
           'duration': null,
@@ -167,48 +185,65 @@ class _MessageInputAreaState extends State<MessageInputArea> {
           'aspectRatio': null,
         };
 
-        if (file.path != null) {
-          final extension = file.extension?.toLowerCase();
-          if (extension == 'jpg' ||
-              extension == 'jpeg' ||
-              extension == 'png' ||
-              extension == 'gif' ||
-              extension == 'bmp' ||
-              extension == 'webp') {
-            final imageFile = File(file.path!);
-            final image = img.decodeImage(await imageFile.readAsBytes());
-            if (image != null) {
-              metadata['width'] = image.width;
-              metadata['height'] = image.height;
-              metadata['aspectRatio'] =
-                  (image.width / image.height).toStringAsFixed(2);
-            }
-          } else if (extension == 'mp4' ||
-              extension == 'mov' ||
-              extension == 'avi' ||
-              extension == 'mkv' ||
-              extension == 'webm') {
-            try {
-              final info = await _videoInfo.getVideoInfo(file.path!);
-              if (info != null) {
-                metadata['width'] = info.width;
-                metadata['height'] = info.height;
-                metadata['duration'] = info.duration;
-                metadata['orientation'] = info.orientation;
-                if (info.width != null &&
-                    info.height != null &&
-                    info.height! > 0) {
-                  metadata['aspectRatio'] =
-                      (info.width! / info.height!).toStringAsFixed(2);
-                }
+        final extension = file.extension?.toLowerCase();
+        if (extension == 'jpg' ||
+            extension == 'jpeg' ||
+            extension == 'png' ||
+            extension == 'gif' ||
+            extension == 'bmp' ||
+            extension == 'webp') {
+          final imageFile = File(safePath);
+          final image = img.decodeImage(await imageFile.readAsBytes());
+          if (image != null) {
+            metadata['width'] = image.width;
+            metadata['height'] = image.height;
+            metadata['aspectRatio'] =
+                (image.width / image.height).toStringAsFixed(2);
+          }
+        } else if (extension == 'mp4' ||
+            extension == 'mov' ||
+            extension == 'avi' ||
+            extension == 'mkv' ||
+            extension == 'webm') {
+          try {
+            final info = await _videoInfo.getVideoInfo(safePath);
+            if (info != null) {
+              metadata['width'] = info.width;
+              metadata['height'] = info.height;
+              metadata['duration'] = info.duration;
+              metadata['orientation'] = info.orientation;
+              if (info.width != null &&
+                  info.height != null &&
+                  info.height! > 0) {
+                metadata['aspectRatio'] =
+                    (info.width! / info.height!).toStringAsFixed(2);
               }
-            } catch (e) {
-              print("Error getting video info: $e");
             }
+          } catch (e) {
+            print("Error getting video info: $e");
           }
         }
         filesWithMetadata.add(metadata);
       }
+
+      if (oversizedFiles.isNotEmpty && mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Files too large'),
+            content: Text(
+                'The following files exceed the 20MB size limit and were not added:\n\n${oversizedFiles.join('\n')}'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+
+      if (filesWithMetadata.isEmpty) return;
 
       final dialogResult = await showDialog<Map<String, dynamic>>(
         context: context,

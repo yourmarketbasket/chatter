@@ -75,6 +75,7 @@ class UploadService {
 
     for (Map<String, dynamic> attachmentMap in attachmentsData) {
       final File originalFile = attachmentMap['file'] as File;
+      final String? safePath = attachmentMap['safePath'] as String?;
       final originalFilePath = originalFile.path;
       final int? width = attachmentMap['width'] as int?;
       final int? height = attachmentMap['height'] as int?;
@@ -276,17 +277,23 @@ class UploadService {
       } finally {
         // Cleanup: Delete the file that was uploaded if it's a temporary compressed file.
         // The CompressionService creates files in a temporary directory.
-        bool isTempCompressedFile = fileToUpload.path != originalFile.path && fileToUpload.path.contains((await getTemporaryDirectory()).path);
-
-        if (isTempCompressedFile && await fileToUpload.exists()) {
-          try {
-            await fileToUpload.delete();
-            if (kDebugMode) {
-              print('[UploadService] Deleted temporary compressed file from CompressionService: ${fileToUpload.path}');
-            }
-          } catch (e) {
-            if (kDebugMode) {
-              print('[UploadService] Error deleting temporary compressed file ${fileToUpload.path}: $e');
+        if (safePath != null) {
+          final tempDir = await getTemporaryDirectory();
+          if (safePath.contains(tempDir.path)) {
+            try {
+              final tempFile = File(safePath);
+              if (await tempFile.exists()) {
+                await tempFile.delete();
+                if (kDebugMode) {
+                  print(
+                      '[UploadService] Deleted temporary file from FileHelper: $safePath');
+                }
+              }
+            } catch (e) {
+              if (kDebugMode) {
+                print(
+                    '[UploadService] Error deleting temporary file $safePath: $e');
+              }
             }
           }
         }
