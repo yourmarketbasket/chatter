@@ -16,6 +16,8 @@ import 'package:video_player/video_player.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:chatter/widgets/video_player_widget.dart';
+import 'package:chatter/widgets/better_player_widget.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:chatter/widgets/audio_waveform_widget.dart';
 import 'package:chatter/widgets/all_attachments_dialog.dart';
 import 'package:chatter/widgets/reply_message_snippet.dart';
@@ -36,10 +38,12 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   Map<String, dynamic>? _replyingTo;
+  int _sdkInt = 0;
 
   @override
   void initState() {
     super.initState();
+    _getAndroidSdkInt();
     final chatId = dataController.currentChat.value['_id'] as String?;
     dataController.activeChatId.value = chatId;
 
@@ -71,6 +75,17 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _loadMessages() async {
     await dataController.fetchMessages(dataController.currentChat.value['_id']!);
+  }
+
+  void _getAndroidSdkInt() async {
+    if (Platform.isAndroid) {
+      final deviceInfo = await DeviceInfoPlugin().androidInfo;
+      if (mounted) {
+        setState(() {
+          _sdkInt = deviceInfo.version.sdkInt;
+        });
+      }
+    }
   }
 
   @override
@@ -574,11 +589,22 @@ class _ChatScreenState extends State<ChatScreen> {
         );
         break;
       case 'video/mp4':
-        content = VideoPlayerWidget(
-          key: key,
-          url: isLocalFile ? null : attachment['url'],
-          file: isLocalFile ? File(attachment['url']) : null,
-        );
+        // Use BetterPlayer for Android versions lower than 13 (SDK 33)
+        if (Platform.isAndroid && _sdkInt > 0 && _sdkInt < 33) {
+          content = BetterPlayerWidget(
+            key: key,
+            url: isLocalFile ? null : attachment['url'],
+            file: isLocalFile ? File(attachment['url']) : null,
+            displayPath: attachment['filename'] ?? 'video.mp4',
+          );
+        } else {
+          // Use VideoPlayer for other platforms or Android 13+
+          content = VideoPlayerWidget(
+            key: key,
+            url: isLocalFile ? null : attachment['url'],
+            file: isLocalFile ? File(attachment['url']) : null,
+          );
+        }
         break;
       case 'audio/mp3':
       case 'voice':
