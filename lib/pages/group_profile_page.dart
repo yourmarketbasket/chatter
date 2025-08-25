@@ -504,12 +504,18 @@ class GroupProfilePage extends StatelessWidget {
                             child: const Text('Cancel'),
                           ),
                           TextButton(
-                            onPressed: () {
-                              dataController.leaveGroup(currentChat['_id']);
+                            onPressed: () async {
+                              final success = await dataController
+                                  .leaveGroup(currentChat['_id']);
+                              if (success) {
+                                await dataController
+                                    .deleteChat(currentChat['_id']);
+                              }
                               Get.back();
                               Get.back();
                             },
-                            child: const Text('Leave', style: TextStyle(color: Colors.redAccent)),
+                            child: const Text('Leave',
+                                style: TextStyle(color: Colors.redAccent)),
                           ),
                         ],
                       ),
