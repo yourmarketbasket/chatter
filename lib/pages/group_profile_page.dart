@@ -365,10 +365,11 @@ class GroupProfilePage extends StatelessWidget {
                         if (isMuted)
                           const SizedBox(width: 1.6),
                         if (isMuted)
-                          const Chip(
+                          Chip(
                             padding: EdgeInsets.all(0),
                             label: Text('Muted'),
-                            backgroundColor: Colors.redAccent,
+                            backgroundColor: Colors.redAccent.withOpacity(0.2),
+                            side: const BorderSide(color: Color.fromARGB(0, 104, 35, 35)),
                           ),
                       ],
                     ),
