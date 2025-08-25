@@ -771,7 +771,7 @@ class _ChatScreenState extends State<ChatScreen> {
     orElse: () {
       final participant = (dataController.currentChat.value['participants'] as List).firstWhere(
         (p) => (p is Map ? p['_id'] : p) == senderId,
-        orElse: () => null,
+        orElse: () => ({}),
       );
       if (participant is Map && participant['name'] != null) {
         return Map<String, dynamic>.from(participant);
