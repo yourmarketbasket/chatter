@@ -15,6 +15,7 @@ class BetterPlayerWidget extends StatefulWidget {
   final String? thumbnailUrl;
   final bool isFeedContext;
   final double? videoAspectRatioProp; // Added to receive aspect ratio for placeholder
+  final bool useSimpleControls;
 
   const BetterPlayerWidget({
     Key? key,
@@ -24,6 +25,7 @@ class BetterPlayerWidget extends StatefulWidget {
     this.thumbnailUrl,
     this.isFeedContext = false,
     this.videoAspectRatioProp, // Added
+    this.useSimpleControls = false,
   }) : super(key: key);
 
   @override
@@ -374,86 +376,106 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
                 // The Center widget will handle centering if BoxFit.contain leads to letter/pillarboxing.
                 child: BetterPlayer(controller: _controller!),
               ),
-              Positioned(
-                bottom: 20,
-                left: 20,
-                right: 20,
-                child: AnimatedOpacity(
-                  opacity: _fadeAnimation.value,
-                  duration: const Duration(milliseconds: 300),
-                  child: _showControls
-                      ? Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                          decoration: const BoxDecoration(
-                            color: Colors.transparent,
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              IconButton(
-                                icon: Icon(
-                                  _isPlaying ? Icons.pause : Icons.play_arrow,
-                                  color: Colors.tealAccent,
-                                  size: 30,
-                                ),
-                                onPressed: _isInitialized
-                                    ? () async {
-                                        if (_isPlaying) {
-                                          await _controller!.pause();
-                                        } else {
-                                          await _controller!.play();
-                                          setState(() {
-                                            _showControls = true;
-                                            _animationController.forward();
-                                          });
-                                          _hideControlsTimer?.cancel();
-                                          _hideControlsTimer = Timer(const Duration(seconds: 3), () {
-                                            if (mounted && _isPlaying) {
-                                              setState(() {
-                                                _showControls = false;
-                                                _animationController.reverse();
-                                              });
-                                            }
-                                          });
+              if (widget.useSimpleControls)
+                Center(
+                  child: IconButton(
+                    icon: Icon(
+                      _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                      color: Colors.white.withOpacity(0.8),
+                      size: 48,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        if (_controller?.isPlaying() ?? false) {
+                          _controller!.pause();
+                        } else {
+                          _controller!.play();
+                        }
+                      });
+                    },
+                  ),
+                )
+              else
+                Positioned(
+                  bottom: 20,
+                  left: 20,
+                  right: 20,
+                  child: AnimatedOpacity(
+                    opacity: _fadeAnimation.value,
+                    duration: const Duration(milliseconds: 300),
+                    child: _showControls
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                            decoration: const BoxDecoration(
+                              color: Colors.transparent,
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                IconButton(
+                                  icon: Icon(
+                                    _isPlaying ? Icons.pause : Icons.play_arrow,
+                                    color: Colors.tealAccent,
+                                    size: 30,
+                                  ),
+                                  onPressed: _isInitialized
+                                      ? () async {
+                                          if (_isPlaying) {
+                                            await _controller!.pause();
+                                          } else {
+                                            await _controller!.play();
+                                            setState(() {
+                                              _showControls = true;
+                                              _animationController.forward();
+                                            });
+                                            _hideControlsTimer?.cancel();
+                                            _hideControlsTimer = Timer(const Duration(seconds: 3), () {
+                                              if (mounted && _isPlaying) {
+                                                setState(() {
+                                                  _showControls = false;
+                                                  _animationController.reverse();
+                                                });
+                                              }
+                                            });
+                                          }
+                                          setState(() {});
                                         }
-                                        setState(() {});
-                                      }
-                                    : null,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                _formatDuration(_position),
-                                style: GoogleFonts.roboto(
-                                  color: Colors.white70,
-                                  fontSize: 12,
+                                      : null,
                                 ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Slider(
-                                  value: _duration.inMilliseconds > 0
-                                      ? _position.inMilliseconds / _duration.inMilliseconds
-                                      : 0.0,
-                                  onChanged: _isInitialized ? (value) => _seekToPosition(value) : null,
-                                  activeColor: Colors.tealAccent,
-                                  inactiveColor: Colors.grey,
+                                const SizedBox(width: 4),
+                                Text(
+                                  _formatDuration(_position),
+                                  style: GoogleFonts.roboto(
+                                    color: Colors.white70,
+                                    fontSize: 12,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                _formatDuration(_duration),
-                                style: GoogleFonts.roboto(
-                                  color: Colors.white70,
-                                  fontSize: 12,
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Slider(
+                                    value: _duration.inMilliseconds > 0
+                                        ? _position.inMilliseconds / _duration.inMilliseconds
+                                        : 0.0,
+                                    onChanged: _isInitialized ? (value) => _seekToPosition(value) : null,
+                                    activeColor: Colors.tealAccent,
+                                    inactiveColor: Colors.grey,
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        )
-                      : const SizedBox.shrink(),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _formatDuration(_duration),
+                                  style: GoogleFonts.roboto(
+                                    color: Colors.white70,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
                 ),
-              ),
             ],
           ),
         );
