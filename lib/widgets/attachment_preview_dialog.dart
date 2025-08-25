@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:chatter/helpers/file_helper.dart';
-import 'package:chatter/widgets/video_player_widget.dart';
+import 'package:chatter/widgets/better_player_widget.dart';
 import 'package:chatter/widgets/audio_waveform_widget.dart';
 import 'package:image/image.dart' as img;
 import 'package:flutter_video_info/flutter_video_info.dart';
@@ -138,7 +138,10 @@ class _AttachmentPreviewDialogState extends State<AttachmentPreviewDialog> {
     }
   }
 
-  Widget _buildPreview(String safePath, String? extension) {
+  Widget _buildPreview(Map<String, dynamic> fileData) {
+    final file = fileData['file'] as PlatformFile;
+    final safePath = fileData['safePath'] as String;
+    final extension = file.extension?.toLowerCase() ?? '';
     Widget preview;
 
     switch (extension) {
@@ -155,8 +158,12 @@ class _AttachmentPreviewDialogState extends State<AttachmentPreviewDialog> {
       case 'mp4':
       case 'mov':
       case 'avi':
-        preview = VideoPlayerWidget(
+        final aspectRatio =
+            double.tryParse(fileData['aspectRatio']?.toString() ?? '1.77');
+        preview = BetterPlayerWidget(
           file: File(safePath),
+          displayPath: file.name,
+          videoAspectRatioProp: aspectRatio,
         );
         break;
       case 'mp3':
@@ -222,8 +229,6 @@ class _AttachmentPreviewDialogState extends State<AttachmentPreviewDialog> {
                       );
                     }
                     final fileData = _files[index];
-                    final file = fileData['file'] as PlatformFile;
-                    final safePath = fileData['safePath'] as String;
                     return Stack(
                       alignment: Alignment.topRight,
                       children: [
@@ -234,7 +239,7 @@ class _AttachmentPreviewDialogState extends State<AttachmentPreviewDialog> {
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(8.0),
-                            child: _buildPreview(safePath, file.extension),
+                            child: _buildPreview(fileData),
                           ),
                         ),
                         IconButton(
