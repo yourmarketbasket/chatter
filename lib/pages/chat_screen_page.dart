@@ -590,28 +590,29 @@ class _ChatScreenState extends State<ChatScreen> {
         );
         break;
       case 'video/mp4':
-        // Use BetterPlayer for Android versions lower than 13 (SDK 33)
-        if (Platform.isAndroid && _sdkInt > 0 && _sdkInt < 33) {
-          // simple controls
-          
-          content = BetterPlayerWidget(
-            key: key,
-            url: isLocalFile ? null : attachment['url'],
-            file: isLocalFile ? File(attachment['url']) : null,
-            displayPath: attachment['filename'] ?? 'video.mp4',
-            videoAspectRatioProp: 9/16,
-            controlsType: VideoControlsType.simple,
-
-            
-          
-          );
-        } else {
-          // Use VideoPlayer for other platforms or Android 13+
+        if (isLocalFile) {
           content = VideoPlayerWidget(
             key: key,
-            url: isLocalFile ? null : attachment['url'],
-            file: isLocalFile ? File(attachment['url']) : null,
+            file: File(attachment['url']),
           );
+        } else {
+          // Use BetterPlayer for Android versions lower than 13 (SDK 33)
+          if (Platform.isAndroid && _sdkInt > 0 && _sdkInt < 33) {
+            // simple controls
+            content = BetterPlayerWidget(
+              key: key,
+              url: attachment['url'],
+              displayPath: attachment['filename'] ?? 'video.mp4',
+              videoAspectRatioProp: 9 / 16,
+              controlsType: VideoControlsType.simple,
+            );
+          } else {
+            // Use VideoPlayer for other platforms or Android 13+
+            content = VideoPlayerWidget(
+              key: key,
+              url: attachment['url'],
+            );
+          }
         }
         break;
       case 'audio/mp3':
