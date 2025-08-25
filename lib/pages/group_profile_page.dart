@@ -326,66 +326,60 @@ class GroupProfilePage extends StatelessWidget {
                           ? const Icon(Icons.person, size: 20)
                           : null,
                     ),
-                    title: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    title: Text(p['username'] ?? p['name'] ?? 'Unknown'),
+                    subtitle: Wrap(
+                      spacing: 4.0,
+                      runSpacing: 4.0,
                       children: [
-                        Text(p['name'] ?? 'Unknown'),
-                        const SizedBox(height: 4),
-                        Wrap(
-                          spacing: 4.0,
-                          runSpacing: 4.0,
-                          children: [
-                            if (isParticipantSuperAdmin)
-                              Chip(
-                                padding: EdgeInsets.all(0),
-                                label: Row(
-                                  children: [
-                                    const Icon(Icons.shield,
-                                        size: 10, color: Colors.teal),
-                                    Text('Super Admin'),
-                                  ],
-                                ),
-                                backgroundColor:
-                                    Color.fromARGB(255, 20, 131, 105)
-                                        .withOpacity(0.2),
-                                side: const BorderSide(color: Colors.transparent),
-                              ),
-                            if (isParticipantSuperAdmin || isParticipantAdmin)
-                              Chip(
-                                padding: EdgeInsets.all(0),
-                                label: Row(
-                                  children: [
-                                    const Icon(Icons.shield_outlined,
-                                        size: 10, color: Colors.teal),
-                                    Text('Admin'),
-                                  ],
-                                ),
-                                backgroundColor:
-                                    Color.fromARGB(255, 20, 131, 105)
-                                        .withOpacity(0.2),
-                                side: const BorderSide(color: Colors.transparent),
-                              ),
-                            if (!isParticipantSuperAdmin && !isParticipantAdmin)
-                              Chip(
-                                padding: EdgeInsets.all(0),
-                                label: Text('Member'),
-                                backgroundColor:
-                                    Color.fromARGB(255, 20, 131, 105)
-                                        .withOpacity(0.2),
-                                side: const BorderSide(
-                                    color: Color.fromARGB(0, 104, 35, 35)),
-                              ),
-                            if (isMuted)
-                              Chip(
-                                padding: EdgeInsets.all(0),
-                                label: Text('Muted'),
-                                backgroundColor:
-                                    Colors.redAccent.withOpacity(0.2),
-                                side: const BorderSide(
-                                    color: Color.fromARGB(0, 104, 35, 35)),
-                              ),
-                          ],
-                        ),
+                        if (isParticipantSuperAdmin)
+                          Chip(
+                            padding: EdgeInsets.all(0),
+                            label: Row(
+                              children: [
+                                const Icon(Icons.shield,
+                                    size: 10, color: Colors.teal),
+                                Text('Super Admin'),
+                              ],
+                            ),
+                            backgroundColor:
+                                Color.fromARGB(255, 20, 131, 105)
+                                    .withOpacity(0.2),
+                            side: const BorderSide(color: Colors.transparent),
+                          ),
+                        if (isParticipantSuperAdmin || isParticipantAdmin)
+                          Chip(
+                            padding: EdgeInsets.all(0),
+                            label: Row(
+                              children: [
+                                const Icon(Icons.shield_outlined,
+                                    size: 10, color: Colors.teal),
+                                Text('Admin'),
+                              ],
+                            ),
+                            backgroundColor:
+                                Color.fromARGB(255, 20, 131, 105)
+                                    .withOpacity(0.2),
+                            side: const BorderSide(color: Colors.transparent),
+                          ),
+                        if (!isParticipantSuperAdmin && !isParticipantAdmin)
+                          Chip(
+                            padding: EdgeInsets.all(0),
+                            label: Text('Member'),
+                            backgroundColor:
+                                Color.fromARGB(255, 20, 131, 105)
+                                    .withOpacity(0.2),
+                            side: const BorderSide(
+                                color: Color.fromARGB(0, 104, 35, 35)),
+                          ),
+                        if (isMuted)
+                          Chip(
+                            padding: EdgeInsets.all(0),
+                            label: Text('Muted'),
+                            backgroundColor:
+                                Colors.redAccent.withOpacity(0.2),
+                            side: const BorderSide(
+                                color: Color.fromARGB(0, 104, 35, 35)),
+                          ),
                       ],
                     ),
                     trailing: (isSuperAdmin || isAdmin) &&
