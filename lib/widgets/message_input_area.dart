@@ -199,6 +199,13 @@ class _MessageInputAreaState extends State<MessageInputArea> {
             metadata['height'] = image.height;
             metadata['aspectRatio'] =
                 (image.width / image.height).toStringAsFixed(2);
+              if (image.width > image.height) {
+                metadata['orientation'] = 'landscape';
+              } else if (image.height > image.width) {
+                metadata['orientation'] = 'portrait';
+              } else {
+                metadata['orientation'] = 'square';
+              }
           }
         } else if (extension == 'mp4' ||
             extension == 'mov' ||
@@ -211,12 +218,18 @@ class _MessageInputAreaState extends State<MessageInputArea> {
               metadata['width'] = info.width;
               metadata['height'] = info.height;
               metadata['duration'] = info.duration;
-                metadata['orientation'] = info.orientation?.toString();
-              if (info.width != null &&
-                  info.height != null &&
-                  info.height! > 0) {
-                metadata['aspectRatio'] =
-                    (info.width! / info.height!).toStringAsFixed(2);
+                if (info.width != null && info.height != null) {
+                  if (info.width! > info.height!) {
+                    metadata['orientation'] = 'landscape';
+                  } else if (info.height! > info.width!) {
+                    metadata['orientation'] = 'portrait';
+                  } else {
+                    metadata['orientation'] = 'square';
+                  }
+                  if (info.height! > 0) {
+                    metadata['aspectRatio'] =
+                        (info.width! / info.height!).toStringAsFixed(2);
+                  }
               }
             }
           } catch (e) {
