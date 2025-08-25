@@ -26,6 +26,8 @@ import 'package:chatter/helpers/time_helper.dart';
 import 'package:chatter/services/socket-service.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
+import 'package:video_thumbnail/video_thumbnail.dart';
+import 'dart:typed_data';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -40,6 +42,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final ScrollController _scrollController = ScrollController();
   Map<String, dynamic>? _replyingTo;
   int _sdkInt = 0;
+  final Map<String, Uint8List?> _localVideoThumbnails = {};
 
   @override
   void initState() {
@@ -108,9 +111,31 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  void _generateVideoThumbnail(String path) async {
+    final thumbnail = await VideoThumbnail.thumbnailData(
+      video: path,
+      imageFormat: ImageFormat.JPEG,
+      maxWidth: 128,
+      quality: 25,
+    );
+    if (mounted) {
+      setState(() {
+        _localVideoThumbnails[path] = thumbnail;
+      });
+    }
+  }
+
   void _sendMessage(String? text, List<PlatformFile>? files, {bool isVoiceNote = false}) async {
     if ((text?.trim().isEmpty ?? true) && (files?.isEmpty ?? true)) {
       return;
+    }
+
+    if (files != null) {
+      for (var file in files) {
+        if (_getMediaType(file.extension ?? '').startsWith('video')) {
+          _generateVideoThumbnail(file.path!);
+        }
+      }
     }
 
     final clientMessageId = const Uuid().v4();
@@ -591,10 +616,21 @@ class _ChatScreenState extends State<ChatScreen> {
         break;
       case 'video/mp4':
         if (isLocalFile) {
-          content = VideoPlayerWidget(
-            key: key,
-            file: File(attachment['url']),
-          );
+          final thumbnailUrl = attachment['url'];
+          final thumbnailData = _localVideoThumbnails[thumbnailUrl];
+          if (thumbnailData != null) {
+            content = Image.memory(thumbnailData, fit: BoxFit.cover, key: key);
+          } else {
+            content = Container(
+              key: key,
+              color: Colors.black,
+              child: const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              ),
+            );
+          }
         } else {
           // Use BetterPlayer for Android versions lower than 13 (SDK 33)
           if (Platform.isAndroid && _sdkInt > 0 && _sdkInt < 33) {
