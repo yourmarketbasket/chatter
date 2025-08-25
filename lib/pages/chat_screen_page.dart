@@ -500,24 +500,45 @@ class _ChatScreenState extends State<ChatScreen> {
 
       final attachments = updatedMessage['files'] as List;
 
-      // Special handling for a single video attachment
       if (attachments.length == 1 && _mapToSimpleType(attachments[0]['type']) == 'video') {
         final attachment = attachments[0];
         final isLocalFile = !(attachment['url'] as String).startsWith('http');
         final attachmentKey = ValueKey('${updatedMessage['clientMessageId']}_0');
 
+        final width = attachment['width'] as num?;
+        final height = attachment['height'] as num?;
+
         double videoAspectRatio = 16 / 9; // Default aspect ratio
-        if (attachment['width'] != null && attachment['height'] != null && attachment['height'] > 0) {
-          videoAspectRatio = attachment['width'] / attachment['height'];
+        if (width != null && height != null && height > 0) {
+          videoAspectRatio = width / height;
         }
 
-        return GestureDetector(
-          onTap: () => _openMediaView(updatedMessage, 0),
-          child: AspectRatio(
-            aspectRatio: videoAspectRatio,
-            child: _buildAttachmentContent(attachment, isLocalFile, videoAspectRatio, key: attachmentKey),
-          ),
-        );
+        bool isPortrait = videoAspectRatio < 1;
+
+        Widget videoPlayer = _buildAttachmentContent(attachment, isLocalFile, videoAspectRatio, key: attachmentKey);
+
+        if (isPortrait) {
+          return GestureDetector(
+            onTap: () => _openMediaView(updatedMessage, 0),
+            child: Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.5,
+              ),
+              child: AspectRatio(
+                aspectRatio: videoAspectRatio,
+                child: videoPlayer,
+              ),
+            ),
+          );
+        } else {
+          return GestureDetector(
+            onTap: () => _openMediaView(updatedMessage, 0),
+            child: AspectRatio(
+              aspectRatio: videoAspectRatio,
+              child: videoPlayer,
+            ),
+          );
+        }
       }
 
       // Existing logic for multiple attachments or non-video single attachments

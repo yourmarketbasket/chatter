@@ -670,21 +670,19 @@ class _VideoPlayerContainerState extends State<VideoPlayerContainer> {
         displayPath: widget.displayPath,
         thumbnailUrl: widget.thumbnailUrl,
         isFeedContext: false,
-        // Pass aspect ratio for thumbnail and loading indicator handling
         videoAspectRatioProp: videoAspectRatio,
       );
     } else {
       playerWidget = VideoPlayerWidget(
         url: widget.url,
         file: widget.file,
+        videoAspectRatioProp: videoAspectRatio,
       );
     }
-    // Ensure the player is centered and respects the calculated aspect ratio
-    return Center(
-      child: AspectRatio(
-        aspectRatio: videoAspectRatio,
-        child: playerWidget,
-      ),
+
+    return AspectRatio(
+      aspectRatio: videoAspectRatio,
+      child: playerWidget,
     );
   }
 }
