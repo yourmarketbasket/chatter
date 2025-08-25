@@ -26,7 +26,10 @@ class BetterPlayerWidget extends StatefulWidget {
     this.isFeedContext = false,
     this.videoAspectRatioProp, // Added
     this.useSimpleControls = false,
+    this.useIntrinsicAspectRatio = false,
   }) : super(key: key);
+
+  final bool useIntrinsicAspectRatio;
 
   @override
   _BetterPlayerWidgetState createState() => _BetterPlayerWidgetState();
@@ -180,7 +183,7 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
         BetterPlayerConfiguration(
           autoPlay: false, // Should be false for feed, true for MediaViewPage (handled by caller)
           looping: false,
-          aspectRatio: widget.videoAspectRatioProp ?? 16 / 9,
+          aspectRatio: widget.useIntrinsicAspectRatio ? null : (widget.videoAspectRatioProp ?? 16 / 9),
           fit: BoxFit.fitWidth, // Ensure it covers the area
           placeholder: _buildPlaceholder(), // Use the new placeholder
           controlsConfiguration: const BetterPlayerControlsConfiguration(

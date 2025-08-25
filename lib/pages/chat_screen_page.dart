@@ -579,6 +579,7 @@ class _ChatScreenState extends State<ChatScreen> {
           file: isLocalFile ? File(attachment['url']) : null,
           displayPath: attachment['filename'] ?? 'video.mp4',
           useSimpleControls: true,
+          useIntrinsicAspectRatio: true,
         );
         break;
       case 'audio/mp3':
