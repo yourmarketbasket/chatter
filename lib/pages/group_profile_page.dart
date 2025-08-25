@@ -402,12 +402,26 @@ class GroupProfilePage extends StatelessWidget {
                                       AlertDialog(
                                         title: const Text('Cannot Remove User'),
                                         content: const Text(
-                                            'A group must have at least 3 members.'),
+                                            'A group must have at least 3 members. You can close the group instead.'),
                                         actions: [
                                           TextButton(
                                             onPressed: () => Get.back(),
-                                            child: const Text('OK'),
+                                            child: const Text('Cancel'),
                                           ),
+                                          if (isSuperAdmin ||
+                                              (isAdmin &&
+                                                  currentChat['superAdmin'] ==
+                                                      null))
+                                            TextButton(
+                                              onPressed: () {
+                                                dataController.closeGroup(
+                                                    currentChat['_id']);
+                                                Get.back();
+                                              },
+                                              child: const Text('Close Group',
+                                                  style: TextStyle(
+                                                      color: Colors.redAccent)),
+                                            ),
                                         ],
                                       ),
                                     );

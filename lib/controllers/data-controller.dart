@@ -3837,4 +3837,37 @@ void clearUserPosts() {
     }
     return null;
   }
+
+  Future<bool> closeGroup(String chatId) async {
+    try {
+      final token = user.value['token'];
+      if (token == null) {
+        throw Exception('User not authenticated');
+      }
+      final response = await _dio.delete(
+        'api/chats/$chatId/close',
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+      return response.statusCode == 200 && response.data['success'] == true;
+    } catch (e) {
+      // print('Error closing group: $e');
+      return false;
+    }
+  }
+
+  void handleGroupClosed(Map<String, dynamic> data) {
+    final chatId = data['chatId'] as String?;
+    if (chatId == null) return;
+
+    if (chats.containsKey(chatId)) {
+      chats.remove(chatId);
+      if (currentChat.value['_id'] == chatId) {
+        currentChat.value = {};
+        currentConversationMessages.clear();
+      }
+      chats.refresh();
+    }
+  }
 }

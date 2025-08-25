@@ -115,6 +115,7 @@ class SocketService {
       'member:demoted': (data) => _handleMemberDemoted(data),
       'member:muted': (data) => _handleMemberMuted(data),
       'member:unmuted': (data) => _handleMemberUnmuted(data),
+      'group:closed': (data) => _handleGroupClosed(data),
     };
 // more canges
     eventHandlers.forEach((event, handler) {
@@ -195,6 +196,13 @@ class SocketService {
     if (data is Map<String, dynamic>) {
       _dataController.handleMemberUnmuted(data);
       _eventController.add({'event': 'member:unmuted', 'data': data});
+    }
+  }
+
+  void _handleGroupClosed(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      _dataController.handleGroupClosed(data);
+      _eventController.add({'event': 'group:closed', 'data': data});
     }
   }
 
