@@ -177,10 +177,14 @@ class _MessageInputAreaState extends State<MessageInputArea> {
     bool isMuted = false;
     if (currentChat['type'] == 'group') {
       final myId = _dataController.user.value['user']['_id'];
-      final me = (currentChat['participants'] as List<dynamic>?)
-          ?.firstWhere((p) => p['_id'] == myId, orElse: () => null);
-      if (me != null) {
-        isMuted = me['isMuted'] ?? false;
+      final participants = currentChat['participants'] as List<dynamic>?;
+      if (participants != null) {
+        for (var p in participants) {
+          if (p is Map && p['_id'] == myId) {
+            isMuted = p['isMuted'] ?? false;
+            break;
+          }
+        }
       }
     }
 
