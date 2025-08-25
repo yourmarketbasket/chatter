@@ -15,7 +15,7 @@ import 'package:chatter/widgets/message_input_area.dart';
 import 'package:video_player/video_player.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:chatter/widgets/video_player_factory.dart';
+import 'package:chatter/widgets/future_player_loader.dart';
 import 'package:chatter/widgets/audio_waveform_widget.dart';
 import 'package:chatter/widgets/all_attachments_dialog.dart';
 import 'package:chatter/widgets/reply_message_snippet.dart';
@@ -23,6 +23,7 @@ import 'package:chatter/helpers/time_helper.dart';
 import 'package:chatter/services/socket-service.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_video_info/flutter_video_info.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -92,6 +93,38 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<List<Map<String, dynamic>>> _getTempMessageFiles(List<PlatformFile> files, {bool isVoiceNote = false}) async {
+    final videoInfo = FlutterVideoInfo();
+    List<Map<String, dynamic>> tempFiles = [];
+
+    for (var file in files) {
+      final fileType = isVoiceNote ? 'voice' : _getMediaType(file.extension ?? '');
+      double? width, height;
+
+      if (fileType.startsWith('video') && file.path != null) {
+        try {
+          final info = await videoInfo.getVideoInfo(file.path!);
+          width = info?.width;
+          height = info?.height;
+        } catch (e) {
+          print("Error getting video info: $e");
+        }
+      }
+
+      tempFiles.add({
+        'url': file.path!,
+        'type': fileType,
+        'size': file.size,
+        'filename': file.name,
+        'isUploading': true,
+        'uploadProgress': 0.0,
+        'width': width,
+        'height': height,
+      });
+    }
+    return tempFiles;
+  }
+
   void _sendMessage(String? text, List<PlatformFile>? files, {bool isVoiceNote = false}) async {
     if ((text?.trim().isEmpty ?? true) && (files?.isEmpty ?? true)) {
       return;
@@ -100,6 +133,11 @@ class _ChatScreenState extends State<ChatScreen> {
     final clientMessageId = const Uuid().v4();
     final messageType = isVoiceNote ? 'voice' : (files?.isNotEmpty ?? false) ? 'attachment' : 'text';
     final now = DateTime.now().toUtc();
+
+    List<Map<String, dynamic>> tempFiles = [];
+    if (files != null && files.isNotEmpty) {
+      tempFiles = await _getTempMessageFiles(files, isVoiceNote: isVoiceNote);
+    }
 
     // Create a temporary message for optimistic UI update
     final tempMessage = {
@@ -112,34 +150,26 @@ class _ChatScreenState extends State<ChatScreen> {
       },
       'content': text?.trim() ?? '',
       'type': messageType,
-      'files': files?.map((file) => {
-            'url': file.path!,
-            'type': isVoiceNote ? 'voice' : _getMediaType(file.extension ?? ''),
-            'size': file.size,
-            'filename': file.name,
-            'isUploading': true,
-            'uploadProgress': 0.0,
-          }).toList() ?? [],
+      'files': tempFiles,
       'replyTo': _replyingTo?['_id'],
       'viewOnce': false,
       'createdAt': now.toIso8601String(),
       'status': 'sending',
     };
-    // force
 
     // Add the temporary message to the UI
     dataController.addTemporaryMessage(tempMessage);
     _messageController.clear();
-    
 
     List<Map<String, dynamic>> uploadedFiles = [];
     if (files != null && files.isNotEmpty) {
-      final attachmentsData = files.map((file) {
-        final fileType = isVoiceNote ? 'voice' : _getMediaType(file.extension ?? '');
+      final attachmentsData = tempFiles.map((fileData) {
         return {
-          'file': File(file.path!),
-          'type': fileType,
-          'filename': file.name,
+          'file': File(fileData['url']),
+          'type': fileData['type'],
+          'filename': fileData['filename'],
+          'width': fileData['width'],
+          'height': fileData['height'],
         };
       }).toList();
 
@@ -153,7 +183,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
       if (uploadResults.any((result) => !result['success'])) {
         dataController.updateMessageStatus(clientMessageId, 'failed');
-        // Optionally, show an error message to the user
         return;
       }
 
@@ -162,9 +191,10 @@ class _ChatScreenState extends State<ChatScreen> {
         'type': result['type'],
         'size': result['size'],
         'filename': result['filename'],
+        'width': result['width'],
+        'height': result['height'],
       }).toList();
     }
-
     
     final finalMessage = {
       'clientMessageId': clientMessageId,
@@ -424,6 +454,8 @@ class _ChatScreenState extends State<ChatScreen> {
               'url': att['url'],
               'type': _mapToSimpleType(att['type']),
               'filename': att['filename'],
+              'width': att['width'],
+              'height': att['height'],
             })
         .toList();
 
@@ -467,6 +499,28 @@ class _ChatScreenState extends State<ChatScreen> {
       }
 
       final attachments = updatedMessage['files'] as List;
+
+      // Special handling for a single video attachment
+      if (attachments.length == 1 && _mapToSimpleType(attachments[0]['type']) == 'video') {
+        final attachment = attachments[0];
+        final isLocalFile = !(attachment['url'] as String).startsWith('http');
+        final attachmentKey = ValueKey('${updatedMessage['clientMessageId']}_0');
+
+        double videoAspectRatio = 16 / 9; // Default aspect ratio
+        if (attachment['width'] != null && attachment['height'] != null && attachment['height'] > 0) {
+          videoAspectRatio = attachment['width'] / attachment['height'];
+        }
+
+        return GestureDetector(
+          onTap: () => _openMediaView(updatedMessage, 0),
+          child: AspectRatio(
+            aspectRatio: videoAspectRatio,
+            child: _buildAttachmentContent(attachment, isLocalFile, videoAspectRatio, key: attachmentKey),
+          ),
+        );
+      }
+
+      // Existing logic for multiple attachments or non-video single attachments
       const maxVisible = 4;
       final hasMore = attachments.length > maxVisible;
       final gridItemCount = hasMore ? maxVisible : attachments.length;
@@ -486,7 +540,7 @@ class _ChatScreenState extends State<ChatScreen> {
         itemBuilder: (context, index) {
           final attachment = attachments[index];
           final isLocalFile = !(attachment['url'] as String).startsWith('http');
-        final attachmentKey = ValueKey('${updatedMessage['clientMessageId']}_$index');
+          final attachmentKey = ValueKey('${updatedMessage['clientMessageId']}_$index');
 
           if (hasMore && index == maxVisible - 1) {
             final remainingCount = attachments.length - maxVisible + 1;
@@ -504,7 +558,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 alignment: Alignment.center,
                 fit: StackFit.expand,
                 children: [
-                _buildAttachmentContent(attachment, isLocalFile, key: attachmentKey),
+                _buildAttachmentContent(attachment, isLocalFile, aspectRatio, key: attachmentKey),
                   Container(
                     color: Colors.black.withOpacity(0.6),
                     child: Center(
@@ -525,14 +579,14 @@ class _ChatScreenState extends State<ChatScreen> {
 
           return GestureDetector(
             onTap: () => _openMediaView(updatedMessage, index),
-          child: _buildAttachmentContent(attachment, isLocalFile, key: attachmentKey),
+            child: _buildAttachmentContent(attachment, isLocalFile, aspectRatio, key: attachmentKey),
           );
         },
       );
     });
   }
 
-  Widget _buildAttachmentContent(Map<String, dynamic> attachment, bool isLocalFile, {Key? key}) {
+  Widget _buildAttachmentContent(Map<String, dynamic> attachment, bool isLocalFile, double aspectRatio, {Key? key}) {
     final attachmentType = attachment['type']?.toLowerCase();
     final simpleType = _mapToSimpleType(attachmentType ?? '');
 
@@ -574,25 +628,12 @@ class _ChatScreenState extends State<ChatScreen> {
         );
         break;
       case 'video/mp4':
-        content = FutureBuilder<Widget>(
+        content = FuturePlayerLoader(
           key: key,
-          future: VideoPlayerFactory.createPlayer(
-            url: isLocalFile ? null : attachment['url'],
-            file: isLocalFile ? File(attachment['url']) : null,
-            displayPath: attachment['filename'] ?? 'video.mp4',
-            videoAspectRatioProp: null,
-            isFeedContext: false,
-          ),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.done) {
-              if (snapshot.hasData) {
-                return snapshot.data!;
-              } else {
-                return const Center(child: Text('Error loading video'));
-              }
-            }
-            return const Center(child: CircularProgressIndicator());
-          },
+          url: isLocalFile ? null : attachment['url'],
+          file: isLocalFile ? File(attachment['url']) : null,
+          displayPath: attachment['filename'] ?? 'video.mp4',
+          videoAspectRatioProp: aspectRatio,
         );
         break;
       case 'audio/mp3':
