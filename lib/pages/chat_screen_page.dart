@@ -847,7 +847,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 Obx(() {
                   final originalMessage = dataController.currentConversationMessages.firstWhere(
                     (m) => m['_id'] == message['replyTo'],
-                    orElse: () => {
+                    orElse: () => <String, dynamic>{
                       '_id': '',
                       'senderId': {'_id': '', 'name': 'Unknown User'},
                       'content': 'Original message not found.',
