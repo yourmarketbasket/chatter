@@ -5,13 +5,11 @@ import 'package:video_player/video_player.dart';
 class VideoPlayerWidget extends StatefulWidget {
   final String? url;
   final File? file;
-  final double? videoAspectRatioProp;
 
   const VideoPlayerWidget({
     super.key,
     this.url,
     this.file,
-    this.videoAspectRatioProp,
   }) : assert(url != null || file != null);
 
   @override
@@ -65,24 +63,14 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    double aspectRatio;
-    if (widget.videoAspectRatioProp != null) {
-      aspectRatio = widget.videoAspectRatioProp!;
-    } else if (_controller.value.isInitialized) {
-      aspectRatio = _controller.value.aspectRatio;
-    } else {
-      aspectRatio = 16 / 9; // Default fallback
-    }
-
     return ClipRRect(
       borderRadius: BorderRadius.circular(8.0),
       child: Stack(
         alignment: Alignment.center,
         children: [
-          AspectRatio(
-            aspectRatio: aspectRatio,
+          SizedBox.expand(
             child: FittedBox(
-              fit: BoxFit.contain,
+              fit: BoxFit.cover,
               child: SizedBox(
                 width: _controller.value.size.width,
                 height: _controller.value.size.height,

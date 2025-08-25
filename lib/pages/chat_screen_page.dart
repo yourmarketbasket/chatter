@@ -575,6 +575,7 @@ class _ChatScreenState extends State<ChatScreen> {
         break;
       case 'video/mp4':
         content = FutureBuilder<Widget>(
+          key: key,
           future: VideoPlayerFactory.createPlayer(
             url: isLocalFile ? null : attachment['url'],
             file: isLocalFile ? File(attachment['url']) : null,

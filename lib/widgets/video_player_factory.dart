@@ -28,7 +28,6 @@ class VideoPlayerFactory {
       return VideoPlayerWidget(
         url: url,
         file: file,
-        videoAspectRatioProp: videoAspectRatioProp,
       );
     }
   }
