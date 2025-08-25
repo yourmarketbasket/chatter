@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:chatter/pages/add_participants_page.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:chatter/controllers/data-controller.dart';
@@ -297,7 +298,7 @@ class GroupProfilePage extends StatelessWidget {
                       IconButton(
                         icon: const Icon(Icons.add, color: Colors.tealAccent),
                         onPressed: () {
-                          // TODO: Implement add participants
+                          Get.to(() => AddParticipantsPage(chat: currentChat));
                         },
                       ),
                   ],
@@ -311,9 +312,7 @@ class GroupProfilePage extends StatelessWidget {
                       false;
                   final isParticipantSuperAdmin =
                       currentChat['superAdmin']?['_id'] == p['_id'];
-                  final isMuted = currentChat['mutedMembers']
-                          ?.any((m) => m['userId']['_id'] == p['_id']) ??
-                      false;
+                  final isMuted = p['isMuted'] ?? false;
             
                   return ListTile(
                     contentPadding:

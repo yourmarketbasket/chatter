@@ -1981,16 +1981,13 @@ class DataController extends GetxController {
 
     if (chats.containsKey(chatId)) {
       final chat = chats[chatId]!;
-      final member = allUsers.firstWhereOrNull((u) => u['_id'] == memberId);
+      final participants =
+          List<Map<String, dynamic>>.from(chat['participants'] ?? []);
+      final memberIndex = participants.indexWhere((p) => p['_id'] == memberId);
 
-      if (member != null) {
-        final mutedMembers =
-            List<Map<String, dynamic>>.from(chat['mutedMembers'] ?? []);
-        mutedMembers.add({
-          'userId': member,
-          'mutedAt': DateTime.now().toIso8601String(),
-        });
-        chat['mutedMembers'] = mutedMembers;
+      if (memberIndex != -1) {
+        participants[memberIndex]['isMuted'] = true;
+        chat['participants'] = participants;
         chats[chatId] = chat;
         if (currentChat.value['_id'] == chatId) {
           currentChat.value = chat;
@@ -2010,17 +2007,21 @@ class DataController extends GetxController {
 
     if (chats.containsKey(chatId)) {
       final chat = chats[chatId]!;
-      final mutedMembers =
-          List<Map<String, dynamic>>.from(chat['mutedMembers'] ?? []);
-      mutedMembers.removeWhere((m) => m['userId']?['_id'] == memberId);
-      chat['mutedMembers'] = mutedMembers;
-      chats[chatId] = chat;
-      if (currentChat.value['_id'] == chatId) {
-        currentChat.value = chat;
-      }
-      chats.refresh();
-      if (currentChat.value['_id'] == chatId) {
-        currentChat.refresh();
+      final participants =
+          List<Map<String, dynamic>>.from(chat['participants'] ?? []);
+      final memberIndex = participants.indexWhere((p) => p['_id'] == memberId);
+
+      if (memberIndex != -1) {
+        participants[memberIndex]['isMuted'] = false;
+        chat['participants'] = participants;
+        chats[chatId] = chat;
+        if (currentChat.value['_id'] == chatId) {
+          currentChat.value = chat;
+        }
+        chats.refresh();
+        if (currentChat.value['_id'] == chatId) {
+          currentChat.refresh();
+        }
       }
     }
   }

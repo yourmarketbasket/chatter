@@ -173,20 +173,31 @@ class _MessageInputAreaState extends State<MessageInputArea> {
 
   @override
   Widget build(BuildContext context) {
+    final currentChat = _dataController.currentChat.value;
+    bool isMuted = false;
+    if (currentChat['type'] == 'group') {
+      final myId = _dataController.user.value['user']['_id'];
+      final me = (currentChat['participants'] as List<dynamic>?)
+          ?.firstWhere((p) => p['_id'] == myId, orElse: () => null);
+      if (me != null) {
+        isMuted = me['isMuted'] ?? false;
+      }
+    }
+
     return Container(
       padding: const EdgeInsets.all(8.0),
       child: Row(
         children: [
           IconButton(
             icon: const Icon(Icons.attach_file, color: Colors.tealAccent),
-            onPressed: _pickAttachments,
+            onPressed: isMuted ? null : _pickAttachments,
           ),
           Expanded(
             child: TextField(
               controller: _messageController,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
-                hintText: 'Type a message...',
+                hintText: isMuted ? 'You are muted' : 'Type a message...',
                 hintStyle: TextStyle(color: Colors.grey[400]),
                 filled: true,
                 fillColor: Colors.grey[800],
@@ -194,16 +205,22 @@ class _MessageInputAreaState extends State<MessageInputArea> {
                   borderRadius: BorderRadius.circular(20),
                   borderSide: BorderSide.none,
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               ),
+              enabled: !isMuted,
             ),
           ),
           const SizedBox(width: 8),
           IconButton(
-            icon: Icon(_isTyping ? Icons.send : (_isRecording ? Icons.stop : Icons.mic), color: Colors.tealAccent),
-            onPressed: _isTyping
-                ? _handleSend
-                : (_isRecording ? _stopRecording : _startRecording),
+            icon: Icon(
+                _isTyping ? Icons.send : (_isRecording ? Icons.stop : Icons.mic),
+                color: Colors.tealAccent),
+            onPressed: isMuted
+                ? null
+                : (_isTyping
+                    ? _handleSend
+                    : (_isRecording ? _stopRecording : _startRecording)),
           ),
         ],
       ),
