@@ -331,7 +331,9 @@ class GroupProfilePage extends StatelessWidget {
                       children: [
                         Text(p['name'] ?? 'Unknown'),
                         const SizedBox(height: 4),
-                        Row(
+                        Wrap(
+                          spacing: 4.0,
+                          runSpacing: 4.0,
                           children: [
                             if (isParticipantSuperAdmin)
                               Chip(
@@ -373,7 +375,6 @@ class GroupProfilePage extends StatelessWidget {
                                 side: const BorderSide(
                                     color: Color.fromARGB(0, 104, 35, 35)),
                               ),
-                            if (isMuted) const SizedBox(width: 1.6),
                             if (isMuted)
                               Chip(
                                 padding: EdgeInsets.all(0),
