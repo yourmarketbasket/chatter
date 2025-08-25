@@ -1,5 +1,6 @@
 import 'dart:ui' as BorderType;
 
+import 'package:better_player_enhanced/better_player.dart';
 import 'package:chatter/controllers/data-controller.dart';
 import 'package:chatter/pages/group_profile_page.dart';
 import 'package:chatter/pages/profile_page.dart';
@@ -591,11 +592,18 @@ class _ChatScreenState extends State<ChatScreen> {
       case 'video/mp4':
         // Use BetterPlayer for Android versions lower than 13 (SDK 33)
         if (Platform.isAndroid && _sdkInt > 0 && _sdkInt < 33) {
+          // simple controls
+          
           content = BetterPlayerWidget(
             key: key,
             url: isLocalFile ? null : attachment['url'],
             file: isLocalFile ? File(attachment['url']) : null,
             displayPath: attachment['filename'] ?? 'video.mp4',
+            videoAspectRatioProp: 9/16,
+            controlsType: VideoControlsType.simple,
+
+            
+          
           );
         } else {
           // Use VideoPlayer for other platforms or Android 13+
@@ -686,12 +694,14 @@ class _ChatScreenState extends State<ChatScreen> {
             top: 4,
             right: 4,
             child: Container(
+
+              padding: const EdgeInsets.all(4.0),
               decoration: BoxDecoration(
                 color: Colors.black.withOpacity(0.5),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
-                Icons.open_in_full,
+                Icons.open_in_new,
                 color: Colors.white,
                 size: 18,
               ),
@@ -901,7 +911,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
-                          Icons.open_in_full,
+                          Icons.open_in_new,
                           color: Colors.white,
                           size: 18,
                         ),

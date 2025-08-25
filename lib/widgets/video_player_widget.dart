@@ -70,7 +70,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
         children: [
           SizedBox.expand(
             child: FittedBox(
-              fit: BoxFit.cover,
+              fit: BoxFit.fitWidth,
               child: SizedBox(
                 width: _controller.value.size.width,
                 height: _controller.value.size.height,

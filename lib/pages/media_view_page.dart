@@ -660,7 +660,7 @@ class _VideoPlayerContainerState extends State<VideoPlayerContainer> {
   @override
   Widget build(BuildContext context) {
     final double videoAspectRatio = widget.numericAspectRatio ??
-        (double.tryParse(widget.aspectRatioString ?? '') ?? 16 / 9);
+        (double.tryParse(widget.aspectRatioString ?? '') ?? 9 / 16);
 
     Widget playerWidget;
     if (widget.preferBetterPlayer) {
@@ -748,7 +748,7 @@ class _InternalBetterPlayerWidgetState extends State<InternalBetterPlayerWidget>
       // Determine aspect ratio to use for the player configuration itself
       // This might be used by BetterPlayer if it needs an explicit aspect ratio hint,
       // but ideally, BoxFit.cover within a sized parent AspectRatio handles it.
-      double playerConfigAspectRatio = widget.videoAspectRatioProp ?? 16/9;
+      double playerConfigAspectRatio = widget.videoAspectRatioProp ?? 9/16;
       // if (widget.numericAspectRatio != null && widget.numericAspectRatio! > 0 && widget.numericAspectRatio!.isFinite) {
       //   playerConfigAspectRatio = widget.numericAspectRatio!;
       // } else if (widget.aspectRatioString != null && widget.aspectRatioString!.isNotEmpty) {
@@ -846,7 +846,7 @@ class _InternalBetterPlayerWidgetState extends State<InternalBetterPlayerWidget>
   }
 
   Widget _buildThumbnailWithLoadingIndicator() {
-    final double effectiveAspectRatio = widget.videoAspectRatioProp ?? 16 / 9;
+    final double effectiveAspectRatio = widget.videoAspectRatioProp ?? 9 / 16;
     // Approximate screen width for memCacheWidth, or pass it if available
     final screenWidth = MediaQuery.of(context).size.width;
 

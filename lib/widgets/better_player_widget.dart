@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:better_player_enhanced/better_player.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:feather_icons/feather_icons.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:get/get.dart';
 import 'package:chatter/controllers/data-controller.dart';
+
+// Enum to define control types
+enum VideoControlsType { all, simple }
 
 // Widget for video playback using better_player for Android 13 and lower
 class BetterPlayerWidget extends StatefulWidget {
@@ -14,7 +18,8 @@ class BetterPlayerWidget extends StatefulWidget {
   final String displayPath;
   final String? thumbnailUrl;
   final bool isFeedContext;
-  final double? videoAspectRatioProp; // Added to receive aspect ratio for placeholder
+  final double? videoAspectRatioProp;
+  final VideoControlsType controlsType;
 
   const BetterPlayerWidget({
     Key? key,
@@ -23,7 +28,8 @@ class BetterPlayerWidget extends StatefulWidget {
     required this.displayPath,
     this.thumbnailUrl,
     this.isFeedContext = false,
-    this.videoAspectRatioProp, // Added
+    this.videoAspectRatioProp,
+    this.controlsType = VideoControlsType.all,
   }) : super(key: key);
 
   @override
@@ -35,6 +41,7 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
   bool _isInitialized = false;
   bool _isLoading = true;
   bool _isPlaying = false;
+  bool _isFinished = false;
   int _retryCount = 0;
   final int _maxRetries = 3;
   String? _errorMessage;
@@ -44,20 +51,17 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
   Timer? _hideControlsTimer;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
-  // double? _aspectRatio; // No longer needed, BetterPlayer will use intrinsic video aspect ratio
 
   // For single video playback
   final DataController _dataController = Get.find<DataController>();
   String? _videoUniqueId;
   StreamSubscription? _currentlyPlayingVideoSubscription;
-  // StreamSubscription? _isTransitioningVideoSubscription; // Removed for transition
   void Function(BetterPlayerEvent)? _eventListener;
-
 
   @override
   void initState() {
     super.initState();
-    _isLoading = true; // Start in loading state for the placeholder
+    _isLoading = true;
     _videoUniqueId = widget.url ?? widget.file?.path ?? widget.key.toString();
 
     _animationController = AnimationController(
@@ -71,7 +75,6 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
     _initializeVideoPlayer();
 
     _currentlyPlayingVideoSubscription = _dataController.currentlyPlayingMediaId.listen((playingId) {
-      // Only enforce single video playback in feed context
       if (widget.isFeedContext &&
           _controller != null &&
           (_controller!.isPlaying() ?? false)) {
@@ -79,7 +82,6 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
             playingId != _videoUniqueId &&
             _dataController.currentlyPlayingMediaType.value == 'video') {
           _controller!.pause();
-          // _isPlaying state will be updated by the event listener
         }
       }
     });
@@ -87,7 +89,7 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
 
   void _attachListeners() {
     _eventListener = (event) {
-      if (mounted && _controller != null) { // Ensure controller is not null
+      if (mounted && _controller != null) {
         bool changed = false;
         if (event.betterPlayerEventType == BetterPlayerEventType.progress) {
           final newPosition = event.parameters?['progress'] as Duration? ?? _position;
@@ -99,27 +101,39 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
 
         final newIsPlayingState = _controller!.isPlaying() ?? false;
         if (_isPlaying != newIsPlayingState) {
-          if (newIsPlayingState && !_isPlaying) { // Video started playing
+          if (newIsPlayingState && !_isPlaying) {
             _dataController.mediaDidStartPlaying(_videoUniqueId!, 'video', _controller!);
-          } else if (!newIsPlayingState && _isPlaying) { // Video stopped playing (paused or finished)
+            if (widget.controlsType == VideoControlsType.simple) {
+              _showControls = false;
+              _animationController.reverse();
+            }
+            _isFinished = false; // Reset finished state when starting playback
+          } else if (!newIsPlayingState && _isPlaying) {
             _dataController.mediaDidStopPlaying(_videoUniqueId!, 'video');
+            if (widget.controlsType == VideoControlsType.simple) {
+              _showControls = true;
+              _animationController.forward();
+            }
           }
           _isPlaying = newIsPlayingState;
           changed = true;
         }
 
-        // Handle finished event specifically to call mediaDidStopPlaying
         if (event.betterPlayerEventType == BetterPlayerEventType.finished) {
-            if (_isPlaying) { // If it was playing and then finished
-                _dataController.mediaDidStopPlaying(_videoUniqueId!, 'video');
-                _isPlaying = false; // Explicitly set _isPlaying to false
-                changed = true;
-            }
+          _dataController.mediaDidStopPlaying(_videoUniqueId!, 'video');
+          _controller!.pause(); // Explicitly pause to prevent looping
+          _isPlaying = false;
+          _isFinished = true;
+          _controller!.seekTo(Duration.zero);
+          _position = Duration.zero;
+          _showControls = true;
+          _animationController.forward();
+          changed = true;
         }
 
         _duration = _controller?.videoPlayerController?.value.duration ?? _duration;
 
-        if (!_isPlaying && !_showControls) {
+        if (!_isPlaying && !_showControls && widget.controlsType != VideoControlsType.simple) {
           _showControls = true;
           _animationController.forward();
           changed = true;
@@ -146,14 +160,9 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
         dataSource = BetterPlayerDataSource(
           BetterPlayerDataSourceType.network,
           widget.url!,
-          cacheConfiguration: const BetterPlayerCacheConfiguration( // Disable caching
+          cacheConfiguration: const BetterPlayerCacheConfiguration(
             useCache: false,
-            // maxCacheSize: 100 * 1024 * 1024,
-            // maxCacheFileSize: 10 * 1024 * 1024,
           ),
-          // headers: { // Remove caching headers
-          //   'Cache-Control': 'max-age=604800',
-          // },
         );
       } else if (widget.file != null) {
         dataSource = BetterPlayerDataSource(
@@ -169,20 +178,15 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
         return;
       }
 
-      // Removed temporary controller logic for aspect ratio calculation
-      // final tempController = BetterPlayerController(...);
-      // await tempController.setupDataSource(dataSource);
-      // if (mounted) { ... tempController.dispose(); }
-
       _controller = BetterPlayerController(
         BetterPlayerConfiguration(
-          autoPlay: false, // Should be false for feed, true for MediaViewPage (handled by caller)
-          looping: false,
-          aspectRatio: widget.videoAspectRatioProp ?? 16 / 9,
-          fit: BoxFit.fitWidth, // Ensure it covers the area
-          placeholder: _buildPlaceholder(), // Use the new placeholder
+          autoPlay: false,
+          looping: false, // Explicitly ensure no looping
+          aspectRatio: widget.videoAspectRatioProp ?? 9 / 16,
+          fit: BoxFit.fitWidth,
+          placeholder: _buildPlaceholder(),
           controlsConfiguration: const BetterPlayerControlsConfiguration(
-            showControls: false, // Custom controls are built on top usually
+            showControls: false,
             loadingWidget: SizedBox.shrink(),
           ),
           handleLifecycle: true,
@@ -198,46 +202,21 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
               _isLoading = false;
               _isInitialized = true;
               _duration = _controller!.videoPlayerController!.value.duration ?? Duration.zero;
-              // _aspectRatio = _controller!.getAspectRatio() ?? _aspectRatio ?? 16 / 9; // No longer storing _aspectRatio
-            });
-            _controller!.removeEventsListener(_eventListener!); // Remove this init listener
-            _attachListeners(); // Attach the comprehensive event listener now
-          }
-        } else if (event.betterPlayerEventType == BetterPlayerEventType.exception) {
-            if (mounted) {
-                 setState(() {
-                    _isLoading = false;
-                    _isInitialized = false;
-                    _errorMessage = event.parameters?['message']?.toString() ?? 'Error initializing video';
-                 });
-            }
-        }
-        // The main _attachListeners will handle other events like progress, play, pause.
-      };
-      _eventListener = (BetterPlayerEvent event) { // Re-assign _eventListener here
-        if (event.betterPlayerEventType == BetterPlayerEventType.initialized) {
-          if (mounted) {
-            setState(() {
-              _isLoading = false; // Initialized, stop loading indicator for placeholder
-              _isInitialized = true;
-              _duration = _controller!.videoPlayerController!.value.duration ?? Duration.zero;
             });
             _controller!.removeEventsListener(_eventListener!);
-            _attachListeners(); // Attach the comprehensive event listener
+            _attachListeners();
           }
         } else if (event.betterPlayerEventType == BetterPlayerEventType.exception) {
-            if (mounted) {
-                 setState(() {
-                    _isLoading = false;
-                    _isInitialized = false;
-                    _errorMessage = event.parameters?['message']?.toString() ?? 'Error initializing video';
-                 });
-            }
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+              _isInitialized = false;
+              _errorMessage = event.parameters?['message']?.toString() ?? 'Error initializing video';
+            });
+          }
         }
       };
       _controller!.addEventsListener(_eventListener!);
-
-
     } catch (e) {
       if (_retryCount < _maxRetries && mounted) {
         _retryCount++;
@@ -246,7 +225,7 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
       } else {
         if (mounted) {
           setState(() {
-            _isLoading = false; // Stop loading on final error
+            _isLoading = false;
             _isInitialized = false;
             _errorMessage = 'Failed to load video after $_maxRetries attempts: $e';
           });
@@ -265,7 +244,7 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
       _showControls = !_showControls;
       if (_showControls) {
         _animationController.forward();
-        if (_isPlaying) {
+        if (_isPlaying && widget.controlsType != VideoControlsType.simple) {
           _hideControlsTimer?.cancel();
           _hideControlsTimer = Timer(const Duration(seconds: 3), () {
             if (mounted && _isPlaying) {
@@ -286,23 +265,18 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
   @override
   void dispose() {
     _currentlyPlayingVideoSubscription?.cancel();
-
     if (_eventListener != null && _controller != null) {
       _controller!.removeEventsListener(_eventListener!);
     }
     _controller?.dispose();
-
-    // If this video was playing, ensure DataController is updated
     if (_isPlaying) {
       _dataController.mediaDidStopPlaying(_videoUniqueId!, 'video');
     }
-
     _hideControlsTimer?.cancel();
     _animationController.dispose();
     super.dispose();
   }
 
-  @override
   Widget _buildPlaceholder() {
     final double effectiveAspectRatio = widget.videoAspectRatioProp ?? 16 / 9;
     final screenWidth = MediaQuery.of(context).size.width;
@@ -320,9 +294,9 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
                   placeholder: (context, url) => Container(color: Colors.black87),
                   errorWidget: (context, url, error) => Container(color: Colors.black),
                 )
-              : Container(color: Colors.black87), // Fallback if no thumbnail
+              : Container(color: Colors.black87),
         ),
-        if (_isLoading) // Show progress indicator if loading
+        if (_isLoading)
           const Center(
             child: CircularProgressIndicator(
               strokeWidth: 1.0,
@@ -333,126 +307,169 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
     );
   }
 
+  Widget _buildControls() {
+    if (widget.controlsType == VideoControlsType.simple) {
+      return Center(
+        child: AnimatedOpacity(
+          opacity: _fadeAnimation.value,
+          duration: const Duration(milliseconds: 300),
+          child: _showControls
+              ? IconButton(
+                icon: Icon(
+                  _isFinished ? FeatherIcons.refreshCcw : (_isPlaying ? FeatherIcons.pauseCircle : FeatherIcons.playCircle),
+                  color: Colors.tealAccent,
+                  size: 36,
+                ),
+                onPressed: _isInitialized
+                    ? () async {
+                        if (_isFinished) {
+                          await _controller!.seekTo(Duration.zero);
+                          await _controller!.play();
+                          setState(() {
+                            _isFinished = false;
+                            _showControls = false;
+                            _animationController.reverse();
+                          });
+                        } else if (_isPlaying) {
+                          await _controller!.pause();
+                          setState(() {
+                            _showControls = true;
+                            _animationController.forward();
+                          });
+                        } else {
+                          await _controller!.play();
+                          setState(() {
+                            _showControls = false;
+                            _animationController.reverse();
+                          });
+                        }
+                        setState(() {});
+                      }
+                    : null,
+              )
+              : const SizedBox.shrink(),
+        ),
+      );
+    } else {
+      return AnimatedOpacity(
+        opacity: _fadeAnimation.value,
+        duration: const Duration(milliseconds: 300),
+        child: _showControls
+            ? Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                decoration: const BoxDecoration(
+                  color: Colors.transparent,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        _isFinished ? FeatherIcons.repeat : (_isPlaying ? FeatherIcons.pause : FeatherIcons.play),
+                        color: Colors.tealAccent,
+                        size: 21,
+                      ),
+                      onPressed: _isInitialized
+                          ? () async {
+                              if (_isFinished) {
+                                await _controller!.seekTo(Duration.zero);
+                                await _controller!.play();
+                                setState(() {
+                                  _isFinished = false;
+                                  _showControls = true;
+                                  _animationController.forward();
+                                });
+                              } else if (_isPlaying) {
+                                await _controller!.pause();
+                              } else {
+                                await _controller!.play();
+                                setState(() {
+                                  _showControls = true;
+                                  _animationController.forward();
+                                });
+                                _hideControlsTimer?.cancel();
+                                _hideControlsTimer = Timer(const Duration(seconds: 3), () {
+                                  if (mounted && _isPlaying) {
+                                    setState(() {
+                                      _showControls = false;
+                                      _animationController.reverse();
+                                    });
+                                  }
+                                });
+                              }
+                              setState(() {});
+                            }
+                          : null,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _formatDuration(_position),
+                      style: GoogleFonts.roboto(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Slider(
+                        value: _duration.inMilliseconds > 0
+                            ? _position.inMilliseconds / _duration.inMilliseconds
+                            : 0.0,
+                        onChanged: _isInitialized ? (value) => _seekToPosition(value) : null,
+                        activeColor: Colors.tealAccent,
+                        inactiveColor: Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _formatDuration(_duration),
+                      style: GoogleFonts.roboto(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : const SizedBox.shrink(),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_errorMessage != null) {
-      // If there's an error, display it using the buildError structure
-      // (assuming buildError is a global helper or defined in this scope)
       return _buildError(
-          context,
-          message: _errorMessage,
-          fileName: widget.displayPath.split('/').last
+        context,
+        message: _errorMessage,
+        fileName: widget.displayPath.split('/').last,
       );
     }
 
-    // If controller is null (init hasn't happened or failed very early) or still loading, show placeholder.
-    // _isLoading is true initially and set to false on BetterPlayerEventType.initialized or playing.
-    if (_controller == null || (_isLoading && !_isInitialized) ) {
+    if (_controller == null || (_isLoading && !_isInitialized)) {
       return _buildPlaceholder();
     }
 
-    // If initialized but for some reason controller is null (should not happen if _isLoading is false)
-    // or if not initialized and also not loading (e.g. error before controller creation)
-    // This state indicates a problem, could show error or placeholder.
-    // The _errorMessage check above should catch most failure scenarios.
-    // If _isInitialized is false here, it means initialization event hasn't fired or failed.
     if (!_isInitialized && !_isLoading) {
-        return _buildPlaceholder(); // Still show placeholder if not initialized and not actively loading
+      return _buildPlaceholder();
     }
 
-    // Controller is available and likely initialized (or BetterPlayer will show its internal placeholder from config)
     return LayoutBuilder(
       builder: (context, constraints) {
         return GestureDetector(
           onTap: _toggleControls,
           child: Stack(
-            alignment: Alignment.bottomCenter,
+            alignment: widget.controlsType == VideoControlsType.simple ? Alignment.center : Alignment.bottomCenter,
             children: [
               Center(
-                // Removed the explicit AspectRatio widget wrapper.
-                // BetterPlayer with aspectRatio: null in its config will use intrinsic video ratio.
-                // The Center widget will handle centering if BoxFit.contain leads to letter/pillarboxing.
                 child: BetterPlayer(controller: _controller!),
               ),
               Positioned(
-                bottom: 20,
-                left: 20,
-                right: 20,
-                child: AnimatedOpacity(
-                  opacity: _fadeAnimation.value,
-                  duration: const Duration(milliseconds: 300),
-                  child: _showControls
-                      ? Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                          decoration: const BoxDecoration(
-                            color: Colors.transparent,
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              IconButton(
-                                icon: Icon(
-                                  _isPlaying ? Icons.pause : Icons.play_arrow,
-                                  color: Colors.tealAccent,
-                                  size: 30,
-                                ),
-                                onPressed: _isInitialized
-                                    ? () async {
-                                        if (_isPlaying) {
-                                          await _controller!.pause();
-                                        } else {
-                                          await _controller!.play();
-                                          setState(() {
-                                            _showControls = true;
-                                            _animationController.forward();
-                                          });
-                                          _hideControlsTimer?.cancel();
-                                          _hideControlsTimer = Timer(const Duration(seconds: 3), () {
-                                            if (mounted && _isPlaying) {
-                                              setState(() {
-                                                _showControls = false;
-                                                _animationController.reverse();
-                                              });
-                                            }
-                                          });
-                                        }
-                                        setState(() {});
-                                      }
-                                    : null,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                _formatDuration(_position),
-                                style: GoogleFonts.roboto(
-                                  color: Colors.white70,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Slider(
-                                  value: _duration.inMilliseconds > 0
-                                      ? _position.inMilliseconds / _duration.inMilliseconds
-                                      : 0.0,
-                                  onChanged: _isInitialized ? (value) => _seekToPosition(value) : null,
-                                  activeColor: Colors.tealAccent,
-                                  inactiveColor: Colors.grey,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                _formatDuration(_duration),
-                                style: GoogleFonts.roboto(
-                                  color: Colors.white70,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      : const SizedBox.shrink(),
-                ),
+                bottom: widget.controlsType == VideoControlsType.simple ? null : 20,
+                left: widget.controlsType == VideoControlsType.simple ? null : 20,
+                right: widget.controlsType == VideoControlsType.simple ? null : 20,
+                child: _buildControls(),
               ),
             ],
           ),
