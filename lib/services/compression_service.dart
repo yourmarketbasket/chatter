@@ -299,10 +299,7 @@ class CompressionService {
       }
       return documentFile;
     }
-    // Plain Text (TXT, CSV, JSON etc.) could be GZipped.
-    // However, this changes the file's effective type (e.g. to application/gzip)
-    // and requires server-side support for decompression.
-    // Forcing this without knowing backend capabilities is risky.
+    
     // If GZip is acceptable:
     // else if (['txt', 'csv', 'json', 'log'].contains(extension)) {
     //   return _handleCompressionLogic(documentFile, () async {
