@@ -211,7 +211,7 @@ class _MessageInputAreaState extends State<MessageInputArea> {
               metadata['width'] = info.width;
               metadata['height'] = info.height;
               metadata['duration'] = info.duration;
-              metadata['orientation'] = info.orientation;
+                metadata['orientation'] = info.orientation?.toString();
               if (info.width != null &&
                   info.height != null &&
                   info.height! > 0) {

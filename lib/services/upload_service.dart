@@ -138,7 +138,10 @@ class UploadService {
 
         // Thumbnail generation for videos. This should happen AFTER our CompressionService has run.
         // The fileToUpload variable now holds the (potentially) compressed file.
-        if (attachmentType == 'video') { // Check against the type determined by app logic
+        if (attachmentType == 'video') {
+          // Check against the type determined by app logic
+          print(
+              '[UploadService] Generating thumbnail for video: ${fileToUpload.path}');
           try {
             final String? thumbnailPath = await VideoThumbnail.thumbnailFile(
               video: fileToUpload.path, // Use the file determined by CompressionService
@@ -175,12 +178,16 @@ class UploadService {
                 uploadedThumbnailUrl = thumbResponse.data['secure_url'] as String?;
                 print('[UploadService uploadFilesToCloudinary] Thumbnail uploaded for $originalFilePath: $uploadedThumbnailUrl');
               } else {
-                print('[UploadService uploadFilesToCloudinary] Thumbnail upload failed for $originalFilePath: ${thumbResponse.data?['error']?['message']}');
+                print(
+                    '[UploadService uploadFilesToCloudinary] Thumbnail upload failed for $originalFilePath: ${thumbResponse.data?['error']?['message']}');
               }
             }
           } catch (e) {
-            print('[UploadService uploadFilesToCloudinary] Error generating or uploading thumbnail for $originalFilePath: $e');
+            print(
+                '[UploadService uploadFilesToCloudinary] Error generating or uploading thumbnail for $originalFilePath: $e');
           }
+          print(
+              '[UploadService] Finished thumbnail generation for video: ${fileToUpload.path}');
         }
 
         // Prepare main file form data (original or compressed)
