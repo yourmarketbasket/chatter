@@ -300,8 +300,7 @@ class CompressionService {
       return documentFile;
     }
     
-    // If GZip is acceptable:
-    // else if (['txt', 'csv', 'json', 'log'].contains(extension)) {
+    
     //   return _handleCompressionLogic(documentFile, () async {
     //     final tempDir = await getTemporaryDirectory();
     //     final targetPath = '${tempDir.path}/${documentFile.path.split('/').last}.gz';
