@@ -168,6 +168,8 @@ class _ChatScreenState extends State<ChatScreen> {
         };
       }).toList();
 
+      print('[ChatScreen] Attachments data for upload: $attachmentsData');
+
       final uploadResults = await dataController.uploadChatFiles(
         attachmentsData,
         (sentBytes, totalBytes) {

@@ -38,6 +38,7 @@ class UploadService {
         grandTotalBytes += await file.length();
       }
     }
+    print('[UploadService] Grand total bytes: $grandTotalBytes');
 
     // If grandTotalBytes is 0 (e.g., all files are empty or don't exist),
     // report progress as complete for the upload phase.
@@ -207,6 +208,8 @@ class UploadService {
           ),
           onSendProgress: (sent, total) {
             if (total > 0) {
+              print(
+                  '[UploadService] onSendProgress: sent=$sent, total=$total, cumulativeSentBytes=$cumulativeSentBytes, grandTotalBytes=$grandTotalBytes');
               onProgress(cumulativeSentBytes + sent, grandTotalBytes);
             }
           },
