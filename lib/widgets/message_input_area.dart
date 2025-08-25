@@ -10,7 +10,6 @@ import 'package:chatter/widgets/voice_note_preview_dialog.dart';
 import 'package:chatter/widgets/attachment_preview_dialog.dart';
 import 'package:chatter/services/socket-service.dart';
 import 'package:chatter/controllers/data-controller.dart';
-import 'package:chatter/helpers/file_helper.dart';
 import 'package:image/image.dart' as img;
 import 'package:flutter_video_info/flutter_video_info.dart';
 
@@ -161,6 +160,7 @@ class _MessageInputAreaState extends State<MessageInputArea> {
 
       List<Map<String, dynamic>> filesWithMetadata = [];
       List<String> oversizedFiles = [];
+      List<String> unprocessableFiles = [];
 
       for (var file in result.files) {
         if (file.size > maxFileSize) {
@@ -168,16 +168,13 @@ class _MessageInputAreaState extends State<MessageInputArea> {
           continue;
         }
 
-        final safePath = await FileHelper.getSafePath(file);
-        if (safePath == null) {
-          // Handle case where path could not be determined
-          print('Could not determine path for file: ${file.name}');
+        if (file.path == null) {
+          unprocessableFiles.add(file.name);
           continue;
         }
 
         Map<String, dynamic> metadata = {
           'file': file,
-          'safePath': safePath,
           'width': null,
           'height': null,
           'duration': null,
@@ -192,20 +189,20 @@ class _MessageInputAreaState extends State<MessageInputArea> {
             extension == 'gif' ||
             extension == 'bmp' ||
             extension == 'webp') {
-          final imageFile = File(safePath);
+          final imageFile = File(file.path!);
           final image = img.decodeImage(await imageFile.readAsBytes());
           if (image != null) {
             metadata['width'] = image.width;
             metadata['height'] = image.height;
             metadata['aspectRatio'] =
                 (image.width / image.height).toStringAsFixed(2);
-              if (image.width > image.height) {
-                metadata['orientation'] = 'landscape';
-              } else if (image.height > image.width) {
-                metadata['orientation'] = 'portrait';
-              } else {
-                metadata['orientation'] = 'square';
-              }
+            if (image.width > image.height) {
+              metadata['orientation'] = 'landscape';
+            } else if (image.height > image.width) {
+              metadata['orientation'] = 'portrait';
+            } else {
+              metadata['orientation'] = 'square';
+            }
           }
         } else if (extension == 'mp4' ||
             extension == 'mov' ||
@@ -213,23 +210,23 @@ class _MessageInputAreaState extends State<MessageInputArea> {
             extension == 'mkv' ||
             extension == 'webm') {
           try {
-            final info = await _videoInfo.getVideoInfo(safePath);
+            final info = await _videoInfo.getVideoInfo(file.path!);
             if (info != null) {
               metadata['width'] = info.width;
               metadata['height'] = info.height;
               metadata['duration'] = info.duration;
-                if (info.width != null && info.height != null) {
-                  if (info.width! > info.height!) {
-                    metadata['orientation'] = 'landscape';
-                  } else if (info.height! > info.width!) {
-                    metadata['orientation'] = 'portrait';
-                  } else {
-                    metadata['orientation'] = 'square';
-                  }
-                  if (info.height! > 0) {
-                    metadata['aspectRatio'] =
-                        (info.width! / info.height!).toStringAsFixed(2);
-                  }
+              if (info.width != null && info.height != null) {
+                if (info.width! > info.height!) {
+                  metadata['orientation'] = 'landscape';
+                } else if (info.height! > info.width!) {
+                  metadata['orientation'] = 'portrait';
+                } else {
+                  metadata['orientation'] = 'square';
+                }
+                if (info.height! > 0) {
+                  metadata['aspectRatio'] =
+                      (info.width! / info.height!).toStringAsFixed(2);
+                }
               }
             }
           } catch (e) {
@@ -239,13 +236,23 @@ class _MessageInputAreaState extends State<MessageInputArea> {
         filesWithMetadata.add(metadata);
       }
 
-      if (oversizedFiles.isNotEmpty && mounted) {
+      String dialogMessage = '';
+      if (oversizedFiles.isNotEmpty) {
+        dialogMessage +=
+            'The following files exceed the 20MB size limit and were not added:\n\n${oversizedFiles.join('\n')}';
+      }
+      if (unprocessableFiles.isNotEmpty) {
+        if (dialogMessage.isNotEmpty) dialogMessage += '\n\n';
+        dialogMessage +=
+            'The following files could not be processed (please select local files):\n\n${unprocessableFiles.join('\n')}';
+      }
+
+      if (dialogMessage.isNotEmpty && mounted) {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Files too large'),
-            content: Text(
-                'The following files exceed the 20MB size limit and were not added:\n\n${oversizedFiles.join('\n')}'),
+            title: const Text('Some Files Were Not Added'),
+            content: Text(dialogMessage),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),

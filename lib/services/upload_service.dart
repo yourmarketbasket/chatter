@@ -77,7 +77,6 @@ class UploadService {
     for (Map<String, dynamic> attachmentMap in attachmentsData) {
       print('[UploadService] Processing attachment: $attachmentMap');
       final File originalFile = attachmentMap['file'] as File;
-      final String? safePath = attachmentMap['safePath'] as String?;
       final originalFilePath = originalFile.path;
       final int? width = attachmentMap['width'] as int?;
       final int? height = attachmentMap['height'] as int?;
@@ -292,29 +291,6 @@ class UploadService {
           'aspectRatio': aspectRatio,
         });
       } finally {
-        // Cleanup: Delete the file that was uploaded if it's a temporary compressed file.
-        // The CompressionService creates files in a temporary directory.
-        if (safePath != null) {
-          final tempDir = await getTemporaryDirectory();
-          if (safePath.contains(tempDir.path)) {
-            try {
-              final tempFile = File(safePath);
-              if (await tempFile.exists()) {
-                await tempFile.delete();
-                if (kDebugMode) {
-                  print(
-                      '[UploadService] Deleted temporary file from FileHelper: $safePath');
-                }
-              }
-            } catch (e) {
-              if (kDebugMode) {
-                print(
-                    '[UploadService] Error deleting temporary file $safePath: $e');
-              }
-            }
-          }
-        }
-
         // Cleanup: Delete temporary thumbnail file
         if (tempThumbnailFile != null && await tempThumbnailFile.exists()) {
           try {

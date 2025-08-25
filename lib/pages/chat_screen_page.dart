@@ -120,9 +120,8 @@ class _ChatScreenState extends State<ChatScreen> {
       'type': messageType,
       'files': files?.map((fileData) {
             final file = fileData['file'] as PlatformFile;
-            final safePath = fileData['safePath'] as String;
             return {
-              'url': safePath,
+              'url': file.path!,
               'type':
                   isVoiceNote ? 'voice' : _getMediaType(file.extension ?? ''),
               'size': file.size,
@@ -152,14 +151,12 @@ class _ChatScreenState extends State<ChatScreen> {
     if (files != null && files.isNotEmpty) {
       final attachmentsData = files.map((fileData) {
         final file = fileData['file'] as PlatformFile;
-        final safePath = fileData['safePath'] as String;
         final fileType =
             isVoiceNote ? 'voice' : _getMediaType(file.extension ?? '');
         return {
-          'file': File(safePath),
+          'file': File(file.path!),
           'type': fileType,
           'filename': file.name,
-          'safePath': safePath,
           'width': fileData['width'],
           'height': fileData['height'],
           'aspectRatio': fileData['aspectRatio'],

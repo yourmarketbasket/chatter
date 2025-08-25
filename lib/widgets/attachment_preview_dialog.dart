@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:chatter/helpers/file_helper.dart';
 import 'package:chatter/widgets/better_player_widget.dart';
 import 'package:chatter/widgets/audio_waveform_widget.dart';
 import 'package:image/image.dart' as img;
@@ -42,94 +41,17 @@ class _AttachmentPreviewDialogState extends State<AttachmentPreviewDialog> {
   }
 
   Future<void> _addMoreFiles() async {
-    const int maxFileSize = 20971520; // 20 MB
     try {
       final result = await FilePicker.platform.pickFiles(allowMultiple: true);
       if (result != null && result.files.isNotEmpty) {
-        List<Map<String, dynamic>> newFilesWithMetadata = [];
-        List<String> oversizedFiles = [];
-
-        for (var file in result.files) {
-          if (file.size > maxFileSize) {
-            oversizedFiles.add(file.name);
-            continue;
-          }
-
-          final safePath = await FileHelper.getSafePath(file);
-          if (safePath == null) {
-            continue;
-          }
-
-          Map<String, dynamic> metadata = {
-            'file': file,
-            'safePath': safePath,
-            'width': null,
-            'height': null,
-            'duration': null,
-            'orientation': null,
-            'aspectRatio': null,
-          };
-
-          final extension = file.extension?.toLowerCase();
-          if (extension == 'jpg' ||
-              extension == 'jpeg' ||
-              extension == 'png' ||
-              extension == 'gif' ||
-              extension == 'bmp' ||
-              extension == 'webp') {
-            final imageFile = File(safePath);
-            final image = img.decodeImage(await imageFile.readAsBytes());
-            if (image != null) {
-              metadata['width'] = image.width;
-              metadata['height'] = image.height;
-              metadata['aspectRatio'] =
-                  (image.width / image.height).toStringAsFixed(2);
-            }
-          } else if (extension == 'mp4' ||
-              extension == 'mov' ||
-              extension == 'avi' ||
-              extension == 'mkv' ||
-              extension == 'webm') {
-            try {
-              final info = await _videoInfo.getVideoInfo(safePath);
-              if (info != null) {
-                metadata['width'] = info.width;
-                metadata['height'] = info.height;
-                metadata['duration'] = info.duration;
-                metadata['orientation'] = info.orientation;
-                if (info.width != null &&
-                    info.height != null &&
-                    info.height! > 0) {
-                  metadata['aspectRatio'] =
-                      (info.width! / info.height!).toStringAsFixed(2);
-                }
-              }
-            } catch (e) {
-              print("Error getting video info: $e");
-            }
-          }
-          newFilesWithMetadata.add(metadata);
-        }
-
-        if (oversizedFiles.isNotEmpty && mounted) {
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Files too large'),
-              content: Text(
-                  'The following files exceed the 20MB size limit and were not added:\n\n${oversizedFiles.join('\n')}'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('OK'),
-                ),
-              ],
-            ),
-          );
-        }
-
+        // This dialog does not handle size limits or metadata, it just adds the files.
+        // The parent widget is responsible for pre-filtering.
+        final newFilesAsMaps = result.files
+            .where((file) => file.path != null)
+            .map((file) => {'file': file})
+            .toList();
         setState(() {
-          _files.addAll(newFilesWithMetadata);
+          _files.addAll(newFilesAsMaps);
         });
       }
     } catch (e) {
@@ -140,7 +62,6 @@ class _AttachmentPreviewDialogState extends State<AttachmentPreviewDialog> {
 
   Widget _buildPreview(Map<String, dynamic> fileData) {
     final file = fileData['file'] as PlatformFile;
-    final safePath = fileData['safePath'] as String;
     final extension = file.extension?.toLowerCase() ?? '';
     Widget preview;
 
@@ -161,7 +82,7 @@ class _AttachmentPreviewDialogState extends State<AttachmentPreviewDialog> {
         final aspectRatio =
             double.tryParse(fileData['aspectRatio']?.toString() ?? '1.77');
         preview = BetterPlayerWidget(
-          file: File(safePath),
+          file: File(file.path!),
           displayPath: file.name,
           videoAspectRatioProp: aspectRatio,
           showSimpleControls: true,
@@ -171,7 +92,7 @@ class _AttachmentPreviewDialogState extends State<AttachmentPreviewDialog> {
       case 'wav':
       case 'm4a':
         preview = AudioWaveformWidget(
-          audioPath: safePath,
+          audioPath: file.path!,
           isLocal: true,
         );
         break;
@@ -230,6 +151,7 @@ class _AttachmentPreviewDialogState extends State<AttachmentPreviewDialog> {
                       );
                     }
                     final fileData = _files[index];
+                    final file = fileData['file'] as PlatformFile;
                     return Stack(
                       alignment: Alignment.topRight,
                       children: [
