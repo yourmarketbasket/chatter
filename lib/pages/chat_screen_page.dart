@@ -323,15 +323,30 @@ class _ChatScreenState extends State<ChatScreen> {
 
 
   String _getReplyPreviewText(Map<String, dynamic> attachment) {
+    String? filename = attachment['filename'];
+    if (filename == null || filename.isEmpty) {
+        final url = attachment['url'] as String? ?? '';
+        if (url.isNotEmpty) {
+            try {
+                // For URLs, decode and take the last path segment
+                filename = Uri.decodeComponent(Uri.parse(url).pathSegments.last);
+            } catch (e) {
+                // For local file paths, just split by the separator
+                filename = url.split(Platform.pathSeparator).last;
+            }
+        }
+    }
+
+
     final attachmentType = attachment['type'] as String? ?? '';
     if (attachmentType.startsWith('image') || attachmentType.startsWith('video')) {
-      return attachment['filename'] ?? (attachmentType.startsWith('image') ? 'Image' : 'Video');
+      return filename ?? (attachmentType.startsWith('image') ? 'Image' : 'Video');
     } else if (attachmentType.startsWith('audio') || attachmentType == 'voice') {
       return 'Voice Note';
     } else if (attachmentType == 'application/pdf') {
-      return attachment['filename'] ?? 'PDF Document';
+      return filename ?? 'PDF Document';
     } else {
-      return attachment['filename'] ?? 'File';
+      return filename ?? 'File';
     }
   }
 
@@ -384,7 +399,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+      padding: const EdgeInsets.fromLTRB(2, 8, 8, 0),
       color: Colors.grey[900],
       child: Container(
         padding: const EdgeInsets.all(8.0),

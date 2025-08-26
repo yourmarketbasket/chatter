@@ -96,6 +96,6 @@ class _ReplyAttachmentPreviewState extends State<ReplyAttachmentPreview> {
         height: 60,
         child: ClipRRect(
             borderRadius: BorderRadius.circular(4),
-            child: Center(child: preview)));
+            child: preview));
   }
 }
