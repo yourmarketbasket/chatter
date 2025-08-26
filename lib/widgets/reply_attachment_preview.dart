@@ -93,7 +93,7 @@ class _ReplyAttachmentPreviewState extends State<ReplyAttachmentPreview> {
 
     return SizedBox(
         width: 80,
-        height: 80,
+        height: 60,
         child: ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: Center(child: preview)));

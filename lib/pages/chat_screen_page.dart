@@ -342,8 +342,10 @@ class _ChatScreenState extends State<ChatScreen> {
         previewText = firstAttachment['filename'] ?? (attachmentType.startsWith('image') ? 'Image' : 'Video');
       } else if (attachmentType.startsWith('audio') || attachmentType == 'voice') {
         previewText = 'Voice Note';
+      } else if (attachmentType == 'application/pdf') {
+        previewText = firstAttachment['filename'] ?? 'PDF Document';
       } else {
-        previewText = firstAttachment['filename'] ?? 'Attachment';
+        previewText = firstAttachment['filename'] ?? 'File';
       }
       contentPreview = Row(
         children: [
