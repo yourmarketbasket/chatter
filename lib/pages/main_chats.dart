@@ -294,24 +294,30 @@ class _MainChatsPageState extends State<MainChatsPage> {
                               avatarUrl = otherUser['avatar'] ?? '';
                               avatarLetter = title.isNotEmpty ? title[0].toUpperCase() : 'U';
                               verificationData = otherUser['verification'] ?? {'entityType': null, 'level': null};
-                              trailingWidget = Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    otherUser['online'] == true
-                                        ? 'online'
-                                        : (otherUser['lastSeen'] != null
-                                            ? 'last seen ${formatLastSeen(DateTime.parse(otherUser['lastSeen']))}'
-                                            : 'offline'),
-                                    style: GoogleFonts.poppins(
-                                      color: otherUser['online'] == true ? Colors.tealAccent.shade400 : Colors.grey.shade500,
-                                      fontSize: 11,
-                                      fontWeight: otherUser['online'] == true ? FontWeight.w600 : FontWeight.normal,
+                              trailingWidget = Obx(() {
+                                final reactiveOtherUser = _dataController.allUsers.firstWhere(
+                                    (u) => u['_id'] == otherUser['_id'],
+                                    orElse: () => otherUser,
+                                );
+                                return Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      reactiveOtherUser['online'] == true
+                                          ? 'online'
+                                          : (reactiveOtherUser['lastSeen'] != null
+                                              ? 'last seen ${formatLastSeen(DateTime.parse(reactiveOtherUser['lastSeen']))}'
+                                              : 'offline'),
+                                      style: GoogleFonts.poppins(
+                                        color: reactiveOtherUser['online'] == true ? Colors.tealAccent.shade400 : Colors.grey.shade500,
+                                        fontSize: 11,
+                                        fontWeight: reactiveOtherUser['online'] == true ? FontWeight.w600 : FontWeight.normal,
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              );
+                                  ],
+                                );
+                              });
                             }
 
                             String preview = '';
@@ -377,43 +383,60 @@ class _MainChatsPageState extends State<MainChatsPage> {
                               },
                               child: ListTile(
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                                leading: Stack(
-                                  clipBehavior: Clip.none,
-                                  children: [
-                                    CircleAvatar(
-                                      radius: 22,
-                                      backgroundColor: Colors.tealAccent.shade400.withOpacity(0.2),
-                                      backgroundImage: avatarUrl.isNotEmpty ? CachedNetworkImageProvider(avatarUrl) : null,
-                                      child: avatarUrl.isEmpty
-                                          ? Text(avatarLetter, style: GoogleFonts.poppins(color: Colors.tealAccent.shade400, fontWeight: FontWeight.w600, fontSize: 16))
-                                          : null,
-                                    ),
-                                    if (isGroup)
-                                      Positioned(
-                                        right: -4,
-                                        bottom: -4,
-                                        child: CircleAvatar(
-                                          radius: 10,
-                                          backgroundColor: Colors.black,
-                                          child: Icon(Icons.group, size: 14, color: Colors.tealAccent.shade400),
-                                        ),
+                                leading: Obx(() {
+                                  bool isUserOnline = false;
+                                  if (!isGroup) {
+                                    final otherParticipantRaw = (chat['participants'] as List<dynamic>).firstWhere(
+                                      (p) => (p is Map<String, dynamic> ? p['_id'] : p) != currentUserId,
+                                      orElse: () => null,
+                                    );
+                                    if (otherParticipantRaw != null) {
+                                      final otherUserId = otherParticipantRaw is Map<String, dynamic> ? otherParticipantRaw['_id'] : otherParticipantRaw;
+                                      final reactiveOtherUser = _dataController.allUsers.firstWhere(
+                                          (u) => u['_id'] == otherUserId,
+                                          orElse: () => {'online': false},
+                                      );
+                                      isUserOnline = reactiveOtherUser['online'] ?? false;
+                                    }
+                                  }
+                                  return Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 22,
+                                        backgroundColor: Colors.tealAccent.shade400.withOpacity(0.2),
+                                        backgroundImage: avatarUrl.isNotEmpty ? CachedNetworkImageProvider(avatarUrl) : null,
+                                        child: avatarUrl.isEmpty
+                                            ? Text(avatarLetter, style: GoogleFonts.poppins(color: Colors.tealAccent.shade400, fontWeight: FontWeight.w600, fontSize: 16))
+                                            : null,
                                       ),
-                                    if (!isGroup && (_dataController.allUsers.firstWhere((u) => u['_id'] == (chat['participants'] as List<dynamic>).firstWhere((p) => (p is Map<String, dynamic> ? p['_id'] : p) != currentUserId)['_id'], orElse: () => {'online': false})['online'] ?? false))
-                                      Positioned(
-                                        right: 0,
-                                        bottom: 0,
-                                        child: Container(
-                                          width: 12,
-                                          height: 12,
-                                          decoration: BoxDecoration(
-                                            color: Colors.green,
-                                            shape: BoxShape.circle,
-                                            border: Border.all(color: Colors.black, width: 2),
+                                      if (isGroup)
+                                        Positioned(
+                                          right: -4,
+                                          bottom: -4,
+                                          child: CircleAvatar(
+                                            radius: 10,
+                                            backgroundColor: Colors.black,
+                                            child: Icon(Icons.group, size: 14, color: Colors.tealAccent.shade400),
                                           ),
                                         ),
-                                      ),
-                                  ],
-                                ),
+                                      if (!isGroup && isUserOnline)
+                                        Positioned(
+                                          right: 0,
+                                          bottom: 0,
+                                          child: Container(
+                                            width: 12,
+                                            height: 12,
+                                            decoration: BoxDecoration(
+                                              color: Colors.green,
+                                              shape: BoxShape.circle,
+                                              border: Border.all(color: Colors.black, width: 2),
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  );
+                                }),
                                 title: Row(
                                   children: [
                                     Text(
