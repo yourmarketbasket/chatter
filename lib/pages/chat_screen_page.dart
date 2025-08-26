@@ -1271,6 +1271,37 @@ class _ChatScreenState extends State<ChatScreen> {
               isOnline = otherUser['online'] ?? false;
             }
 
+            // This widget will now rebuild whenever the typing status, online status, or chat details change.
+            Widget statusWidget;
+            if (!isGroup && userForProfile != null) {
+              final chatId = chat['_id'] as String?;
+              // Safely access the isTyping map. The map itself is observable.
+              final typingUserId = dataController.isTyping[chatId];
+
+              if (chatId != null && typingUserId == userForProfile['_id']) {
+                statusWidget = const Text(
+                  'typing...',
+                  style: TextStyle(color: Colors.tealAccent, fontSize: 12, fontStyle: FontStyle.italic),
+                );
+              } else {
+                // The user's online status is part of the userForProfile map, which is derived
+                // from the observable allUsers list. So this part is reactive.
+                if (userForProfile['online'] == true) {
+                  statusWidget = const Text('online', style: TextStyle(color: Colors.green, fontSize: 12));
+                } else if (userForProfile['lastSeen'] != null) {
+                  statusWidget = Text(
+                    'last seen ${formatLastSeen(DateTime.parse(userForProfile['lastSeen']))}',
+                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    overflow: TextOverflow.ellipsis,
+                  );
+                } else {
+                  statusWidget = const Text('offline', style: TextStyle(color: Colors.grey, fontSize: 12));
+                }
+              }
+            } else {
+              statusWidget = const SizedBox.shrink();
+            }
+
             return GestureDetector(
               onTap: () {
                 if (isGroup) {
@@ -1322,49 +1353,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           style: const TextStyle(color: Colors.white, fontSize: 16),
                           overflow: TextOverflow.ellipsis,
                         ),
-                        if (!isGroup && userForProfile != null)
-                          Obx(() {
-                            final chatId = chat['_id'];
-                            if (chatId != null) {
-                              final typingUserId =
-                                  dataController.isTyping[chatId];
-                              if (typingUserId != null &&
-                                  typingUserId == userForProfile!['_id']) {
-                                return const Text(
-                                  'typing...',
-                                  style: TextStyle(
-                                      color: Colors.tealAccent,
-                                      fontSize: 12,
-                                      fontStyle: FontStyle.italic),
-                                );
-                              }
-                            }
-
-                            final user = userForProfile;
-                            if (user == null) {
-                              // This case should ideally not be reached due to the outer check,
-                              // but it provides an extra layer of safety.
-                              return const Text('offline',
-                                  style: TextStyle(
-                                      color: Colors.grey, fontSize: 12));
-                            }
-                            if (user['online'] == true) {
-                              return const Text('online',
-                                  style: TextStyle(
-                                      color: Colors.green, fontSize: 12));
-                            }
-                            if (user['lastSeen'] != null) {
-                              return Text(
-                                'last seen ${formatLastSeen(DateTime.parse(user['lastSeen']))}',
-                                style: const TextStyle(
-                                    color: Colors.grey, fontSize: 12),
-                                overflow: TextOverflow.ellipsis,
-                              );
-                            }
-                            return const Text('offline',
-                                style: TextStyle(
-                                    color: Colors.grey, fontSize: 12));
-                          }),
+                        statusWidget,
                       ],
                     ),
                   ),
