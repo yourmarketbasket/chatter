@@ -1584,6 +1584,7 @@ class DataController extends GetxController {
 
           chats[newChatId] = newChat;
           currentChat.value = newChat; // This updates the whole object
+          activeChatId.value = newChatId;
           Get.find<SocketService>().joinChatRoom(newChatId);
           chats.refresh();
         }
@@ -1600,6 +1601,7 @@ class DataController extends GetxController {
             var tempChat = Map<String, dynamic>.from(currentChat.value);
             tempChat['_id'] = messageChatId;
             currentChat.value = tempChat;
+            activeChatId.value = messageChatId;
 
             // Join the room.
             Get.find<SocketService>().joinChatRoom(messageChatId);
