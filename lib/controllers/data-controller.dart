@@ -473,6 +473,7 @@ class DataController extends GetxController {
           }).where((userMap) => userMap.isNotEmpty && userMap['_id'] != currentUserId).toList(); // Filter out empty maps and the current user
 
           allUsers.assignAll(fetchedUsers);
+          Get.find<NotificationService>().refreshToken();
           // print('[DataController] Fetched all users successfully. Count: ${allUsers.length}');
         } else {
           allUsers.clear();
@@ -2173,6 +2174,7 @@ class DataController extends GetxController {
 
             followers.addAll(processedFollowers);
             _currentFollowersPage.value++;
+            Get.find<NotificationService>().refreshToken();
           } else {
             _hasMoreFollowers.value = false;
           }
@@ -2251,6 +2253,7 @@ class DataController extends GetxController {
 
             following.addAll(processedFollowing);
             _currentFollowingPage.value++;
+            Get.find<NotificationService>().refreshToken();
           } else {
             _hasMoreFollowing.value = false;
           }

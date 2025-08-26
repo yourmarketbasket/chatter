@@ -45,12 +45,7 @@ class NotificationService {
     _isInitialized = true;
 
     await _requestPermissions();
-    final fcmToken = await _firebaseMessaging.getToken();
-    if (fcmToken != null) {
-      if (Get.isRegistered<DataController>()) {
-        _dataController.updateFcmToken(fcmToken);
-      }
-    }
+    await refreshToken();
 
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('ic_status_16px');
@@ -73,6 +68,15 @@ class NotificationService {
     });
 
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  }
+
+  Future<void> refreshToken() async {
+    final fcmToken = await _firebaseMessaging.getToken();
+    if (fcmToken != null) {
+      if (Get.isRegistered<DataController>()) {
+        await _dataController.updateFcmToken(fcmToken);
+      }
+    }
   }
 
   void onDidReceiveNotificationResponse(NotificationResponse response) async {
