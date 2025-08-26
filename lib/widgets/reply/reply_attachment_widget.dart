@@ -67,7 +67,7 @@ class ReplyAttachmentDisplayWidget extends StatelessWidget {
           attachment: attachmentMap,
           post: postOrReplyData,
           borderRadius: borderRadius,
-          enforceFeedConstraints: false,
+          enforceFeedConstraints: true,
         );
         break;
 
