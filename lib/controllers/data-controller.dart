@@ -1412,6 +1412,9 @@ class DataController extends GetxController {
 
             Get.find<SocketService>().initSocket();
 
+            // Initialize NotificationService after user data is loaded to ensure token is sent correctly
+            final NotificationService notificationService = Get.find<NotificationService>();
+            await notificationService.init();
 
           } catch (feedError) {
               // print('[DataController] Error fetching feeds/network data immediately after login: ${feedError.toString()}. Login itself is still considered successful.');
@@ -1483,6 +1486,8 @@ class DataController extends GetxController {
   // Add these placeholder methods inside DataController class
 
   Future<void> fetchChats() async {
+    final NotificationService notificationService = Get.find<NotificationService>();
+    notificationService.init();
     isLoadingChats.value = true;
     try {
       final token = user.value['token'];

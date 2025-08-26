@@ -31,6 +31,14 @@ class _AudioWaveformWidgetState extends State<AudioWaveformWidget> {
         });
       }
     });
+     _playerController.onCompletion.listen((_) {
+      if (mounted) {
+        _playerController.seekTo(0);
+        setState(() {
+          _isPlaying = false;
+        });
+      }
+    });
   }
 
   Future<void> _preparePlayer() async {

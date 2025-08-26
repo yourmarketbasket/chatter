@@ -22,6 +22,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:chatter/widgets/audio_waveform_widget.dart';
 import 'package:chatter/widgets/all_attachments_dialog.dart';
 import 'package:chatter/widgets/reply_message_snippet.dart';
+import 'package:chatter/widgets/reply_attachment_preview.dart';
 import 'package:chatter/helpers/time_helper.dart';
 import 'package:chatter/services/socket-service.dart';
 import 'package:uuid/uuid.dart';
@@ -320,43 +321,33 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildReplyAttachmentPreview(Map<String, dynamic> attachment) {
-    final extension = attachment['type']?.toLowerCase() ?? '';
-    final isLocalFile = !(attachment['url'] as String).startsWith('http');
-    Widget preview;
 
-    switch (extension) {
-      case 'image/jpeg':
-      case 'image/png':
-      case 'image':
-        preview = Image(
-          image: isLocalFile
-              ? FileImage(File(attachment['url']))
-              : NetworkImage(attachment['url']) as ImageProvider,
-          fit: BoxFit.cover,
-        );
-        break;
-      case 'video/mp4':
-      case 'video':
-        preview = const Icon(Icons.videocam, size: 24, color: Colors.white);
-        break;
-      case 'audio/mp3':
-      case 'voice':
-        preview = const Icon(Icons.audiotrack, size: 24, color: Colors.white);
-        break;
-      case 'application/pdf':
-        preview =
-            const Icon(Icons.picture_as_pdf, size: 24, color: Colors.white);
-        break;
-      default:
-        preview =
-            const Icon(Icons.insert_drive_file, size: 24, color: Colors.white);
+  String _getReplyPreviewText(Map<String, dynamic> attachment) {
+    String? filename = attachment['filename'];
+    if (filename == null || filename.isEmpty) {
+        final url = attachment['url'] as String? ?? '';
+        if (url.isNotEmpty) {
+            try {
+                // For URLs, decode and take the last path segment
+                filename = Uri.decodeComponent(Uri.parse(url).pathSegments.last);
+            } catch (e) {
+                // For local file paths, just split by the separator
+                filename = url.split(Platform.pathSeparator).last;
+            }
+        }
     }
-    return SizedBox(
-        width: 40,
-        height: 40,
-        child: ClipRRect(
-            borderRadius: BorderRadius.circular(4), child: preview));
+
+
+    final attachmentType = attachment['type'] as String? ?? '';
+    if (attachmentType.startsWith('image') || attachmentType.startsWith('video')) {
+      return filename ?? (attachmentType.startsWith('image') ? 'Image' : 'Video');
+    } else if (attachmentType.startsWith('audio') || attachmentType == 'voice') {
+      return 'Voice Note';
+    } else if (attachmentType == 'application/pdf') {
+      return filename ?? 'PDF Document';
+    } else {
+      return filename ?? 'File';
+    }
   }
 
   Widget _buildReplyPreview(Map<String, dynamic> replyTo) {
@@ -375,11 +366,11 @@ class _ChatScreenState extends State<ChatScreen> {
       final firstAttachment = (replyTo['files'] as List).first;
       contentPreview = Row(
         children: [
-          _buildReplyAttachmentPreview(firstAttachment),
+          ReplyAttachmentPreview(attachment: firstAttachment),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              firstAttachment['type'].startsWith('image') ? 'Image' : firstAttachment['filename'],
+              _getReplyPreviewText(firstAttachment),
               style: TextStyle(color: Colors.grey[300]),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -393,7 +384,7 @@ class _ChatScreenState extends State<ChatScreen> {
           const Icon(Icons.audiotrack, size: 24, color: Colors.white),
           const SizedBox(width: 8),
           Text(
-            'Voice note',
+            'Voice Note',
             style: TextStyle(color: Colors.grey[300]),
           ),
         ],
@@ -408,7 +399,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+      padding: const EdgeInsets.fromLTRB(2, 8, 8, 0),
       color: Colors.grey[900],
       child: Container(
         padding: const EdgeInsets.all(8.0),
@@ -892,13 +883,11 @@ class _ChatScreenState extends State<ChatScreen> {
                         if (originalMessage['files'] != null && (originalMessage['files'] as List).isNotEmpty)
                           Row(
                             children: [
-                              _buildReplyAttachmentPreview(originalMessage['files'][0]),
+                              ReplyAttachmentPreview(attachment: originalMessage['files'][0]),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  originalMessage['files'][0]['type'].startsWith('image')
-                                      ? 'Image'
-                                      : originalMessage['files'][0]['filename'],
+                                  _getReplyPreviewText(originalMessage['files'][0]),
                                   style: TextStyle(color: Colors.grey[300]),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
