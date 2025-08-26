@@ -866,7 +866,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         if (originalMessage['files'] != null && (originalMessage['files'] as List).isNotEmpty)
                           Row(
                             children: [
-                              _buildReplyAttachmentPreview(originalMessage['files'][0]),
+                              ReplyAttachmentPreview(attachment: originalMessage['files'][0]),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
