@@ -22,6 +22,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:chatter/widgets/audio_waveform_widget.dart';
 import 'package:chatter/widgets/all_attachments_dialog.dart';
 import 'package:chatter/widgets/reply_message_snippet.dart';
+import 'package:chatter/widgets/reply_attachment_preview.dart';
 import 'package:chatter/helpers/time_helper.dart';
 import 'package:chatter/services/socket-service.dart';
 import 'package:uuid/uuid.dart';
@@ -320,44 +321,6 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildReplyAttachmentPreview(Map<String, dynamic> attachment) {
-    final extension = attachment['type']?.toLowerCase() ?? '';
-    final isLocalFile = !(attachment['url'] as String).startsWith('http');
-    Widget preview;
-
-    switch (extension) {
-      case 'image/jpeg':
-      case 'image/png':
-      case 'image':
-        preview = Image(
-          image: isLocalFile
-              ? FileImage(File(attachment['url']))
-              : NetworkImage(attachment['url']) as ImageProvider,
-          fit: BoxFit.cover,
-        );
-        break;
-      case 'video/mp4':
-      case 'video':
-        preview = const Icon(Icons.videocam, size: 24, color: Colors.white);
-        break;
-      case 'audio/mp3':
-      case 'voice':
-        preview = const Icon(Icons.audiotrack, size: 24, color: Colors.white);
-        break;
-      case 'application/pdf':
-        preview =
-            const Icon(Icons.picture_as_pdf, size: 24, color: Colors.white);
-        break;
-      default:
-        preview =
-            const Icon(Icons.insert_drive_file, size: 24, color: Colors.white);
-    }
-    return SizedBox(
-        width: 40,
-        height: 40,
-        child: ClipRRect(
-            borderRadius: BorderRadius.circular(4), child: preview));
-  }
 
   Widget _buildReplyPreview(Map<String, dynamic> replyTo) {
     final sender = (dataController.currentChat.value['participants'] as List)
@@ -386,7 +349,7 @@ class _ChatScreenState extends State<ChatScreen> {
       }
       contentPreview = Row(
         children: [
-          _buildReplyAttachmentPreview(firstAttachment),
+          ReplyAttachmentPreview(attachment: firstAttachment),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
