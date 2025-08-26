@@ -1324,31 +1324,46 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                         if (!isGroup && userForProfile != null)
                           Obx(() {
-                            final typingUserId = dataController.isTyping[chat['_id']];
-                            if (typingUserId != null && typingUserId == userForProfile!['_id']) {
-                              return const Text(
-                                'typing...',
-                                style: TextStyle(color: Colors.tealAccent, fontSize: 12, fontStyle: FontStyle.italic),
-                              );
+                            final chatId = chat['_id'];
+                            if (chatId != null) {
+                              final typingUserId =
+                                  dataController.isTyping[chatId];
+                              if (typingUserId != null &&
+                                  typingUserId == userForProfile!['_id']) {
+                                return const Text(
+                                  'typing...',
+                                  style: TextStyle(
+                                      color: Colors.tealAccent,
+                                      fontSize: 12,
+                                      fontStyle: FontStyle.italic),
+                                );
+                              }
                             }
 
                             final user = userForProfile;
                             if (user == null) {
                               // This case should ideally not be reached due to the outer check,
                               // but it provides an extra layer of safety.
-                              return const Text('offline', style: TextStyle(color: Colors.grey, fontSize: 12));
+                              return const Text('offline',
+                                  style: TextStyle(
+                                      color: Colors.grey, fontSize: 12));
                             }
                             if (user['online'] == true) {
-                              return const Text('online', style: TextStyle(color: Colors.green, fontSize: 12));
+                              return const Text('online',
+                                  style: TextStyle(
+                                      color: Colors.green, fontSize: 12));
                             }
                             if (user['lastSeen'] != null) {
                               return Text(
                                 'last seen ${formatLastSeen(DateTime.parse(user['lastSeen']))}',
-                                style: const TextStyle(color: Colors.grey, fontSize: 12),
+                                style: const TextStyle(
+                                    color: Colors.grey, fontSize: 12),
                                 overflow: TextOverflow.ellipsis,
                               );
                             }
-                            return const Text('offline', style: TextStyle(color: Colors.grey, fontSize: 12));
+                            return const Text('offline',
+                                style: TextStyle(
+                                    color: Colors.grey, fontSize: 12));
                           }),
                       ],
                     ),
