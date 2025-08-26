@@ -265,6 +265,11 @@ class _MainChatsPageState extends State<MainChatsPage> {
 
                             // Wrap the entire ListTile generation in an Obx
                             return Obx(() {
+                              // Ensure this Obx always has a reactive dependency. For group chats,
+                              // the dependency on `allUsers` isn't hit, which causes the GetX error.
+                              // Accessing the length of the chats map is a safe way to subscribe to any change.
+                              _dataController.chats.length;
+
                               final isGroup = chat['type'] == "group";
 
                               // --- All data lookup happens inside Obx ---
