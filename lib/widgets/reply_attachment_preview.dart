@@ -24,6 +24,7 @@ class _ReplyAttachmentPreviewState extends State<ReplyAttachmentPreview> {
       _generateThumbnail();
     }
   }
+  // force
 
   Future<void> _generateThumbnail() async {
     if (!mounted) return;
