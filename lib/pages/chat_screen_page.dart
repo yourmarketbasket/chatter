@@ -373,13 +373,24 @@ class _ChatScreenState extends State<ChatScreen> {
     Widget contentPreview;
     if (replyTo['files'] != null && (replyTo['files'] as List).isNotEmpty) {
       final firstAttachment = (replyTo['files'] as List).first;
+      final attachmentType = firstAttachment['type'] as String? ?? '';
+      String previewText;
+      if (attachmentType.startsWith('image')) {
+        previewText = 'Image';
+      } else if (attachmentType.startsWith('video')) {
+        previewText = 'Video';
+      } else if (attachmentType.startsWith('audio') || attachmentType == 'voice') {
+        previewText = 'Voice Message';
+      } else {
+        previewText = firstAttachment['filename'] ?? 'Attachment';
+      }
       contentPreview = Row(
         children: [
           _buildReplyAttachmentPreview(firstAttachment),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              firstAttachment['type'].startsWith('image') ? 'Image' : firstAttachment['filename'] ?? 'Attachment',
+              previewText,
               style: TextStyle(color: Colors.grey[300]),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
