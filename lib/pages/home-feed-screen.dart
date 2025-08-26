@@ -37,6 +37,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
+import 'package:chatter/main.dart'; // Import for routeObserver
 
 class HomeFeedScreen extends StatefulWidget {
   const HomeFeedScreen({Key? key}) : super(key: key);
@@ -45,7 +46,7 @@ class HomeFeedScreen extends StatefulWidget {
   _HomeFeedScreenState createState() => _HomeFeedScreenState();
 }
 
-class _HomeFeedScreenState extends State<HomeFeedScreen> {
+class _HomeFeedScreenState extends State<HomeFeedScreen> with RouteAware {
   final DataController dataController = Get.find<DataController>();
   final MediaVisibilityService mediaVisibilityService = Get.find<MediaVisibilityService>();
   final ScrollController _scrollController = ScrollController();
@@ -243,9 +244,23 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    routeObserver.subscribe(this, ModalRoute.of(context)!);
+  }
+
+  @override
   void dispose() {
+    routeObserver.unsubscribe(this);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didPushNext() {
+    // This method is called when a new route is pushed, and the current route is no longer visible.
+    dataController.pauseCurrentMedia();
+    super.didPushNext();
   }
 
   void _navigateToPostScreen() async {

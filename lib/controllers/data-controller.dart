@@ -1,6 +1,9 @@
 import 'dart:io';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:better_player_enhanced/better_player.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:video_player/video_player.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:dio/dio.dart' as dio; // Use prefix for dio to avoid conflicts
 import 'dart:convert';
@@ -2459,6 +2462,27 @@ class DataController extends GetxController {
       currentlyPlayingMediaType.value = null;
       activeMediaController.value = null;
         // print("[DataController] Media $mediaId (type: $mediaType) stopped playing. Releasing global lock.");
+    }
+  }
+
+  void pauseCurrentMedia() {
+    if (activeMediaController.value == null) {
+      // print('[DataController] pauseCurrentMedia called, but no active media.');
+      return;
+    }
+    // print('[DataController] Pausing currently active media.');
+
+    final controller = activeMediaController.value;
+
+    // Using `is` checks to avoid casting errors with different player types.
+    if (controller is BetterPlayerController) {
+      controller.pause();
+    } else if (controller is VideoPlayerController) {
+      controller.pause();
+    } else if (controller is AudioPlayer) {
+      controller.pause();
+    } else {
+      // print('[DataController] Unknown controller type in activeMediaController: ${controller.runtimeType}');
     }
   }
 

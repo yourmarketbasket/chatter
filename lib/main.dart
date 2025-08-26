@@ -20,6 +20,8 @@ import 'package:chatter/helpers/timeago_helpers.dart';
 // import 'package:device_info_plus/device_info_plus.dart'; // No longer needed for player selection
 // import 'dart:io'; // No longer needed for player selection (Platform check)
 
+final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
+
 void main() async {
   // Ensure Flutter bindings are initialized
   WidgetsFlutterBinding.ensureInitialized();
@@ -128,6 +130,7 @@ class _ChatterAppState extends State<ChatterApp> {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
         scaffoldBackgroundColor: Colors.white,
       ),
+      navigatorObservers: [routeObserver],
       home: const LandingPage(), // Show LandingPage while checking storage
       getPages: [
         GetPage(name: '/landing', page: () => const LandingPage()),
