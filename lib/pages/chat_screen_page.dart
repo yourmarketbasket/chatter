@@ -1275,10 +1275,16 @@ class _ChatScreenState extends State<ChatScreen> {
             Widget statusWidget;
             if (!isGroup && userForProfile != null) {
               final chatId = chat['_id'] as String?;
-              // Safely access the isTyping map. The map itself is observable.
-              final typingUserId = dataController.isTyping[chatId];
+              // Always read an observable property to prevent GetX errors.
+              // We can use `.value` or `.length` on the RxMap.
+              final isTypingMap = dataController.isTyping.value;
 
-              if (chatId != null && typingUserId == userForProfile['_id']) {
+              String? typingUserId;
+              if (chatId != null) {
+                typingUserId = isTypingMap[chatId];
+              }
+
+              if (typingUserId != null && typingUserId == userForProfile['_id']) {
                 statusWidget = const Text(
                   'typing...',
                   style: TextStyle(color: Colors.tealAccent, fontSize: 12, fontStyle: FontStyle.italic),
