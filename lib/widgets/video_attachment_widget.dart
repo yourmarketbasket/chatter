@@ -164,16 +164,16 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
 
   void _playVideo() {
     print("[VideoAttachmentWidget-$_videoUniqueId] Play callback received.");
+    if (mounted) {
+      setState(() {
+        _shouldRenderPlayer = true;
+      });
+    }
+
     if (!_isInitialized || _betterPlayerController == null) {
       print("[VideoAttachmentWidget-$_videoUniqueId] Player not ready, initializing to play.");
-      // _updateAspectAndFit(); // Ensure aspect/fit are correct before initializing
       _initializeVideoPlayer(autoplay: true);
     } else {
-      if (mounted) {
-        setState(() {
-          _shouldRenderPlayer = true;
-        });
-      }
       _betterPlayerController!.play();
       print("[VideoAttachmentWidget-$_videoUniqueId] Player ready, playing.");
     }
