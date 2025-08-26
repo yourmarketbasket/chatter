@@ -9,6 +9,7 @@ class SocketService {
   final DataController _dataController = Get.find<DataController>();
   bool _isInitialized = false;
   String? _userId; // Store userId for joining rooms and emitting events
+  final Set<String> _joinedChatRooms = {};
 
   SocketService() {
     // print('SocketService: Instance created.');
@@ -134,8 +135,7 @@ class SocketService {
       // print('[SocketService] Starting sync of all chat rooms...');
       List<String> chatIds = await _dataController.getActiveChatIds();
       for (String chatId in chatIds) {
-        // print('[SocketService] ==> Emitting join for chatId: $chatId');
-        _socket!.emit('join', {'chatId': chatId});
+        joinChatRoom(chatId);
       }
       // print('[SocketService] Finished syncing all chat rooms.');
     } catch (e) {
@@ -276,7 +276,7 @@ class SocketService {
     if (data is Map<String, dynamic> && data['_id'] is String) {
       _dataController.handleNewChat(data);
       // Join the new chat room
-      _socket!.emit('join', {'chatId': data['_id']});
+      joinChatRoom(data['_id'] as String);
       _eventController.add({'event': 'chat:new', 'data': data});
     } else {
         // print('SocketService: Invalid chat:new data format: ${data.runtimeType}');
@@ -303,6 +303,13 @@ class SocketService {
 
   void _handleNewMessage(dynamic data) {
     if (data is Map<String, dynamic> && data['chatId'] is String) {
+      final chatId = data['chatId'] as String;
+      // Auto-join room if a message is received for a chat we're not in.
+      if (!_joinedChatRooms.contains(chatId)) {
+        // print('[SocketService] Received message for un-joined room $chatId. Auto-joining.');
+        joinChatRoom(chatId);
+      }
+
       _dataController.handleNewMessage(data);
       // Emit message:delivered to backend
       if (data['messageId'] is String && _userId != null) {
@@ -477,10 +484,15 @@ class SocketService {
 
   void joinChatRoom(String chatId) {
     if (_socket != null && _socket!.connected) {
-      print('[SocketService] ==> Emitting chat:join for chat ID: $chatId');
-      _socket!.emit('chat:join', {'chatId': chatId});
+      if (_joinedChatRooms.contains(chatId)) {
+        // print('[SocketService] Already joined chat room $chatId. Skipping.');
+        return;
+      }
+      // print('[SocketService] ==> Emitting join for chat ID: $chatId');
+      _socket!.emit('join', {'chatId': chatId});
+      _joinedChatRooms.add(chatId);
     } else {
-      print('[SocketService] Cannot join room. Socket is null or not connected.');
+      // print('[SocketService] Cannot join room. Socket is null or not connected.');
     }
   }
 
