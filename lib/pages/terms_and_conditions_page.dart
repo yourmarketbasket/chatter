@@ -57,6 +57,9 @@ class _TermsAndConditionsPageState extends State<TermsAndConditionsPage> {
                     return Markdown(
                       controller: _scrollController,
                       data: snapshot.data!,
+                      styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+                        p: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white),
+                      ),
                     );
                   } else {
                     return const Center(child: Text('Could not load terms.'));
@@ -71,8 +74,8 @@ class _TermsAndConditionsPageState extends State<TermsAndConditionsPage> {
             child: ElevatedButton(
               onPressed: _isScrolledToEnd ? _acceptTerms : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: _isScrolledToEnd ? Colors.tealAccent : Colors.grey,
-                foregroundColor: Colors.black,
+                backgroundColor: _isScrolledToEnd ? Theme.of(context).colorScheme.primary : Colors.grey,
+                foregroundColor: Colors.white,
                 minimumSize: const Size(double.infinity, 50),
               ),
               child: const Text('Accept and Continue'),

@@ -125,10 +125,27 @@ class _ChatterAppState extends State<ChatterApp> {
       },
       title: 'Chatter',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.teal,
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
-        scaffoldBackgroundColor: Colors.white,
+      theme: ThemeData.dark().copyWith(
+        primaryColor: Colors.tealAccent,
+        colorScheme: const ColorScheme.dark(
+          primary: Colors.tealAccent,
+          secondary: Colors.pinkAccent,
+        ),
+        scaffoldBackgroundColor: Colors.black,
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(color: Colors.white),
+          bodyMedium: TextStyle(color: Colors.white),
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.black,
+          foregroundColor: Colors.white,
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.tealAccent,
+            foregroundColor: Colors.black,
+          ),
+        ),
       ),
       navigatorObservers: [routeObserver],
       home: const LandingPage(), // Show LandingPage while checking storage
