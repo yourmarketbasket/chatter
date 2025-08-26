@@ -558,7 +558,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
 
   void _handleVideoCompletionInGrid(String completedVideoId, String postId, List<Map<String, dynamic>> gridVideos) {
     if (!_postVideoIds.containsKey(postId) || !_postVideoQueueIndex.containsKey(postId)) {
-        // Initialize if not already (e.g. if first video completion triggers this)
+        
         _postVideoIds[postId] = gridVideos.map((v) => v['url'] as String? ?? v['tempId'] as String? ?? v.hashCode.toString()).toList();
         _postVideoQueueIndex[postId] = _postVideoIds[postId]!.indexOf(completedVideoId);
     }
