@@ -74,11 +74,12 @@ class _TermsAndConditionsPageState extends State<TermsAndConditionsPage> {
             child: ElevatedButton(
               onPressed: _isScrolledToEnd ? _acceptTerms : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: _isScrolledToEnd ? Theme.of(context).colorScheme.primary : Colors.grey,
+                backgroundColor: _isScrolledToEnd ? Colors.pink : Colors.grey,
                 foregroundColor: Colors.white,
                 minimumSize: const Size(double.infinity, 50),
               ),
               child: const Text('Accept and Continue'),
+              // force
             ),
           ),
         ],
