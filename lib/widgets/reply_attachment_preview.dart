@@ -24,7 +24,6 @@ class _ReplyAttachmentPreviewState extends State<ReplyAttachmentPreview> {
       _generateThumbnail();
     }
   }
-  // force
 
   Future<void> _generateThumbnail() async {
     if (!mounted) return;
@@ -62,14 +61,14 @@ class _ReplyAttachmentPreviewState extends State<ReplyAttachmentPreview> {
     if (extension.startsWith('video')) {
       if (_isLoading) {
         preview = Padding(
-          padding: const EdgeInsets.all(10.0),
-          child: CircularProgressIndicator(strokeWidth: 1.0, color: Colors.teal, valueColor: AlwaysStoppedAnimation<Color>(Color.fromARGB(255, 110, 110, 110))),
+          padding: EdgeInsets.all(20.0),
+          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white, valueColor: AlwaysStoppedAnimation<Color>(Colors.teal)),
         );
       } else if (_thumbnailData != null) {
         preview = Image.memory(
           _thumbnailData!,
           fit: BoxFit.cover,
-          width: 60, // Set width to maintain 4:3 ratio with height 60
+          width: 50, // Set width to maintain 4:3 ratio with height 60
           height: 60,
         );
       } else {
@@ -92,10 +91,9 @@ class _ReplyAttachmentPreviewState extends State<ReplyAttachmentPreview> {
                   fit: BoxFit.cover,
                   width: 50,
                   height: 60,
-                  placeholder: (context, url) => const SizedBox(
-                    height: 10,
-                    width: 10,
-                    child: CircularProgressIndicator(strokeWidth: 1.0, color: Colors.teal, valueColor: AlwaysStoppedAnimation<Color>(Color.fromARGB(255, 110, 110, 110))),
+                  placeholder: (context, url) => Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white, valueColor: AlwaysStoppedAnimation<Color>(Colors.teal)),
                   ),
                   errorWidget: (context, url, error) => const Icon(
                     Icons.broken_image,
