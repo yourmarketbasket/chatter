@@ -33,7 +33,7 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
-  DataController get _dataController => Get.find<DataController>();
+  DataController _dataController = Get.put(DataController());
   bool _isInitialized = false;
 
   static const String _channelId = 'chatter_default_channel';
@@ -46,11 +46,8 @@ class NotificationService {
 
     await _requestPermissions();
     final fcmToken = await _firebaseMessaging.getToken();
-    if (fcmToken != null) {
-      if (Get.isRegistered<DataController>()) {
-        _dataController.updateFcmToken(fcmToken);
-      }
-    }
+        _dataController.updateFcmToken(fcmToken!);
+    
 
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('ic_status_16px');
