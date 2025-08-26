@@ -40,17 +40,24 @@ class NotificationService {
   static const String _channelName = 'Chatter Notifications';
   static const String _channelDescription = 'Default channel for Chatter app notifications';
 
-  Future<void> init() async {
-    if (_isInitialized) return;
-    _isInitialized = true;
-
-    await _requestPermissions();
+  Future<void> _updateFCMToken() async {
     final fcmToken = await _firebaseMessaging.getToken();
     if (fcmToken != null) {
       if (Get.isRegistered<DataController>()) {
         _dataController.updateFcmToken(fcmToken);
       }
     }
+  }
+
+  Future<void> init() async {
+    if (_isInitialized) {
+      await _updateFCMToken();
+      return;
+    }
+    _isInitialized = true;
+
+    await _requestPermissions();
+    await _updateFCMToken();
 
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('ic_status_16px');

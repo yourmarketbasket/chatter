@@ -1384,6 +1384,9 @@ class DataController extends GetxController {
           user.value = jsonDecode(userJson);
             // print('[DataController] User data saved to storage and in-memory state updated.');
 
+          // Initialize NotificationService and update token for the new session
+          await Get.find<NotificationService>().init();
+
           // notification service is already initialized in main.dart
           // ... (rest of original logic)
           // Now, fetch feeds
