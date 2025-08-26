@@ -892,13 +892,13 @@ class _ChatScreenState extends State<ChatScreen> {
                         if (originalMessage['files'] != null && (originalMessage['files'] as List).isNotEmpty)
                           Row(
                             children: [
-                              _buildReplyAttachmentPreview(originalMessage['files'][0]),
+                              ReplyAttachmentPreview(attachment: originalMessage['files'][0]),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   originalMessage['files'][0]['type'].startsWith('image')
                                       ? 'Image'
-                                      : originalMessage['files'][0]['filename'],
+                                      : originalMessage['files'][0]['filename'] ?? 'Attachment',
                                   style: TextStyle(color: Colors.grey[300]),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
