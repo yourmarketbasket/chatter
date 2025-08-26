@@ -27,34 +27,18 @@ class _UsersListPageState extends State<UsersListPage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        if (_dataController.allUsers.isEmpty) {
-          _dataController.fetchAllUsers().then((_) {
-            _filteredUsers.assignAll(_dataController.allUsers);
-          }).catchError((error) {
-            print("Error initially fetching all users from initState: $error");
-            if (mounted) {
-              WidgetsBinding.instance.addPostFrameCallback((_){
-                if (mounted) {
-                   Get.snackbar(
-                    'Error Loading Users',
-                    'Failed to load users. Please try again later.',
-                    snackPosition: SnackPosition.BOTTOM,
-                    backgroundColor: Colors.red[700],
-                    colorText: Colors.white,
-                  );
-                }
-              });
-            }
-          });
-        } else {
-          _filteredUsers.assignAll(_dataController.allUsers);
-        }
-      }
+    // Data is now primarily loaded by DataController's init method.
+    // This page will reactively display the users from _dataController.allUsers.
+    // We still need to initialize the filteredUsers list and listen for search changes.
+    if (_dataController.allUsers.isNotEmpty) {
+      _filterUsers();
+    }
+    _searchController.addListener(() {
+      _filterUsers();
     });
 
-    _searchController.addListener(() {
+    // Listen to changes in allUsers from the controller to update the filtered list
+    _dataController.allUsers.listen((_) {
       _filterUsers();
     });
   }
@@ -264,40 +248,43 @@ class _UsersListPageState extends State<UsersListPage> {
             ),
           ),
           Expanded(
-            child: Obx(() {
-              if (_filteredUsers.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+            child: RefreshIndicator(
+              onRefresh: () async {
+                await _dataController.fetchAllUsers();
+                _filterUsers();
+              },
+              child: Obx(() {
+                if (_dataController.isLoading.value && _filteredUsers.isEmpty) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (_filteredUsers.isEmpty) {
+                  return Stack(
                     children: [
-                      Icon(FeatherIcons.users, size: 48, color: Colors.grey[700]),
-                      const SizedBox(height: 16),
-                      Text(
-                        _searchController.text.isEmpty
-                            ? 'No users found or failed to load.'
-                            : 'No users match your search.',
-                        style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 16),
-                      ),
-                      const SizedBox(height: 8),
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.tealAccent[700],
-                          foregroundColor: Colors.black,
+                      Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(FeatherIcons.users, size: 48, color: Colors.grey[700]),
+                            const SizedBox(height: 16),
+                            Text(
+                              _searchController.text.isEmpty
+                                  ? 'No users found. Pull to refresh.'
+                                  : 'No users match your search.',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 16),
+                            ),
+                          ],
                         ),
-                        icon: const Icon(FeatherIcons.refreshCw, size: 18),
-                        label: const Text('Retry'),
-                        onPressed: () => _dataController.fetchAllUsers().then((_) {
-                          _filterUsers();
-                        }),
-                      )
+                      ),
+                      // This makes the empty space scrollable, so RefreshIndicator works.
+                      ListView(),
                     ],
-                  ),
-                );
-              }
-              return ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _filteredUsers.length,
+                  );
+                }
+
+                return ListView.separated(
+                  itemCount: _filteredUsers.length,
                 separatorBuilder: (context, index) => Divider(
                   color: Colors.grey[850],
                   height: 1,

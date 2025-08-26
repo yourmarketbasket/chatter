@@ -33,8 +33,13 @@ class _FollowersPageState extends State<FollowersPage> with SingleTickerProvider
     _targetUserId = widget.viewUserId ?? _dataController.user.value['user']?['_id'] as String? ?? '';
 
     if (_targetUserId.isNotEmpty) {
-      _dataController.fetchFollowers(_targetUserId, isRefresh: true);
-      _dataController.fetchFollowing(_targetUserId, isRefresh: true);
+      // Only fetch if the lists are empty. Data is persisted in the controller.
+      if (_dataController.followers.isEmpty) {
+        _dataController.fetchFollowers(_targetUserId);
+      }
+      if (_dataController.following.isEmpty) {
+        _dataController.fetchFollowing(_targetUserId);
+      }
     }
   }
 
