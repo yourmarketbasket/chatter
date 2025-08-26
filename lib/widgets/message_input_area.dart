@@ -10,6 +10,7 @@ import 'package:chatter/widgets/voice_note_preview_dialog.dart';
 import 'package:chatter/widgets/attachment_preview_dialog.dart';
 import 'package:chatter/services/socket-service.dart';
 import 'package:chatter/controllers/data-controller.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class MessageInputArea extends StatefulWidget {
   final Function(String text, List<PlatformFile> files) onSend;
@@ -145,15 +146,67 @@ class _MessageInputAreaState extends State<MessageInputArea> {
     );
   }
 
+  void _showOversizedFileDialog(List<PlatformFile> oversizedFiles) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey.shade900,
+        title: Text('Files Too Large', style: GoogleFonts.poppins(color: Colors.white, fontSize: 16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'The following files exceed the 20MB size limit and were not attached:',
+              style: GoogleFonts.poppins(color: Colors.grey.shade300, fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            ...oversizedFiles
+                .map((file) => Text(
+                      '- ${file.name}',
+                      style: GoogleFonts.poppins(color: Colors.white, fontStyle: FontStyle.italic),
+                      overflow: TextOverflow.ellipsis,
+                    ))
+                .toList(),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('OK', style: GoogleFonts.poppins(color: Colors.tealAccent.shade400)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _pickAttachments() async {
     try {
       final result = await FilePicker.platform.pickFiles(allowMultiple: true);
       if (result == null || result.files.isEmpty) return;
 
+      const int maxSizeInBytes = 20 * 1024 * 1024; // 20 MB
+      final List<PlatformFile> validFiles = [];
+      final List<PlatformFile> oversizedFiles = [];
+
+      for (final file in result.files) {
+        if (file.size > maxSizeInBytes) {
+          oversizedFiles.add(file);
+        } else {
+          validFiles.add(file);
+        }
+      }
+
+      if (oversizedFiles.isNotEmpty) {
+        _showOversizedFileDialog(oversizedFiles);
+      }
+
+      if (validFiles.isEmpty) return;
+
       final dialogResult = await showDialog<Map<String, dynamic>>(
         context: context,
         builder: (context) => AttachmentPreviewDialog(
-          files: result.files,
+          files: validFiles,
         ),
       );
 
