@@ -170,12 +170,19 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
       });
     }
 
-    if (!_isInitialized || _betterPlayerController == null) {
-      print("[VideoAttachmentWidget-$_videoUniqueId] Player not ready, initializing to play.");
-      _initializeVideoPlayer(autoplay: true);
+    if (_betterPlayerController != null) {
+      if (_isInitialized) {
+        _betterPlayerController!.play();
+        print("[VideoAttachmentWidget-$_videoUniqueId] Player ready, playing.");
+      } else {
+        // It's initializing, so just make sure it will autoplay when ready.
+        _shouldAutoplayAfterInit = true;
+        print("[VideoAttachmentWidget-$_videoUniqueId] Player is initializing, will play when ready.");
+      }
     } else {
-      _betterPlayerController!.play();
-      print("[VideoAttachmentWidget-$_videoUniqueId] Player ready, playing.");
+      // This case should ideally not happen if VisibilityDetector works correctly
+      print("[VideoAttachmentWidget-$_videoUniqueId] Play called but controller is null. Initializing now.");
+      _initializeVideoPlayer(autoplay: true);
     }
   }
 
