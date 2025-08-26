@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 
 class GroupProfilePage extends StatelessWidget {
   final Map<String, dynamic> chat;
+  // force
 
   const GroupProfilePage({super.key, required this.chat});
 

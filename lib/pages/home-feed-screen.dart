@@ -553,8 +553,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         }
       }
     }
-    // No need to call dataController.replyToPost() here anymore,
-    // as ReplyPage is responsible for its own submission.
+    
   }
 
   void _handleVideoCompletionInGrid(String completedVideoId, String postId, List<Map<String, dynamic>> gridVideos) {
