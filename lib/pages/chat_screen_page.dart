@@ -379,7 +379,7 @@ class _ChatScreenState extends State<ChatScreen> {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              firstAttachment['type'].startsWith('image') ? 'Image' : firstAttachment['filename'],
+              firstAttachment['type'].startsWith('image') ? 'Image' : firstAttachment['filename'] ?? 'Attachment',
               style: TextStyle(color: Colors.grey[300]),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
