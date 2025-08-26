@@ -285,168 +285,169 @@ class _UsersListPageState extends State<UsersListPage> {
 
                 return ListView.separated(
                   itemCount: _filteredUsers.length,
-                separatorBuilder: (context, index) => Divider(
-                  color: Colors.grey[850],
-                  height: 1,
-                  indent: 72,
-                  endIndent: 16,
-                ),
-                itemBuilder: (context, index) {
-                  final user = _filteredUsers[index];
-                  final String userId = user['_id'] ?? '';
-                  final String avatarUrl = user['avatar'] ?? '';
-                  final String name = user['name'] ?? 'User';
-                  final String username = user['username'] ?? 'username';
-                  final int followersCount = user['followersCount'] ?? 0;
-                  final int followingCount = user['followingCount'] ?? 0;
-                  final bool isFollowing = user['isFollowingCurrentUser'] ?? false;
-                  final String avatarInitial = name.isNotEmpty
-                      ? name[0].toUpperCase()
-                      : (username.isNotEmpty ? username[0].toUpperCase() : '?');
+                  separatorBuilder: (context, index) => Divider(
+                    color: Colors.grey[850],
+                    height: 1,
+                    indent: 72,
+                    endIndent: 16,
+                  ),
+                  itemBuilder: (context, index) {
+                    final user = _filteredUsers[index];
+                    final String userId = user['_id'] ?? '';
+                    final String avatarUrl = user['avatar'] ?? '';
+                    final String name = user['name'] ?? 'User';
+                    final String username = user['username'] ?? 'username';
+                    final int followersCount = user['followersCount'] ?? 0;
+                    final int followingCount = user['followingCount'] ?? 0;
+                    final bool isFollowing = user['isFollowingCurrentUser'] ?? false;
+                    final String avatarInitial = name.isNotEmpty
+                        ? name[0].toUpperCase()
+                        : (username.isNotEmpty ? username[0].toUpperCase() : '?');
 
-                  return ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 3.0),
-                    leading: CircleAvatar(
-                      radius: 24,
-                      backgroundColor: Colors.tealAccent.withOpacity(0.2),
-                      backgroundImage: avatarUrl.isNotEmpty ? CachedNetworkImageProvider(avatarUrl) : null,
-                      child: avatarUrl.isEmpty
-                          ? Text(
-                              avatarInitial,
-                              style: GoogleFonts.poppins(
-                                color: Colors.tealAccent,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 18,
-                              ),
-                            )
-                          : null,
-                    ),
-                    title: Row(
-                      children: [
-                        Text(
-                          name,
-                          style: GoogleFonts.poppins(
-                            color: Colors.white,
-                            fontSize: 13,
-                          ),
-                        ),
-                        Icon(Icons.verified,
-                            color: getVerificationBadgeColor(
-                                user['verification']?['entityType'],
-                                user['verification']?['level']),
-                            size: 12)
-                      ],
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '@$username',
-                          style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 12),
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Text(
-                              '$followersCount Followers',
-                              style: GoogleFonts.roboto(color: Colors.grey[400], fontSize: 9),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '·',
-                              style: GoogleFonts.roboto(color: Colors.grey[600], fontSize: 12),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '$followingCount Following',
-                              style: GoogleFonts.roboto(color: Colors.grey[400], fontSize: 9),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    trailing: Obx(() {
-                      final bool isLoadingFollowAction = _isUpdatingFollowStatus[userId] ?? false;
-                      return ElevatedButton(
-                        onPressed: isLoadingFollowAction
-                            ? null
-                            : () => _toggleFollow(userId, isFollowing),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: isFollowing ? Colors.transparent : Colors.white,
-                          foregroundColor: isFollowing ? Colors.white : Colors.black,
-                          side: isFollowing ? BorderSide(color: Colors.grey[700]!) : null,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          minimumSize: const Size(90, 36),
-                        ),
-                        child: isLoadingFollowAction
-                            ? SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    isFollowing ? Colors.white : Colors.black,
-                                  ),
+                    return ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 3.0),
+                      leading: CircleAvatar(
+                        radius: 24,
+                        backgroundColor: Colors.tealAccent.withOpacity(0.2),
+                        backgroundImage: avatarUrl.isNotEmpty ? CachedNetworkImageProvider(avatarUrl) : null,
+                        child: avatarUrl.isEmpty
+                            ? Text(
+                                avatarInitial,
+                                style: GoogleFonts.poppins(
+                                  color: Colors.tealAccent,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 18,
                                 ),
                               )
-                            : Text(
-                                isFollowing ? 'Unfollow' : 'Follow',
-                                style: GoogleFonts.roboto(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                ),
+                            : null,
+                      ),
+                      title: Row(
+                        children: [
+                          Text(
+                            name,
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontSize: 13,
+                            ),
+                          ),
+                          Icon(Icons.verified,
+                              color: getVerificationBadgeColor(
+                                  user['verification']?['entityType'],
+                                  user['verification']?['level']),
+                              size: 12)
+                        ],
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '@$username',
+                            style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 12),
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Text(
+                                '$followersCount Followers',
+                                style: GoogleFonts.roboto(color: Colors.grey[400], fontSize: 9),
                               ),
-                      );
-                    }),
-                    onTap: () async {
-                      if (_isGroupCreationMode) {
-                        setState(() {
-                          if (_selectedUsers.any((u) => u['_id'] == userId)) {
-                            _selectedUsers.removeWhere((u) => u['_id'] == userId);
-                          } else {
-                            _selectedUsers.add(user);
-                          }
-                        });
-                      } else {
-                        final currentUserId = _dataController.user.value['user']['_id'];
-                        Map<String, dynamic>? existingChat;
-                        try {
-                          existingChat = _dataController.chats.values.firstWhere(
-                            (chat) {
-                              if (chat['isGroup'] == true) return false;
-                              final participantIds = (chat['participants'] as List).map((p) {
-                                if (p is Map<String, dynamic>) return p['_id'] as String;
-                                return p as String;
-                              }).toSet();
-                              return participantIds.contains(currentUserId) &&
-                                  participantIds.contains(userId);
-                            },
-                          );
-                        } catch (e) {
-                          existingChat = null;
-                        }
-
-                        if (existingChat != null) {
-                          _dataController.currentChat.value = existingChat;
-                          Get.to(() => const ChatScreen());
+                              const SizedBox(width: 4),
+                              Text(
+                                '·',
+                                style: GoogleFonts.roboto(color: Colors.grey[600], fontSize: 12),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '$followingCount Following',
+                                style: GoogleFonts.roboto(color: Colors.grey[400], fontSize: 9),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      trailing: Obx(() {
+                        final bool isLoadingFollowAction = _isUpdatingFollowStatus[userId] ?? false;
+                        return ElevatedButton(
+                          onPressed: isLoadingFollowAction
+                              ? null
+                              : () => _toggleFollow(userId, isFollowing),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isFollowing ? Colors.transparent : Colors.white,
+                            foregroundColor: isFollowing ? Colors.white : Colors.black,
+                            side: isFollowing ? BorderSide(color: Colors.grey[700]!) : null,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            minimumSize: const Size(90, 36),
+                          ),
+                          child: isLoadingFollowAction
+                              ? SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      isFollowing ? Colors.white : Colors.black,
+                                    ),
+                                  ),
+                                )
+                              : Text(
+                                  isFollowing ? 'Unfollow' : 'Follow',
+                                  style: GoogleFonts.roboto(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                        );
+                      }),
+                      onTap: () async {
+                        if (_isGroupCreationMode) {
+                          setState(() {
+                            if (_selectedUsers.any((u) => u['_id'] == userId)) {
+                              _selectedUsers.removeWhere((u) => u['_id'] == userId);
+                            } else {
+                              _selectedUsers.add(user);
+                            }
+                          });
                         } else {
-                          final tempChat = {
-                            'participants': [_dataController.user.value['user'], user],
-                            'type': 'dm',
-                          };
-                          _dataController.currentChat.value = tempChat;
-                          Get.to(() => const ChatScreen());
+                          final currentUserId = _dataController.user.value['user']['_id'];
+                          Map<String, dynamic>? existingChat;
+                          try {
+                            existingChat = _dataController.chats.values.firstWhere(
+                              (chat) {
+                                if (chat['isGroup'] == true) return false;
+                                final participantIds = (chat['participants'] as List).map((p) {
+                                  if (p is Map<String, dynamic>) return p['_id'] as String;
+                                  return p as String;
+                                }).toSet();
+                                return participantIds.contains(currentUserId) &&
+                                    participantIds.contains(userId);
+                              },
+                            );
+                          } catch (e) {
+                            existingChat = null;
+                          }
+
+                          if (existingChat != null) {
+                            _dataController.currentChat.value = existingChat;
+                            Get.to(() => const ChatScreen());
+                          } else {
+                            final tempChat = {
+                              'participants': [_dataController.user.value['user'], user],
+                              'type': 'dm',
+                            };
+                            _dataController.currentChat.value = tempChat;
+                            Get.to(() => const ChatScreen());
+                          }
                         }
-                      }
-                    },
-                    selected: _isGroupCreationMode && _selectedUsers.any((u) => u['_id'] == userId),
-                    selectedTileColor: Colors.teal.withOpacity(0.2),
-                  );
-                },
-                padding: const EdgeInsets.only(bottom: 16),
-              );
-            }),
+                      },
+                      selected: _isGroupCreationMode && _selectedUsers.any((u) => u['_id'] == userId),
+                      selectedTileColor: Colors.teal.withOpacity(0.2),
+                    );
+                  },
+                  padding: const EdgeInsets.only(bottom: 16),
+                );
+              }),
+            ),
           ),
         ],
       ),
