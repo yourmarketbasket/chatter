@@ -23,7 +23,7 @@ class SocketService {
 
     try {
       // print('SocketService: Creating socket with http://192.168.1.104:3000');
-      _socket = IO.io('http://192.168.1.104:3000', <String, dynamic>{
+      _socket = IO.io('https://chatter-api-little-field-3471.fly.dev', <String, dynamic>{
         'transports': ['websocket'],
         'autoConnect': false,
         'reconnection': true,

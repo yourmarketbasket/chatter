@@ -32,9 +32,9 @@ class DataController extends GetxController {
   final Set<String> _pendingViewRegistrations = <String>{};
 
   // URL
-  final String baseUrl = 'http://192.168.1.104:3000/';
+  final String baseUrl = 'https://chatter-api-little-field-3471.fly.dev/';
   final dio.Dio _dio = dio.Dio(dio.BaseOptions(
-    baseUrl: 'http://192.168.1.104:3000/',
+    baseUrl: 'https://chatter-api-little-field-3471.fly.dev/',
     connectTimeout: const Duration(seconds: 30),
     receiveTimeout: const Duration(seconds: 30),
     sendTimeout: const Duration(seconds: 30),

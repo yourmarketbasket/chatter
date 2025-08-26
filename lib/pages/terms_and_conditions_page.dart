@@ -44,7 +44,7 @@ class _TermsAndConditionsPageState extends State<TermsAndConditionsPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Terms & Conditions'),
-        automaticallyImplyLeading: false, // Disables the back button
+        automaticallyImplyLeading: false, 
       ),
       body: Column(
         children: [
