@@ -29,6 +29,7 @@ class ReplyMessageSnippet extends StatelessWidget {
         preview = const Icon(Icons.videocam, size: 24, color: Colors.white);
         break;
       case 'audio':
+      case 'voice':
         preview = const Icon(Icons.audiotrack, size: 24, color: Colors.white);
         break;
       default:
@@ -66,7 +67,7 @@ class ReplyMessageSnippet extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              firstAttachment['type'] == 'image' ? 'Image' : firstAttachment['filename'],
+              firstAttachment['type'] == 'image' ? 'Image' : firstAttachment['filename'] ?? 'Attachment',
               style: TextStyle(color: Colors.grey[300]),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -74,7 +75,7 @@ class ReplyMessageSnippet extends StatelessWidget {
           ),
         ],
       );
-    } else if (originalMessage['voiceNote'] != null) {
+    } else if (originalMessage['type'] == 'voice') {
       contentPreview = Row(
         children: [
           const Icon(Icons.audiotrack, size: 24, color: Colors.white),

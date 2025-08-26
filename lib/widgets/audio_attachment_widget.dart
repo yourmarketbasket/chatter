@@ -92,6 +92,16 @@ class _AudioAttachmentWidgetState extends State<AudioAttachmentWidget> {
       }
     });
 
+    _audioPlayer.onPlayerComplete.listen((event) {
+      if (mounted) {
+        _audioPlayer.seek(Duration.zero);
+        setState(() {
+          _isPlaying = false;
+          _playerState = PlayerState.stopped;
+        });
+      }
+    });
+
     _currentlyPlayingMediaSubscription = ever(_dataController.currentlyPlayingMediaId, (String? playingId) {
       if (!mounted) return;
       if (_isPlaying && playingId != null && playingId != _audioId) {
