@@ -61,7 +61,7 @@ class _ReplyAttachmentPreviewState extends State<ReplyAttachmentPreview> {
       if (_isLoading) {
         preview = const CircularProgressIndicator(strokeWidth: 2);
       } else if (_thumbnailData != null) {
-        preview = Image.memory(_thumbnailData!, fit: BoxFit.cover);
+        preview = Image.memory(_thumbnailData!, fit: BoxFit.fill);
       } else {
         preview = const Icon(Icons.videocam, size: 24, color: Colors.white);
       }
@@ -74,7 +74,7 @@ class _ReplyAttachmentPreviewState extends State<ReplyAttachmentPreview> {
             image: isLocalFile
                 ? FileImage(File(widget.attachment['url']))
                 : NetworkImage(widget.attachment['url']) as ImageProvider,
-            fit: BoxFit.cover,
+            fit: BoxFit.fill,
           );
           break;
         case 'audio/mp3':

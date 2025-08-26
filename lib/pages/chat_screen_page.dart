@@ -322,6 +322,19 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
 
+  String _getReplyPreviewText(Map<String, dynamic> attachment) {
+    final attachmentType = attachment['type'] as String? ?? '';
+    if (attachmentType.startsWith('image') || attachmentType.startsWith('video')) {
+      return attachment['filename'] ?? (attachmentType.startsWith('image') ? 'Image' : 'Video');
+    } else if (attachmentType.startsWith('audio') || attachmentType == 'voice') {
+      return 'Voice Note';
+    } else if (attachmentType == 'application/pdf') {
+      return attachment['filename'] ?? 'PDF Document';
+    } else {
+      return attachment['filename'] ?? 'File';
+    }
+  }
+
   Widget _buildReplyPreview(Map<String, dynamic> replyTo) {
     final sender = (dataController.currentChat.value['participants'] as List)
         .firstWhere(
@@ -336,24 +349,13 @@ class _ChatScreenState extends State<ChatScreen> {
     Widget contentPreview;
     if (replyTo['files'] != null && (replyTo['files'] as List).isNotEmpty) {
       final firstAttachment = (replyTo['files'] as List).first;
-      final attachmentType = firstAttachment['type'] as String? ?? '';
-      String previewText;
-      if (attachmentType.startsWith('image') || attachmentType.startsWith('video')) {
-        previewText = firstAttachment['filename'] ?? (attachmentType.startsWith('image') ? 'Image' : 'Video');
-      } else if (attachmentType.startsWith('audio') || attachmentType == 'voice') {
-        previewText = 'Voice Note';
-      } else if (attachmentType == 'application/pdf') {
-        previewText = firstAttachment['filename'] ?? 'PDF Document';
-      } else {
-        previewText = firstAttachment['filename'] ?? 'File';
-      }
       contentPreview = Row(
         children: [
           ReplyAttachmentPreview(attachment: firstAttachment),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              previewText,
+              _getReplyPreviewText(firstAttachment),
               style: TextStyle(color: Colors.grey[300]),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -870,9 +872,7 @@ class _ChatScreenState extends State<ChatScreen> {
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  (originalMessage['files'][0]['type'] as String? ?? '').startsWith('image')
-                                      ? 'Image'
-                                      : (originalMessage['files'][0]['filename'] as String? ?? 'Attachment'),
+                                  _getReplyPreviewText(originalMessage['files'][0]),
                                   style: TextStyle(color: Colors.grey[300]),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
