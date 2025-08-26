@@ -338,12 +338,10 @@ class _ChatScreenState extends State<ChatScreen> {
       final firstAttachment = (replyTo['files'] as List).first;
       final attachmentType = firstAttachment['type'] as String? ?? '';
       String previewText;
-      if (attachmentType.startsWith('image')) {
-        previewText = 'Image';
-      } else if (attachmentType.startsWith('video')) {
-        previewText = 'Video';
+      if (attachmentType.startsWith('image') || attachmentType.startsWith('video')) {
+        previewText = firstAttachment['filename'] ?? (attachmentType.startsWith('image') ? 'Image' : 'Video');
       } else if (attachmentType.startsWith('audio') || attachmentType == 'voice') {
-        previewText = 'Voice Message';
+        previewText = 'Voice Note';
       } else {
         previewText = firstAttachment['filename'] ?? 'Attachment';
       }
@@ -367,7 +365,7 @@ class _ChatScreenState extends State<ChatScreen> {
           const Icon(Icons.audiotrack, size: 24, color: Colors.white),
           const SizedBox(width: 8),
           Text(
-            'Voice note',
+            'Voice Note',
             style: TextStyle(color: Colors.grey[300]),
           ),
         ],
