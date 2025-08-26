@@ -1052,6 +1052,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         borderRadius: BorderRadius.zero, // Border radius handled by ClipRRect wrapper usually
         isFeedContext: true, // This is the home feed context
         enforceFeedConstraints: true, // Enforce 4:3 for home feed
+        startMuted: false, // Start videos unmuted in the feed
         onVideoCompletedInGrid: isVideoGrid
             ? (completedVideoId) => _handleVideoCompletionInGrid(
                 completedVideoId,

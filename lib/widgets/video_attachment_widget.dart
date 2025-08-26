@@ -17,6 +17,7 @@ class VideoAttachmentWidget extends StatefulWidget {
   final bool isFeedContext; // Remains for other feed-specific logic if any
   final Function(String videoId)? onVideoCompletedInGrid;
   final bool enforceFeedConstraints; // New parameter
+  final bool startMuted;
 
   const VideoAttachmentWidget({
     required Key key,
@@ -26,6 +27,7 @@ class VideoAttachmentWidget extends StatefulWidget {
     this.isFeedContext = false,
     this.onVideoCompletedInGrid,
     this.enforceFeedConstraints = false, // Default to false (native aspect ratio)
+    this.startMuted = true,
   }) : super(key: key);
 
   @override
@@ -36,7 +38,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
   BetterPlayerController? _betterPlayerController;
   late AnimationController _pulseAnimationController;
   late Animation<double> _pulseAnimation;
-  bool _isMuted = true;
+  late bool _isMuted;
   bool _isInitialized = false;
   String _videoUniqueId = "";
   bool _shouldAutoplayAfterInit = false;
@@ -51,6 +53,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
   @override
   void initState() {
     super.initState();
+    _isMuted = widget.startMuted;
     _videoUniqueId = widget.attachment['url'] as String? ??
                      (widget.key?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString());
 
