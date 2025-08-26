@@ -3,6 +3,7 @@ import 'package:chatter/pages/add_participants_page.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:chatter/controllers/data-controller.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -326,61 +327,29 @@ class GroupProfilePage extends StatelessWidget {
                           ? const Icon(Icons.person, size: 20)
                           : null,
                     ),
-                    title: Text(p['username'] ?? p['name'] ?? 'Unknown',
-                        style: const TextStyle(color: Colors.white)),
-                    subtitle: Wrap(
-                      spacing: 4.0,
-                      runSpacing: 4.0,
+                    title: Row(
+                      children: [
+                    
+                        Text(p['username'] ?? p['name'] ?? 'Unknown',
+                            style: const TextStyle(color: Colors.white)),
+                        isParticipantSuperAdmin ? const Icon(Icons.verified, color: Colors.amber, size: 12) : const SizedBox(),
+                        isParticipantAdmin ? const Icon(Icons.admin_panel_settings, color: Colors.teal, size: 12) : const SizedBox(),
+                        isMuted ? const Icon(Icons.mic_off_outlined, color: Colors.redAccent, size: 12) : const SizedBox(),
+                      ],
+                    ),
+                    subtitle: Row(
+                      
                       children: [
                         if (isParticipantSuperAdmin)
-                          Chip(
-                            padding: EdgeInsets.all(0),
-                            label: Row(
-                              children: [
-                                const Icon(Icons.shield,
-                                    size: 10, color: Colors.teal),
-                                Text('Super Admin'),
-                              ],
-                            ),
-                            backgroundColor:
-                                Color.fromARGB(255, 20, 131, 105)
-                                    .withOpacity(0.2),
-                            side: const BorderSide(color: Colors.transparent),
-                          ),
+                                Text('Super Admin, ', style: GoogleFonts.poppins(color: Colors.tealAccent, fontSize: 8, fontStyle: FontStyle.italic)),
+                          
                         if (isParticipantSuperAdmin || isParticipantAdmin)
-                          Chip(
-                            padding: EdgeInsets.all(0),
-                            label: Row(
-                              children: [
-                                const Icon(Icons.shield_outlined,
-                                    size: 10, color: Colors.teal),
-                                Text('Admin'),
-                              ],
-                            ),
-                            backgroundColor:
-                                Color.fromARGB(255, 20, 131, 105)
-                                    .withOpacity(0.2),
-                            side: const BorderSide(color: Colors.transparent),
-                          ),
+                                Text('Admin', style: GoogleFonts.poppins(color: Colors.tealAccent, fontSize: 8, fontStyle: FontStyle.italic)),
+                          
                         if (!isParticipantSuperAdmin && !isParticipantAdmin)
-                          Chip(
-                            padding: EdgeInsets.all(0),
-                            label: Text('Member'),
-                            backgroundColor:
-                                Color.fromARGB(255, 20, 131, 105)
-                                    .withOpacity(0.2),
-                            side: const BorderSide(
-                                color: Color.fromARGB(0, 104, 35, 35)),
-                          ),
-                        if (isMuted)
-                          Chip(
-                            padding: EdgeInsets.all(0),
-                            label: Text('Muted'),
-                            backgroundColor:
-                                Colors.redAccent.withOpacity(0.2),
-                            side: const BorderSide(
-                                color: Color.fromARGB(0, 104, 35, 35)),
-                          ),
+                            Text('Member', style: GoogleFonts.poppins(color: Colors.tealAccent, fontSize: 8, fontStyle: FontStyle.italic)),                          
+                        
+                          
                       ],
                     ),
                     trailing: (isSuperAdmin || isAdmin) &&
