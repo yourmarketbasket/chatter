@@ -1333,6 +1333,11 @@ class _ChatScreenState extends State<ChatScreen> {
                             }
 
                             final user = userForProfile;
+                            if (user == null) {
+                              // This case should ideally not be reached due to the outer check,
+                              // but it provides an extra layer of safety.
+                              return const Text('offline', style: TextStyle(color: Colors.grey, fontSize: 12));
+                            }
                             if (user['online'] == true) {
                               return const Text('online', style: TextStyle(color: Colors.green, fontSize: 12));
                             }
