@@ -265,75 +265,11 @@ class _MainChatsPageState extends State<MainChatsPage> {
                             final lastMessageData = chat['lastMessage'];
                             final currentUserId = _dataController.user.value['user']['_id'];
 
-                            String title;
-                            String avatarUrl;
-                            String avatarLetter;
-                            Widget trailingWidget;
-                            Map<String, dynamic> verificationData;
-
-                            if (isGroup) {
-                              title = chat['name'] ?? 'Group Chat';
-                              avatarUrl = chat['groupAvatar'] ?? '';
-                              avatarLetter = title.isNotEmpty ? title[0].toUpperCase() : 'G';
-                              trailingWidget = const SizedBox.shrink();
-                              verificationData = chat['verification'] ?? {'entityType': null, 'level': null};
-                            } else {
-                              final otherParticipantRaw = (chat['participants'] as List<dynamic>).firstWhere(
-                                (p) => (p is Map<String, dynamic> ? p['_id'] : p) != currentUserId,
-                                orElse: () => (chat['participants'] as List<dynamic>).first,
-                              );
-
-                              final otherUser = otherParticipantRaw is Map<String, dynamic>
-                                  ? otherParticipantRaw
-                                  : _dataController.allUsers.firstWhere(
-                                      (u) => u['_id'] == otherParticipantRaw,
-                                      orElse: () => {'name': 'Unknown', 'avatar': '', 'verification': null},
-                                    );
-
-                              title = otherUser['name'] ?? 'User';
-                              avatarUrl = otherUser['avatar'] ?? '';
-                              avatarLetter = title.isNotEmpty ? title[0].toUpperCase() : 'U';
-                              verificationData = otherUser['verification'] ?? {'entityType': null, 'level': null};
-                              trailingWidget = Obx(() {
-                                final reactiveOtherUser = _dataController.allUsers.firstWhere(
-                                    (u) => u['_id'] == otherUser['_id'],
-                                    orElse: () => otherUser,
-                                );
-                                return Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      reactiveOtherUser['online'] == true
-                                          ? 'online'
-                                          : (reactiveOtherUser['lastSeen'] != null
-                                              ? 'last seen ${formatLastSeen(DateTime.parse(reactiveOtherUser['lastSeen']))}'
-                                              : 'offline'),
-                                      style: GoogleFonts.poppins(
-                                        color: reactiveOtherUser['online'] == true ? Colors.tealAccent.shade400 : Colors.grey.shade500,
-                                        fontSize: 11,
-                                        fontWeight: reactiveOtherUser['online'] == true ? FontWeight.w600 : FontWeight.normal,
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              });
-                            }
-
+                            // --- Start of Non-Reactive Data Calculation ---
                             String preview = '';
                             if (lastMessageData != null && lastMessageData is Map<String, dynamic>) {
                               final senderId = lastMessageData['senderId'];
                               final senderIdString = senderId is Map ? senderId['_id'] : senderId;
-                              String senderName;
-
-                              if (senderIdString == currentUserId) {
-                                senderName = 'You';
-                              } else {
-                                senderName = isGroup
-                                    ? (chat['participants'] as List)
-                                        .firstWhere((p) => p['_id'] == senderIdString, orElse: () => {'name': '...'})['name']
-                                    : title;
-                              }
 
                               if (lastMessageData['deletedForEveryone'] == true) {
                                 preview = 'Message deleted';
@@ -342,17 +278,23 @@ class _MainChatsPageState extends State<MainChatsPage> {
                               } else {
                                 preview = lastMessageData['content'] ?? '';
                               }
-                              preview = '$senderName: $preview';
+
+                              if (senderIdString == currentUserId) {
+                                preview = 'You: $preview';
+                              } else if (isGroup) {
+                                // For group chats, find sender name
+                                final senderName = (chat['participants'] as List)
+                                        .firstWhere((p) => p['_id'] == senderIdString, orElse: () => {'name': '...'})['name'];
+                                preview = '$senderName: $preview';
+                              }
                             }
 
                             final String status = lastMessageData != null ? _getAggregateStatus(lastMessageData) : 'none';
                             final IconData statusIcon = _getStatusIcon(status);
                             final Color statusColor = _getStatusColor(status);
-                            final senderId = lastMessageData != null
-                                ? (lastMessageData['senderId'] is Map ? lastMessageData['senderId']['_id'] : lastMessageData['senderId'])
-                                : null;
-                            final bool isMyMessage = senderId == currentUserId;
+                            final bool isMyMessage = lastMessageData != null && (lastMessageData['senderId'] is Map ? lastMessageData['senderId']['_id'] : lastMessageData['senderId']) == currentUserId;
                             final int unreadCount = chat['unreadCount'] as int? ?? 0;
+                            // --- End of Non-Reactive Data Calculation ---
 
                             return GestureDetector(
                               onLongPress: () {
@@ -384,21 +326,36 @@ class _MainChatsPageState extends State<MainChatsPage> {
                               child: ListTile(
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                                 leading: Obx(() {
+                                  // --- Reactive Leading Logic ---
+                                  String avatarUrl;
+                                  String avatarLetter;
                                   bool isUserOnline = false;
-                                  if (!isGroup) {
+
+                                  if (isGroup) {
+                                    avatarUrl = chat['groupAvatar'] ?? '';
+                                    avatarLetter = (chat['name'] ?? 'G').isNotEmpty ? (chat['name'] ?? 'G')[0].toUpperCase() : 'G';
+                                  } else {
                                     final otherParticipantRaw = (chat['participants'] as List<dynamic>).firstWhere(
                                       (p) => (p is Map<String, dynamic> ? p['_id'] : p) != currentUserId,
                                       orElse: () => null,
                                     );
-                                    if (otherParticipantRaw != null) {
+
+                                    if (otherParticipantRaw == null) {
+                                      avatarUrl = '';
+                                      avatarLetter = '?';
+                                    } else {
                                       final otherUserId = otherParticipantRaw is Map<String, dynamic> ? otherParticipantRaw['_id'] : otherParticipantRaw;
                                       final reactiveOtherUser = _dataController.allUsers.firstWhere(
                                           (u) => u['_id'] == otherUserId,
-                                          orElse: () => {'online': false},
+                                          orElse: () => {'name': 'Unknown', 'avatar': '', 'online': false},
                                       );
+                                      avatarUrl = reactiveOtherUser['avatar'] ?? '';
+                                      final name = reactiveOtherUser['name'] ?? 'U';
+                                      avatarLetter = name.isNotEmpty ? name[0].toUpperCase() : 'U';
                                       isUserOnline = reactiveOtherUser['online'] ?? false;
                                     }
                                   }
+
                                   return Stack(
                                     clipBehavior: Clip.none,
                                     children: [
@@ -437,24 +394,49 @@ class _MainChatsPageState extends State<MainChatsPage> {
                                     ],
                                   );
                                 }),
-                                title: Row(
-                                  children: [
-                                    Text(
-                                      _capitalizeFirstLetter(title),
-                                      style: GoogleFonts.poppins(color: Colors.white, fontSize: 15),
-                                    ),
-                                    // Verification Badge
-                                    if (verificationData['entityType'] != null && verificationData['level'] != null)
-                                      Padding(
-                                        padding: const EdgeInsets.only(left: 4.0),
-                                        child: Icon(
-                                          Icons.verified,
-                                          color: getVerificationBadgeColor(verificationData['entityType'], verificationData['level']),
-                                          size: 20,
-                                        ),
+                                title: Obx(() {
+                                  // --- Reactive Title Logic ---
+                                  String title;
+                                  Map<String, dynamic> verificationData;
+                                  if (isGroup) {
+                                    title = chat['name'] ?? 'Group Chat';
+                                    verificationData = chat['verification'] ?? {'entityType': null, 'level': null};
+                                  } else {
+                                    final otherParticipantRaw = (chat['participants'] as List<dynamic>).firstWhere(
+                                      (p) => (p is Map<String, dynamic> ? p['_id'] : p) != currentUserId,
+                                      orElse: () => null,
+                                    );
+                                    if (otherParticipantRaw == null) {
+                                      title = 'Unknown User';
+                                      verificationData = {'entityType': null, 'level': null};
+                                    } else {
+                                      final otherUserId = otherParticipantRaw is Map<String, dynamic> ? otherParticipantRaw['_id'] : otherParticipantRaw;
+                                      final reactiveOtherUser = _dataController.allUsers.firstWhere(
+                                          (u) => u['_id'] == otherUserId,
+                                          orElse: () => {'name': 'Unknown', 'verification': null},
+                                      );
+                                      title = reactiveOtherUser['name'] ?? 'User';
+                                      verificationData = reactiveOtherUser['verification'] ?? {'entityType': null, 'level': null};
+                                    }
+                                  }
+                                  return Row(
+                                    children: [
+                                      Text(
+                                        _capitalizeFirstLetter(title),
+                                        style: GoogleFonts.poppins(color: Colors.white, fontSize: 15),
                                       ),
-                                  ],
-                                ),
+                                      if (verificationData['entityType'] != null && verificationData['level'] != null)
+                                        Padding(
+                                          padding: const EdgeInsets.only(left: 4.0),
+                                          child: Icon(
+                                            Icons.verified,
+                                            color: getVerificationBadgeColor(verificationData['entityType'], verificationData['level']),
+                                            size: 20,
+                                          ),
+                                        ),
+                                    ],
+                                  );
+                                }),
                                 subtitle: Obx(() {
                                   final typingUserId = _dataController.isTyping[chat['_id']];
                                   if (typingUserId != null) {
@@ -480,33 +462,58 @@ class _MainChatsPageState extends State<MainChatsPage> {
                                     overflow: TextOverflow.ellipsis,
                                   );
                                 }),
-                                trailing: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    if (!isGroup) trailingWidget,
-                                    if (lastMessageData != null)
+                                trailing: Obx(() {
+                                  // --- Reactive Trailing Logic ---
+                                  final lastMessageTimestamp = lastMessageData != null ? formatLastSeen(DateTime.parse(lastMessageData['createdAt'] as String).toLocal()) : '';
+
+                                  if (isGroup) {
+                                    return Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        if (lastMessageData != null) Text(lastMessageTimestamp, style: GoogleFonts.poppins(color: Colors.grey.shade500, fontSize: 11)),
+                                        const SizedBox(height: 4),
+                                        if (unreadCount > 0) Container(width: 10, height: 10, decoration: const BoxDecoration(color: Colors.teal, shape: BoxShape.circle))
+                                        else if (isMyMessage && status != 'none') Padding(padding: const EdgeInsets.only(top: 4.0), child: Icon(statusIcon, size: 14, color: statusColor)),
+                                      ],
+                                    );
+                                  }
+
+                                  final otherParticipantRaw = (chat['participants'] as List<dynamic>).firstWhere(
+                                    (p) => (p is Map<String, dynamic> ? p['_id'] : p) != currentUserId,
+                                    orElse: () => null,
+                                  );
+                                  if(otherParticipantRaw == null) return const SizedBox.shrink();
+
+                                  final otherUserId = otherParticipantRaw is Map<String, dynamic> ? otherParticipantRaw['_id'] : otherParticipantRaw;
+                                  final reactiveOtherUser = _dataController.allUsers.firstWhere(
+                                      (u) => u['_id'] == otherUserId,
+                                      orElse: () => {'online': false, 'lastSeen': null},
+                                  );
+
+                                  return Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
                                       Text(
-                                        formatLastSeen(DateTime.parse(lastMessageData['createdAt'] as String).toLocal()),
-                                        style: GoogleFonts.poppins(color: Colors.grey.shade500, fontSize: 11),
-                                      ),
-                                    const SizedBox(height: 4),
-                                    if (unreadCount > 0)
-                                      Container(
-                                        width: 10,
-                                        height: 10,
-                                        decoration: const BoxDecoration(
-                                          color: Colors.teal,
-                                          shape: BoxShape.circle,
+                                        reactiveOtherUser['online'] == true
+                                            ? 'online'
+                                            : (reactiveOtherUser['lastSeen'] != null
+                                                ? 'last seen ${formatLastSeen(DateTime.parse(reactiveOtherUser['lastSeen']))}'
+                                                : 'offline'),
+                                        style: GoogleFonts.poppins(
+                                          color: reactiveOtherUser['online'] == true ? Colors.tealAccent.shade400 : Colors.grey.shade500,
+                                          fontSize: 11,
+                                          fontWeight: reactiveOtherUser['online'] == true ? FontWeight.w600 : FontWeight.normal,
                                         ),
-                                      )
-                                    else if (isMyMessage && status != 'none')
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 4.0),
-                                        child: Icon(statusIcon, size: 14, color: statusColor),
                                       ),
-                                  ],
-                                ),
+                                      if (lastMessageData != null) Text(lastMessageTimestamp, style: GoogleFonts.poppins(color: Colors.grey.shade500, fontSize: 11)),
+                                      const SizedBox(height: 4),
+                                      if (unreadCount > 0) Container(width: 10, height: 10, decoration: const BoxDecoration(color: Colors.teal, shape: BoxShape.circle))
+                                      else if (isMyMessage && status != 'none') Padding(padding: const EdgeInsets.only(top: 4.0), child: Icon(statusIcon, size: 14, color: statusColor)),
+                                    ],
+                                  );
+                                }),
                                 onTap: () {
                                   _dataController.currentChat.value = chat;
                                   if (unreadCount > 0) {
