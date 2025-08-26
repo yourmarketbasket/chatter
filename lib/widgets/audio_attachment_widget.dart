@@ -26,7 +26,7 @@ class AudioAttachmentWidget extends StatefulWidget {
 
 class _AudioAttachmentWidgetState extends State<AudioAttachmentWidget> {
   late AudioPlayer _audioPlayer;
-  bool _isMuted = true;
+  bool _isMuted = false;
   bool _isPlaying = false;
   PlayerState _playerState = PlayerState.stopped;
 
