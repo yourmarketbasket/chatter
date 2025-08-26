@@ -1215,151 +1215,143 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       }
 
-      final otherUser = chat['type'] == 'group'
-          ? null
-          : (chat['participants'] as List<dynamic>).firstWhere(
-              (p) {
-                if (p is Map<String, dynamic>) {
-                  return p['_id'] != dataController.user.value['user']['_id'];
-                }
-                return p != dataController.user.value['user']['_id'];
-              },
-              orElse: () => (chat['participants'] as List<dynamic>).first,
-            );
-
-      final otherUserMap = otherUser is Map<String, dynamic>
-          ? otherUser
-          : dataController.allUsers.firstWhere(
-              (u) => u['_id'] == otherUser,
-              orElse: () => {'name': 'Unknown', 'avatar': ''},
-            );
-
       return Scaffold(
         backgroundColor: Colors.black,
         appBar: AppBar(
           backgroundColor: Colors.black,
           surfaceTintColor: Colors.black,
-          title: GestureDetector(
-            onTap: (){
-              if (chat['type'] != 'group') {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ProfilePage(
-                          userId: otherUserMap!['_id'],
-                          username: otherUserMap['name'],
-                          userAvatarUrl: otherUserMap['avatar'],
-                        ),
-                      ),
-                    );
-                  }else {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => GroupProfilePage(chat: chat),
-                      ),
-                    );
-                  }
-            },
-            child: Row(
-              children: [
-                Stack(
-                  children: [
-                    DottedBorder(
-                      options: CircularDottedBorderOptions(
-                        gradient: LinearGradient(
-                          colors: [(otherUserMap?['online'] ?? false) ? Colors.teal : const BorderType.Color.fromARGB(255, 161, 161, 161), Colors.black],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        strokeWidth: 1.5,
-                      ),
-                      child: CircleAvatar(
-                        backgroundColor: Colors.tealAccent,
-                        backgroundImage: (chat['type'] == 'group'
-                                    ? chat['groupAvatar']
-                                    : otherUserMap?['avatar']) !=
-                                null &&
-                                (chat['type'] == 'group'
-                                    ? chat['groupAvatar']
-                                    : otherUserMap?['avatar'])
-                                    .isNotEmpty
-                            ? NetworkImage((chat['type'] == 'group'
-                                ? chat['groupAvatar']
-                                : otherUserMap!['avatar'])!)
-                            : null,
-                        child: (chat['type'] == 'group'
-                                    ? chat['groupAvatar']
-                                    : otherUserMap?['avatar']) ==
-                                null ||
-                                (chat['type'] == 'group'
-                                    ? chat['groupAvatar']
-                                    : otherUserMap?['avatar'])
-                                    .isEmpty
-                            ? Text(
-                                chat['type'] == 'group'
-                                    ? (chat['name']?[0] ?? '?')
-                                    : (otherUserMap?['name'][0] ?? '?'),
-                                style: const TextStyle(color: Colors.black),
-                              )
-                            : null,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 10),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      chat['type'] == 'group'
-                          ? _capitalizeFirstLetter(chat['name'] ?? 'Group Chat')
-                          : _capitalizeFirstLetter(otherUserMap!['name'] ?? 'User'),
-                      style: const TextStyle(color: Colors.white, fontSize: 16),
-                    ),
-                    if (chat['type'] != 'group')
-                      Obx(() {
-                        final isTyping = chat['_id'] != null && dataController.isTyping[chat['_id']] != null;
-                        if (isTyping) {
-                          return const Text(
-                            'typing...',
-                            style: TextStyle(
-                              color: Colors.tealAccent,
-                              fontSize: 12,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          );
-                        }
-                        final user = dataController.allUsers.firstWhere(
-                          (u) => u['_id'] == otherUserMap!['_id'],
-                          orElse: () => otherUserMap,
-                        );
-                        if (user['online'] == true) {
-                          return const Text(
-                            'online',
-                            style: TextStyle(color: Colors.green, fontSize: 12),
-                          );
-                        }
-                        if (user['lastSeen'] != null) {
-                          return Text(
-                            'last seen ${formatLastSeen(DateTime.parse(user['lastSeen']))}',
-                            style: const TextStyle(color: Colors.grey, fontSize: 12),
-                          );
-                        }
-                        return const Text(
-                          'offline',
-                          style: TextStyle(color: Colors.grey, fontSize: 12),
-                        );
-                      }),
-                  ],
-                ),
-              ],
-            ),
-          ),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.white),
             onPressed: () => Navigator.pop(context),
-          )
+          ),
+          title: Obx(() {
+            // All data fetching logic is now inside Obx, ensuring reactivity.
+            final chat = dataController.currentChat.value;
+            final isGroup = chat['type'] == 'group';
+
+            String title;
+            String avatarUrl;
+            String avatarLetter;
+            bool isOnline = false;
+            Map<String, dynamic>? userForProfile; // For navigation and status
+
+            if (isGroup) {
+              title = chat['name'] ?? 'Group Chat';
+              avatarUrl = chat['groupAvatar'] ?? '';
+              avatarLetter = title.isNotEmpty ? title[0].toUpperCase() : 'G';
+            } else {
+              final currentUserId = dataController.user.value['user']['_id'];
+              final otherParticipantRaw = (chat['participants'] as List<dynamic>).firstWhere(
+                (p) => (p is Map ? p['_id'] : p) != currentUserId,
+                orElse: () => null,
+              );
+
+              if (otherParticipantRaw == null) {
+                return const Text('Error: User not found', style: TextStyle(color: Colors.red, fontSize: 14));
+              }
+
+              final otherUserId = otherParticipantRaw is Map ? otherParticipantRaw['_id'] : otherParticipantRaw;
+
+              // Reactively find the user in the global user list.
+              final otherUser = dataController.allUsers.firstWhere(
+                (u) => u['_id'] == otherUserId,
+                orElse: () => {
+                  '_id': otherUserId,
+                  'name': 'Loading...',
+                  'avatar': '',
+                  'online': false,
+                  'lastSeen': null,
+                },
+              );
+
+              userForProfile = otherUser;
+              title = otherUser['name'] ?? 'User';
+              avatarUrl = otherUser['avatar'] ?? '';
+              avatarLetter = title.isNotEmpty ? title[0].toUpperCase() : 'U';
+              isOnline = otherUser['online'] ?? false;
+            }
+
+            return GestureDetector(
+              onTap: () {
+                if (isGroup) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => GroupProfilePage(chat: chat)),
+                  );
+                } else if (userForProfile != null) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ProfilePage(
+                        userId: userForProfile!['_id'],
+                        username: userForProfile['name'],
+                        userAvatarUrl: userForProfile['avatar'],
+                      ),
+                    ),
+                  );
+                }
+              },
+              child: Row(
+                children: [
+                  Stack(
+                    children: [
+                      DottedBorder(
+                        options: CircularDottedBorderOptions(
+                          gradient: LinearGradient(
+                            colors: [isOnline ? Colors.teal : const BorderType.Color.fromARGB(255, 161, 161, 161), Colors.black],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          strokeWidth: 1.5,
+                        ),
+                        child: CircleAvatar(
+                          backgroundColor: Colors.tealAccent,
+                          backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+                          child: avatarUrl.isEmpty ? Text(avatarLetter, style: const TextStyle(color: Colors.black)) : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _capitalizeFirstLetter(title),
+                          style: const TextStyle(color: Colors.white, fontSize: 16),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (!isGroup && userForProfile != null)
+                          Obx(() {
+                            final typingUserId = dataController.isTyping[chat['_id']];
+                            if (typingUserId != null && typingUserId == userForProfile!['_id']) {
+                              return const Text(
+                                'typing...',
+                                style: TextStyle(color: Colors.tealAccent, fontSize: 12, fontStyle: FontStyle.italic),
+                              );
+                            }
+
+                            final user = userForProfile;
+                            if (user['online'] == true) {
+                              return const Text('online', style: TextStyle(color: Colors.green, fontSize: 12));
+                            }
+                            if (user['lastSeen'] != null) {
+                              return Text(
+                                'last seen ${formatLastSeen(DateTime.parse(user['lastSeen']))}',
+                                style: const TextStyle(color: Colors.grey, fontSize: 12),
+                                overflow: TextOverflow.ellipsis,
+                              );
+                            }
+                            return const Text('offline', style: TextStyle(color: Colors.grey, fontSize: 12));
+                          }),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
         ),
         body: Column(
           children: [
