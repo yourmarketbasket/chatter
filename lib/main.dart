@@ -17,10 +17,10 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:logging/logging.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:chatter/helpers/timeago_helpers.dart';
-import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'dart:async';
 import 'package:chatter/pages/users_list_page.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:share_handler/share_handler.dart';
 // import 'package:device_info_plus/device_info_plus.dart'; // No longer needed for player selection
 // import 'dart:io'; // No longer needed for player selection (Platform check)
 
@@ -75,7 +75,7 @@ class ChatterApp extends StatefulWidget {
 class _ChatterAppState extends State<ChatterApp> {
   late FlutterSecureStorage _storage;
   final  DataController _dataController = Get.put(DataController());
-  late StreamSubscription _intentDataStreamSubscription;
+  late ShareHandler _shareHandler;
 
   @override
   void initState() {
@@ -93,37 +93,22 @@ class _ChatterAppState extends State<ChatterApp> {
     // Check initial screen after initialization
     _checkInitialScreen();
 
-    // For sharing any data coming from outside the app while it is in the memory
-    _intentDataStreamSubscription = ReceiveSharingIntent.instance.getMediaStream()
-        .listen((List<SharedMediaFile> value) {
+    _shareHandler = ShareHandler.instance;
+    _shareHandler.onRecieveShare.listen((SharedAttachment attachment) {
       setState(() {
-        _handleSharedData(value);
-      });
-    }, onError: (err) {
-      print("getIntentDataStream error: $err");
-    });
-
-    // For sharing any data coming from outside the app while it is closed
-    ReceiveSharingIntent.instance.getInitialMedia().then((List<SharedMediaFile> value) {
-      setState(() {
-        if (value.isNotEmpty) {
-          _handleSharedData(value);
-        }
+        _handleSharedData(attachment);
       });
     });
   }
 
-  void _handleSharedData(List<SharedMediaFile> sharedFiles) {
-    if (sharedFiles.isEmpty) return;
-
+  void _handleSharedData(SharedAttachment attachment) {
     Get.to(() => UsersListPage(
-          sharedData: sharedFiles,
+          sharedData: attachment,
           onUserSelected: (user) {
-            final file = sharedFiles.first;
-            if (file.type == SharedMediaType.text || file.path.startsWith('http')) {
+            if (attachment.type == SharedAttachmentType.text) {
               _dataController.sendChatMessage({
                 'chatId': user['chatId'],
-                'content': file.path,
+                'content': attachment.path,
                 'type': 'text',
                 'senderId': _dataController.user.value['user']['_id'],
                 'participants': [
@@ -131,49 +116,36 @@ class _ChatterAppState extends State<ChatterApp> {
                   user['_id']
                 ],
               }, null);
-            } else if (file.type == SharedMediaType.url || file.path.startsWith('geo:')) {
-              _dataController.sendChatMessage({
+            } else if (attachment.type == SharedAttachmentType.url) {
+               _dataController.sendChatMessage({
                 'chatId': user['chatId'],
-                'content': file.path,
-                'type': 'location',
+                'content': attachment.path,
+                'type': 'text', // Treat URL as text
                 'senderId': _dataController.user.value['user']['_id'],
                 'participants': [
                   _dataController.user.value['user']['_id'],
                   user['_id']
                 ],
               }, null);
-            } else if (file.path.endsWith('.vcf')) {
-              _dataController.sendChatMessage({
-                'chatId': user['chatId'],
-                'content': file.path,
-                'type': 'contact',
-                'senderId': _dataController.user.value['user']['_id'],
-                'participants': [
-                  _dataController.user.value['user']['_id'],
-                  user['_id']
-                ],
-              }, null);
-            } else {
-              final files = sharedFiles
-                  .map((file) => PlatformFile(
-                        name: file.path.split('/').last,
-                        path: file.path,
-                        size: 0,
-                      ))
-                  .toList();
+            }
+            else {
+              final file = PlatformFile(
+                name: attachment.path.split('/').last,
+                path: attachment.path,
+                size: 0,
+              );
               _dataController.sendChatMessage({
                 'chatId': user['chatId'],
                 'content': '',
                 'type': 'attachment',
-                'files': files
-                    .map((file) => {
-                          'url': file.path,
-                          'type':
-                              _dataController.getMediaType(file.extension ?? ''),
-                          'size': file.size,
-                          'filename': file.name,
-                        })
-                    .toList(),
+                'files': [
+                  {
+                    'url': file.path,
+                    'type': _dataController.getMediaType(file.extension ?? ''),
+                    'size': file.size,
+                    'filename': file.name,
+                  }
+                ],
                 'senderId': _dataController.user.value['user']['_id'],
                 'participants': [
                   _dataController.user.value['user']['_id'],
@@ -209,7 +181,7 @@ class _ChatterAppState extends State<ChatterApp> {
     final socketService = Get.find<SocketService>();
     socketService.disconnect();
     socketService.dispose();
-    _intentDataStreamSubscription.cancel();
+    _shareHandler.close();
     super.dispose();
   }
 

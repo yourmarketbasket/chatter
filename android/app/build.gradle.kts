@@ -8,24 +8,20 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-kotlin {
-    jvmToolchain(8)
-}
-
 android {
     namespace = "com.example.chatter"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = "27.0.12077973"
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
         // Enable core library desugaring
         isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
-        jvmTarget = "21"
+        jvmTarget = JavaVersion.VERSION_11.toString()
     }
 
     defaultConfig {
