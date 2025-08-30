@@ -298,26 +298,27 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _showReactionsDialog(Map<String, dynamic> message) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color.fromARGB(255, 46, 46, 46),
-        title: const Text('React to message', style: TextStyle(color: Colors.white)),
-        content: Wrap(
-          spacing: 10,
-          children: ['👍', '❤️', '😂', '😮', '🙏', '🤣']
-              .map((emoji) => IconButton(
-                    icon: Text(emoji, style: const TextStyle(fontSize: 24)),
-                    onPressed: () {
-                      dataController.addReaction(message['_id'], emoji);
-                      Navigator.pop(context);
-                    },
-                  ))
-              .toList(),
-        ),
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      contentPadding: EdgeInsets.all(10),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
+      backgroundColor: const Color.fromARGB(255, 46, 46, 46),
+      content: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: ['👍', '❤️', '😂', '😮', '🙏', '🤣']
+            .map((emoji) => GestureDetector(
+                  onTap: () {
+                    dataController.addReaction(message['_id'], emoji);
+                    Navigator.pop(context);
+                  },
+                  child: Text(emoji, style: const TextStyle(fontSize: 20)),
+                ))
+            .toList(),
       ),
-    );
-  }
+    ),
+  );
+}
 
   void _showMessageOptions(Map<String, dynamic> message) {
     showModalBottomSheet(
@@ -427,9 +428,9 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     return Positioned(
-      bottom: 2, // Move up 10px from -8
-      left: isYou ? 10 : null,
-      right: isYou ? null : 10,
+      bottom: -5, // Move up 10px from -8
+      left: isYou ? 5 : null,
+      right: isYou ? null : 5,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: groupedReactions.entries.map((entry) {
@@ -448,8 +449,9 @@ class _ChatScreenState extends State<ChatScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
               margin: const EdgeInsets.symmetric(horizontal: 2),
               decoration: BoxDecoration(
-                color: Colors.grey[900],
+                color: Colors.black,
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(color:const BorderType.Color.fromARGB(255, 92, 92, 92), width: 0.5),
               ),
               child: Text(
                 '$emoji $count',
@@ -923,10 +925,10 @@ class _ChatScreenState extends State<ChatScreen> {
       color: isYou ? Colors.transparent.withOpacity(0.2) : Colors.transparent,
       border: Border.all(color: isYou ? Colors.teal.withOpacity(0.6) : const Color.fromARGB(167, 143, 141, 141), width: 1.0),
       borderRadius: BorderRadius.only(
-        topLeft: const Radius.circular(12.0),
-        topRight: const Radius.circular(12.0),
-        bottomLeft: Radius.circular(isYou ? 12.0 : 0.0),
-        bottomRight: Radius.circular(isYou ? 0.0 : 12.0),
+        topLeft: const Radius.circular(20.0),
+        topRight: const Radius.circular(20.0),
+        bottomLeft: Radius.circular(isYou ? 20.0 : 0.0),
+        bottomRight: Radius.circular(isYou ? 0.0 : 20.0),
       ),
     ),
     child: Column(
@@ -973,9 +975,10 @@ class _ChatScreenState extends State<ChatScreen> {
                 padding: const EdgeInsets.all(8.0),
                 decoration: BoxDecoration(
                   color: Colors.grey[900]?.withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(8),
-                  border: const Border(
-                    left: BorderSide(color: Colors.tealAccent, width: 2),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border(
+                    left: BorderSide(color: isYou ? Colors.teal : Colors.grey, width: 2),
+                    
                   ),
                 ),
                 child: Column(
