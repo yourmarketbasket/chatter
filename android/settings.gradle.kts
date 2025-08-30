@@ -26,13 +26,3 @@ plugins {
 }
 
 include(":app")
-
-toolchainManagement {
-    jvm {
-        javaRepositories {
-            repository("foojay") {
-                vendor = JvmVendorSpec.AZUL
-            }
-        }
-    }
-}
