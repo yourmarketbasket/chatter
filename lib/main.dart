@@ -120,7 +120,7 @@ class _ChatterAppState extends State<ChatterApp> {
           sharedData: sharedFiles,
           onUserSelected: (user) {
             final file = sharedFiles.first;
-            if (file.type == SharedMediaType.text) {
+            if (file.type == SharedMediaType.text || file.path.startsWith('http')) {
               _dataController.sendChatMessage({
                 'chatId': user['chatId'],
                 'content': file.path,
@@ -131,11 +131,22 @@ class _ChatterAppState extends State<ChatterApp> {
                   user['_id']
                 ],
               }, null);
-            } else if (file.type == SharedMediaType.url) {
+            } else if (file.type == SharedMediaType.url || file.path.startsWith('geo:')) {
               _dataController.sendChatMessage({
                 'chatId': user['chatId'],
                 'content': file.path,
                 'type': 'location',
+                'senderId': _dataController.user.value['user']['_id'],
+                'participants': [
+                  _dataController.user.value['user']['_id'],
+                  user['_id']
+                ],
+              }, null);
+            } else if (file.path.endsWith('.vcf')) {
+              _dataController.sendChatMessage({
+                'chatId': user['chatId'],
+                'content': file.path,
+                'type': 'contact',
                 'senderId': _dataController.user.value['user']['_id'],
                 'participants': [
                   _dataController.user.value['user']['_id'],
