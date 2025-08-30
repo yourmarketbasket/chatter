@@ -397,72 +397,6 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-class ReactionPileWidget extends StatefulWidget {
-  final Map<String, dynamic> message;
-  final bool isYou;
-
-  const ReactionPileWidget({Key? key, required this.message, required this.isYou}) : super(key: key);
-
-  @override
-  _ReactionPileWidgetState createState() => _ReactionPileWidgetState();
-}
-
-class _ReactionPileWidgetState extends State<ReactionPileWidget> {
-  bool _isExpanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final reactions = widget.message['reactions'] as List<dynamic>? ?? [];
-    if (reactions.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    final groupedReactions = <String, int>{};
-    for (var reaction in reactions) {
-      final emoji = reaction['emoji'] as String;
-      groupedReactions[emoji] = (groupedReactions[emoji] ?? 0) + 1;
-    }
-
-    return Positioned(
-      bottom: -10,
-      right: widget.isYou ? null : -10,
-      left: widget.isYou ? -10 : null,
-      child: GestureDetector(
-        onTap: () {
-          setState(() {
-            _isExpanded = !_isExpanded;
-          });
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.grey[800],
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.black, width: 2),
-          ),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            width: _isExpanded ? (groupedReactions.length * 25.0) : (groupedReactions.length > 1 ? 35.0 : 25.0),
-            height: 20,
-            child: Stack(
-              children: groupedReactions.entries.map((entry) {
-                final index = groupedReactions.keys.toList().indexOf(entry.key);
-                return AnimatedPositioned(
-                  duration: const Duration(milliseconds: 300),
-                  left: _isExpanded ? (index * 25.0) : (index * 10.0),
-                  child: Text(
-                    '${entry.key} ${entry.value}',
-                    style: const TextStyle(color: Colors.white, fontSize: 12),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
   Widget _buildReactions(Map<String, dynamic> message, bool isYou) {
     return ReactionPileWidget(message: message, isYou: isYou);
@@ -1582,5 +1516,72 @@ class _ReactionPileWidgetState extends State<ReactionPileWidget> {
         ),
       );
     });
+  }
+}
+
+class ReactionPileWidget extends StatefulWidget {
+  final Map<String, dynamic> message;
+  final bool isYou;
+
+  const ReactionPileWidget({Key? key, required this.message, required this.isYou}) : super(key: key);
+
+  @override
+  _ReactionPileWidgetState createState() => _ReactionPileWidgetState();
+}
+
+class _ReactionPileWidgetState extends State<ReactionPileWidget> {
+  bool _isExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final reactions = widget.message['reactions'] as List<dynamic>? ?? [];
+    if (reactions.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final groupedReactions = <String, int>{};
+    for (var reaction in reactions) {
+      final emoji = reaction['emoji'] as String;
+      groupedReactions[emoji] = (groupedReactions[emoji] ?? 0) + 1;
+    }
+
+    return Positioned(
+      bottom: -10,
+      right: widget.isYou ? null : -10,
+      left: widget.isYou ? -10 : null,
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _isExpanded = !_isExpanded;
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.grey[800],
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.black, width: 2),
+          ),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            width: _isExpanded ? (groupedReactions.length * 25.0) : (groupedReactions.length > 1 ? 35.0 : 25.0),
+            height: 20,
+            child: Stack(
+              children: groupedReactions.entries.map((entry) {
+                final index = groupedReactions.keys.toList().indexOf(entry.key);
+                return AnimatedPositioned(
+                  duration: const Duration(milliseconds: 300),
+                  left: _isExpanded ? (index * 25.0) : (index * 10.0),
+                  child: Text(
+                    '${entry.key} ${entry.value}',
+                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
