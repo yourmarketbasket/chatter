@@ -4,8 +4,13 @@ import 'package:url_launcher/url_launcher.dart';
 
 class LinkPreviewWidget extends StatefulWidget {
   final String url;
+  final VoidCallback onPreviewSuccess;
 
-  const LinkPreviewWidget({Key? key, required this.url}) : super(key: key);
+  const LinkPreviewWidget({
+    Key? key,
+    required this.url,
+    required this.onPreviewSuccess,
+  }) : super(key: key);
 
   @override
   _LinkPreviewWidgetState createState() => _LinkPreviewWidgetState();
@@ -13,6 +18,7 @@ class LinkPreviewWidget extends StatefulWidget {
 
 class _LinkPreviewWidgetState extends State<LinkPreviewWidget> {
   late Future<Metadata?> _metadataFuture;
+  bool _hasCalledSuccess = false;
 
   @override
   void initState() {
@@ -27,7 +33,6 @@ class _LinkPreviewWidgetState extends State<LinkPreviewWidget> {
       return await AnyLinkPreview.getMetadata(
         link: urlToFetch,
         cache: const Duration(days: 7),
-        proxyUrl: "https://cors-anywhere.herokuapp.com/", // A proxy is needed to bypass CORS issues on web
       );
     } catch (e) {
       // It's better to not show an error in the chat, just fail silently.
@@ -76,6 +81,13 @@ class _LinkPreviewWidgetState extends State<LinkPreviewWidget> {
         }
 
         final metadata = snapshot.data!;
+
+        if (!_hasCalledSuccess) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            widget.onPreviewSuccess();
+          });
+          _hasCalledSuccess = true;
+        }
 
         return GestureDetector(
           onTap: () async {

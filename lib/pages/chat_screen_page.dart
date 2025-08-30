@@ -31,9 +31,8 @@ import 'package:video_thumbnail/video_thumbnail.dart';
 import 'dart:typed_data';
 import 'package:chatter/pages/users_list_page.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_linkify/flutter_linkify.dart';
-import 'package:chatter/widgets/link_preview_widget.dart';
-import 'package:linkify/linkify.dart' as linkify_helper;
+import 'package:chatter/widgets/message_bubble.dart';
+import 'package:chatter/widgets/pdf_thumbnail_widget.dart';
 
 
 class ChatScreen extends StatefulWidget {
@@ -794,26 +793,9 @@ class _ChatScreenState extends State<ChatScreen> {
         );
         break;
       case 'application/pdf':
-        content = Container(
-          padding: const EdgeInsets.all(8.0),
-          decoration: BoxDecoration(
-            color: Colors.grey[700],
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.picture_as_pdf, color: Colors.white),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  attachment['filename'] ?? 'PDF Document',
-                  style: const TextStyle(color: Colors.white),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
+        content = PdfThumbnailWidget(
+          url: attachment['url'],
+          isLocal: isLocalFile,
         );
         break;
       default:
@@ -1157,56 +1139,6 @@ class _ChatScreenState extends State<ChatScreen> {
     ),
   );
 }
-  String _getAggregateStatus(Map<String, dynamic> message) {
-    // Priority 1: Check for a temporary/failed status first.
-    if (message['status'] == 'sending') return 'sending';
-    if (message['status_for_failed_only'] == 'failed') return 'failed';
-
-    // Priority 2: Derive status from receipts.
-    final receipts = (message['readReceipts'] as List?)?.cast<Map<String, dynamic>>();
-    if (receipts == null || receipts.isEmpty) {
-      return 'sent'; // No receipts means it's sent but not delivered/read.
-    }
-
-    // If all receipts are 'read'
-    if (receipts.every((r) => r['status'] == 'read')) {
-      return 'read';
-    }
-    // If any receipt is 'delivered' or 'read'
-    if (receipts.any((r) => r['status'] == 'delivered' || r['status'] == 'read')) {
-      return 'delivered';
-    }
-
-    return 'sent';
-  }
-
-  IconData _getStatusIcon(String status) {
-    switch (status) {
-      case 'sending':
-        return Icons.access_time; // Clock icon for sending
-      case 'sent':
-        return Icons.check; // Single tick for sent
-      case 'delivered':
-        return Icons.done_all;
-      case 'read':
-        return Icons.done_all;
-      case 'failed':
-        return Icons.error_outline;
-      default:
-        return Icons.access_time; // Default to clock
-    }
-  }
-
-  Color _getStatusColor(String? status) {
-    switch (status) {
-      case 'read':
-        return Colors.tealAccent;
-      case 'failed':
-        return Colors.red;
-      default:
-        return Colors.grey[400]!;
-    }
-  }
 
   String _getMediaType(String extension) {
     switch (extension.toLowerCase()) {
@@ -1353,27 +1285,6 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       ),
     );
-  }
-
-  @override
-  List<Widget> _extractUrlPreviews(String text) {
-    final List<linkify_helper.LinkifyElement> elements = linkify_helper.linkify(
-      text,
-      options: const linkify_helper.LinkifyOptions(humanize: false),
-    );
-
-    final Set<String> urls = {};
-    for (var e in elements) {
-      if (e is linkify_helper.LinkableElement) {
-        urls.add(e.url);
-      }
-    }
-
-    if (urls.isEmpty) {
-      return [];
-    }
-
-    return urls.map((url) => LinkPreviewWidget(url: url)).toList();
   }
 
   @override
@@ -1595,7 +1506,16 @@ class _ChatScreenState extends State<ChatScreen> {
                                     dataController.user.value['user']['_id']
                                 ? Alignment.centerRight
                                 : Alignment.centerLeft,
-                            child: _buildMessageContent(message, prevMessage),
+                            child: MessageBubble(
+                              message: message,
+                              prevMessage: prevMessage,
+                              dataController: dataController,
+                              showMessageOptions: _showMessageOptions,
+                              openMediaView: _openMediaView,
+                              buildAttachment: _buildAttachment,
+                              getReplyPreviewText: _getReplyPreviewText,
+                              buildReactions: _buildReactions,
+                            ),
                           ),
                         ),
                       );
