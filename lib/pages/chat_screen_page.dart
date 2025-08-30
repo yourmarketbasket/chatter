@@ -418,44 +418,39 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     }
 
-    return Align(
-      alignment: isYou ? Alignment.bottomRight : Alignment.bottomLeft,
-      child: Container(
-        margin: const EdgeInsets.only(top: 4),
-        child: Wrap(
-          spacing: 4.0,
-          runSpacing: 4.0,
-          alignment: isYou ? WrapAlignment.end : WrapAlignment.start,
-          children: groupedReactions.entries.map((entry) {
-            final emoji = entry.key;
-            final userIds = entry.value;
-            final count = userIds.length;
-            final hasReacted = userIds.contains(currentUserId);
+    return Positioned(
+      bottom: -10, // Positioned to stack on top of the bottom border
+      right: isYou ? 10 : null,
+      left: isYou ? null : 10,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: groupedReactions.entries.map((entry) {
+          final emoji = entry.key;
+          final userIds = entry.value;
+          final count = userIds.length;
+          final hasReacted = userIds.contains(currentUserId);
 
-            return GestureDetector(
-              onTap: () {
-                if (hasReacted) {
-                  dataController.removeReaction(message['_id'], emoji);
-                } else {
-                  // Optionally, you could allow adding a reaction by tapping it again,
-                  // but the primary action here is removal.
-                }
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: hasReacted ? Colors.tealAccent.withOpacity(0.5) : Colors.grey[800],
-                  borderRadius: BorderRadius.circular(12),
-                  border: hasReacted ? Border.all(color: Colors.tealAccent, width: 1) : null,
-                ),
-                child: Text(
-                  '$emoji $count',
-                  style: const TextStyle(color: Colors.white, fontSize: 12),
-                ),
+          return GestureDetector(
+            onTap: () {
+              if (hasReacted) {
+                dataController.removeReaction(message['_id'], emoji);
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              margin: const EdgeInsets.symmetric(horizontal: 2),
+              decoration: BoxDecoration(
+                color: hasReacted ? Colors.tealAccent.withOpacity(0.5) : Colors.grey[800],
+                borderRadius: BorderRadius.circular(12),
+                border: hasReacted ? Border.all(color: Colors.tealAccent, width: 1) : null,
               ),
-            );
-          }).toList(),
-        ),
+              child: Text(
+                '$emoji $count',
+                style: const TextStyle(color: Colors.white, fontSize: 12),
+              ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }
@@ -910,6 +905,200 @@ class _ChatScreenState extends State<ChatScreen> {
   );
   final senderName = isYou ? 'You' : sender['name'];
 
+  final messageBubble = Container(
+    margin: EdgeInsets.only(bottom: bottomMargin),
+    padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.0),
+    constraints: BoxConstraints(
+      maxWidth: MediaQuery.of(context).size.width * 0.75,
+      minWidth: MediaQuery.of(context).size.width * 0.25,
+    ),
+    decoration: BoxDecoration(
+      color: isYou ? Colors.transparent.withOpacity(0.2) : Colors.transparent,
+      border: Border.all(color: isYou ? Colors.teal.withOpacity(0.6) : const Color.fromARGB(167, 143, 141, 141), width: 1.0),
+      borderRadius: BorderRadius.only(
+        topLeft: const Radius.circular(12.0),
+        topRight: const Radius.circular(12.0),
+        bottomLeft: Radius.circular(isYou ? 12.0 : 0.0),
+        bottomRight: Radius.circular(isYou ? 0.0 : 12.0),
+      ),
+    ),
+    child: Column(
+      crossAxisAlignment: isYou ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        if (dataController.currentChat.value['type'] == 'group' && !isYou)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4.0),
+            child: Text(
+              senderName,
+              style: const TextStyle(
+                color: Colors.tealAccent,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        if (message['deletedForEveryone'] ?? false)
+          Text(
+            'Message deleted',
+            style: TextStyle(
+              color: Colors.grey[400],
+              fontStyle: FontStyle.italic,
+            ),
+          )
+        else ...[
+          if (message['replyTo'] != null)
+            Obx(() {
+              final originalMessage = dataController.currentConversationMessages.firstWhere(
+                (m) => m['_id'] == message['replyTo'],
+                orElse: () => {
+                  '_id': '',
+                  'senderId': {'_id': '', 'name': 'Unknown User'},
+                  'content': 'Original message not found.',
+                  'files': [],
+                  'type': 'text',
+                },
+              );
+              if (originalMessage['_id'].isEmpty) {
+                return const SizedBox.shrink();
+              }
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8.0),
+                padding: const EdgeInsets.all(8.0),
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.grey[900]?.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(8),
+                  border: const Border(
+                    left: BorderSide(color: Colors.tealAccent, width: 2),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      originalMessage['senderId']['_id'] == dataController.user.value['user']['_id']
+                          ? 'You'
+                          : dataController.allUsers.firstWhere(
+                              (u) => u['_id'] == originalMessage['senderId']['_id'],
+                              orElse: () => {'name': 'Unknown User'},
+                            )['name'],
+                      style: const TextStyle(
+                        color: Colors.tealAccent,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    if (originalMessage['files'] != null && (originalMessage['files'] as List).isNotEmpty)
+                      Row(
+                        children: [
+                          ReplyAttachmentPreview(attachment: originalMessage['files'][0]),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _getReplyPreviewText(originalMessage['files'][0]),
+                              style: TextStyle(color: Colors.grey[300]),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      )
+                    else if (originalMessage['type'] == 'voice')
+                      Row(
+                        children: [
+                          const Icon(Icons.audiotrack, size: 24, color: Colors.white),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Voice note',
+                            style: TextStyle(color: Colors.grey[300]),
+                          ),
+                        ],
+                      )
+                    else
+                      Text(
+                        originalMessage['content'] ?? '',
+                        style: TextStyle(color: Colors.grey[300]),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
+              );
+            }),
+          if (message['type'] == 'voice')
+            Stack(
+              alignment: Alignment.topRight,
+              children: [
+                GestureDetector(
+                  onTap: () => _openMediaView(message, 0),
+                  child: AudioWaveformWidget(
+                    audioPath: message['files'][0]['url'],
+                    isLocal: !(message['files'][0]['url'] as String).startsWith('http'),
+                  ),
+                ),
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.open_in_new,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          if (hasAttachment && message['type'] != 'voice') ...[
+            _buildAttachment(message),
+            if (message['content'] != null && message['content']!.isNotEmpty)
+              const SizedBox(height: 8),
+          ],
+          if (message['content'] != null && message['content']!.isNotEmpty)
+            Text(
+              message['content']!,
+              style: TextStyle(color: isYou ? Colors.white : Colors.grey[200]),
+            ),
+        ],
+        const SizedBox(height: 4),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (message['edited'] ?? false)
+              Text(
+                '(edited) ',
+                style: TextStyle(
+                  color: Colors.grey[400],
+                  fontSize: 10,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            Text(
+              DateFormat('h:mm a').format(DateTime.parse(message['createdAt']).toLocal()),
+              style: GoogleFonts.roboto(
+                color: Colors.grey[400],
+                fontSize: 9,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            if (isYou) ...[
+              const SizedBox(width: 4),
+              Icon(
+                _getStatusIcon(_getAggregateStatus(message)),
+                size: 12,
+                color: _getStatusColor(_getAggregateStatus(message)),
+              ),
+            ],
+          ],
+        ),
+      ],
+    ),
+  );
+
   return GestureDetector(
     onLongPress: () {
       if (!(message['deletedForEveryone'] ?? false)) _showMessageOptions(message);
@@ -931,207 +1120,16 @@ class _ChatScreenState extends State<ChatScreen> {
         padding: const EdgeInsets.only(left: 16.0),
         child: const Icon(Icons.reply, color: Colors.white),
       ),
-      child: Container(
-        margin: EdgeInsets.only(bottom: bottomMargin),
-        padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.0),
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.5,
-          minWidth: MediaQuery.of(context).size.width * 0.25,
-        ),
-        decoration: BoxDecoration(
-          color: isYou ? Colors.transparent.withOpacity(0.2) : Colors.transparent,
-          border: Border.all(color: isYou ? Colors.teal.withOpacity(0.6) : const Color.fromARGB(167, 143, 141, 141), width: 1.0),
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(12.0),
-            topRight: Radius.circular( 12.0),
-            bottomLeft: Radius.circular(isYou ?12.0: 0.0),
-            bottomRight: Radius.circular(isYou? 0.0:12.0),),
-        ),
-        child: Column(
-          crossAxisAlignment: isYou ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            // Display sender name for group chats
-            if (dataController.currentChat.value['type'] == 'group' && !isYou)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4.0),
-                child: Text(
-                  senderName,
-                  style: const TextStyle(
-                    color: Colors.tealAccent,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            if (message['deletedForEveryone'] ?? false)
-              Text(
-                'Message deleted',
-                style: TextStyle(
-                  color: Colors.grey[400],
-                  fontStyle: FontStyle.italic,
-                ),
-              )
-            else ...[
-              if (message['replyTo'] != null)
-                Obx(() {
-                  final originalMessage = dataController.currentConversationMessages.firstWhere(
-                    (m) => m['_id'] == message['replyTo'],
-                    orElse: () => {
-                      '_id': '',
-                      'senderId': {'_id': '', 'name': 'Unknown User'},
-                      'content': 'Original message not found.',
-                      'files': [],
-                      'type': 'text',
-                    },
-                  );
-                  if (originalMessage['_id'].isEmpty) {
-                    return const SizedBox.shrink();
-                  }
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 8.0),
-                    padding: const EdgeInsets.all(8.0),
-                    constraints: const BoxConstraints(
-                      minWidth: double.infinity,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[900]?.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(8),
-                      border: const Border(
-                        left: BorderSide(color: Colors.tealAccent, width: 2),
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          originalMessage['senderId']['_id'] == dataController.user.value['user']['_id']
-                              ? 'You'
-                              : dataController.allUsers.firstWhere(
-                                  (u) => u['_id'] == originalMessage['senderId']['_id'],
-                                  orElse: () => {'name': 'Unknown User'},
-                                )['name'],
-                          style: const TextStyle(
-                            color: Colors.tealAccent,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        if (originalMessage['files'] != null && (originalMessage['files'] as List).isNotEmpty)
-                          Row(
-                            children: [
-                              ReplyAttachmentPreview(attachment: originalMessage['files'][0]),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  _getReplyPreviewText(originalMessage['files'][0]),
-                                  style: TextStyle(color: Colors.grey[300]),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          )
-                        else if (originalMessage['type'] == 'voice')
-                          Row(
-                            children: [
-                              const Icon(Icons.audiotrack, size: 24, color: Colors.white),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Voice note',
-                                style: TextStyle(color: Colors.grey[300]),
-                              ),
-                            ],
-                          )
-                        else
-                          Text(
-                            originalMessage['content'] ?? '',
-                            style: TextStyle(color: Colors.grey[300]),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                      ],
-                    ),
-                  );
-                }),
-              if (message['type'] == 'voice')
-                Stack(
-                  alignment: Alignment.topRight,
-                  children: [
-                    GestureDetector(
-                  onTap: () => _openMediaView(message, 0),
-                      child: AudioWaveformWidget(
-                        audioPath: message['files'][0]['url'],
-                        isLocal: !(message['files'][0]['url'] as String).startsWith('http'),
-                      ),
-                    ),
-                    Positioned(
-                      top: 4,
-                      right: 4,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.5),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.open_in_new,
-                          color: Colors.white,
-                          size: 18,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              if (hasAttachment && message['type'] != 'voice') ...[
-                _buildAttachment(message),
-                if (message['content'] != null && message['content']!.isNotEmpty)
-                  const SizedBox(height: 8),
-              ],
-              if (message['content'] != null && message['content']!.isNotEmpty)
-                Text(
-                  message['content']!,
-                  style: TextStyle(color: isYou ? Colors.white : Colors.grey[200]),
-                ),
-            ],
-            const SizedBox(height: 4),
-            _buildReactions(message, isYou),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (message['edited'] ?? false)
-                  Text(
-                    '(edited) ',
-                    style: TextStyle(
-                      color: Colors.grey[400],
-                      fontSize: 10,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                 // Ensure this is imported
-
-                Text(
-                  DateFormat('h:mm a').format(DateTime.parse(message['createdAt']).toLocal()),
-                  // googlepoppins font
-                  style: GoogleFonts.roboto(
-                    color: Colors.grey[400],
-                    fontSize: 9,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-                if (isYou) ...[
-                  const SizedBox(width: 4),
-                  Icon(
-                    _getStatusIcon(_getAggregateStatus(message)),
-                    size: 12,
-                    color: _getStatusColor(_getAggregateStatus(message)),
-                  ),
-                ],
-              ],
-            ),
-          ],
-        ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          messageBubble,
+          _buildReactions(message, isYou),
+        ],
       ),
-    ));
-  }
+    ),
+  );
+}
   String _getAggregateStatus(Map<String, dynamic> message) {
     // Priority 1: Check for a temporary/failed status first.
     if (message['status'] == 'sending') return 'sending';
