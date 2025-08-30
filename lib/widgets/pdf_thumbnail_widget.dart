@@ -1,9 +1,8 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:pdfrx/pdfrx.dart';
+import 'package:pdfrx_engine/pdfrx_engine.dart';
 import 'package:http/http.dart' as http;
-import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:image/image.dart' as img;
 
@@ -27,6 +26,11 @@ class _PdfThumbnailWidgetState extends State<PdfThumbnailWidget> {
   @override
   void initState() {
     super.initState();
+    // It's important to initialize pdfrx before using engine APIs directly.
+    // The main app should call pdfrxFlutterInitialize(), but we can call it here
+    // as a fallback, though it's not ideal to call it in a widget's initState.
+    // A better pattern is a singleton or DI approach for initialization.
+    // For now, we'll assume it's initialized in main.dart as per docs.
     _thumbnailFuture = _generateThumbnail();
   }
 
@@ -44,37 +48,38 @@ class _PdfThumbnailWidgetState extends State<PdfThumbnailWidget> {
         }
       }
 
-      if (doc == null || doc.pageCount == 0) {
+      if (doc == null || doc.pages.isEmpty) {
         return null;
       }
 
-      final page = await doc.getPage(1);
-      // Render the page to an image
+      final page = doc.pages.first;
+      // Render the page to an image.
+      // Let's use a fixed width for consistency and calculate height based on aspect ratio.
+      const double thumbnailWidth = 200;
       final pageImage = await page.render(
-        width: page.width * 2, // Render at a higher resolution for better quality
-        height: page.height * 2,
+        width: thumbnailWidth,
+        height: (thumbnailWidth * page.height) / page.width,
       );
 
       if (pageImage == null) {
         return null;
       }
 
-      // Convert to a format that the image package can use
-      final image = img.Image.fromBytes(
-        width: pageImage.width,
-        height: pageImage.height,
-        bytes: pageImage.pixels.buffer,
-        format: img.Format.bgra, // PDFium renders in BGRA format
-      );
+      // Use the library's method to create an image object.
+      final image = pageImage.createImageNF();
 
       // Encode to PNG
       final pngBytes = img.encodePng(image);
+
+      // It's important to dispose the pageImage to free up memory
+      pageImage.dispose();
 
       return pngBytes;
     } catch (e) {
       print('Error generating PDF thumbnail with pdfrx: $e');
       return null;
     } finally {
+      // Ensure the document is closed.
       await doc?.close();
     }
   }
