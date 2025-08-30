@@ -13,6 +13,7 @@ import '../models/feed_models.dart';
 import '../services/socket-service.dart';
 import '../services/notification_service.dart';
 import '../services/upload_service.dart'; 
+import 'package:file_picker/file_picker.dart';
 
 class DataController extends GetxController {
   final UploadService _uploadService = UploadService(); // Instantiate UploadService
@@ -1921,7 +1922,12 @@ class DataController extends GetxController {
       final participants =
           List<Map<String, dynamic>>.from(chat['participants'] ?? []);
 
-      final member = allUsers.firstWhereOrNull((u) => u['_id'] == memberId);
+      Map<String, dynamic>? member;
+      try {
+        member = allUsers.firstWhere((u) => u['_id'] == memberId);
+      } catch (e) {
+        member = null;
+      }
 
       if (member != null) {
         participants.add(member);
@@ -1975,7 +1981,12 @@ class DataController extends GetxController {
       final chat = chats[chatId]!;
       final participants =
           List<Map<String, dynamic>>.from(chat['participants'] ?? []);
-      final member = participants.firstWhereOrNull((p) => p['_id'] == memberId);
+      Map<String, dynamic>? member;
+      try {
+        member = participants.firstWhere((p) => p['_id'] == memberId);
+      } catch (e) {
+        member = null;
+      }
 
       if (member != null) {
         final admins = List<Map<String, dynamic>>.from(chat['admins'] ?? []);
@@ -3070,7 +3081,12 @@ Future<Map<String, dynamic>> followUser(String userIdToFollow) async {
       // If the `followers` list is currently loaded for `userIdToFollow` (the user who gained a follower)
       // Add `currentUserId` (the new follower) to this list.
       // We need a minimal representation of the current user.
-      var currentUserDataForList = allUsers.firstWhereOrNull((u) => u['_id'] == currentUserId);
+      Map<String, dynamic>? currentUserDataForList;
+      try {
+        currentUserDataForList = allUsers.firstWhere((u) => u['_id'] == currentUserId);
+      } catch (e) {
+        currentUserDataForList = null;
+      }
       if (currentUserDataForList == null && user.value['user']?['_id'] == currentUserId) {
           currentUserDataForList = {
             '_id': currentUserId,
@@ -3103,7 +3119,12 @@ Future<Map<String, dynamic>> followUser(String userIdToFollow) async {
 
       // If the `following` list is currently loaded for `currentUserId`
       // Add `userIdToFollow` (the user now being followed) to this list.
-      var targetUserDataForList = allUsers.firstWhereOrNull((u) => u['_id'] == userIdToFollow);
+      Map<String, dynamic>? targetUserDataForList;
+      try {
+        targetUserDataForList = allUsers.firstWhere((u) => u['_id'] == userIdToFollow);
+      } catch (e) {
+        targetUserDataForList = null;
+      }
       if (targetUserDataForList != null) {
         // Check if `_dataController.following` is for the `currentUserId`.
         // Similar to above, this needs context.
@@ -3420,7 +3441,12 @@ void clearUserPosts() {
     // If current user (`followerId`) followed `followedId`:
     // - Add `followedId` to `_dataController.following` if it's for `followerId`.
     // - Add `followerId` to `_dataController.followers` if it's for `followedId`.
-    var followedUserData = allUsers.firstWhereOrNull((u) => u['_id'] == followedId);
+    Map<String, dynamic>? followedUserData;
+    try {
+      followedUserData = allUsers.firstWhere((u) => u['_id'] == followedId);
+    } catch (e) {
+      followedUserData = null;
+    }
     if (followedUserData != null) {
         int idx = following.indexWhere((u) => u['_id'] == followedId);
         if (idx == -1) { // If not already in the `following` list of the current user (followerId)
@@ -3440,7 +3466,12 @@ void clearUserPosts() {
         }
     }
 
-    var followerUserData = allUsers.firstWhereOrNull((u) => u['_id'] == followerId);
+    Map<String, dynamic>? followerUserData;
+    try {
+      followerUserData = allUsers.firstWhere((u) => u['_id'] == followerId);
+    } catch (e) {
+      followerUserData = null;
+    }
      if (followerUserData != null) {
         int idx = followers.indexWhere((u) => u['_id'] == followerId);
         if (idx == -1) { // If `followerId` is not in the `followers` list of `followedId`
@@ -3944,11 +3975,16 @@ void clearUserPosts() {
 
     // Create a new chat with the target user if it doesn't exist
     // This logic might need to be adjusted based on how you create new chats
-    final existingChat = chats.values.firstWhereOrNull(
-      (chat) =>
-          chat['type'] == 'private' &&
-          (chat['participants'] as List).any((p) => p['_id'] == targetUserId),
-    );
+    Map<String, dynamic>? existingChat;
+    try {
+      existingChat = chats.values.firstWhere(
+        (chat) =>
+            chat['type'] == 'private' &&
+            (chat['participants'] as List).any((p) => p['_id'] == targetUserId),
+      );
+    } catch (e) {
+      existingChat = null;
+    }
 
     String? chatId;
     if (existingChat != null) {
