@@ -32,6 +32,8 @@ import 'dart:typed_data';
 import 'package:chatter/pages/users_list_page.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_linkify/flutter_linkify.dart';
+import 'package:chatter/widgets/link_preview_widget.dart';
+import 'package:linkify/linkify.dart' as linkify_helper;
 
 
 class ChatScreen extends StatefulWidget {
@@ -805,7 +807,7 @@ class _ChatScreenState extends State<ChatScreen> {
               const SizedBox(width: 8),
               Flexible(
                 child: Text(
-                  attachment['filename'],
+                  attachment['filename'] ?? 'PDF Document',
                   style: const TextStyle(color: Colors.white),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -1069,18 +1071,24 @@ class _ChatScreenState extends State<ChatScreen> {
               const SizedBox(height: 8),
           ],
           if (message['content'] != null && message['content']!.isNotEmpty)
-            Linkify(
-              onOpen: (link) async {
-                final uri = Uri.parse(link.url);
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri);
-                } else {
-                  throw 'Could not launch ${link.url}';
-                }
-              },
-              text: message['content']!,
-              style: TextStyle(color: isYou ? Colors.white : Colors.grey[200]),
-              linkStyle: const TextStyle(color: Colors.blue, decoration: TextDecoration.underline),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Linkify(
+                  onOpen: (link) async {
+                    final uri = Uri.parse(link.url);
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri);
+                    } else {
+                      throw 'Could not launch ${link.url}';
+                    }
+                  },
+                  text: message['content']!,
+                  style: TextStyle(color: isYou ? Colors.white : Colors.grey[200]),
+                  linkStyle: const TextStyle(color: Colors.blue, decoration: TextDecoration.underline),
+                ),
+                ..._extractUrlPreviews(message['content']!),
+              ],
             ),
         ],
         const SizedBox(height: 4),
@@ -1345,6 +1353,27 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       ),
     );
+  }
+
+  @override
+  List<Widget> _extractUrlPreviews(String text) {
+    final List<linkify_helper.LinkifyElement> elements = linkify_helper.linkify(
+      text,
+      options: const linkify_helper.LinkifyOptions(humanize: false),
+    );
+
+    final Set<String> urls = {};
+    for (var e in elements) {
+      if (e is linkify_helper.LinkableElement) {
+        urls.add(e.url);
+      }
+    }
+
+    if (urls.isEmpty) {
+      return [];
+    }
+
+    return urls.map((url) => LinkPreviewWidget(url: url)).toList();
   }
 
   @override
