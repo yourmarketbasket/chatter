@@ -127,11 +127,14 @@ class _PdfThumbnailWidgetState extends State<PdfThumbnailWidget> {
           );
         }
 
-        return Image.memory(
-          snapshot.data!,
-          fit: BoxFit.cover,
-          width: double.infinity,
-          height: double.infinity,
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(8.0),
+          child: Image.memory(
+            snapshot.data!,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+          ),
         );
       },
     );

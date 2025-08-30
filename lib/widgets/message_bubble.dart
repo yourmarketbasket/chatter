@@ -129,6 +129,10 @@ class _MessageBubbleState extends State<MessageBubble> {
     final List<linkify_helper.LinkifyElement> elements = linkify_helper.linkify(content, options: const linkify_helper.LinkifyOptions(humanize: false));
     final Set<String> urls = elements.whereType<linkify_helper.LinkableElement>().map((e) => e.url).toSet();
 
+    final bool isOnlyLinkWithPreview = elements.length == 1 &&
+        elements.first is linkify_helper.LinkableElement &&
+        _successfulPreviewUrls.contains((elements.first as linkify_helper.LinkableElement).url);
+
     final messageBubbleContent = Column(
       crossAxisAlignment: isYou ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       children: [
@@ -183,7 +187,7 @@ class _MessageBubbleState extends State<MessageBubble> {
             widget.buildAttachment(widget.message),
             if (content.isNotEmpty) const SizedBox(height: 8),
           ],
-          if (content.isNotEmpty)
+          if (content.isNotEmpty && !isOnlyLinkWithPreview)
             RichText(
               text: TextSpan(
                 style: TextStyle(color: isYou ? Colors.white : Colors.grey[200]),
@@ -231,7 +235,9 @@ class _MessageBubbleState extends State<MessageBubble> {
         children: [
           Container(
             margin: EdgeInsets.only(bottom: bottomMargin),
-            padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.0),
+            padding: isOnlyLinkWithPreview
+                ? EdgeInsets.zero
+                : const EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.0),
             constraints: BoxConstraints(
               maxWidth: MediaQuery.of(context).size.width * 0.55,
               minWidth: MediaQuery.of(context).size.width * 0.10,
