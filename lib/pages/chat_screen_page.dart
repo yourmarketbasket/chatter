@@ -358,14 +358,15 @@ class _ChatScreenState extends State<ChatScreen> {
                 _copyMessage(message);
               },
             ),
-          ListTile(
-            leading: const Icon(Icons.thumb_up, color: Colors.white),
-            title: const Text('React', style: TextStyle(color: Colors.white)),
-            onTap: () {
-              Navigator.pop(context);
-              _showReactionsDialog(message);
-            },
-          ),
+          if (dataController.currentChat.value['type'] != 'group')
+            ListTile(
+              leading: const Icon(Icons.thumb_up, color: Colors.white),
+              title: const Text('React', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                _showReactionsDialog(message);
+              },
+            ),
           if (message['senderId']['_id'] == dataController.user.value['user']['_id'])
             ListTile(
               leading: const Icon(Icons.edit, color: Colors.white),
@@ -443,12 +444,11 @@ class _ChatScreenState extends State<ChatScreen> {
               }
             },
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
               margin: const EdgeInsets.symmetric(horizontal: 2),
               decoration: BoxDecoration(
-                color: hasReacted ? Colors.tealAccent.withOpacity(0.5) : Colors.grey[800],
+                color: hasReacted ? Colors.teal[700] : Colors.grey[900],
                 borderRadius: BorderRadius.circular(12),
-                border: hasReacted ? Border.all(color: Colors.tealAccent, width: 1) : null,
               ),
               child: Text(
                 '$emoji $count',
