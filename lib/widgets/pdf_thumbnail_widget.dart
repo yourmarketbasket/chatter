@@ -88,7 +88,6 @@ class _PdfThumbnailWidgetState extends State<PdfThumbnailWidget> {
     } finally {
       // Dispose resources
       pageImage?.dispose();
-      page?.dispose();
       // Assuming dispose() is the correct method for the older version
       doc?.dispose();
     }
