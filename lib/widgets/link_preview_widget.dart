@@ -42,25 +42,24 @@ class _LinkPreviewWidgetState extends State<LinkPreviewWidget> {
 
   String _getDomain(String url) {
     try {
-      // Normalize the URL to handle various inputs
-      String normalizedUrl = url.trim();
-      bool hasScheme = normalizedUrl.startsWith('http://') || normalizedUrl.startsWith('https://');
+      Uri uri = Uri.parse(url);
 
-      if (!hasScheme) {
-        // This is a bare domain like 'codethelabs.com' or 'www.codethelabs.com'.
-        // The user wants to force 'www.' in this case.
-        String hostPart = normalizedUrl.split('/')[0]; // Get the host part before any path
-        if (!hostPart.startsWith('www.')) {
-          hostPart = 'www.$hostPart';
-        }
-        return 'https://$hostPart';
-      } else {
-        // The URL already has a scheme. Use its origin.
-        final uri = Uri.parse(normalizedUrl);
-        return uri.origin;
+      // If the link is http, upgrade it to https.
+      if (uri.scheme == 'http') {
+        uri = uri.replace(scheme: 'https');
       }
+      // If there is no scheme (e.g. from a bare domain that linkify missed), add https.
+      else if (!uri.hasScheme) {
+        // Uri.parse('example.com') results in a Uri with empty scheme and host, and path 'example.com'.
+        // We need to handle this case by prepending the scheme.
+        return 'https://$url';
+      }
+
+      // Return the origin (scheme + host) of the (potentially upgraded) URI.
+      return uri.origin;
     } catch (e) {
-      return url; // Fallback
+      // If parsing fails, it's likely a bare domain. Just prepend https as a fallback.
+      return 'https://$url';
     }
   }
 
