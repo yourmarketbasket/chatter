@@ -4001,6 +4001,25 @@ void clearUserPosts() {
   }
 
   Future<void> addReaction(String messageId, String emoji) async {
+    // Optimistic UI Update
+    final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
+    if (messageIndex != -1) {
+      final message = currentConversationMessages[messageIndex];
+      final reactions = List<Map<String, dynamic>>.from(message['reactions'] ?? []);
+      final myReactionIndex = reactions.indexWhere((r) => r['userId'] == getUserId());
+
+      if (myReactionIndex != -1) {
+        // User is changing their reaction
+        reactions[myReactionIndex]['emoji'] = emoji;
+      } else {
+        // User is adding a new reaction
+        reactions.add({'userId': getUserId(), 'emoji': emoji});
+      }
+      message['reactions'] = reactions;
+      currentConversationMessages[messageIndex] = message;
+      currentConversationMessages.refresh();
+    }
+
     try {
       final token = user.value['token'];
       if (token == null) {
@@ -4015,6 +4034,22 @@ void clearUserPosts() {
       );
     } catch (e) {
       // print('Error adding reaction: $e');
+      // Here you might want to revert the optimistic update on failure
+    }
+  }
+
+  void handleMessageReaction(Map<String, dynamic> data) {
+    final messageId = data['messageId'] as String?;
+    final reactions = data['reactions'] as List<dynamic>?;
+
+    if (messageId == null || reactions == null) return;
+
+    final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
+    if (messageIndex != -1) {
+      final message = currentConversationMessages[messageIndex];
+      message['reactions'] = reactions;
+      currentConversationMessages[messageIndex] = message;
+      currentConversationMessages.refresh();
     }
   }
 

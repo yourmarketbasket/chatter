@@ -102,7 +102,7 @@ class SocketService {
       'message:update': (data) => _handleMessageUpdate(data),
       'message:delete': (data) => _handleMessageDelete(data),
       'message:statusUpdate': (data) => _handleMessageStatusUpdate(data),
-      'message:reaction': (data) => _handleNewMessage(data),
+      'message:reaction': (data) => _handleMessageReaction(data),
       'chat:deletedForMe': (data) => _handleChatDeleted(data, 'chat:deletedForMe'),
       'chat:hardDeleted': (data) => _handleChatDeleted(data, 'chat:hardDeleted'),
       'typing:started': (data) => _handleTyping(data, true),
@@ -333,6 +333,13 @@ class SocketService {
       _eventController.add({'event': 'message:statusUpdate', 'data': data});
     } else {
         // print('SocketService: Invalid message:statusUpdate data format: ${data.runtimeType}');
+    }
+  }
+
+  void _handleMessageReaction(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      _dataController.handleMessageReaction(data);
+      _eventController.add({'event': 'message:reaction', 'data': data});
     }
   }
   // End of message events
