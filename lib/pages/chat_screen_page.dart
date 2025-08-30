@@ -410,7 +410,13 @@ class _ChatScreenState extends State<ChatScreen> {
     final groupedReactions = <String, List<String>>{};
     for (var reaction in reactions) {
       final emoji = reaction['emoji'] as String;
-      final userId = reaction['userId'] as String;
+      final userIdValue = reaction['userId'];
+      final String userId;
+      if (userIdValue is Map) {
+        userId = userIdValue['_id'] as String;
+      } else {
+        userId = userIdValue as String;
+      }
       if (groupedReactions.containsKey(emoji)) {
         groupedReactions[emoji]!.add(userId);
       } else {
