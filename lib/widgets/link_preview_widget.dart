@@ -41,13 +41,9 @@ class _LinkPreviewWidgetState extends State<LinkPreviewWidget> {
       if (!uri.hasScheme) {
         uri = Uri.parse('https://$url');
       }
-      // The user wants something like "www.codethelabs.com" from "codethelabs.com/assets/files/chatter.apk"
-      String host = uri.host;
-      if (host.isEmpty) return url;
-      if (!host.startsWith('www.')) {
-        host = 'www.$host';
-      }
-      return 'https://$host';
+      // Return 'scheme://host' which is the base URL. e.g., 'https://www.example.com'
+      // This is more robust than forcing 'www.'
+      return uri.origin;
     } catch (e) {
       return url; // Fallback to original url
     }
