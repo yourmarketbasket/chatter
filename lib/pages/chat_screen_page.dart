@@ -917,7 +917,7 @@ class _ChatScreenState extends State<ChatScreen> {
     padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.0),
     constraints: BoxConstraints(
       maxWidth: MediaQuery.of(context).size.width * 0.55,
-      minWidth: MediaQuery.of(context).size.width * 0.25,
+      minWidth: MediaQuery.of(context).size.width * 0.10,
     ),
     decoration: BoxDecoration(
       color: isYou ? Colors.transparent.withOpacity(0.2) : Colors.transparent,
@@ -930,32 +930,26 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
     ),
     child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: isYou ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       children: [
         if (dataController.currentChat.value['type'] == 'group' && !isYou)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 4.0),
-              child: Text(
-                senderName,
-                style: const TextStyle(
-                  color: Colors.tealAccent,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4.0),
+            child: Text(
+              senderName,
+              style: const TextStyle(
+                color: Colors.tealAccent,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
               ),
             ),
           ),
         if (message['deletedForEveryone'] ?? false)
-          Align(
-            alignment: isYou ? Alignment.centerRight : Alignment.centerLeft,
-            child: Text(
-              'Message deleted',
-              style: TextStyle(
-                color: Colors.grey[400],
-                fontStyle: FontStyle.italic,
-              ),
+          Text(
+            'Message deleted',
+            style: TextStyle(
+              color: Colors.grey[400],
+              fontStyle: FontStyle.italic,
             ),
           )
         else ...[
@@ -1038,35 +1032,32 @@ class _ChatScreenState extends State<ChatScreen> {
               );
             }),
           if (message['type'] == 'voice')
-            Align(
-              alignment: isYou ? Alignment.centerRight : Alignment.centerLeft,
-              child: Stack(
-                alignment: Alignment.topRight,
-                children: [
-                  GestureDetector(
-                    onTap: () => _openMediaView(message, 0),
-                    child: AudioWaveformWidget(
-                      audioPath: message['files'][0]['url'],
-                      isLocal: !(message['files'][0]['url'] as String).startsWith('http'),
+            Stack(
+              alignment: Alignment.topRight,
+              children: [
+                GestureDetector(
+                  onTap: () => _openMediaView(message, 0),
+                  child: AudioWaveformWidget(
+                    audioPath: message['files'][0]['url'],
+                    isLocal: !(message['files'][0]['url'] as String).startsWith('http'),
+                  ),
+                ),
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.open_in_new,
+                      color: Colors.white,
+                      size: 18,
                     ),
                   ),
-                  Positioned(
-                    top: 4,
-                    right: 4,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.5),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.open_in_new,
-                        color: Colors.white,
-                        size: 18,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           if (hasAttachment && message['type'] != 'voice') ...[
             _buildAttachment(message),
@@ -1074,57 +1065,50 @@ class _ChatScreenState extends State<ChatScreen> {
               const SizedBox(height: 8),
           ],
           if (message['content'] != null && message['content']!.isNotEmpty)
-            Align(
-              alignment: isYou ? Alignment.centerRight : Alignment.centerLeft,
-              child: Linkify(
-                onOpen: (link) async {
-                  final uri = Uri.parse(link.url);
-                  if (await canLaunchUrl(uri)) {
-                    await launchUrl(uri);
-                  } else {
-                    throw 'Could not launch ${link.url}';
-                  }
-                },
-                text: message['content']!,
-                style: TextStyle(color: isYou ? Colors.white : Colors.grey[200]),
-                linkStyle: const TextStyle(color: Colors.blue, decoration: TextDecoration.underline),
-                textAlign: isYou ? TextAlign.right : TextAlign.left,
-              ),
+            Linkify(
+              onOpen: (link) async {
+                final uri = Uri.parse(link.url);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri);
+                } else {
+                  throw 'Could not launch ${link.url}';
+                }
+              },
+              text: message['content']!,
+              style: TextStyle(color: isYou ? Colors.white : Colors.grey[200]),
+              linkStyle: const TextStyle(color: Colors.blue, decoration: TextDecoration.underline),
             ),
         ],
         const SizedBox(height: 4),
-        Align(
-          alignment: isYou ? Alignment.centerRight : Alignment.centerLeft,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (message['edited'] ?? false)
-                Text(
-                  '(edited) ',
-                  style: TextStyle(
-                    color: Colors.grey[400],
-                    fontSize: 10,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (message['edited'] ?? false)
               Text(
-                DateFormat('h:mm a').format(DateTime.parse(message['createdAt']).toLocal()),
-                style: GoogleFonts.roboto(
+                '(edited) ',
+                style: TextStyle(
                   color: Colors.grey[400],
-                  fontSize: 9,
+                  fontSize: 10,
                   fontStyle: FontStyle.italic,
                 ),
               ),
-              if (isYou) ...[
-                const SizedBox(width: 4),
-                Icon(
-                  _getStatusIcon(_getAggregateStatus(message)),
-                  size: 12,
-                  color: _getStatusColor(_getAggregateStatus(message)),
-                ),
-              ],
+            Text(
+              DateFormat('h:mm a').format(DateTime.parse(message['createdAt']).toLocal()),
+              style: GoogleFonts.roboto(
+                color: Colors.grey[400],
+                fontSize: 9,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            if (isYou) ...[
+              const SizedBox(width: 4),
+              Icon(
+                _getStatusIcon(_getAggregateStatus(message)),
+                size: 12,
+                color: _getStatusColor(_getAggregateStatus(message)),
+              ),
             ],
-          ),
+          ],
         ),
       ],
     ),
