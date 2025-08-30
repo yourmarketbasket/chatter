@@ -75,7 +75,8 @@ class ChatterApp extends StatefulWidget {
 class _ChatterAppState extends State<ChatterApp> {
   late FlutterSecureStorage _storage;
   final  DataController _dataController = Get.put(DataController());
-  late ShareHandler _shareHandler;
+  late StreamSubscription _shareSubscription;
+  SharedMedia? _sharedMedia;
 
   @override
   void initState() {
@@ -92,23 +93,33 @@ class _ChatterAppState extends State<ChatterApp> {
     );
     // Check initial screen after initialization
     _checkInitialScreen();
+    _initShareHandler();
+  }
 
-    _shareHandler = ShareHandler.instance;
-    _shareHandler.onRecieveShare.listen((SharedAttachment attachment) {
-      setState(() {
-        _handleSharedData(attachment);
-      });
+  Future<void> _initShareHandler() async {
+    final handler = ShareHandlerPlatform.instance;
+    _sharedMedia = await handler.getInitialSharedMedia();
+
+    if (_sharedMedia != null) {
+      _handleSharedData(_sharedMedia!);
+    }
+
+    _shareSubscription = handler.sharedMediaStream.listen((SharedMedia media) {
+      _handleSharedData(media);
     });
   }
 
-  void _handleSharedData(SharedAttachment attachment) {
+  void _handleSharedData(SharedMedia sharedMedia) {
     Get.to(() => UsersListPage(
-          sharedData: attachment,
+          sharedData: sharedMedia,
           onUserSelected: (user) {
+            final attachment = sharedMedia.attachments?.first;
+            if (attachment == null) return;
+
             if (attachment.type == SharedAttachmentType.text) {
               _dataController.sendChatMessage({
                 'chatId': user['chatId'],
-                'content': attachment.path,
+                'content': sharedMedia.content,
                 'type': 'text',
                 'senderId': _dataController.user.value['user']['_id'],
                 'participants': [
@@ -129,23 +140,25 @@ class _ChatterAppState extends State<ChatterApp> {
               }, null);
             }
             else {
-              final file = PlatformFile(
-                name: attachment.path.split('/').last,
-                path: attachment.path,
-                size: 0,
-              );
+              final files = sharedMedia.attachments!
+                  .map((attachment) => PlatformFile(
+                        name: attachment.path.split('/').last,
+                        path: attachment.path,
+                        size: 0,
+                      ))
+                  .toList();
               _dataController.sendChatMessage({
                 'chatId': user['chatId'],
-                'content': '',
+                'content': sharedMedia.content,
                 'type': 'attachment',
-                'files': [
-                  {
-                    'url': file.path,
-                    'type': _dataController.getMediaType(file.extension ?? ''),
-                    'size': file.size,
-                    'filename': file.name,
-                  }
-                ],
+                'files': files
+                    .map((file) => {
+                          'url': file.path,
+                          'type': _dataController.getMediaType(file.extension ?? ''),
+                          'size': file.size,
+                          'filename': file.name,
+                        })
+                    .toList(),
                 'senderId': _dataController.user.value['user']['_id'],
                 'participants': [
                   _dataController.user.value['user']['_id'],
@@ -181,7 +194,7 @@ class _ChatterAppState extends State<ChatterApp> {
     final socketService = Get.find<SocketService>();
     socketService.disconnect();
     socketService.dispose();
-    _shareHandler.close();
+    _shareSubscription.cancel();
     super.dispose();
   }
 
