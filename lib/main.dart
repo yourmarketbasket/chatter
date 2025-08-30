@@ -75,8 +75,7 @@ class ChatterApp extends StatefulWidget {
 class _ChatterAppState extends State<ChatterApp> {
   late FlutterSecureStorage _storage;
   final  DataController _dataController = Get.put(DataController());
-  late StreamSubscription _mediaStreamSubscription;
-  late StreamSubscription _textStreamSubscription;
+  late StreamSubscription _intentDataStreamSubscription;
 
   @override
   void initState() {
@@ -94,8 +93,8 @@ class _ChatterAppState extends State<ChatterApp> {
     // Check initial screen after initialization
     _checkInitialScreen();
 
-    // For sharing media files coming from outside the app while it is in the memory
-    _mediaStreamSubscription = ReceiveSharingIntent.getMediaStream()
+    // For sharing any data coming from outside the app while it is in the memory
+    _intentDataStreamSubscription = ReceiveSharingIntent.instance.getMediaStream()
         .listen((List<SharedMediaFile> value) {
       setState(() {
         _handleSharedData(value);
@@ -104,52 +103,47 @@ class _ChatterAppState extends State<ChatterApp> {
       print("getIntentDataStream error: $err");
     });
 
-    // For sharing media files coming from outside the app while it is closed
-    ReceiveSharingIntent.getInitialMedia().then((List<SharedMediaFile> value) {
+    // For sharing any data coming from outside the app while it is closed
+    ReceiveSharingIntent.instance.getInitialMedia().then((List<SharedMediaFile> value) {
       setState(() {
         if (value.isNotEmpty) {
           _handleSharedData(value);
         }
       });
     });
-
-    // For sharing text coming from outside the app while it is in the memory
-    _textStreamSubscription =
-        ReceiveSharingIntent.getTextStream().listen((String value) {
-      setState(() {
-        _handleSharedData(value);
-      });
-    }, onError: (err) {
-      print("getLinkStream error: $err");
-    });
-
-    // For sharing text coming from outside the app while it is closed
-    ReceiveSharingIntent.getInitialText().then((String? value) {
-      setState(() {
-        if (value != null) {
-          _handleSharedData(value);
-        }
-      });
-    });
   }
 
-  void _handleSharedData(dynamic sharedData) {
+  void _handleSharedData(List<SharedMediaFile> sharedFiles) {
+    if (sharedFiles.isEmpty) return;
+
     Get.to(() => UsersListPage(
-          sharedData: sharedData,
+          sharedData: sharedFiles,
           onUserSelected: (user) {
-            if (sharedData is String) {
+            final file = sharedFiles.first;
+            if (file.type == SharedMediaType.text) {
               _dataController.sendChatMessage({
                 'chatId': user['chatId'],
-                'content': sharedData,
-                'type': sharedData.startsWith('geo:') ? 'location' : 'text',
+                'content': file.path,
+                'type': 'text',
                 'senderId': _dataController.user.value['user']['_id'],
                 'participants': [
                   _dataController.user.value['user']['_id'],
                   user['_id']
                 ],
               }, null);
-            } else if (sharedData is List<SharedMediaFile>) {
-              final files = sharedData
+            } else if (file.type == SharedMediaType.url) {
+              _dataController.sendChatMessage({
+                'chatId': user['chatId'],
+                'content': file.path,
+                'type': 'location',
+                'senderId': _dataController.user.value['user']['_id'],
+                'participants': [
+                  _dataController.user.value['user']['_id'],
+                  user['_id']
+                ],
+              }, null);
+            } else {
+              final files = sharedFiles
                   .map((file) => PlatformFile(
                         name: file.path.split('/').last,
                         path: file.path,
@@ -204,8 +198,7 @@ class _ChatterAppState extends State<ChatterApp> {
     final socketService = Get.find<SocketService>();
     socketService.disconnect();
     socketService.dispose();
-    _mediaStreamSubscription.cancel();
-    _textStreamSubscription.cancel();
+    _intentDataStreamSubscription.cancel();
     super.dispose();
   }
 
