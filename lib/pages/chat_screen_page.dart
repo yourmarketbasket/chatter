@@ -954,6 +954,7 @@ class _ChatScreenState extends State<ChatScreen> {
               fontStyle: FontStyle.italic,
             ),
           )
+          // more changes
         else ...[
           if (message['replyTo'] != null)
             Obx(() {
