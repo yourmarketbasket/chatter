@@ -20,6 +20,7 @@ import 'package:chatter/helpers/timeago_helpers.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'dart:async';
 import 'package:chatter/pages/users_list_page.dart';
+import 'package:file_picker/file_picker.dart';
 // import 'package:device_info_plus/device_info_plus.dart'; // No longer needed for player selection
 // import 'dart:io'; // No longer needed for player selection (Platform check)
 
@@ -74,7 +75,8 @@ class ChatterApp extends StatefulWidget {
 class _ChatterAppState extends State<ChatterApp> {
   late FlutterSecureStorage _storage;
   final  DataController _dataController = Get.put(DataController());
-  late StreamSubscription _intentDataStreamSubscription;
+  late StreamSubscription _mediaStreamSubscription;
+  late StreamSubscription _textStreamSubscription;
 
   @override
   void initState() {
@@ -92,8 +94,8 @@ class _ChatterAppState extends State<ChatterApp> {
     // Check initial screen after initialization
     _checkInitialScreen();
 
-    // For sharing or opening urls/text coming from outside the app while it is in the memory
-    _intentDataStreamSubscription = ReceiveSharingIntent.getMediaStream()
+    // For sharing media files coming from outside the app while it is in the memory
+    _mediaStreamSubscription = ReceiveSharingIntent.getMediaStream()
         .listen((List<SharedMediaFile> value) {
       setState(() {
         _handleSharedData(value);
@@ -102,7 +104,7 @@ class _ChatterAppState extends State<ChatterApp> {
       print("getIntentDataStream error: $err");
     });
 
-    // For sharing or opening urls/text coming from outside the app while it is closed
+    // For sharing media files coming from outside the app while it is closed
     ReceiveSharingIntent.getInitialMedia().then((List<SharedMediaFile> value) {
       setState(() {
         if (value.isNotEmpty) {
@@ -111,8 +113,8 @@ class _ChatterAppState extends State<ChatterApp> {
       });
     });
 
-    // For sharing or opening urls/text coming from outside the app while it is in the memory
-    _intentDataStreamSubscription =
+    // For sharing text coming from outside the app while it is in the memory
+    _textStreamSubscription =
         ReceiveSharingIntent.getTextStream().listen((String value) {
       setState(() {
         _handleSharedData(value);
@@ -121,7 +123,7 @@ class _ChatterAppState extends State<ChatterApp> {
       print("getLinkStream error: $err");
     });
 
-    // For sharing or opening urls/text coming from outside the app while it is closed
+    // For sharing text coming from outside the app while it is closed
     ReceiveSharingIntent.getInitialText().then((String? value) {
       setState(() {
         if (value != null) {
@@ -132,55 +134,28 @@ class _ChatterAppState extends State<ChatterApp> {
   }
 
   void _handleSharedData(dynamic sharedData) {
-    if (sharedData is String) {
-      // Handle text and geo URIs
-      if (sharedData.startsWith('geo:')) {
-        // Handle location
-        Get.to(() => UsersListPage(
-              onUserSelected: (user) {
-                _dataController.sendChatMessage({
-                  'chatId': user['chatId'],
-                  'content': sharedData,
-                  'type': 'location',
-                  'senderId': _dataController.user.value['user']['_id'],
-                  'participants': [
-                    _dataController.user.value['user']['_id'],
-                    user['_id']
-                  ],
-                }, null);
-                Get.back();
-              },
-            ));
-      } else {
-        // Handle text
-        Get.to(() => UsersListPage(
-              onUserSelected: (user) {
-                _dataController.sendChatMessage({
-                  'chatId': user['chatId'],
-                  'content': sharedData,
-                  'type': 'text',
-                  'senderId': _dataController.user.value['user']['_id'],
-                  'participants': [
-                    _dataController.user.value['user']['_id'],
-                    user['_id']
-                  ],
-                }, null);
-                Get.back();
-              },
-            ));
-      }
-    } else if (sharedData is List<SharedMediaFile>) {
-      // Handle files
-      final files = sharedData
-          .map((file) => PlatformFile(
-                name: file.path.split('/').last,
-                path: file.path,
-                size: 0, // Size is not available from the intent
-              ))
-          .toList();
-
-      Get.to(() => UsersListPage(
-            onUserSelected: (user) {
+    Get.to(() => UsersListPage(
+          sharedData: sharedData,
+          onUserSelected: (user) {
+            if (sharedData is String) {
+              _dataController.sendChatMessage({
+                'chatId': user['chatId'],
+                'content': sharedData,
+                'type': sharedData.startsWith('geo:') ? 'location' : 'text',
+                'senderId': _dataController.user.value['user']['_id'],
+                'participants': [
+                  _dataController.user.value['user']['_id'],
+                  user['_id']
+                ],
+              }, null);
+            } else if (sharedData is List<SharedMediaFile>) {
+              final files = sharedData
+                  .map((file) => PlatformFile(
+                        name: file.path.split('/').last,
+                        path: file.path,
+                        size: 0,
+                      ))
+                  .toList();
               _dataController.sendChatMessage({
                 'chatId': user['chatId'],
                 'content': '',
@@ -188,7 +163,8 @@ class _ChatterAppState extends State<ChatterApp> {
                 'files': files
                     .map((file) => {
                           'url': file.path,
-                          'type': _dataController.getMediaType(file.extension ?? ''),
+                          'type':
+                              _dataController.getMediaType(file.extension ?? ''),
                           'size': file.size,
                           'filename': file.name,
                         })
@@ -199,10 +175,10 @@ class _ChatterAppState extends State<ChatterApp> {
                   user['_id']
                 ],
               }, null);
-              Get.back();
-            },
-          ));
-    }
+            }
+            Get.back();
+          },
+        ));
   }
 
   Future<void> _checkInitialScreen() async {
@@ -228,7 +204,8 @@ class _ChatterAppState extends State<ChatterApp> {
     final socketService = Get.find<SocketService>();
     socketService.disconnect();
     socketService.dispose();
-    _intentDataStreamSubscription.cancel();
+    _mediaStreamSubscription.cancel();
+    _textStreamSubscription.cancel();
     super.dispose();
   }
 

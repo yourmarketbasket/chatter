@@ -3971,7 +3971,7 @@ void clearUserPosts() {
         throw Exception('User not authenticated');
       }
       await _dio.post(
-        'api/messages/$messageId/react',
+        'api/messages/$messageId/reactions',
         data: {'emoji': emoji},
         options: dio.Options(
           headers: {'Authorization': 'Bearer $token'},

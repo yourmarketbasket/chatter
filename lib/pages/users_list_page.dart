@@ -10,7 +10,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:chatter/widgets/app_drawer.dart';
 
 class UsersListPage extends StatefulWidget {
-  const UsersListPage({Key? key}) : super(key: key);
+  final Function(Map<String, dynamic>)? onUserSelected;
+  final dynamic sharedData;
+
+  const UsersListPage({Key? key, this.onUserSelected, this.sharedData}) : super(key: key);
 
   @override
   _UsersListPageState createState() => _UsersListPageState();
@@ -400,7 +403,9 @@ class _UsersListPageState extends State<UsersListPage> {
                         );
                       }),
                       onTap: () async {
-                        if (_isGroupCreationMode) {
+                        if (widget.onUserSelected != null) {
+                          widget.onUserSelected!(user);
+                        } else if (_isGroupCreationMode) {
                           setState(() {
                             if (_selectedUsers.any((u) => u['_id'] == userId)) {
                               _selectedUsers.removeWhere((u) => u['_id'] == userId);
