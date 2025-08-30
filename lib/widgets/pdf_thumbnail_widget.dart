@@ -1,9 +1,11 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:pdf_render/pdf_render.dart';
+import 'package:pdfrx/pdfrx.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
+import 'package:image/image.dart' as img;
 
 class PdfThumbnailWidget extends StatefulWidget {
   final String url;
@@ -20,7 +22,7 @@ class PdfThumbnailWidget extends StatefulWidget {
 }
 
 class _PdfThumbnailWidgetState extends State<PdfThumbnailWidget> {
-  late Future<PdfPageImage?> _thumbnailFuture;
+  late Future<Uint8List?> _thumbnailFuture;
 
   @override
   void initState() {
@@ -28,42 +30,58 @@ class _PdfThumbnailWidgetState extends State<PdfThumbnailWidget> {
     _thumbnailFuture = _generateThumbnail();
   }
 
-  Future<PdfPageImage?> _generateThumbnail() async {
+  Future<Uint8List?> _generateThumbnail() async {
+    PdfDocument? doc;
     try {
-      PdfDocument doc;
       if (widget.isLocal) {
         doc = await PdfDocument.openFile(widget.url);
       } else {
-        // For network URLs, we need to download the file first.
         final response = await http.get(Uri.parse(widget.url));
         if (response.statusCode == 200) {
-          final dir = await getTemporaryDirectory();
-          // Use a unique name to avoid conflicts
-          final filename = '${DateTime.now().millisecondsSinceEpoch}_${p.basename(widget.url)}';
-          final file = File(p.join(dir.path, filename));
-          await file.writeAsBytes(response.bodyBytes);
-          doc = await PdfDocument.openFile(file.path);
+          doc = await PdfDocument.openData(response.bodyBytes);
         } else {
           throw Exception('Failed to download PDF: ${response.statusCode}');
         }
       }
 
-      if (doc.pageCount > 0) {
-        final page = await doc.getPage(1); // 1-based index
-        final pageImage = await page.render();
-        await page.dispose(); // It's good practice to dispose the page
-        return pageImage;
+      if (doc == null || doc.pageCount == 0) {
+        return null;
       }
-      return null;
+
+      final page = await doc.getPage(1);
+      // Render the page to an image
+      final pageImage = await page.render(
+        width: page.width * 2, // Render at a higher resolution for better quality
+        height: page.height * 2,
+      );
+
+      if (pageImage == null) {
+        return null;
+      }
+
+      // Convert to a format that the image package can use
+      final image = img.Image.fromBytes(
+        width: pageImage.width,
+        height: pageImage.height,
+        bytes: pageImage.pixels.buffer,
+        format: img.Format.bgra, // PDFium renders in BGRA format
+      );
+
+      // Encode to PNG
+      final pngBytes = img.encodePng(image);
+
+      return pngBytes;
     } catch (e) {
-      print('Error generating PDF thumbnail: $e');
+      print('Error generating PDF thumbnail with pdfrx: $e');
       return null;
+    } finally {
+      await doc?.close();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<PdfPageImage?>(
+    return FutureBuilder<Uint8List?>(
       future: _thumbnailFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -95,9 +113,8 @@ class _PdfThumbnailWidgetState extends State<PdfThumbnailWidget> {
           );
         }
 
-        final pageImage = snapshot.data!;
         return Image.memory(
-          pageImage.bytes,
+          snapshot.data!,
           fit: BoxFit.cover,
           width: double.infinity,
           height: double.infinity,
