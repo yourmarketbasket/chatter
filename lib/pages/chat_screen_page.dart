@@ -426,7 +426,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     return Positioned(
-      bottom: -10, // Positioned to stack on top of the bottom border
+      bottom: -8, // Centered on the border
       left: isYou ? 10 : null,   // Swapped for "You"
       right: isYou ? null : 10,  // Swapped for "others"
       child: Row(
@@ -1547,12 +1547,15 @@ class _ChatScreenState extends State<ChatScreen> {
                             dataController.markMessageAsRead(message);
                           }
                         },
-                        child: Align(
-                          alignment: message['senderId']['_id'] ==
-                                  dataController.user.value['user']['_id']
-                              ? Alignment.centerRight
-                              : Alignment.centerLeft,
-                          child: _buildMessageContent(message, prevMessage),
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 12.0),
+                          child: Align(
+                            alignment: message['senderId']['_id'] ==
+                                    dataController.user.value['user']['_id']
+                                ? Alignment.centerRight
+                                : Alignment.centerLeft,
+                            child: _buildMessageContent(message, prevMessage),
+                          ),
                         ),
                       );
                     }
