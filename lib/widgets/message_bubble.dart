@@ -80,17 +80,24 @@ class _MessageBubbleState extends State<MessageBubble> {
     final spans = <TextSpan>[];
     final elements = linkify_helper.linkify(text, options: const linkify_helper.LinkifyOptions(humanize: false));
 
+    // Check if the text contains only a single URL
+    final isOnlyUrl = elements.length == 1 && elements.first is linkify_helper.LinkableElement;
+
     for (final e in elements) {
       if (e is linkify_helper.LinkableElement) {
-        // If a preview exists for this URL, render the text plainly.
+        // If text contains only a URL, skip adding it to spans
+        if (isOnlyUrl) {
+          continue;
+        }
+        // If a preview exists for this URL, render the text plainly
         if (_successfulPreviewUrls.contains(e.url)) {
           spans.add(TextSpan(text: e.text));
         } else {
-          // Otherwise, render it as a clickable link.
+          // Otherwise, render it as a clickable link
           spans.add(
             TextSpan(
               text: e.text,
-              style: const TextStyle(color: Colors.blue, decoration: TextDecoration.underline),
+              style: const TextStyle(color: Colors.tealAccent, decoration: TextDecoration.underline),
               recognizer: TapGestureRecognizer()..onTap = () => _onOpenLink(e.url),
             ),
           );
@@ -100,7 +107,7 @@ class _MessageBubbleState extends State<MessageBubble> {
       }
     }
     return spans;
-  }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -138,7 +145,7 @@ class _MessageBubbleState extends State<MessageBubble> {
       children: [
         if (widget.dataController.currentChat.value['type'] == 'group' && !isYou)
           Padding(
-            padding: const EdgeInsets.only(bottom: 4.0),
+            padding: const EdgeInsets.only(bottom: 2.0),
             child: Text(senderName, style: const TextStyle(color: Colors.tealAccent, fontWeight: FontWeight.bold, fontSize: 12)),
           ),
         if (widget.message['deletedForEveryone'] ?? false)
@@ -152,15 +159,15 @@ class _MessageBubbleState extends State<MessageBubble> {
               );
               if (originalMessage['_id'].isEmpty) return const SizedBox.shrink();
               return Container(
-                margin: const EdgeInsets.only(bottom: 8.0),
+                margin: const EdgeInsets.all(8.0),
                 padding: const EdgeInsets.all(8.0),
                 decoration: BoxDecoration(
                   color: Colors.grey[900]?.withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(10),
                   border: Border(left: BorderSide(color: isYou ? Colors.teal : Colors.grey, width: 2)),
                 ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment:  CrossAxisAlignment.start,
                   children: [
                     Text(
                       originalMessage['senderId']['_id'] == widget.dataController.user.value['user']['_id']
@@ -184,16 +191,12 @@ class _MessageBubbleState extends State<MessageBubble> {
               );
             }),
           if (hasAttachment) ...[
-            widget.buildAttachment(widget.message),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: widget.buildAttachment(widget.message),
+            ),
             if (content.isNotEmpty) const SizedBox(height: 8),
           ],
-          if (content.isNotEmpty && !isOnlyLinkWithPreview)
-            RichText(
-              text: TextSpan(
-                style: TextStyle(color: isYou ? Colors.white : Colors.grey[200]),
-                children: _buildTextSpans(content, isYou),
-              ),
-            ),
           ...urls.map((url) => LinkPreviewWidget(
                 url: url,
                 onPreviewSuccess: () {
@@ -206,22 +209,36 @@ class _MessageBubbleState extends State<MessageBubble> {
                   });
                 },
               )),
+          if (content.isNotEmpty && !isOnlyLinkWithPreview)
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0, left: 8, right:8),
+              child: RichText(
+                textAlign: isYou ? TextAlign.right : TextAlign.left,
+                text: TextSpan(
+                  style: TextStyle(color: isYou ? Colors.white : Colors.grey[200], fontSize: 12),
+                  children: _buildTextSpans(content, isYou),
+                ),
+              ),
+            ),
         ],
         const SizedBox(height: 4),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (widget.message['edited'] ?? false)
-              Text('(edited) ', style: TextStyle(color: Colors.grey[400], fontSize: 10, fontStyle: FontStyle.italic)),
-            Text(
-              DateFormat('h:mm a').format(DateTime.parse(widget.message['createdAt']).toLocal()),
-              style: GoogleFonts.roboto(color: Colors.grey[400], fontSize: 9, fontStyle: FontStyle.italic),
-            ),
-            if (isYou) ...[
-              const SizedBox(width: 4),
-              Icon(_getStatusIcon(_getAggregateStatus(widget.message)), size: 12, color: _getStatusColor(_getAggregateStatus(widget.message))),
+        Padding(
+          padding: const EdgeInsets.only(left:10.0, right: 10.0, bottom:5),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (widget.message['edited'] ?? false)
+                Text('(edited) ', style: TextStyle(color: Colors.grey[400], fontSize: 10, fontStyle: FontStyle.italic)),
+              Text(
+                DateFormat('h:mm a').format(DateTime.parse(widget.message['createdAt']).toLocal()),
+                style: GoogleFonts.roboto(color: Colors.grey[400], fontSize: 9, fontStyle: FontStyle.italic),
+              ),
+              if (isYou) ...[
+                const SizedBox(width: 4),
+                Icon(_getStatusIcon(_getAggregateStatus(widget.message)), size: 12, color: _getStatusColor(_getAggregateStatus(widget.message))),
+              ],
             ],
-          ],
+          ),
         ),
       ],
     );
@@ -237,7 +254,7 @@ class _MessageBubbleState extends State<MessageBubble> {
             margin: EdgeInsets.only(bottom: bottomMargin),
             padding: isOnlyLinkWithPreview
                 ? EdgeInsets.zero
-                : const EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.0),
+                : const EdgeInsets.symmetric(horizontal: 1.0, vertical: 1.0),
             constraints: BoxConstraints(
               maxWidth: MediaQuery.of(context).size.width * 0.55,
               minWidth: MediaQuery.of(context).size.width * 0.10,

@@ -29,13 +29,11 @@ class _LinkPreviewWidgetState extends State<LinkPreviewWidget> {
   Future<Metadata?> _fetchMetadata() async {
     try {
       var urlToFetch = _getDomain(widget.url);
-      // aHR0cHM6Ly9jb3JzLWFueXdoZXJlLmhlcm9rdWFwcC5jb20v is the base64 of https://cors-anywhere.herokuapp.com/
       return await AnyLinkPreview.getMetadata(
         link: urlToFetch,
         cache: const Duration(days: 7),
       );
     } catch (e) {
-      // It's better to not show an error in the chat, just fail silently.
       return null;
     }
   }
@@ -43,23 +41,26 @@ class _LinkPreviewWidgetState extends State<LinkPreviewWidget> {
   String _getDomain(String url) {
     try {
       Uri uri = Uri.parse(url);
-
-      // If the link is http, upgrade it to https.
       if (uri.scheme == 'http') {
         uri = uri.replace(scheme: 'https');
-      }
-      // If there is no scheme (e.g. from a bare domain that linkify missed), add https.
-      else if (!uri.hasScheme) {
-        // Uri.parse('example.com') results in a Uri with empty scheme and host, and path 'example.com'.
-        // We need to handle this case by prepending the scheme.
+      } else if (!uri.hasScheme) {
         return 'https://$url';
       }
-
-      // Return the origin (scheme + host) of the (potentially upgraded) URI.
       return uri.origin;
     } catch (e) {
-      // If parsing fails, it's likely a bare domain. Just prepend https as a fallback.
       return 'https://$url';
+    }
+  }
+
+  Future<void> _launchURL() async {
+    final uri = Uri.parse(widget.url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not launch URL')),
+      );
     }
   }
 
@@ -69,19 +70,21 @@ class _LinkPreviewWidgetState extends State<LinkPreviewWidget> {
       future: _metadataFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const SizedBox(
+          return Container(
             height: 100,
-            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+
+            margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
+            constraints: const BoxConstraints(maxWidth: double.infinity),
+            child: const Center(
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+              ),
+            ),
           );
         }
 
-        if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
-          return const SizedBox.shrink();
-        }
-
-        final metadata = snapshot.data!;
-
-        if (!_hasCalledSuccess) {
+        if (!_hasCalledSuccess && snapshot.hasData && snapshot.data != null) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             widget.onPreviewSuccess();
           });
@@ -89,52 +92,103 @@ class _LinkPreviewWidgetState extends State<LinkPreviewWidget> {
         }
 
         return GestureDetector(
-          onTap: () async {
-            final uri = Uri.parse(widget.url);
-            if (await canLaunchUrl(uri)) {
-              await launchUrl(uri);
-            }
-          },
+          onTap: _launchURL,
           child: Container(
-            margin: const EdgeInsets.only(top: 8.0),
-            padding: const EdgeInsets.all(8.0),
+            margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 8.0),
+            constraints: const BoxConstraints(maxWidth: double.infinity),
             decoration: BoxDecoration(
-              color: Colors.grey[800],
-              borderRadius: BorderRadius.circular(12),
+              color: Theme.of(context).cardColor,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
+            child: snapshot.hasData && snapshot.data != null
+                ? _buildPreviewCard(snapshot.data!)
+                : _buildErrorCard(),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPreviewCard(Metadata metadata) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (metadata.image != null && metadata.image!.isNotEmpty)
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                  child: Image.network(
+                    metadata.image!,
+                    fit: BoxFit.fitWidth,
+                    width: double.infinity,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      height: 180,
+                      width: double.infinity,
+                      color: Colors.grey[300],
+                      child: const Icon(
+                        Icons.image_not_supported,
+                        size: 50,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      'Open Link',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (metadata.image != null && metadata.image!.isNotEmpty)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      metadata.image!,
-                      fit: BoxFit.cover,
-                      height: 150,
-                      width: double.infinity,
-                      errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
-                    ),
-                  ),
                 if (metadata.title != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8.0),
-                    child: Text(
-                      metadata.title!,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                  Text(
+                    metadata.title!,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Color.fromARGB(221, 75, 74, 74),
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 if (metadata.desc != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 4.0),
                     child: Text(
                       metadata.desc!,
-                      style: TextStyle(color: Colors.grey[400]),
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 14,
+                      ),
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -143,14 +197,63 @@ class _LinkPreviewWidgetState extends State<LinkPreviewWidget> {
                   padding: const EdgeInsets.only(top: 8.0),
                   child: Text(
                     Uri.parse(_getDomain(widget.url)).host,
-                    style: TextStyle(color: Colors.blue[300], fontSize: 12),
+                    style: TextStyle(
+                      color: Colors.blue[600],
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-        );
-      },
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorCard() {
+    return Container(
+      padding: EdgeInsets.only(top:5, bottom:5),
+      width: double.infinity,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.error_outline,
+            color: Colors.red[400],
+            size: 40,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Preview Not Available',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+              color: Colors.grey[200],
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Tap to visit',
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontSize: 14,
+            ),
+          ),
+          Text(
+            Uri.parse(_getDomain(widget.url)).host,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: Colors.blue[600],
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          )
+        ],
+      ),
     );
   }
 }
