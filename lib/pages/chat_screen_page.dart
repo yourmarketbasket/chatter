@@ -427,8 +427,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
     return Positioned(
       bottom: -10, // Positioned to stack on top of the bottom border
-      right: isYou ? 10 : null,
-      left: isYou ? null : 10,
+      left: isYou ? 10 : null,   // Swapped for "You"
+      right: isYou ? null : 10,  // Swapped for "others"
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: groupedReactions.entries.map((entry) {
@@ -447,8 +447,9 @@ class _ChatScreenState extends State<ChatScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
               margin: const EdgeInsets.symmetric(horizontal: 2),
               decoration: BoxDecoration(
-                color: hasReacted ? Colors.teal[700] : Colors.grey[900],
+                color: Colors.grey[900], // Use dark grey for all
                 borderRadius: BorderRadius.circular(12),
+                border: hasReacted ? Border.all(color: Colors.tealAccent, width: 1) : null,
               ),
               child: Text(
                 '$emoji $count',
