@@ -80,7 +80,6 @@ dependencies:
   dotted_border: ^3.1.0
   flutter_linkify: ^6.0.0
   any_link_preview: ^3.0.3
-  image: ^4.1.7
 
 dev_dependencies:
   flutter_test:
