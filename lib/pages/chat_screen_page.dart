@@ -31,6 +31,7 @@ import 'package:video_thumbnail/video_thumbnail.dart';
 import 'dart:typed_data';
 import 'package:chatter/pages/users_list_page.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_linkify/flutter_linkify.dart';
 
 
 class ChatScreen extends StatefulWidget {
@@ -447,7 +448,7 @@ class _ChatScreenState extends State<ChatScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
               margin: const EdgeInsets.symmetric(horizontal: 2),
               decoration: BoxDecoration(
-                color: hasReacted ? Colors.teal[700] : Colors.grey[900],
+                color: Colors.grey[900],
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
@@ -929,26 +930,32 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
     ),
     child: Column(
-      crossAxisAlignment: isYou ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (dataController.currentChat.value['type'] == 'group' && !isYou)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 4.0),
-            child: Text(
-              senderName,
-              style: const TextStyle(
-                color: Colors.tealAccent,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 4.0),
+              child: Text(
+                senderName,
+                style: const TextStyle(
+                  color: Colors.tealAccent,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
               ),
             ),
           ),
         if (message['deletedForEveryone'] ?? false)
-          Text(
-            'Message deleted',
-            style: TextStyle(
-              color: Colors.grey[400],
-              fontStyle: FontStyle.italic,
+          Align(
+            alignment: isYou ? Alignment.centerRight : Alignment.centerLeft,
+            child: Text(
+              'Message deleted',
+              style: TextStyle(
+                color: Colors.grey[400],
+                fontStyle: FontStyle.italic,
+              ),
             ),
           )
         else ...[
@@ -1031,32 +1038,35 @@ class _ChatScreenState extends State<ChatScreen> {
               );
             }),
           if (message['type'] == 'voice')
-            Stack(
-              alignment: Alignment.topRight,
-              children: [
-                GestureDetector(
-                  onTap: () => _openMediaView(message, 0),
-                  child: AudioWaveformWidget(
-                    audioPath: message['files'][0]['url'],
-                    isLocal: !(message['files'][0]['url'] as String).startsWith('http'),
-                  ),
-                ),
-                Positioned(
-                  top: 4,
-                  right: 4,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.5),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.open_in_new,
-                      color: Colors.white,
-                      size: 18,
+            Align(
+              alignment: isYou ? Alignment.centerRight : Alignment.centerLeft,
+              child: Stack(
+                alignment: Alignment.topRight,
+                children: [
+                  GestureDetector(
+                    onTap: () => _openMediaView(message, 0),
+                    child: AudioWaveformWidget(
+                      audioPath: message['files'][0]['url'],
+                      isLocal: !(message['files'][0]['url'] as String).startsWith('http'),
                     ),
                   ),
-                ),
-              ],
+                  Positioned(
+                    top: 4,
+                    right: 4,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.5),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.open_in_new,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           if (hasAttachment && message['type'] != 'voice') ...[
             _buildAttachment(message),
@@ -1064,41 +1074,57 @@ class _ChatScreenState extends State<ChatScreen> {
               const SizedBox(height: 8),
           ],
           if (message['content'] != null && message['content']!.isNotEmpty)
-            Text(
-              message['content']!,
-              style: TextStyle(color: isYou ? Colors.white : Colors.grey[200]),
+            Align(
+              alignment: isYou ? Alignment.centerRight : Alignment.centerLeft,
+              child: Linkify(
+                onOpen: (link) async {
+                  final uri = Uri.parse(link.url);
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri);
+                  } else {
+                    throw 'Could not launch ${link.url}';
+                  }
+                },
+                text: message['content']!,
+                style: TextStyle(color: isYou ? Colors.white : Colors.grey[200]),
+                linkStyle: const TextStyle(color: Colors.blue, decoration: TextDecoration.underline),
+                textAlign: isYou ? TextAlign.right : TextAlign.left,
+              ),
             ),
         ],
         const SizedBox(height: 4),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (message['edited'] ?? false)
+        Align(
+          alignment: isYou ? Alignment.centerRight : Alignment.centerLeft,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (message['edited'] ?? false)
+                Text(
+                  '(edited) ',
+                  style: TextStyle(
+                    color: Colors.grey[400],
+                    fontSize: 10,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
               Text(
-                '(edited) ',
-                style: TextStyle(
+                DateFormat('h:mm a').format(DateTime.parse(message['createdAt']).toLocal()),
+                style: GoogleFonts.roboto(
                   color: Colors.grey[400],
-                  fontSize: 10,
+                  fontSize: 9,
                   fontStyle: FontStyle.italic,
                 ),
               ),
-            Text(
-              DateFormat('h:mm a').format(DateTime.parse(message['createdAt']).toLocal()),
-              style: GoogleFonts.roboto(
-                color: Colors.grey[400],
-                fontSize: 9,
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-            if (isYou) ...[
-              const SizedBox(width: 4),
-              Icon(
-                _getStatusIcon(_getAggregateStatus(message)),
-                size: 12,
-                color: _getStatusColor(_getAggregateStatus(message)),
-              ),
+              if (isYou) ...[
+                const SizedBox(width: 4),
+                Icon(
+                  _getStatusIcon(_getAggregateStatus(message)),
+                  size: 12,
+                  color: _getStatusColor(_getAggregateStatus(message)),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ],
     ),

@@ -253,6 +253,8 @@ class _MessageInputAreaState extends State<MessageInputArea> {
             child: TextField(
               controller: _messageController,
               style: const TextStyle(color: Colors.white),
+              keyboardType: TextInputType.multiline,
+              maxLines: null,
               decoration: InputDecoration(
                 hintText: isMuted ? 'You are muted' : 'Type a message...',
                 hintStyle: TextStyle(color: Colors.grey[400]),
