@@ -915,7 +915,7 @@ class _ChatScreenState extends State<ChatScreen> {
     margin: EdgeInsets.only(bottom: bottomMargin),
     padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.0),
     constraints: BoxConstraints(
-      maxWidth: MediaQuery.of(context).size.width * 0.75,
+      maxWidth: MediaQuery.of(context).size.width * 0.55,
       minWidth: MediaQuery.of(context).size.width * 0.25,
     ),
     decoration: BoxDecoration(
