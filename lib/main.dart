@@ -129,8 +129,8 @@ class _ChatterAppState extends State<ChatterApp> {
               // Handle file sharing
               final files = sharedMedia.attachments!
                   .map((attachment) => PlatformFile(
-                        name: attachment.path.split('/').last,
-                        path: attachment.path,
+                        name: attachment!.path.split('/').last,
+                        path: attachment?.path,
                         size: 0,
                       ))
                   .toList();
