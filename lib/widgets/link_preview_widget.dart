@@ -37,15 +37,25 @@ class _LinkPreviewWidgetState extends State<LinkPreviewWidget> {
 
   String _getDomain(String url) {
     try {
-      Uri uri = Uri.parse(url);
-      if (!uri.hasScheme) {
-        uri = Uri.parse('https://$url');
+      // Normalize the URL to handle various inputs
+      String normalizedUrl = url.trim();
+      bool hasScheme = normalizedUrl.startsWith('http://') || normalizedUrl.startsWith('https://');
+
+      if (!hasScheme) {
+        // This is a bare domain like 'codethelabs.com' or 'www.codethelabs.com'.
+        // The user wants to force 'www.' in this case.
+        String hostPart = normalizedUrl.split('/')[0]; // Get the host part before any path
+        if (!hostPart.startsWith('www.')) {
+          hostPart = 'www.$hostPart';
+        }
+        return 'https://$hostPart';
+      } else {
+        // The URL already has a scheme. Use its origin.
+        final uri = Uri.parse(normalizedUrl);
+        return uri.origin;
       }
-      // Return 'scheme://host' which is the base URL. e.g., 'https://www.example.com'
-      // This is more robust than forcing 'www.'
-      return uri.origin;
     } catch (e) {
-      return url; // Fallback to original url
+      return url; // Fallback
     }
   }
 
