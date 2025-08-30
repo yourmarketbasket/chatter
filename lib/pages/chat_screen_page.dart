@@ -920,163 +920,188 @@ class _ChatScreenState extends State<ChatScreen> {
             bottomLeft: Radius.circular(isYou ?12.0: 0.0),
             bottomRight: Radius.circular(isYou? 0.0:12.0),),
         ),
-        child: Stack(
-          clipBehavior: Clip.none,
+        child: Column(
+          crossAxisAlignment: isYou ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: 5.0),
-              child: Column(
-                crossAxisAlignment: isYou ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                children: [
-                  // Display sender name for group chats
-                  if (dataController.currentChat.value['type'] == 'group' && !isYou)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 4.0),
-                      child: Text(
-                        senderName,
-                        style: const TextStyle(
-                          color: Colors.tealAccent,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
+            // Display sender name for group chats
+            if (dataController.currentChat.value['type'] == 'group' && !isYou)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4.0),
+                child: Text(
+                  senderName,
+                  style: const TextStyle(
+                    color: Colors.tealAccent,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            if (message['deletedForEveryone'] ?? false)
+              Text(
+                'Message deleted',
+                style: TextStyle(
+                  color: Colors.grey[400],
+                  fontStyle: FontStyle.italic,
+                ),
+              )
+            else ...[
+              if (message['replyTo'] != null)
+                Obx(() {
+                  final originalMessage = dataController.currentConversationMessages.firstWhere(
+                    (m) => m['_id'] == message['replyTo'],
+                    orElse: () => {
+                      '_id': '',
+                      'senderId': {'_id': '', 'name': 'Unknown User'},
+                      'content': 'Original message not found.',
+                      'files': [],
+                      'type': 'text',
+                    },
+                  );
+                  if (originalMessage['_id'].isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8.0),
+                    padding: const EdgeInsets.all(8.0),
+                    constraints: BoxConstraints(
+                      // maxwidth should take the entire width of the message bubble
+                      maxWidth: MediaQuery.of(context).size.width * 0.5,
+                      minWidth: MediaQuery.of(context).size.width * 0.25,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[900]?.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(8),
+                      border: const Border(
+                        left: BorderSide(color: Colors.tealAccent, width: 2),
                       ),
                     ),
-                  if (message['deletedForEveryone'] ?? false)
-                    Text(
-                      'Message deleted',
-                      style: TextStyle(
-                        color: Colors.grey[400],
-                        fontStyle: FontStyle.italic,
-                      ),
-                    )
-                  else ...[
-                    if (message['replyTo'] != null)
-                      Obx(() {
-                        final originalMessage = dataController.currentConversationMessages.firstWhere(
-                          (m) => m['_id'] == message['replyTo'],
-                          orElse: () => {
-                            '_id': '',
-                            'senderId': {'_id': '', 'name': 'Unknown User'},
-                            'content': 'Original message not found.',
-                            'files': [],
-                            'type': 'text',
-                          },
-                        );
-                        if (originalMessage['_id'].isEmpty) {
-                          return const SizedBox.shrink();
-                        }
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 8.0),
-                          padding: const EdgeInsets.all(8.0),
-                          constraints: BoxConstraints(
-                            // maxwidth should take the entire width of the message bubble
-                            maxWidth: MediaQuery.of(context).size.width * 0.5,
-                            minWidth: MediaQuery.of(context).size.width * 0.25,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          originalMessage['senderId']['_id'] == dataController.user.value['user']['_id']
+                              ? 'You'
+                              : dataController.allUsers.firstWhere(
+                                  (u) => u['_id'] == originalMessage['senderId']['_id'],
+                                  orElse: () => {'name': 'Unknown User'},
+                                )['name'],
+                          style: const TextStyle(
+                            color: Colors.tealAccent,
+                            fontWeight: FontWeight.bold,
                           ),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[900]?.withOpacity(0.5),
-                            borderRadius: BorderRadius.circular(8),
-                            border: const Border(
-                              left: BorderSide(color: Colors.tealAccent, width: 2),
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                        ),
+                        const SizedBox(height: 4),
+                        if (originalMessage['files'] != null && (originalMessage['files'] as List).isNotEmpty)
+                          Row(
                             children: [
-                              Text(
-                                originalMessage['senderId']['_id'] == dataController.user.value['user']['_id']
-                                    ? 'You'
-                                    : dataController.allUsers.firstWhere(
-                                        (u) => u['_id'] == originalMessage['senderId']['_id'],
-                                        orElse: () => {'name': 'Unknown User'},
-                                      )['name'],
-                                style: const TextStyle(
-                                  color: Colors.tealAccent,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              if (originalMessage['files'] != null && (originalMessage['files'] as List).isNotEmpty)
-                                Row(
-                                  children: [
-                                    ReplyAttachmentPreview(attachment: originalMessage['files'][0]),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        _getReplyPreviewText(originalMessage['files'][0]),
-                                        style: TextStyle(color: Colors.grey[300]),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                )
-                              else if (originalMessage['type'] == 'voice')
-                                Row(
-                                  children: [
-                                    const Icon(Icons.audiotrack, size: 24, color: Colors.white),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'Voice note',
-                                      style: TextStyle(color: Colors.grey[300]),
-                                    ),
-                                  ],
-                                )
-                              else
-                                Text(
-                                  originalMessage['content'] ?? '',
+                              ReplyAttachmentPreview(attachment: originalMessage['files'][0]),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _getReplyPreviewText(originalMessage['files'][0]),
                                   style: TextStyle(color: Colors.grey[300]),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
+                              ),
                             ],
-                          ),
-                        );
-                      }),
-                    if (message['type'] == 'voice')
-                      Stack(
-                        alignment: Alignment.topRight,
-                        children: [
-                          GestureDetector(
-                        onTap: () => _openMediaView(message, 0),
-                            child: AudioWaveformWidget(
-                              audioPath: message['files'][0]['url'],
-                              isLocal: !(message['files'][0]['url'] as String).startsWith('http'),
-                            ),
-                          ),
-                          Positioned(
-                            top: 4,
-                            right: 4,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.5),
-                                shape: BoxShape.circle,
+                          )
+                        else if (originalMessage['type'] == 'voice')
+                          Row(
+                            children: [
+                              const Icon(Icons.audiotrack, size: 24, color: Colors.white),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Voice note',
+                                style: TextStyle(color: Colors.grey[300]),
                               ),
-                              child: const Icon(
-                                Icons.open_in_new,
-                                color: Colors.white,
-                                size: 18,
-                              ),
-                            ),
+                            ],
+                          )
+                        else
+                          Text(
+                            originalMessage['content'] ?? '',
+                            style: TextStyle(color: Colors.grey[300]),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        ],
+                      ],
+                    ),
+                  );
+                }),
+              if (message['type'] == 'voice')
+                Stack(
+                  alignment: Alignment.topRight,
+                  children: [
+                    GestureDetector(
+                  onTap: () => _openMediaView(message, 0),
+                      child: AudioWaveformWidget(
+                        audioPath: message['files'][0]['url'],
+                        isLocal: !(message['files'][0]['url'] as String).startsWith('http'),
                       ),
-                    if (hasAttachment && message['type'] != 'voice') ...[
-                      _buildAttachment(message),
-                      if (message['content'] != null && message['content']!.isNotEmpty)
-                        const SizedBox(height: 8),
-                    ],
-                    if (message['content'] != null && message['content']!.isNotEmpty)
-                      Text(
-                        message['content']!,
-                        style: TextStyle(color: isYou ? Colors.white : Colors.grey[200]),
+                    ),
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.5),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.open_in_new,
+                          color: Colors.white,
+                          size: 18,
+                        ),
                       ),
+                    ),
                   ],
-                  const SizedBox(height: 20), // Space for reactions
-                ],
-              ),
-            ),
+                ),
+              if (hasAttachment && message['type'] != 'voice') ...[
+                _buildAttachment(message),
+                if (message['content'] != null && message['content']!.isNotEmpty)
+                  const SizedBox(height: 8),
+              ],
+              if (message['content'] != null && message['content']!.isNotEmpty)
+                Text(
+                  message['content']!,
+                  style: TextStyle(color: isYou ? Colors.white : Colors.grey[200]),
+                ),
+            ],
+            const SizedBox(height: 4),
             _buildReactions(message, isYou),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (message['edited'] ?? false)
+                  Text(
+                    '(edited) ',
+                    style: TextStyle(
+                      color: Colors.grey[400],
+                      fontSize: 10,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                 // Ensure this is imported
+
+                Text(
+                  DateFormat('h:mm a').format(DateTime.parse(message['createdAt']).toLocal()),
+                  // googlepoppins font
+                  style: GoogleFonts.roboto(
+                    color: Colors.grey[400],
+                    fontSize: 9,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+                if (isYou) ...[
+                  const SizedBox(width: 4),
+                  Icon(
+                    _getStatusIcon(_getAggregateStatus(message)),
+                    size: 12,
+                    color: _getStatusColor(_getAggregateStatus(message)),
+                  ),
+                ],
+              ],
+            ),
           ],
         ),
       ),
