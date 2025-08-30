@@ -97,7 +97,7 @@ class _ChatterAppState extends State<ChatterApp> {
   }
 
   Future<void> _initShareHandler() async {
-    final handler = ShareHandlerPlatform.instance;
+    final handler = ShareHandler.instance;
     _sharedMedia = await handler.getInitialSharedMedia();
 
     if (_sharedMedia != null) {
@@ -113,10 +113,8 @@ class _ChatterAppState extends State<ChatterApp> {
     Get.to(() => UsersListPage(
           sharedData: sharedMedia,
           onUserSelected: (user) {
-            final attachment = sharedMedia.attachments?.first;
-            if (attachment == null) return;
-
-            if (attachment.type == SharedAttachmentType.text) {
+            if (sharedMedia.attachments == null || sharedMedia.attachments!.isEmpty) {
+              // Handle text sharing
               _dataController.sendChatMessage({
                 'chatId': user['chatId'],
                 'content': sharedMedia.content,
@@ -127,19 +125,8 @@ class _ChatterAppState extends State<ChatterApp> {
                   user['_id']
                 ],
               }, null);
-            } else if (attachment.type == SharedAttachmentType.url) {
-               _dataController.sendChatMessage({
-                'chatId': user['chatId'],
-                'content': attachment.path,
-                'type': 'text', // Treat URL as text
-                'senderId': _dataController.user.value['user']['_id'],
-                'participants': [
-                  _dataController.user.value['user']['_id'],
-                  user['_id']
-                ],
-              }, null);
-            }
-            else {
+            } else {
+              // Handle file sharing
               final files = sharedMedia.attachments!
                   .map((attachment) => PlatformFile(
                         name: attachment.path.split('/').last,
