@@ -400,35 +400,62 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildReactions(Map<String, dynamic> message, bool isYou) {
     final reactions = message['reactions'] as List<dynamic>? ?? [];
+    final currentUserId = dataController.getUserId();
+
     if (reactions.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    final groupedReactions = <String, int>{};
+    // Group reactions by emoji
+    final groupedReactions = <String, List<String>>{};
     for (var reaction in reactions) {
       final emoji = reaction['emoji'] as String;
-      groupedReactions[emoji] = (groupedReactions[emoji] ?? 0) + 1;
+      final userId = reaction['userId'] as String;
+      if (groupedReactions.containsKey(emoji)) {
+        groupedReactions[emoji]!.add(userId);
+      } else {
+        groupedReactions[emoji] = [userId];
+      }
     }
 
-    return Positioned(
-      bottom: -15,
-      right: isYou ? null : 10,
-      left: isYou ? 10 : null,
-      child: Row(
-        children: groupedReactions.entries.map((entry) {
-          return Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            margin: const EdgeInsets.only(right: 4),
-            decoration: BoxDecoration(
-              color: Colors.grey[800],
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              '${entry.key} ${entry.value}',
-              style: const TextStyle(color: Colors.white, fontSize: 12),
-            ),
-          );
-        }).toList(),
+    return Align(
+      alignment: isYou ? Alignment.bottomRight : Alignment.bottomLeft,
+      child: Container(
+        margin: const EdgeInsets.only(top: 4),
+        child: Wrap(
+          spacing: 4.0,
+          runSpacing: 4.0,
+          alignment: isYou ? WrapAlignment.end : WrapAlignment.start,
+          children: groupedReactions.entries.map((entry) {
+            final emoji = entry.key;
+            final userIds = entry.value;
+            final count = userIds.length;
+            final hasReacted = userIds.contains(currentUserId);
+
+            return GestureDetector(
+              onTap: () {
+                if (hasReacted) {
+                  dataController.removeReaction(message['_id'], emoji);
+                } else {
+                  // Optionally, you could allow adding a reaction by tapping it again,
+                  // but the primary action here is removal.
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: hasReacted ? Colors.tealAccent.withOpacity(0.5) : Colors.grey[800],
+                  borderRadius: BorderRadius.circular(12),
+                  border: hasReacted ? Border.all(color: Colors.tealAccent, width: 1) : null,
+                ),
+                child: Text(
+                  '$emoji $count',
+                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
       ),
     );
   }
@@ -963,10 +990,8 @@ class _ChatScreenState extends State<ChatScreen> {
                   return Container(
                     margin: const EdgeInsets.only(bottom: 8.0),
                     padding: const EdgeInsets.all(8.0),
-                    constraints: BoxConstraints(
-                      // maxwidth should take the entire width of the message bubble
-                      maxWidth: MediaQuery.of(context).size.width * 0.5,
-                      minWidth: MediaQuery.of(context).size.width * 0.25,
+                    constraints: const BoxConstraints(
+                      minWidth: double.infinity,
                     ),
                     decoration: BoxDecoration(
                       color: Colors.grey[900]?.withOpacity(0.5),

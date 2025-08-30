@@ -103,6 +103,7 @@ class SocketService {
       'message:delete': (data) => _handleMessageDelete(data),
       'message:statusUpdate': (data) => _handleMessageStatusUpdate(data),
       'message:reaction': (data) => _handleMessageReaction(data),
+      'message:reaction:removed': (data) => _handleMessageReactionRemoved(data),
       'chat:deletedForMe': (data) => _handleChatDeleted(data, 'chat:deletedForMe'),
       'chat:hardDeleted': (data) => _handleChatDeleted(data, 'chat:hardDeleted'),
       'typing:started': (data) => _handleTyping(data, true),
@@ -340,6 +341,13 @@ class SocketService {
     if (data is Map<String, dynamic>) {
       _dataController.handleMessageReaction(data);
       _eventController.add({'event': 'message:reaction', 'data': data});
+    }
+  }
+
+  void _handleMessageReactionRemoved(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      _dataController.handleMessageReactionRemoved(data);
+      _eventController.add({'event': 'message:reaction:removed', 'data': data});
     }
   }
   // End of message events

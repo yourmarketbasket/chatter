@@ -4038,7 +4038,56 @@ void clearUserPosts() {
     }
   }
 
+  Future<void> removeReaction(String messageId, String emoji) async {
+    // Optimistic UI Update
+    final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
+    if (messageIndex != -1) {
+      final message = currentConversationMessages[messageIndex];
+      final reactions = List<Map<String, dynamic>>.from(message['reactions'] ?? []);
+      final myReactionIndex = reactions.indexWhere((r) => r['userId'] == getUserId() && r['emoji'] == emoji);
+
+      if (myReactionIndex != -1) {
+        reactions.removeAt(myReactionIndex);
+      }
+
+      message['reactions'] = reactions;
+      currentConversationMessages[messageIndex] = message;
+      currentConversationMessages.refresh();
+    }
+
+    try {
+      final token = user.value['token'];
+      if (token == null) {
+        throw Exception('User not authenticated');
+      }
+      await _dio.delete(
+        'api/messages/$messageId/reactions',
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+    } catch (e) {
+      // print('Error removing reaction: $e');
+      // Here you might want to revert the optimistic update on failure
+    }
+  }
+
   void handleMessageReaction(Map<String, dynamic> data) {
+    final messageId = data['messageId'] as String?;
+    final reactions = data['reactions'] as List<dynamic>?;
+
+    if (messageId == null || reactions == null) return;
+
+    final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
+    if (messageIndex != -1) {
+      final message = currentConversationMessages[messageIndex];
+      message['reactions'] = reactions;
+      currentConversationMessages[messageIndex] = message;
+      currentConversationMessages.refresh();
+    }
+  }
+
+  void handleMessageReactionRemoved(Map<String, dynamic> data) {
     final messageId = data['messageId'] as String?;
     final reactions = data['reactions'] as List<dynamic>?;
 
