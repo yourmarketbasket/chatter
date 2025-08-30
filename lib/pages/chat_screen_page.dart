@@ -813,7 +813,7 @@ class _ChatScreenState extends State<ChatScreen> {
               const SizedBox(width: 8),
               Flexible(
                 child: Text(
-                  attachment['filename'],
+                  attachment['filename'] ?? 'PDF Document',
                   style: const TextStyle(color: Colors.white),
                   overflow: TextOverflow.ellipsis,
                 ),
