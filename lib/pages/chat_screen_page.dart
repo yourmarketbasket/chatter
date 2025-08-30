@@ -1079,51 +1079,61 @@ class _ChatScreenState extends State<ChatScreen> {
           if (message['content'] != null && message['content']!.isNotEmpty)
             Builder(builder: (context) {
               final url = _extractFirstUrl(message['content']!);
+              final messageText = Linkify(
+                onOpen: (link) async {
+                  final uri = Uri.parse(link.url);
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri);
+                  } else {
+                    throw 'Could not launch ${link.url}';
+                  }
+                },
+                text: message['content']!,
+                style:
+                    TextStyle(color: isYou ? Colors.white : Colors.grey[200]),
+                linkStyle: const TextStyle(
+                    color: Colors.blue, decoration: TextDecoration.underline),
+              );
+
               if (url != null) {
-                return AnyLinkPreview(
-                  link: url,
-                  displayDirection: UIDirection.uiDirectionVertical,
-                  showMultimedia: true,
-                  bodyMaxLines: 5,
-                  bodyTextOverflow: TextOverflow.ellipsis,
-                  titleStyle: const TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                  ),
-                  bodyStyle: const TextStyle(color: Colors.grey, fontSize: 12),
-                  errorBody: 'Show my custom error body',
-                  errorTitle: 'Show my custom error title',
-                  errorWidget: Container(
-                    color: Colors.grey[300],
-                    child: const Text('Oops!'),
-                  ),
-                  errorImage: "https://google.com/favicon.ico",
-                  cache: const Duration(days: 7),
-                  backgroundColor: Colors.grey[300],
-                  borderRadius: 12,
-                  removeElevation: false,
-                  boxShadow: const [
-                    BoxShadow(blurRadius: 3, color: Colors.grey)
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    messageText,
+                    const SizedBox(height: 8),
+                    AnyLinkPreview(
+                      link: url,
+                      displayDirection: UIDirection.uiDirectionVertical,
+                      showMultimedia: true,
+                      bodyMaxLines: 5,
+                      bodyTextOverflow: TextOverflow.ellipsis,
+                      titleStyle: const TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                      bodyStyle:
+                          const TextStyle(color: Colors.grey, fontSize: 12),
+                      errorBody: 'Show my custom error body',
+                      errorTitle: 'Show my custom error title',
+                      errorWidget: Container(
+                        color: Colors.grey[300],
+                        child: const Text('Oops!'),
+                      ),
+                      errorImage: "https://google.com/favicon.ico",
+                      cache: const Duration(days: 7),
+                      backgroundColor: Colors.grey[300],
+                      borderRadius: 12,
+                      removeElevation: false,
+                      boxShadow: const [
+                        BoxShadow(blurRadius: 3, color: Colors.grey)
+                      ],
+                      onTap: () {}, // This disables tap event of the card
+                    ),
                   ],
-                  onTap: () {}, // This disables tap event of the card
                 );
               } else {
-                return Linkify(
-                  onOpen: (link) async {
-                    final uri = Uri.parse(link.url);
-                    if (await canLaunchUrl(uri)) {
-                      await launchUrl(uri);
-                    } else {
-                      throw 'Could not launch ${link.url}';
-                    }
-                  },
-                  text: message['content']!,
-                  style:
-                      TextStyle(color: isYou ? Colors.white : Colors.grey[200]),
-                  linkStyle: const TextStyle(
-                      color: Colors.blue, decoration: TextDecoration.underline),
-                );
+                return messageText;
               }
             }),
         ],
