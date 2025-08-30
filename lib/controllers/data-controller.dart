@@ -177,6 +177,30 @@ class DataController extends GetxController {
     }
   }
 
+  String getMediaType(String extension) {
+    switch (extension.toLowerCase()) {
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+      case 'gif':
+        return 'image/jpeg';
+      case 'mp4':
+      case 'mov':
+      case 'avi':
+        return 'video/mp4';
+      case 'mp3':
+      case 'wav':
+      case 'm4a':
+        return 'audio/mp3';
+      case 'pdf':
+        return 'application/pdf';
+      case 'vcf':
+        return 'text/x-vcard';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
     void handleNewMessage(Map<String, dynamic> newMessage) {
     final chatId = newMessage['chatId'] as String?;
 
@@ -1547,7 +1571,7 @@ class DataController extends GetxController {
   }
 
   
-  Future<void> sendChatMessage(Map<String, dynamic> message, String clientMessageId) async {
+  Future<void> sendChatMessage(Map<String, dynamic> message, String? clientMessageId) async {
     try {
       final token = user.value['token'];
       if (token == null) {
@@ -1574,7 +1598,9 @@ class DataController extends GetxController {
       );
       print('[DataController.sendChatMessage] Received response: ${response.data}');
 
-      final messageIndex = currentConversationMessages.indexWhere((m) => m['clientMessageId'] == clientMessageId);
+      final messageIndex = clientMessageId != null
+          ? currentConversationMessages.indexWhere((m) => m['clientMessageId'] == clientMessageId)
+          : -1;
 
       if (response.statusCode == 201 && response.data['success'] == true) {
         final serverMessage = response.data['message'];
@@ -1624,7 +1650,9 @@ class DataController extends GetxController {
         if (messageIndex != -1) {
           final localMessage = currentConversationMessages[messageIndex];
           var finalMessage = Map<String, dynamic>.from(serverMessage);
-          finalMessage['clientMessageId'] = clientMessageId; // Preserve client ID
+          if (clientMessageId != null) {
+            finalMessage['clientMessageId'] = clientMessageId; // Preserve client ID
+          }
 
           // Preserve read receipts if they were updated by a socket event in the meantime
           if ((localMessage['readReceipts'] as List?)?.isNotEmpty ?? false) {
@@ -1641,9 +1669,11 @@ class DataController extends GetxController {
         }
       }
     } catch (e) {
-      final messageIndex = currentConversationMessages.indexWhere((m) => m['clientMessageId'] == clientMessageId);
-      if (messageIndex != -1) {
-        currentConversationMessages[messageIndex]['status_for_failed_only'] = 'failed';
+      if (clientMessageId != null) {
+        final messageIndex = currentConversationMessages.indexWhere((m) => m['clientMessageId'] == clientMessageId);
+        if (messageIndex != -1) {
+          currentConversationMessages[messageIndex]['status_for_failed_only'] = 'failed';
+        }
       }
     } finally {
         currentConversationMessages.refresh();
@@ -3899,6 +3929,74 @@ void clearUserPosts() {
         currentConversationMessages.clear();
       }
       chats.refresh();
+    }
+  }
+
+  Future<void> forwardMessage(Map<String, dynamic> message, String targetUserId) async {
+    final content = message['content'];
+    final files = (message['files'] as List)
+        .map((file) => PlatformFile(
+              name: file['filename'],
+              size: file['size'],
+              path: file['url'],
+            ))
+        .toList();
+
+    // Create a new chat with the target user if it doesn't exist
+    // This logic might need to be adjusted based on how you create new chats
+    final existingChat = chats.values.firstWhereOrNull(
+      (chat) =>
+          chat['type'] == 'private' &&
+          (chat['participants'] as List).any((p) => p['_id'] == targetUserId),
+    );
+
+    String? chatId;
+    if (existingChat != null) {
+      chatId = existingChat['_id'];
+    }
+
+    sendChatMessage({
+      'chatId': chatId,
+      'content': content,
+      'type': message['type'],
+      'files': message['files'],
+      'participants': [getUserId(), targetUserId],
+    }, null);
+  }
+
+  Future<void> addReaction(String messageId, String emoji) async {
+    try {
+      final token = user.value['token'];
+      if (token == null) {
+        throw Exception('User not authenticated');
+      }
+      await _dio.post(
+        'api/messages/$messageId/react',
+        data: {'emoji': emoji},
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+    } catch (e) {
+      // print('Error adding reaction: $e');
+    }
+  }
+
+  Future<void> deleteMultipleChats(List<String> chatIds) async {
+    try {
+      final token = user.value['token'];
+      if (token == null) {
+        throw Exception('User not authenticated');
+      }
+      await _dio.post(
+        'api/chats/delete-multiple',
+        data: {'chatIds': chatIds},
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+    } catch (e) {
+      // print('Error deleting multiple chats: $e');
     }
   }
 }

@@ -29,6 +29,9 @@ import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 import 'dart:typed_data';
+import 'package:chatter/pages/users_list_page.dart';
+import 'package:flutter/services.dart';
+
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -268,6 +271,53 @@ class _ChatScreenState extends State<ChatScreen> {
     dataController.deleteChatMessage(message['_id'], forEveryone: forEveryone);
   }
 
+  void _forwardMessage(Map<String, dynamic> message) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => UsersListPage(
+          onUserSelected: (user) {
+            dataController.forwardMessage(message, user['_id']);
+            Navigator.pop(context);
+            // Optionally, show a confirmation message
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Message forwarded to ${user['name']}')),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  void _copyMessage(Map<String, dynamic> message) {
+    Clipboard.setData(ClipboardData(text: message['content']));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Message copied to clipboard')),
+    );
+  }
+
+  void _showReactionsDialog(Map<String, dynamic> message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color.fromARGB(255, 46, 46, 46),
+        title: const Text('React to message', style: TextStyle(color: Colors.white)),
+        content: Wrap(
+          spacing: 10,
+          children: ['👍', '❤️', '😂', '😮', '🙏', '🤣']
+              .map((emoji) => IconButton(
+                    icon: Text(emoji, style: const TextStyle(fontSize: 24)),
+                    onPressed: () {
+                      dataController.addReaction(message['_id'], emoji);
+                      Navigator.pop(context);
+                    },
+                  ))
+              .toList(),
+        ),
+      ),
+    );
+  }
+
   void _showMessageOptions(Map<String, dynamic> message) {
     showModalBottomSheet(
       backgroundColor: const Color.fromARGB(255, 31, 31, 31),
@@ -277,11 +327,45 @@ class _ChatScreenState extends State<ChatScreen> {
           topRight: Radius.circular(20.0),
         ),
       ),
-
       context: context,
       builder: (context) => Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          ListTile(
+            leading: const Icon(Icons.reply, color: Colors.white),
+            title: const Text('Reply', style: TextStyle(color: Colors.white)),
+            onTap: () {
+              Navigator.pop(context);
+              setState(() {
+                _replyingTo = message;
+              });
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.forward, color: Colors.white),
+            title: const Text('Forward', style: TextStyle(color: Colors.white)),
+            onTap: () {
+              Navigator.pop(context);
+              _forwardMessage(message);
+            },
+          ),
+          if ((message['content'] as String).isNotEmpty)
+            ListTile(
+              leading: const Icon(Icons.copy, color: Colors.white),
+              title: const Text('Copy', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                _copyMessage(message);
+              },
+            ),
+          ListTile(
+            leading: const Icon(Icons.thumb_up, color: Colors.white),
+            title: const Text('React', style: TextStyle(color: Colors.white)),
+            onTap: () {
+              Navigator.pop(context);
+              _showReactionsDialog(message);
+            },
+          ),
           if (message['senderId']['_id'] == dataController.user.value['user']['_id'])
             ListTile(
               leading: const Icon(Icons.edit, color: Colors.white),
@@ -308,19 +392,35 @@ class _ChatScreenState extends State<ChatScreen> {
                 _deleteMessage(message, forEveryone: true);
               },
             ),
-          ListTile(
-            leading: const Icon(Icons.thumb_up, color: Colors.white),
-            title: const Text('React', style: TextStyle(color: Colors.white)),
-            onTap: () {
-              Navigator.pop(context);
-              // Reaction logic to be implemented
-            },
-          ),
         ],
       ),
     );
   }
 
+  Widget _buildReactions(Map<String, dynamic> message) {
+    final reactions = message['reactions'] as List<dynamic>? ?? [];
+    if (reactions.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    // Group reactions by emoji
+    final groupedReactions = <String, int>{};
+    for (var reaction in reactions) {
+      final emoji = reaction['emoji'] as String;
+      groupedReactions[emoji] = (groupedReactions[emoji] ?? 0) + 1;
+    }
+
+    return Wrap(
+      spacing: 4.0,
+      children: groupedReactions.entries.map((entry) {
+        return Chip(
+          backgroundColor: Colors.grey[800],
+          label: Text('${entry.key} ${entry.value}', style: const TextStyle(color: Colors.white)),
+          padding: const EdgeInsets.all(2),
+        );
+      }).toList(),
+    );
+  }
 
   String _getReplyPreviewText(Map<String, dynamic> attachment) {
     String? filename = attachment['filename'];
@@ -955,6 +1055,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   message['content']!,
                   style: TextStyle(color: isYou ? Colors.white : Colors.grey[200]),
                 ),
+              _buildReactions(message),
             ],
             const SizedBox(height: 4),
             Row(

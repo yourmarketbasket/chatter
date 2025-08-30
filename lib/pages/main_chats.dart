@@ -21,6 +21,30 @@ class _MainChatsPageState extends State<MainChatsPage> {
   final TextEditingController _searchController = TextEditingController();
   final DataController _dataController = Get.find<DataController>();
   String _searchQuery = '';
+  bool _isSelectionMode = false;
+  final Set<String> _selectedChats = {};
+
+  void _toggleSelection(String chatId) {
+    setState(() {
+      if (_selectedChats.contains(chatId)) {
+        _selectedChats.remove(chatId);
+        if (_selectedChats.isEmpty) {
+          _isSelectionMode = false;
+        }
+      } else {
+        _selectedChats.add(chatId);
+        _isSelectionMode = true;
+      }
+    });
+  }
+
+  void _deleteSelectedChats() {
+    _dataController.deleteMultipleChats(_selectedChats.toList());
+    setState(() {
+      _selectedChats.clear();
+      _isSelectionMode = false;
+    });
+  }
 
   String _capitalizeFirstLetter(String text) {
     if (text.isEmpty) return text;
@@ -140,6 +164,26 @@ class _MainChatsPageState extends State<MainChatsPage> {
           elevation: 2,
           child: Icon(FeatherIcons.userPlus, color: Colors.tealAccent.shade400, size: 20),
         ),
+        appBar: _isSelectionMode
+            ? AppBar(
+                title: Text('${_selectedChats.length} selected'),
+                leading: IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () {
+                    setState(() {
+                      _isSelectionMode = false;
+                      _selectedChats.clear();
+                    });
+                  },
+                ),
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.delete),
+                    onPressed: _deleteSelectedChats,
+                  ),
+                ],
+              )
+            : null,
         body: Obx(() {
           if (_dataController.isLoadingChats.value && _dataController.chats.isEmpty) {
             return Center(child: CircularProgressIndicator(color: Colors.tealAccent.shade400));
@@ -344,35 +388,15 @@ class _MainChatsPageState extends State<MainChatsPage> {
                               final Color statusColor = _getStatusColor(status);
                               final bool isMyMessage = lastMessageData != null && (lastMessageData['senderId'] is Map ? lastMessageData['senderId']['_id'] : lastMessageData['senderId']) == currentUserId;
                               final int unreadCount = chat['unreadCount'] as int? ?? 0;
+                              final bool isSelected = _selectedChats.contains(chat['_id']);
 
                               return GestureDetector(
                                 onLongPress: () {
-                                  showDialog(
-                                    context: context,
-                                    builder: (context) => AlertDialog(
-                                      backgroundColor: Colors.grey.shade900,
-                                      title: Text('Delete Chat', style: GoogleFonts.poppins(color: Colors.white, fontSize: 16)),
-                                      content: Text(
-                                        'Are you sure you want to permanently delete this chat and all its messages?',
-                                        style: GoogleFonts.poppins(color: Colors.grey.shade300, fontSize: 14),
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () => Navigator.pop(context),
-                                          child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.tealAccent.shade400)),
-                                        ),
-                                        TextButton(
-                                          onPressed: () async {
-                                            Navigator.pop(context);
-                                            await _dataController.deleteChat(chat['_id']);
-                                          },
-                                          child: Text('Delete', style: GoogleFonts.poppins(color: Colors.red.shade400)),
-                                        ),
-                                      ],
-                                    ),
-                                  );
+                                  _toggleSelection(chat['_id']);
                                 },
                                 child: ListTile(
+                                  selected: isSelected,
+                                  selectedTileColor: Colors.teal.withOpacity(0.2),
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                                   leading: Stack(
                                     clipBehavior: Clip.none,
@@ -381,9 +405,11 @@ class _MainChatsPageState extends State<MainChatsPage> {
                                         radius: 22,
                                         backgroundColor: Colors.tealAccent.shade400.withOpacity(0.2),
                                         backgroundImage: avatarUrl.isNotEmpty ? CachedNetworkImageProvider(avatarUrl) : null,
-                                        child: avatarUrl.isEmpty
-                                            ? Text(avatarLetter, style: GoogleFonts.poppins(color: Colors.tealAccent.shade400, fontWeight: FontWeight.w600, fontSize: 16))
-                                            : null,
+                                        child: isSelected
+                                            ? const Icon(Icons.check, color: Colors.white)
+                                            : (avatarUrl.isEmpty
+                                                ? Text(avatarLetter, style: GoogleFonts.poppins(color: Colors.tealAccent.shade400, fontWeight: FontWeight.w600, fontSize: 16))
+                                                : null),
                                       ),
                                       if (isGroup)
                                         Positioned(
@@ -493,12 +519,16 @@ class _MainChatsPageState extends State<MainChatsPage> {
                                     ],
                                   ),
                                   onTap: () {
-                                    _dataController.currentChat.value = chat;
-                                    if (unreadCount > 0) {
-                                      _dataController.chats[chat['_id']]!['unreadCount'] = 0;
-                                      _dataController.chats.refresh();
+                                    if (_isSelectionMode) {
+                                      _toggleSelection(chat['_id']);
+                                    } else {
+                                      _dataController.currentChat.value = chat;
+                                      if (unreadCount > 0) {
+                                        _dataController.chats[chat['_id']]!['unreadCount'] = 0;
+                                        _dataController.chats.refresh();
+                                      }
+                                      Get.to(() => const ChatScreen());
                                     }
-                                    Get.to(() => const ChatScreen());
                                   },
                                 ),
                               );
