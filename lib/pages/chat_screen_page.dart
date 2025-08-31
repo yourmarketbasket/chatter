@@ -345,18 +345,26 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
-                    children: ['👍', '❤️', '😂', '😮', '😢', '🙏']
-                        .map((emoji) => GestureDetector(
-                              onTap: () {
-                                dataController.addReaction(message['_id'], emoji);
-                                Navigator.pop(context);
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                                child: Text(emoji, style: const TextStyle(fontSize: 24)),
-                              ),
-                            ))
-                        .toList(),
+                    children: [
+                      ...['👍', '❤️', '😂', '😮', '😢', '🙏']
+                          .map((emoji) => GestureDetector(
+                                onTap: () {
+                                  dataController.addReaction(message['_id'], emoji);
+                                  Navigator.pop(context);
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                                  child: Text(emoji, style: const TextStyle(fontSize: 24)),
+                                ),
+                              )),
+                      IconButton(
+                        icon: const Icon(Icons.check_box_outline_blank, color: Colors.white),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _toggleSelection(message['_id'] ?? message['clientMessageId']);
+                        },
+                      )
+                    ],
                   ),
                 ),
               ),
@@ -1300,22 +1308,40 @@ class _ChatScreenState extends State<ChatScreen> {
                             dataController.markMessageAsRead(message);
                           }
                         },
-                        child: GestureDetector(
-                          onLongPress: () {
-                            final messageId = message['_id'] ?? message['clientMessageId'];
-                            if (messageId != null) {
-                              _toggleSelection(messageId);
-                            }
+                        child: Dismissible(
+                          key: Key(message['_id'] ?? message['clientMessageId']),
+                          direction: DismissDirection.startToEnd,
+                          onDismissed: (direction) {
+                            setState(() {
+                              _replyingTo = message;
+                            });
                           },
-                          onTap: () {
-                            if (_isSelectionMode) {
+                          background: Container(
+                            color: Colors.teal,
+                            alignment: Alignment.centerLeft,
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: const Icon(Icons.reply, color: Colors.white),
+                          ),
+                          child: GestureDetector(
+                            onLongPressStart: (details) {
                               final messageId = message['_id'] ?? message['clientMessageId'];
                               if (messageId != null) {
-                                _toggleSelection(messageId);
+                                if (_isSelectionMode) {
+                                  _toggleSelection(messageId);
+                                } else {
+                                  _showReactionDialog(context, message, details.globalPosition);
+                                }
                               }
-                            }
-                          },
-                          child: Container(
+                            },
+                            onTap: () {
+                              if (_isSelectionMode) {
+                                final messageId = message['_id'] ?? message['clientMessageId'];
+                                if (messageId != null) {
+                                  _toggleSelection(messageId);
+                                }
+                              }
+                            },
+                            child: Container(
                             color: _selectedMessages.contains(message['_id'] ?? message['clientMessageId'])
                                 ? Colors.teal.withOpacity(0.2)
                                 : Colors.transparent,
