@@ -209,7 +209,7 @@ class _RegisterPageState extends State<RegisterPage> {
           setState(() {
             _tapCount++;
           });
-          if (_tapCount == 10) {
+          if (_tapCount >= 10) {
             _tapCount = 0;
             Navigator.push(
               context,
@@ -227,278 +227,279 @@ class _RegisterPageState extends State<RegisterPage> {
                 children: [
                   Container(
                     padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[900],
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    'Privacy Notice: Use an alias, not your real name. For your security, we don’t collect emails or phone numbers. If you lose your username or password, your account cannot be recovered. Keep your details safe!',
-                    style: GoogleFonts.roboto(
-                      color: Colors.white70,
-                      fontSize: 14,
-                      height: 1.5,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Create Account',
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontSize: 32,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                if (_generalMessage != null)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      border: Border.all(
-                        color: _isSuccess ? Colors.green[700]! : Colors.red[700]!,
-                        width: 1,
-                      ),
+                      color: Colors.grey[900],
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          _isSuccess ? FeatherIcons.checkCircle : FeatherIcons.alertCircle,
-                          color: _isSuccess ? Colors.green[400] : Colors.red[400],
-                          size: 20,
+                    child: Text(
+                      'Privacy Notice: Use an alias, not your real name. For your security, we don’t collect emails or phone numbers. If you lose your username or password, your account cannot be recovered. Keep your details safe!',
+                      style: GoogleFonts.roboto(
+                        color: Colors.white70,
+                        fontSize: 14,
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Create Account',
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontSize: 32,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  if (_generalMessage != null)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: _isSuccess ? Colors.green[700]! : Colors.red[700]!,
+                          width: 1,
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _generalMessage!,
-                            style: GoogleFonts.roboto(
-                              color: _isSuccess ? Colors.green[400] : Colors.red[400],
-                              fontSize: 14,
-                              height: 1.5,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _isSuccess ? FeatherIcons.checkCircle : FeatherIcons.alertCircle,
+                            color: _isSuccess ? Colors.green[400] : Colors.red[400],
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _generalMessage!,
+                              style: GoogleFonts.roboto(
+                                color: _isSuccess ? Colors.green[400] : Colors.red[400],
+                                fontSize: 14,
+                                height: 1.5,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                if (_generalMessage != null) const SizedBox(height: 16),
-                TextField(
-                  controller: _usernameController,
-                  style: GoogleFonts.roboto(color: Colors.white, fontSize: 16),
-                  decoration: InputDecoration(
-                    labelText: 'Username (Alias)',
-                    labelStyle: GoogleFonts.roboto(color: Colors.grey[500]),
-                    hintText: 'e.g., ShengStar',
-                    hintStyle: GoogleFonts.roboto(color: Colors.grey[700]),
-                    errorText: _usernameError,
-                    errorStyle: GoogleFonts.roboto(color: Colors.red[400], fontSize: 12),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[700]!),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[700]!),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.tealAccent),
-                    ),
-                    errorBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.red[700]!),
-                    ),
-                    focusedErrorBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.red[700]!),
-                    ),
-                    filled: true,
-                    fillColor: const Color(0xFF252525),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Focus(
-                  focusNode: _passwordFocusNode,
-                  child: TextField(
-                    controller: _passwordController,
-                    obscureText: _obscurePassword,
+                  if (_generalMessage != null) const SizedBox(height: 16),
+                  TextField(
+                    controller: _usernameController,
                     style: GoogleFonts.roboto(color: Colors.white, fontSize: 16),
                     decoration: InputDecoration(
-                      labelText: 'Password',
-                    labelStyle: GoogleFonts.roboto(color: Colors.grey[500]),
-                    hintText: '8+ chars, 1 capital, 1 symbol',
-                    hintStyle: GoogleFonts.roboto(color: Colors.grey[700]),
-                    errorText: _passwordError,
-                    errorStyle: GoogleFonts.roboto(color: Colors.red[400], fontSize: 12),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[700]!),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[700]!),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.tealAccent),
-                    ),
-                    errorBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.red[700]!),
-                    ),
-                    focusedErrorBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.red[700]!),
-                    ),
-                    filled: true,
-                    fillColor: const Color(0xFF252525),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword ? FeatherIcons.eyeOff : FeatherIcons.eye,
-                        color: Colors.grey[500],
+                      labelText: 'Username (Alias)',
+                      labelStyle: GoogleFonts.roboto(color: Colors.grey[500]),
+                      hintText: 'e.g., ShengStar',
+                      hintStyle: GoogleFonts.roboto(color: Colors.grey[700]),
+                      errorText: _usernameError,
+                      errorStyle: GoogleFonts.roboto(color: Colors.red[400], fontSize: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey[700]!),
                       ),
-                      onPressed: () {
-                        setState(() {
-                          _obscurePassword = !_obscurePassword;
-                        });
-                      },
-                    ),
-                  ),
-                ),
-                ),
-                if (_isPasswordFocused || _passwordController.text.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8.0),
-                    child: PasswordCriteriaWidget(
-                      hasMinLength: _hasMinLength,
-                      hasUppercase: _hasUppercase,
-                      hasLowercase: _hasLowercase,
-                      hasNumber: _hasNumber,
-                      hasSymbol: _hasSymbol,
-                    ),
-                  ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _confirmPasswordController,
-                  obscureText: _obscureConfirmPassword,
-                  style: GoogleFonts.roboto(color: Colors.white, fontSize: 16),
-                  decoration: InputDecoration(
-                    labelText: 'Confirm Password',
-                    labelStyle: GoogleFonts.roboto(color: Colors.grey[500]),
-                    errorText: _confirmPasswordError,
-                    errorStyle: GoogleFonts.roboto(color: Colors.red[400], fontSize: 12),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[700]!),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[700]!),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.tealAccent),
-                    ),
-                    errorBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.red[700]!),
-                    ),
-                    focusedErrorBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.red[700]!),
-                    ),
-                    filled: true,
-                    fillColor: const Color(0xFF252525),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscureConfirmPassword ? FeatherIcons.eyeOff : FeatherIcons.eye,
-                        color: Colors.grey[500],
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey[700]!),
                       ),
-                      onPressed: () {
-                        setState(() {
-                          _obscureConfirmPassword = !_obscureConfirmPassword;
-                        });
-                      },
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Colors.tealAccent),
+                      ),
+                      errorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.red[700]!),
+                      ),
+                      focusedErrorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.red[700]!),
+                      ),
+                      filled: true,
+                      fillColor: const Color(0xFF252525),
                     ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Checkbox(
-                      value: _acceptTerms,
-                      onChanged: (value) {
-                        setState(() {
-                          _acceptTerms = value ?? false;
-                        });
-                      },
-                      checkColor: Colors.black,
-                      activeColor: Colors.tealAccent,
-                      side: BorderSide(color: Colors.grey[700]!),
+                  const SizedBox(height: 16),
+                  Focus(
+                    focusNode: _passwordFocusNode,
+                    child: TextField(
+                      controller: _passwordController,
+                      obscureText: _obscurePassword,
+                      style: GoogleFonts.roboto(color: Colors.white, fontSize: 16),
+                      decoration: InputDecoration(
+                        labelText: 'Password',
+                      labelStyle: GoogleFonts.roboto(color: Colors.grey[500]),
+                      hintText: '8+ chars, 1 capital, 1 symbol',
+                      hintStyle: GoogleFonts.roboto(color: Colors.grey[700]),
+                      errorText: _passwordError,
+                      errorStyle: GoogleFonts.roboto(color: Colors.red[400], fontSize: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey[700]!),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey[700]!),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Colors.tealAccent),
+                      ),
+                      errorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.red[700]!),
+                      ),
+                      focusedErrorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.red[700]!),
+                      ),
+                      filled: true,
+                      fillColor: const Color(0xFF252525),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword ? FeatherIcons.eyeOff : FeatherIcons.eye,
+                          color: Colors.grey[500],
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _obscurePassword = !_obscurePassword;
+                          });
+                        },
+                      ),
                     ),
-                    Expanded(
+                  ),
+                  ),
+                  if (_isPasswordFocused || _passwordController.text.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: PasswordCriteriaWidget(
+                        hasMinLength: _hasMinLength,
+                        hasUppercase: _hasUppercase,
+                        hasLowercase: _hasLowercase,
+                        hasNumber: _hasNumber,
+                        hasSymbol: _hasSymbol,
+                      ),
+                    ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _confirmPasswordController,
+                    obscureText: _obscureConfirmPassword,
+                    style: GoogleFonts.roboto(color: Colors.white, fontSize: 16),
+                    decoration: InputDecoration(
+                      labelText: 'Confirm Password',
+                      labelStyle: GoogleFonts.roboto(color: Colors.grey[500]),
+                      errorText: _confirmPasswordError,
+                      errorStyle: GoogleFonts.roboto(color: Colors.red[400], fontSize: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey[700]!),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey[700]!),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Colors.tealAccent),
+                      ),
+                      errorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.red[700]!),
+                      ),
+                      focusedErrorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.red[700]!),
+                      ),
+                      filled: true,
+                      fillColor: const Color(0xFF252525),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscureConfirmPassword ? FeatherIcons.eyeOff : FeatherIcons.eye,
+                          color: Colors.grey[500],
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _obscureConfirmPassword = !_obscureConfirmPassword;
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: _acceptTerms,
+                        onChanged: (value) {
+                          setState(() {
+                            _acceptTerms = value ?? false;
+                          });
+                        },
+                        checkColor: Colors.black,
+                        activeColor: Colors.tealAccent,
+                        side: BorderSide(color: Colors.grey[700]!),
+                      ),
+                      Expanded(
+                        child: Text(
+                          'I accept the Terms and Conditions',
+                          style: GoogleFonts.roboto(
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _register,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.tealAccent,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                color: Colors.black,
+                                strokeWidth: 3,
+                              ),
+                            )
+                          : Text(
+                              'Register',
+                              style: GoogleFonts.poppins(
+                                color: Colors.black,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: TextButton(
+                      onPressed: () {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (context) => const LoginPage()),
+                        );
+                      },
                       child: Text(
-                        'I accept the Terms and Conditions',
+                        'Already have an account? Log in',
                         style: GoogleFonts.roboto(
-                          color: Colors.white,
+                          color: Colors.tealAccent,
                           fontSize: 14,
                         ),
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _register,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.tealAccent,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              color: Colors.black,
-                              strokeWidth: 3,
-                            ),
-                          )
-                        : Text(
-                            'Register',
-                            style: GoogleFonts.poppins(
-                              color: Colors.black,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                Center(
-                  child: TextButton(
-                    onPressed: () {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (context) => const LoginPage()),
-                      );
-                    },
-                    child: Text(
-                      'Already have an account? Log in',
-                      style: GoogleFonts.roboto(
-                        color: Colors.tealAccent,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
