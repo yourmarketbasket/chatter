@@ -320,8 +320,8 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
           TextButton(
             onPressed: () {
-              dataController.deletePost(postId);
               Navigator.pop(context);
+              dataController.deletePost(postId);
             },
             child: const Text('Delete', style: TextStyle(color: Colors.redAccent)),
           ),

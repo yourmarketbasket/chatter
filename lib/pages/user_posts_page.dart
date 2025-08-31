@@ -607,8 +607,8 @@ class _UserPostsPageState extends State<UserPostsPage> {
           ),
           TextButton(
             onPressed: () {
-              _dataController.deletePost(postId);
               Navigator.pop(context);
+              _dataController.deletePost(postId);
             },
             child: const Text('Delete', style: TextStyle(color: Colors.redAccent)),
           ),

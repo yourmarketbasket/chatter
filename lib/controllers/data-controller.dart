@@ -179,6 +179,26 @@ class DataController extends GetxController {
     }
   }
 
+  Map<String, dynamic> _processMessage(Map<String, dynamic> message) {
+    final processedMessage = Map<String, dynamic>.from(message);
+    if (processedMessage['createdAt'] is Map && processedMessage['createdAt'].containsKey('\$date')) {
+      processedMessage['createdAt'] = processedMessage['createdAt']['\$date'];
+    }
+    if (processedMessage['updatedAt'] is Map && processedMessage['updatedAt'].containsKey('\$date')) {
+      processedMessage['updatedAt'] = processedMessage['updatedAt']['\$date'];
+    }
+    if (processedMessage['readReceipts'] is List) {
+      processedMessage['readReceipts'] = (processedMessage['readReceipts'] as List).map((r) {
+        final receipt = Map<String, dynamic>.from(r);
+        if (receipt['timestamp'] is Map && receipt['timestamp'].containsKey('\$date')) {
+          receipt['timestamp'] = receipt['timestamp']['\$date'];
+        }
+        return receipt;
+      }).toList();
+    }
+    return processedMessage;
+  }
+
   String getMediaType(String extension) {
     switch (extension.toLowerCase()) {
       case 'jpg':
@@ -203,7 +223,8 @@ class DataController extends GetxController {
     }
   }
 
-    void handleNewMessage(Map<String, dynamic> newMessage) {
+    void handleNewMessage(Map<String, dynamic> data) {
+    final newMessage = _processMessage(data);
     final chatId = newMessage['chatId'] as String?;
 
     if (chatId == null || newMessage['_id'] == null) {
@@ -268,9 +289,10 @@ class DataController extends GetxController {
 
   void handleChatUpdated(Map<String, dynamic> data) {
     final chatId = data['_id'] as String?;
-    final newMessage = data['lastMessage'] as Map?;
+    if (data['lastMessage'] == null) return;
+    final newMessage = _processMessage(data['lastMessage'] as Map<String, dynamic>);
 
-    if (chatId == null || newMessage == null || newMessage['_id'] == null) {
+    if (chatId == null || newMessage['_id'] == null) {
       // print('[DataController] Invalid chat:updated data received: $data');
       return;
     }
@@ -1774,7 +1796,7 @@ class DataController extends GetxController {
       );
       if (response.statusCode == 200 && response.data['success'] == true) {
         final List<dynamic> messageData = response.data['messages'];
-        final messages = List<Map<String, dynamic>>.from(messageData);
+        final messages = List<Map<String, dynamic>>.from(messageData.map((m) => _processMessage(m as Map<String, dynamic>)));
         messages.sort((a, b) => DateTime.parse(a['createdAt']).compareTo(DateTime.parse(b['createdAt'])));
         currentConversationMessages.value = messages;
       } else {
@@ -1989,6 +2011,17 @@ class DataController extends GetxController {
   }
 
   Future<void> deleteChatMessage(String messageId, {bool forEveryone = false}) async {
+    if (forEveryone) {
+      final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
+      if (messageIndex != -1) {
+        final message = currentConversationMessages[messageIndex];
+        final createdAt = DateTime.parse(message['createdAt']);
+        if (DateTime.now().difference(createdAt).inMinutes > 15) {
+          Get.snackbar('Error', 'You can only delete messages for everyone within 15 minutes.');
+          return;
+        }
+      }
+    }
     // print('[DataController] Deleting message $messageId with forEveryone=$forEveryone');
     try {
       final token = user.value['token'];
