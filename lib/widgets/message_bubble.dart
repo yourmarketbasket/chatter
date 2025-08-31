@@ -17,6 +17,7 @@ class MessageBubble extends StatefulWidget {
   final Widget Function(Map<String, dynamic>) buildAttachment;
   final String Function(Map<String, dynamic>) getReplyPreviewText;
   final Widget Function(Map<String, dynamic>, bool) buildReactions;
+  final Function(Map<String, dynamic>) onReply;
 
   const MessageBubble({
     Key? key,
@@ -27,6 +28,7 @@ class MessageBubble extends StatefulWidget {
     required this.buildAttachment,
     required this.getReplyPreviewText,
     required this.buildReactions,
+    required this.onReply,
   }) : super(key: key);
 
   @override
@@ -242,7 +244,7 @@ class _MessageBubbleState extends State<MessageBubble> {
       ],
     );
 
-    return Stack(
+    final bubble = Stack(
       clipBehavior: Clip.none,
       children: [
         Container(
@@ -268,6 +270,21 @@ class _MessageBubbleState extends State<MessageBubble> {
         ),
         widget.buildReactions(widget.message, isYou),
       ],
+    );
+
+    return Dismissible(
+      key: ValueKey(widget.message['_id'] ?? widget.message['clientMessageId']),
+      direction: DismissDirection.startToEnd,
+      confirmDismiss: (direction) async {
+        widget.onReply(widget.message);
+        return false; // This will prevent the item from being dismissed
+      },
+      background: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        alignment: Alignment.centerLeft,
+        child: const Icon(Icons.reply, color: Colors.white),
+      ),
+      child: bubble,
     );
   }
 }

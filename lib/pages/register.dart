@@ -1,4 +1,5 @@
 import 'package:chatter/controllers/data-controller.dart';
+import 'package:chatter/pages/admin_register_page.dart';
 import 'package:chatter/pages/login.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -15,6 +16,7 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
+  int _tapCount = 0;
   DataController dataController = Get.put(DataController());
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
@@ -202,16 +204,29 @@ class _RegisterPageState extends State<RegisterPage> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
+      body: GestureDetector(
+        onTap: () {
+          setState(() {
+            _tapCount++;
+          });
+          if (_tapCount == 10) {
+            _tapCount = 0;
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const AdminRegisterPage()),
+            );
+          }
+        },
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.grey[900],
                     borderRadius: BorderRadius.circular(12),

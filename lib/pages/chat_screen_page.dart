@@ -1328,7 +1328,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    if (message['senderId']['_id'] != dataController.getUserId() && _selectedMessages.contains(message['_id'] ?? message['clientMessageId']))
+                                    if (message['senderId']['_id'] == dataController.getUserId() && _selectedMessages.contains(message['_id'] ?? message['clientMessageId']))
                                       IconButton(
                                         icon: const Icon(Icons.forward, color: Colors.white),
                                         onPressed: _forwardSelectedMessages,
@@ -1342,9 +1342,14 @@ class _ChatScreenState extends State<ChatScreen> {
                                         buildAttachment: _buildAttachment,
                                         getReplyPreviewText: _getReplyPreviewText,
                                         buildReactions: _buildReactions,
+                                        onReply: (message) {
+                                          setState(() {
+                                            _replyingTo = message;
+                                          });
+                                        },
                                       ),
                                     ),
-                                    if (message['senderId']['_id'] == dataController.getUserId() && _selectedMessages.contains(message['_id'] ?? message['clientMessageId']))
+                                    if (message['senderId']['_id'] != dataController.getUserId() && _selectedMessages.contains(message['_id'] ?? message['clientMessageId']))
                                       IconButton(
                                         icon: const Icon(Icons.forward, color: Colors.white),
                                         onPressed: _forwardSelectedMessages,

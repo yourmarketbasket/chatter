@@ -5,7 +5,7 @@ import 'package:get/get.dart';
 
 class SocketService {
   IO.Socket? _socket;
-  final StreamController<Map<String, dynamic>> _eventController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<Map<String, dynamic>> _eventController = StreamController<Map<String, dynamic>>.broadcast();
   final DataController _dataController = Get.find<DataController>();
   bool _isInitialized = false;
   String? _userId; // Store userId for joining rooms and emitting events
@@ -19,6 +19,10 @@ class SocketService {
     if (_isInitialized) {
       // print('SocketService: Already initialized, skipping.');
       return;
+    }
+
+    if (_eventController.isClosed) {
+      _eventController = StreamController<Map<String, dynamic>>.broadcast();
     }
 
     try {

@@ -608,6 +608,140 @@ class DataController extends GetxController {
     }
   }
 
+  Future<Map<String, dynamic>> blockUser(String userIdToBlock) async {
+    final String? token = user.value['token'];
+    final String? currentUserId = user.value['user']?['_id'];
+
+    if (token == null || currentUserId == null) {
+      return {'success': false, 'message': 'User not authenticated.'};
+    }
+    if (currentUserId == userIdToBlock) {
+      return {'success': false, 'message': 'Cannot block yourself.'};
+    }
+
+    try {
+      final response = await _dio.post(
+        '/api/users/$userIdToBlock/block',
+        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        // Optimistic UI update
+        if (user.value['user'] is Map) {
+          var userDetail = Map<String, dynamic>.from(user.value['user']);
+          var blockedUsers = List<String>.from((userDetail['blockedUsers'] as List<dynamic>? ?? []).map((e) => e.toString()));
+          if (!blockedUsers.contains(userIdToBlock)) {
+            blockedUsers.add(userIdToBlock);
+          }
+          userDetail['blockedUsers'] = blockedUsers;
+
+          var mainUserMap = Map<String, dynamic>.from(user.value);
+          mainUserMap['user'] = userDetail;
+          user.value = mainUserMap;
+          await _storage.write(key: 'user', value: jsonEncode(user.value));
+        }
+
+        // Remove the blocked user from the allUsers list
+        allUsers.removeWhere((u) => u['_id'] == userIdToBlock);
+
+        return {'success': true, 'message': response.data['message'] ?? 'Successfully blocked user.'};
+      } else {
+        return {'success': false, 'message': response.data['message'] ?? 'Failed to block user.'};
+      }
+    } catch (e) {
+      String errorMessage = 'An error occurred while trying to block user.';
+      if (e is dio.DioException && e.response?.data != null && e.response!.data['message'] != null) {
+        errorMessage = e.response!.data['message'];
+      } else if (e is dio.DioException) {
+        errorMessage = e.message ?? errorMessage;
+      }
+      return {'success': false, 'message': errorMessage};
+    }
+  }
+
+  Future<Map<String, dynamic>> updatePost(String postId, String content) async {
+    try {
+      final token = user.value['token'];
+      if (token == null) {
+        throw Exception('User not authenticated');
+      }
+      final response = await _dio.put(
+        'api/posts/$postId',
+        data: {'content': content},
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        // Optimistic UI update
+        final updatedPost = response.data['post'];
+        final index = posts.indexWhere((p) => p['_id'] == postId);
+        if (index != -1) {
+          posts[index] = updatedPost;
+          posts.refresh();
+        }
+        final userPostIndex = userPosts.indexWhere((p) => p['_id'] == postId);
+        if (userPostIndex != -1) {
+          userPosts[userPostIndex] = updatedPost;
+          userPosts.refresh();
+        }
+        return {'success': true, 'message': 'Post updated successfully'};
+      } else {
+        return {'success': false, 'message': response.data['message'] ?? 'Failed to update post'};
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> registerAdmin(String username, String password, String adminCode) async {
+    try {
+      var response = await _dio.post(
+        'api/auth/register-admin',
+        data: {
+          'username': username,
+          'password': password,
+          'adminRegistrationCode': adminCode,
+        },
+      );
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return {'success': true, 'message': 'Admin registered successfully'};
+      } else {
+        return {
+          'success': false,
+          'message': response.data['message'] ?? 'Admin registration failed'
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> deletePost(String postId) async {
+    try {
+      final token = user.value['token'];
+      if (token == null) {
+        throw Exception('User not authenticated');
+      }
+      final response = await _dio.delete(
+        'api/posts/$postId',
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        // Optimistic UI update
+        posts.removeWhere((p) => p['_id'] == postId);
+        userPosts.removeWhere((p) => p['_id'] == postId);
+        return {'success': true, 'message': 'Post deleted successfully'};
+      } else {
+        return {'success': false, 'message': response.data['message'] ?? 'Failed to delete post'};
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
   Future<Map<String, dynamic>> verifyUser(String userId, String entityType, String level, bool paid) async {
     try {
       final String? token = user.value['token'];
@@ -1494,6 +1628,59 @@ class DataController extends GetxController {
       // This catch is for network errors or other issues with the login API call itself
         // print('[DataController] Login API call failed: ${e.toString()}');
       return {'success': false, 'message': 'Login failed: ${e.toString()}'};
+    }
+  }
+
+  Future<Map<String, dynamic>> loginAdmin(String username, String password) async {
+    try {
+      var response = await _dio.post(
+        'api/auth/login-admin',
+        data: {
+          'username': username,
+          'password': password,
+        },
+      );
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        try {
+          // Save token and user data to secure storage
+          String? tokenValue = response.data['user']['token']?.toString();
+          String userJson = jsonEncode(response.data['user']);
+
+          await _storage.write(key: 'token', value: tokenValue);
+          await _storage.write(key: 'user', value: userJson);
+
+          // Update the in-memory user state immediately
+          user.value = jsonDecode(userJson);
+
+          await fetchFeeds();
+          final String? currentUserId = user.value['user']?['_id'];
+          if (currentUserId != null && currentUserId.isNotEmpty) {
+            fetchFollowers(currentUserId);
+            fetchFollowing(currentUserId);
+          }
+          await fetchAllUsers();
+          await fetchChats();
+
+          Get.find<SocketService>().initSocket();
+
+          final NotificationService notificationService = Get.find<NotificationService>();
+          await notificationService.init();
+
+          return {'success': true, 'message': 'Admin logged in successfully'};
+        } catch (e) {
+          return {
+            'success': false,
+            'message': 'Admin login partially failed: Could not save user session: ${e.toString()}'
+          };
+        }
+      } else {
+        return {
+          'success': false,
+          'message': response.data['message'] ?? 'Admin login failed'
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Admin login failed: ${e.toString()}'};
     }
   }
 
@@ -2429,8 +2616,8 @@ class DataController extends GetxController {
 
       // 3. Optionally, disconnect other services
       // Example: If SocketService is managed or accessible here
-      // final SocketService socketService = Get.find<SocketService>();
-      // socketService.disconnect();
+      final SocketService socketService = Get.find<SocketService>();
+      socketService.dispose();
       //   // print('[DataController] SocketService disconnected.');
       // Note: Ensure SocketService handles multiple disconnect calls gracefully if also called in app dispose.
 

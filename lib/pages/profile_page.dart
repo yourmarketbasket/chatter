@@ -271,6 +271,65 @@ class _ProfilePageState extends State<ProfilePage> {
     await Share.share(content.isNotEmpty ? content : 'Check out this post from Chatter!', subject: 'Shared from Chatter');
   }
 
+  void _editPost(Map<String, dynamic> post) {
+    final editController = TextEditingController(text: post['content']);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
+        backgroundColor: const Color.fromARGB(255, 46, 46, 46),
+        title: const Text('Edit Post', style: TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: editController,
+          decoration: const InputDecoration(hintText: 'Edit your post', hintStyle: TextStyle(color: Colors.white)),
+          style: const TextStyle(color: Colors.white),
+          autofocus: true,
+          maxLines: null,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (editController.text.trim().isNotEmpty) {
+                dataController.updatePost(post['_id'], editController.text.trim());
+              }
+              Navigator.pop(context);
+            },
+            child: const Text('Save', style: TextStyle(color: Colors.tealAccent)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _deletePost(String postId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
+        backgroundColor: const Color.fromARGB(255, 46, 46, 46),
+        title: const Text('Delete Post', style: TextStyle(color: Colors.white)),
+        content: const Text('Are you sure you want to delete this post?', style: TextStyle(color: Colors.white)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              dataController.deletePost(postId);
+              Navigator.pop(context);
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Obx(() {
@@ -460,6 +519,19 @@ class _ProfilePageState extends State<ProfilePage> {
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                           ),
                         ),
+                        const SizedBox(width: 12),
+                        ElevatedButton.icon(
+                          onPressed: () async {
+                            await dataController.blockUser(widget.userId);
+                          },
+                          icon: const Icon(Icons.block),
+                          label: const Text('Block'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.redAccent,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                          ),
+                        ),
                       ],
                     ),
                 ],
@@ -545,6 +617,28 @@ class _ProfilePageState extends State<ProfilePage> {
                                           style: GoogleFonts.poppins(fontSize: 10, color: Colors.grey[500]),
                                           overflow: TextOverflow.ellipsis,
                                         ),
+                                        const Spacer(),
+                                        if (isOwnProfile)
+                                          PopupMenuButton<String>(
+                                            onSelected: (value) {
+                                              if (value == 'edit') {
+                                                _editPost(post);
+                                              } else if (value == 'delete') {
+                                                _deletePost(postId);
+                                              }
+                                            },
+                                            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                                              const PopupMenuItem<String>(
+                                                value: 'edit',
+                                                child: Text('Edit'),
+                                              ),
+                                              const PopupMenuItem<String>(
+                                                value: 'delete',
+                                                child: Text('Delete'),
+                                              ),
+                                            ],
+                                            icon: const Icon(Icons.more_horiz, color: Colors.white),
+                                          ),
                                       ],
                                     ),
                                     const SizedBox(height: 6),

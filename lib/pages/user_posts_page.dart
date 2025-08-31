@@ -558,6 +558,65 @@ class _UserPostsPageState extends State<UserPostsPage> {
     }
   }
 
+  void _editPost(Map<String, dynamic> post) {
+    final editController = TextEditingController(text: post['content']);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
+        backgroundColor: const Color.fromARGB(255, 46, 46, 46),
+        title: const Text('Edit Post', style: TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: editController,
+          decoration: const InputDecoration(hintText: 'Edit your post', hintStyle: TextStyle(color: Colors.white)),
+          style: const TextStyle(color: Colors.white),
+          autofocus: true,
+          maxLines: null,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (editController.text.trim().isNotEmpty) {
+                _dataController.updatePost(post['_id'], editController.text.trim());
+              }
+              Navigator.pop(context);
+            },
+            child: const Text('Save', style: TextStyle(color: Colors.tealAccent)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _deletePost(String postId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
+        backgroundColor: const Color.fromARGB(255, 46, 46, 46),
+        title: const Text('Delete Post', style: TextStyle(color: Colors.white)),
+        content: const Text('Are you sure you want to delete this post?', style: TextStyle(color: Colors.white)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              _dataController.deletePost(postId);
+              Navigator.pop(context);
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+  }
+
   final ScrollController _scrollController = ScrollController();
 
   @override
@@ -572,7 +631,7 @@ class _UserPostsPageState extends State<UserPostsPage> {
     });
   }
 
-  Widget _buildPostContent(Map<String, dynamic> post, {required bool isReply}) {
+  Widget _buildPostContent(Map<String, dynamic> post, {required bool isReply, required bool isMyPost}) {
     final String postId = post['_id'] as String? ?? post.hashCode.toString();
     final String username = post['username'] as String? ?? 'Unknown User';
     final String contentTextData = post['content'] as String? ?? '';
@@ -665,6 +724,28 @@ class _UserPostsPageState extends State<UserPostsPage> {
                           overflow: TextOverflow.ellipsis,
                           softWrap: false,
                         ),
+                        const Spacer(),
+                        if (isMyPost)
+                          PopupMenuButton<String>(
+                            onSelected: (value) {
+                              if (value == 'edit') {
+                                _editPost(post);
+                              } else if (value == 'delete') {
+                                _deletePost(postId);
+                              }
+                            },
+                            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                              const PopupMenuItem<String>(
+                                value: 'edit',
+                                child: Text('Edit'),
+                              ),
+                              const PopupMenuItem<String>(
+                                value: 'delete',
+                                child: Text('Delete'),
+                              ),
+                            ],
+                            icon: const Icon(Icons.more_horiz, color: Colors.white),
+                          ),
 
                         Obx(() {
                           final loggedInUserId = _dataController.user.value['user']?['_id'];
@@ -785,7 +866,7 @@ class _UserPostsPageState extends State<UserPostsPage> {
                 return const Center(child: CircularProgressIndicator());
               }
               final post = _dataController.userPosts[index];
-              return _buildPostContent(post, isReply: false);
+              return _buildPostContent(post, isReply: false, isMyPost: isMyPosts);
             },
           );
         }),
