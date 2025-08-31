@@ -1816,6 +1816,52 @@ class DataController extends GetxController {
     }
   }
 
+  Future<void> deleteMultipleChatMessages(List<String> messageIds, {required bool forEveryone}) async {
+    // print('[DataController] Deleting messages ${messageIds.join(', ')} with forEveryone=$forEveryone');
+    try {
+      final token = user.value['token'];
+      if (token == null) {
+        throw Exception('User not authenticated');
+      }
+      final response = await _dio.post(
+        'api/messages/delete-multiple',
+        data: {
+          'messageIds': messageIds,
+          'forEveryone': forEveryone,
+        },
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        // print('[DataController] API call to delete messages successful.');
+
+        for (final messageId in messageIds) {
+            final index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
+            if (index != -1) {
+                if (forEveryone) {
+                    var message = Map<String, dynamic>.from(currentConversationMessages[index]);
+                    message['deletedForEveryone'] = true;
+                    message['content'] = ''; // Clear content
+                    message['files'] = []; // Clear files
+                    currentConversationMessages[index] = message;
+                } else {
+                    currentConversationMessages.removeAt(index);
+                }
+            }
+        }
+        currentConversationMessages.refresh();
+
+      } else {
+        // print('[DataController] Failed to delete messages on the server.');
+        throw Exception('Failed to delete messages on the server');
+      }
+    } catch (e) {
+      // print('[DataController] Error deleting messages: $e');
+    }
+  }
+
   Future<Map<String, dynamic>> deleteChat(String chatId) async {
     // print('[DataController] Deleting chat $chatId');
     try {

@@ -32,6 +32,7 @@ import 'dart:typed_data';
 import 'package:chatter/pages/users_list_page.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_linkify/flutter_linkify.dart';
+import 'package:feather_icons/feather_icons.dart';
 
 
 class ChatScreen extends StatefulWidget {
@@ -48,6 +49,8 @@ class _ChatScreenState extends State<ChatScreen> {
   Map<String, dynamic>? _replyingTo;
   int _sdkInt = 0;
   final Map<String, Uint8List?> _localVideoThumbnails = {};
+  final RxList<String> selectedMessages = <String>[].obs;
+  bool get isSelectionMode => selectedMessages.isNotEmpty;
 
   @override
   void initState() {
@@ -320,86 +323,35 @@ class _ChatScreenState extends State<ChatScreen> {
   );
 }
 
-  void _showMessageOptions(Map<String, dynamic> message) {
-    showModalBottomSheet(
-      backgroundColor: const Color.fromARGB(255, 31, 31, 31),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(20.0),
-          topRight: Radius.circular(20.0),
-        ),
-      ),
-      context: context,
-      builder: (context) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(
-            leading: const Icon(Icons.reply, color: Colors.white),
-            title: const Text('Reply', style: TextStyle(color: Colors.white)),
-            onTap: () {
-              Navigator.pop(context);
-              setState(() {
-                _replyingTo = message;
-              });
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.forward, color: Colors.white),
-            title: const Text('Forward', style: TextStyle(color: Colors.white)),
-            onTap: () {
-              Navigator.pop(context);
-              _forwardMessage(message);
-            },
-          ),
-          if ((message['content'] as String).isNotEmpty)
-            ListTile(
-              leading: const Icon(Icons.copy, color: Colors.white),
-              title: const Text('Copy', style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Navigator.pop(context);
-                _copyMessage(message);
-              },
-            ),
-          if (dataController.currentChat.value['type'] != 'group')
-            ListTile(
-              leading: const Icon(Icons.thumb_up, color: Colors.white),
-              title: const Text('React', style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Navigator.pop(context);
-                _showReactionsDialog(message);
-              },
-            ),
-          if (message['senderId']['_id'] == dataController.user.value['user']['_id'])
-            ListTile(
-              leading: const Icon(Icons.edit, color: Colors.white),
-              title: const Text('Edit', style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Navigator.pop(context);
-                _editMessage(message);
-              },
-            ),
-          ListTile(
-            leading: const Icon(Icons.delete, color: Colors.white),
-            title: const Text('Delete for me', style: TextStyle(color: Colors.white)),
-            onTap: () {
-              Navigator.pop(context);
-              _deleteMessage(message, forEveryone: false);
-            },
-          ),
-          if (message['senderId']['_id'] == dataController.user.value['user']['_id'])
-            ListTile(
-              leading: const Icon(Icons.delete_forever, color: Colors.white),
-              title: const Text('Delete for everyone', style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Navigator.pop(context);
-                _deleteMessage(message, forEveryone: true);
-              },
-            ),
-        ],
-      ),
-    );
-  }
+void _forwardMultipleMessages(List<Map<String, dynamic>> messages) {
+    if (messages.isEmpty) return;
 
+    if (messages.length == 1) {
+        _forwardMessage(messages.first);
+    } else {
+        Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) => UsersListPage(
+                    onUserSelected: (user) {
+                        for (var message in messages) {
+                            dataController.forwardMessage(message, user['_id']);
+                        }
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('${messages.length} messages forwarded to ${user['name']}')),
+                        );
+                    },
+                ),
+            ),
+        );
+    }
+}
+
+void _deleteMultipleMessages({required bool forEveryone}) {
+    dataController.deleteMultipleChatMessages(List<String>.from(selectedMessages), forEveryone: forEveryone);
+    selectedMessages.clear();
+}
 
   Widget _buildReactions(Map<String, dynamic> message, bool isYou) {
     final reactions = message['reactions'] as List<dynamic>? ?? [];
@@ -697,9 +649,17 @@ class _ChatScreenState extends State<ChatScreen> {
             );
           }
 
-          return GestureDetector(
-            onTap: () => _openMediaView(updatedMessage, index),
-          child: _buildAttachmentContent(attachment, isLocalFile, key: attachmentKey),
+          return Stack(
+            children: [
+              _buildAttachmentContent(attachment, isLocalFile, key: attachmentKey),
+              if (selectedMessages.contains(updatedMessage['_id']))
+                Container(
+                  color: Colors.black.withOpacity(0.5),
+                  child: const Center(
+                    child: Icon(FeatherIcons.check, color: Colors.white),
+                  ),
+                ),
+            ],
           );
         },
       );
@@ -890,13 +850,14 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
- Widget _buildMessageContent(Map<String, dynamic> message, Map<String, dynamic>? prevMessage) {
+Widget _buildMessageContent(Map<String, dynamic> message, Map<String, dynamic>? prevMessage) {
   final senderId = message['senderId'] is Map ? message['senderId']['_id'] : message['senderId'];
   final isYou = senderId == dataController.user.value['user']['_id'];
   final prevSenderId = prevMessage != null ? (prevMessage['senderId'] is Map ? prevMessage['senderId']['_id'] : prevMessage['senderId']) : null;
   final isSameSenderAsPrevious = prevSenderId != null && prevSenderId == senderId;
   final bottomMargin = isSameSenderAsPrevious ? 2.0 : 8.0;
   final hasAttachment = message['files'] != null && (message['files'] as List).isNotEmpty;
+  final isSelected = selectedMessages.contains(message['_id']);
 
   // Determine sender name for display
   final sender = dataController.allUsers.firstWhere(
@@ -922,7 +883,7 @@ class _ChatScreenState extends State<ChatScreen> {
       minWidth: MediaQuery.of(context).size.width * 0.10,
     ),
     decoration: BoxDecoration(
-      color: isYou ? Colors.transparent.withOpacity(0.2) : Colors.transparent,
+      color: isSelected ? Colors.teal.withOpacity(0.4) : (isYou ? Colors.transparent.withOpacity(0.2) : Colors.transparent),
       border: Border.all(color: isYou ? Colors.teal.withOpacity(0.6) : const Color.fromARGB(167, 143, 141, 141), width: 1.0),
       borderRadius: BorderRadius.only(
         topLeft: const Radius.circular(20.0),
@@ -954,7 +915,6 @@ class _ChatScreenState extends State<ChatScreen> {
               fontStyle: FontStyle.italic,
             ),
           )
-          // more changes
         else ...[
           if (message['replyTo'] != null)
             Obx(() {
@@ -979,7 +939,6 @@ class _ChatScreenState extends State<ChatScreen> {
                   borderRadius: BorderRadius.circular(20),
                   border: Border(
                     left: BorderSide(color: isYou ? Colors.teal : Colors.grey, width: 2),
-                    
                   ),
                 ),
                 child: Column(
@@ -1039,27 +998,9 @@ class _ChatScreenState extends State<ChatScreen> {
             Stack(
               alignment: Alignment.topRight,
               children: [
-                GestureDetector(
-                  onTap: () => _openMediaView(message, 0),
-                  child: AudioWaveformWidget(
-                    audioPath: message['files'][0]['url'],
-                    isLocal: !(message['files'][0]['url'] as String).startsWith('http'),
-                  ),
-                ),
-                Positioned(
-                  top: 4,
-                  right: 4,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.5),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.open_in_new,
-                      color: Colors.white,
-                      size: 18,
-                    ),
-                  ),
+                AudioWaveformWidget(
+                  audioPath: message['files'][0]['url'],
+                  isLocal: !(message['files'][0]['url'] as String).startsWith('http'),
                 ),
               ],
             ),
@@ -1120,11 +1061,31 @@ class _ChatScreenState extends State<ChatScreen> {
 
   return GestureDetector(
     onLongPress: () {
-      if (!(message['deletedForEveryone'] ?? false)) _showMessageOptions(message);
+      if (!(message['deletedForEveryone'] ?? false)) {
+        if (!isSelectionMode) {
+          selectedMessages.add(message['_id']);
+        }
+      }
+    },
+    onTap: () {
+      if (isSelectionMode) {
+        if (isSelected) {
+          selectedMessages.remove(message['_id']);
+        } else {
+          selectedMessages.add(message['_id']);
+        }
+      } else if (hasAttachment) {
+        // Handle tap for attachments if not in selection mode
+        if (message['type'] == 'voice') {
+          _openMediaView(message, 0);
+        } else {
+          // For other attachments, the tap is handled in _buildAttachment
+        }
+      }
     },
     child: Dismissible(
       key: Key(message['clientMessageId'] ?? message['_id']),
-      direction: (message['deletedForEveryone'] ?? false)
+      direction: isSelectionMode || (message['deletedForEveryone'] ?? false)
           ? DismissDirection.none
           : DismissDirection.startToEnd,
       confirmDismiss: (direction) async {
@@ -1144,6 +1105,20 @@ class _ChatScreenState extends State<ChatScreen> {
         children: [
           messageBubble,
           _buildReactions(message, isYou),
+          if (isSelected)
+            Positioned(
+              bottom: -5,
+              left: isYou ? null : 5,
+              right: isYou ? 5 : null,
+              child: Icon(FeatherIcons.checkCircle, color: Colors.teal, size: 20),
+            ),
+          if (isSelected)
+            Positioned(
+            bottom: -5,
+            left: isYou ? null : 5,
+            right: isYou ? 5 : null,
+            child: Icon(FeatherIcons.checkCircle, color: Colors.teal, size: 20),
+            ),
         ],
       ),
     ),
@@ -1347,6 +1322,250 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  AppBar _buildSelectionAppBar() {
+    final selectedMessageObjects = dataController.currentConversationMessages
+        .where((m) => selectedMessages.contains(m['_id']))
+        .toList();
+
+    final canCopy = selectedMessageObjects.length == 1 &&
+        selectedMessageObjects.first['content'] != null &&
+        (selectedMessageObjects.first['content'] as String).isNotEmpty;
+
+    final canEdit = selectedMessageObjects.length == 1 &&
+        selectedMessageObjects.first['senderId']['_id'] == dataController.getUserId() &&
+        selectedMessageObjects.first['content'] != null &&
+        (selectedMessageObjects.first['content'] as String).isNotEmpty;
+
+    final canReply = selectedMessageObjects.length == 1;
+    final canForward = selectedMessageObjects.isNotEmpty;
+    final canDeleteForEveryone = selectedMessageObjects.isNotEmpty &&
+        selectedMessageObjects.every((m) => m['senderId']['_id'] == dataController.getUserId());
+
+    return AppBar(
+      backgroundColor: Colors.black,
+      surfaceTintColor: Colors.black,
+      leading: IconButton(
+        icon: const Icon(FeatherIcons.x, color: Colors.white),
+        onPressed: () {
+          selectedMessages.clear();
+        },
+      ),
+      title: Text('${selectedMessages.length} selected', style: const TextStyle(color: Colors.white)),
+      actions: [
+        if (canCopy)
+          IconButton(
+            icon: const Icon(FeatherIcons.copy, color: Colors.white),
+            onPressed: () {
+              _copyMessage(selectedMessageObjects.first);
+              selectedMessages.clear();
+            },
+          ),
+        if (canEdit)
+          IconButton(
+            icon: const Icon(FeatherIcons.edit, color: Colors.white),
+            onPressed: () {
+              _editMessage(selectedMessageObjects.first);
+              selectedMessages.clear();
+            },
+          ),
+        if (canReply)
+          IconButton(
+            icon: const Icon(FeatherIcons.cornerUpLeft, color: Colors.white),
+            onPressed: () {
+              setState(() {
+                _replyingTo = selectedMessageObjects.first;
+              });
+              selectedMessages.clear();
+            },
+          ),
+        if (canForward)
+          IconButton(
+            icon: const Icon(FeatherIcons.arrowRight, color: Colors.white),
+            onPressed: () {
+              _forwardMultipleMessages(selectedMessageObjects);
+              selectedMessages.clear();
+            },
+          ),
+        PopupMenuButton<String>(
+          onSelected: (value) {
+            if (value == 'delete_for_me') {
+              _deleteMultipleMessages(forEveryone: false);
+            } else if (value == 'delete_for_everyone') {
+              _deleteMultipleMessages(forEveryone: true);
+            }
+            selectedMessages.clear();
+          },
+          itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+            const PopupMenuItem<String>(
+              value: 'delete_for_me',
+              child: Text('Delete for me'),
+            ),
+            if (canDeleteForEveryone)
+              const PopupMenuItem<String>(
+                value: 'delete_for_everyone',
+                child: Text('Delete for everyone'),
+              ),
+          ],
+          icon: const Icon(FeatherIcons.moreVertical, color: Colors.white),
+        ),
+      ],
+    );
+  }
+
+  AppBar _buildNormalAppBar() {
+    return AppBar(
+      backgroundColor: Colors.black,
+      surfaceTintColor: Colors.black,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back, color: Colors.white),
+        onPressed: () => Navigator.pop(context),
+      ),
+      title: Obx(() {
+        // All data fetching logic is now inside Obx, ensuring reactivity.
+        final chat = dataController.currentChat.value;
+        final isGroup = chat['type'] == 'group';
+
+        String title;
+        String avatarUrl;
+        String avatarLetter;
+        bool isOnline = false;
+        Map<String, dynamic>? userForProfile; // For navigation and status
+
+        if (isGroup) {
+          title = chat['name'] ?? 'Group Chat';
+          avatarUrl = chat['groupAvatar'] ?? '';
+          avatarLetter = title.isNotEmpty ? title[0].toUpperCase() : 'G';
+        } else {
+          final currentUserId = dataController.user.value['user']['_id'];
+          final otherParticipantRaw = (chat['participants'] as List<dynamic>).firstWhere(
+            (p) => (p is Map ? p['_id'] : p) != currentUserId,
+            orElse: () => null,
+          );
+
+          if (otherParticipantRaw == null) {
+            return const Text('Error: User not found', style: TextStyle(color: Colors.red, fontSize: 14));
+          }
+
+          final otherUserId = otherParticipantRaw is Map ? otherParticipantRaw['_id'] : otherParticipantRaw;
+
+          // Reactively find the user in the global user list.
+          final otherUser = dataController.allUsers.firstWhere(
+            (u) => u['_id'] == otherUserId,
+            orElse: () => {
+              '_id': otherUserId,
+              'name': 'Loading...',
+              'avatar': '',
+              'online': false,
+              'lastSeen': null,
+            },
+          );
+
+          userForProfile = otherUser;
+          title = otherUser['name'] ?? 'User';
+          avatarUrl = otherUser['avatar'] ?? '';
+          avatarLetter = title.isNotEmpty ? title[0].toUpperCase() : 'U';
+          isOnline = otherUser['online'] ?? false;
+        }
+
+        // This widget will now rebuild whenever the typing status, online status, or chat details change.
+        Widget statusWidget;
+        if (!isGroup && userForProfile != null) {
+          final chatId = chat['_id'] as String?;
+          // Always read an observable property to prevent GetX errors.
+          // We can use `.value` or `.length` on the RxMap.
+          final isTypingMap = dataController.isTyping.value;
+
+          String? typingUserId;
+          if (chatId != null) {
+            typingUserId = isTypingMap[chatId];
+          }
+
+          if (typingUserId != null && typingUserId == userForProfile['_id']) {
+            statusWidget = const Text(
+              'typing...',
+              style: TextStyle(color: Colors.tealAccent, fontSize: 12, fontStyle: FontStyle.italic),
+            );
+          } else {
+            // The user's online status is part of the userForProfile map, which is derived
+            // from the observable allUsers list. So this part is reactive.
+            if (userForProfile['online'] == true) {
+              statusWidget = const Text('online', style: TextStyle(color: Colors.green, fontSize: 12));
+            } else if (userForProfile['lastSeen'] != null) {
+              statusWidget = Text(
+                'last seen ${formatLastSeen(DateTime.parse(userForProfile['lastSeen']))}',
+                style: const TextStyle(color: Colors.grey, fontSize: 12),
+                overflow: TextOverflow.ellipsis,
+              );
+            } else {
+              statusWidget = const Text('offline', style: TextStyle(color: Colors.grey, fontSize: 12));
+            }
+          }
+        } else {
+          statusWidget = const SizedBox.shrink();
+        }
+
+        return GestureDetector(
+          onTap: () {
+            if (isGroup) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => GroupProfilePage(chat: chat)),
+              );
+            } else if (userForProfile != null) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProfilePage(
+                    userId: userForProfile!['_id'],
+                    username: userForProfile['name'],
+                    userAvatarUrl: userForProfile['avatar'],
+                  ),
+                ),
+              );
+            }
+          },
+          child: Row(
+            children: [
+              Stack(
+                children: [
+                  DottedBorder(
+                    options: CircularDottedBorderOptions(
+                      gradient: LinearGradient(
+                        colors: [isOnline ? Colors.teal : const BorderType.Color.fromARGB(255, 161, 161, 161), Colors.black],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      strokeWidth: 1.5,
+                    ),
+                    child: CircleAvatar(
+                      backgroundColor: Colors.tealAccent,
+                      backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+                      child: avatarUrl.isEmpty ? Text(avatarLetter, style: const TextStyle(color: Colors.black)) : null,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _capitalizeFirstLetter(title),
+                      style: const TextStyle(color: Colors.white, fontSize: 16),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    statusWidget,
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      }),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Obx(() {
@@ -1360,157 +1579,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
       return Scaffold(
         backgroundColor: Colors.black,
-        appBar: AppBar(
-          backgroundColor: Colors.black,
-          surfaceTintColor: Colors.black,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          ),
-          title: Obx(() {
-            // All data fetching logic is now inside Obx, ensuring reactivity.
-            final chat = dataController.currentChat.value;
-            final isGroup = chat['type'] == 'group';
-
-            String title;
-            String avatarUrl;
-            String avatarLetter;
-            bool isOnline = false;
-            Map<String, dynamic>? userForProfile; // For navigation and status
-
-            if (isGroup) {
-              title = chat['name'] ?? 'Group Chat';
-              avatarUrl = chat['groupAvatar'] ?? '';
-              avatarLetter = title.isNotEmpty ? title[0].toUpperCase() : 'G';
-            } else {
-              final currentUserId = dataController.user.value['user']['_id'];
-              final otherParticipantRaw = (chat['participants'] as List<dynamic>).firstWhere(
-                (p) => (p is Map ? p['_id'] : p) != currentUserId,
-                orElse: () => null,
-              );
-
-              if (otherParticipantRaw == null) {
-                return const Text('Error: User not found', style: TextStyle(color: Colors.red, fontSize: 14));
-              }
-
-              final otherUserId = otherParticipantRaw is Map ? otherParticipantRaw['_id'] : otherParticipantRaw;
-
-              // Reactively find the user in the global user list.
-              final otherUser = dataController.allUsers.firstWhere(
-                (u) => u['_id'] == otherUserId,
-                orElse: () => {
-                  '_id': otherUserId,
-                  'name': 'Loading...',
-                  'avatar': '',
-                  'online': false,
-                  'lastSeen': null,
-                },
-              );
-
-              userForProfile = otherUser;
-              title = otherUser['name'] ?? 'User';
-              avatarUrl = otherUser['avatar'] ?? '';
-              avatarLetter = title.isNotEmpty ? title[0].toUpperCase() : 'U';
-              isOnline = otherUser['online'] ?? false;
-            }
-
-            // This widget will now rebuild whenever the typing status, online status, or chat details change.
-            Widget statusWidget;
-            if (!isGroup && userForProfile != null) {
-              final chatId = chat['_id'] as String?;
-              // Always read an observable property to prevent GetX errors.
-              // We can use `.value` or `.length` on the RxMap.
-              final isTypingMap = dataController.isTyping.value;
-
-              String? typingUserId;
-              if (chatId != null) {
-                typingUserId = isTypingMap[chatId];
-              }
-
-              if (typingUserId != null && typingUserId == userForProfile['_id']) {
-                statusWidget = const Text(
-                  'typing...',
-                  style: TextStyle(color: Colors.tealAccent, fontSize: 12, fontStyle: FontStyle.italic),
-                );
-              } else {
-                // The user's online status is part of the userForProfile map, which is derived
-                // from the observable allUsers list. So this part is reactive.
-                if (userForProfile['online'] == true) {
-                  statusWidget = const Text('online', style: TextStyle(color: Colors.green, fontSize: 12));
-                } else if (userForProfile['lastSeen'] != null) {
-                  statusWidget = Text(
-                    'last seen ${formatLastSeen(DateTime.parse(userForProfile['lastSeen']))}',
-                    style: const TextStyle(color: Colors.grey, fontSize: 12),
-                    overflow: TextOverflow.ellipsis,
-                  );
-                } else {
-                  statusWidget = const Text('offline', style: TextStyle(color: Colors.grey, fontSize: 12));
-                }
-              }
-            } else {
-              statusWidget = const SizedBox.shrink();
-            }
-
-            return GestureDetector(
-              onTap: () {
-                if (isGroup) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => GroupProfilePage(chat: chat)),
-                  );
-                } else if (userForProfile != null) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => ProfilePage(
-                        userId: userForProfile!['_id'],
-                        username: userForProfile['name'],
-                        userAvatarUrl: userForProfile['avatar'],
-                      ),
-                    ),
-                  );
-                }
-              },
-              child: Row(
-                children: [
-                  Stack(
-                    children: [
-                      DottedBorder(
-                        options: CircularDottedBorderOptions(
-                          gradient: LinearGradient(
-                            colors: [isOnline ? Colors.teal : const BorderType.Color.fromARGB(255, 161, 161, 161), Colors.black],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          strokeWidth: 1.5,
-                        ),
-                        child: CircleAvatar(
-                          backgroundColor: Colors.tealAccent,
-                          backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
-                          child: avatarUrl.isEmpty ? Text(avatarLetter, style: const TextStyle(color: Colors.black)) : null,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _capitalizeFirstLetter(title),
-                          style: const TextStyle(color: Colors.white, fontSize: 16),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        statusWidget,
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
-        ),
+        appBar: isSelectionMode ? _buildSelectionAppBar() : _buildNormalAppBar(),
         body: Column(
           children: [
             Expanded(
