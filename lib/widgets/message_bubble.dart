@@ -197,6 +197,7 @@ class _MessageBubbleState extends State<MessageBubble> {
             ),
             if (content.isNotEmpty) const SizedBox(height: 8),
           ],
+          // important
           ...urls.map((url) => LinkPreviewWidget(
                 url: url,
                 onPreviewSuccess: () {
