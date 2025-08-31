@@ -49,6 +49,22 @@ class _ChatScreenState extends State<ChatScreen> {
   Map<String, dynamic>? _replyingTo;
   int _sdkInt = 0;
   final Map<String, Uint8List?> _localVideoThumbnails = {};
+  bool _isSelectionMode = false;
+  final Set<String> _selectedMessages = {};
+
+  void _toggleSelection(String messageId) {
+    setState(() {
+      if (_selectedMessages.contains(messageId)) {
+        _selectedMessages.remove(messageId);
+        if (_selectedMessages.isEmpty) {
+          _isSelectionMode = false;
+        }
+      } else {
+        _selectedMessages.add(messageId);
+        _isSelectionMode = true;
+      }
+    });
+  }
 
   @override
   void initState() {
