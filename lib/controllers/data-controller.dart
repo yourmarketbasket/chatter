@@ -4429,7 +4429,7 @@ void clearUserPosts() {
       'files': uploadedFiles,
     };
 
-    await sendChatMessage(finalMessage, clientMessageI d);
+    await sendChatMessage(finalMessage, clientMessageId);
 
     final targetUser = allUsers.firstWhere((u) => u['_id'] == targetUserId, orElse: () => {'name': 'user'});
     Get.snackbar('Success', 'Message sent to ${targetUser['name']}');

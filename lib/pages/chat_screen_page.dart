@@ -327,7 +327,6 @@ class _ChatScreenState extends State<ChatScreen> {
     showGeneralDialog(
       context: context,
       barrierDismissible: true,
-      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissibleLabel,
       barrierColor: Colors.black.withOpacity(0.5),
       transitionDuration: const Duration(milliseconds: 200),
       pageBuilder: (BuildContext buildContext, Animation<double> animation, Animation<double> secondaryAnimation) {
@@ -1302,11 +1301,10 @@ class _ChatScreenState extends State<ChatScreen> {
                           }
                         },
                         child: GestureDetector(
-                          onLongPressStart: (details) {
+                          onLongPress: () {
                             final messageId = message['_id'] ?? message['clientMessageId'];
                             if (messageId != null) {
                               _toggleSelection(messageId);
-                              _showReactionDialog(context, message, details.globalPosition);
                             }
                           },
                           onTap: () {
