@@ -38,6 +38,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'package:chatter/main.dart'; // Import for routeObserver
+import 'package:share_handler/share_handler.dart';
 
 class HomeFeedScreen extends StatefulWidget {
   const HomeFeedScreen({Key? key}) : super(key: key);
@@ -67,6 +68,39 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> with RouteAware {
         dataController.fetchFeeds();
       }
     });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (Get.arguments != null && Get.arguments['sharedMedia'] != null) {
+        final sharedMedia = Get.arguments['sharedMedia'] as SharedMedia;
+        _handleSharedPost(sharedMedia);
+        // Clear arguments after handling
+        Get.arguments.remove('sharedMedia');
+      }
+    });
+  }
+
+  Future<void> _handleSharedPost(SharedMedia sharedMedia) async {
+    final String content = sharedMedia.content ?? '';
+    final List<Map<String, dynamic>> attachments = [];
+
+    if (sharedMedia.attachments != null && sharedMedia.attachments!.isNotEmpty) {
+      for (var attachment in sharedMedia.attachments!) {
+        if (attachment?.path != null) {
+          final file = File(attachment!.path);
+          final fileType = dataController.getMediaType(attachment.path.split('.').last);
+          attachments.add({
+            'file': file,
+            'type': fileType,
+            'filename': attachment.path.split('/').last,
+            'size': await file.length(),
+          });
+        }
+      }
+    }
+
+    if (content.isNotEmpty || attachments.isNotEmpty) {
+      _addPost(content, attachments);
+    }
   }
 
   void _navigateToProfilePage(BuildContext context, String userId, String username, String? userAvatarUrl) {

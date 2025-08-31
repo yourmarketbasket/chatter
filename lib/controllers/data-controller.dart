@@ -405,6 +405,34 @@ class DataController extends GetxController {
     }
   }
 
+  void handleMessagesDeleted(Map<String, dynamic> data) {
+    final messageIds = List<String>.from(data['messageIds'] ?? []);
+    final deleteFor = data['deleteFor'] as String?;
+
+    if (messageIds.isEmpty || deleteFor == null) {
+      return;
+    }
+
+    if (deleteFor == 'everyone') {
+      bool changed = false;
+      for (final messageId in messageIds) {
+        final index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
+        if (index != -1) {
+          // Mark as deleted for everyone
+          currentConversationMessages[index]['deletedForEveryone'] = true;
+          currentConversationMessages[index]['content'] = '';
+          currentConversationMessages[index]['files'] = [];
+          changed = true;
+        }
+      }
+      if (changed) {
+        currentConversationMessages.refresh();
+      }
+    }
+    // No action needed for deleteFor: "me" as it only affects the sender,
+    // who has already handled it optimistically.
+  }
+
   void markMessageAsReadById(String messageId) {
     if (messageId.isEmpty) return;
     // This is called from a notification, so we don't have the message object.
@@ -1874,6 +1902,14 @@ class DataController extends GetxController {
     } else {
       print('[DataController] Chat with ID $chatId not found in the local chats map.');
     }
+  }
+
+  void handleChatsDeletedForMe(List<String> chatIds) {
+    // This event confirms that the chats were successfully deleted on the server
+    // for the current user. Since we already optimistically removed them from the UI,
+    // we don't need to do anything here other than maybe log it for debugging.
+    // If the API call in `deleteMultipleChats` had failed, the UI would have already been reverted.
+    print('[DataController] Received confirmation for soft deletion of chats: $chatIds');
   }
 
   void handleGroupUpdated(Map<String, dynamic> data) {
@@ -3745,6 +3781,47 @@ void clearUserPosts() {
     }
   }
 
+  // ASSUMED ENDPOINT
+  Future<Map<String, dynamic>?> getGroupDetailsFromInvite(String inviteCode) async {
+    try {
+      final token = user.value['token'];
+      if (token == null) throw Exception('User not authenticated');
+      // This endpoint is assumed as it is not in the documentation.
+      final response = await _dio.get(
+        'api/invites/$inviteCode',
+        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return response.data['group'];
+      }
+      return null;
+    } catch (e) {
+      print('Error getting group details from invite: $e');
+      return null;
+    }
+  }
+
+  // ASSUMED ENDPOINT
+  Future<bool> joinGroupFromInvite(String inviteCode) async {
+    try {
+      final token = user.value['token'];
+      if (token == null) throw Exception('User not authenticated');
+      // This endpoint is assumed as it is not in the documentation.
+      final response = await _dio.post(
+        'api/invites/$inviteCode/join',
+        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        fetchChats();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      print('Error joining group from invite: $e');
+      return false;
+    }
+  }
+
   Future<bool> updateGroupDetails(String chatId, {String? name, String? about}) async {
     try {
       final token = user.value['token'];
@@ -3766,6 +3843,28 @@ void clearUserPosts() {
     } catch (e) {
       // print('Error updating group details: $e');
       return false;
+    }
+  }
+
+  Future<String?> generateGroupInviteLink(String chatId) async {
+    try {
+      final token = user.value['token'];
+      if (token == null) {
+        throw Exception('User not authenticated');
+      }
+      final response = await _dio.post(
+        'api/chats/$chatId/invite-link',
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+      if (response.statusCode == 200 && response.data['inviteLink'] != null) {
+        return response.data['inviteLink'];
+      }
+      return null;
+    } catch (e) {
+      print('Error generating group invite link: $e');
+      return null;
     }
   }
 
@@ -3965,39 +4064,55 @@ void clearUserPosts() {
 
   Future<void> forwardMessage(Map<String, dynamic> message, String targetUserId) async {
     final content = message['content'];
-    final files = (message['files'] as List)
-        .map((file) => PlatformFile(
-              name: file['filename'],
-              size: file['size'],
-              path: file['url'],
-            ))
-        .toList();
+    final files = message['files']; // This is already a List<Map<String, dynamic>>
+    final messageType = message['type'];
 
-    // Create a new chat with the target user if it doesn't exist
-    // This logic might need to be adjusted based on how you create new chats
-    Map<String, dynamic>? existingChat;
+    // Find existing DM chat with the target user
+    String? chatId;
     try {
-      existingChat = chats.values.firstWhere(
+      final targetChat = chats.values.firstWhere(
         (chat) =>
-            chat['type'] == 'private' &&
-            (chat['participants'] as List).any((p) => p['_id'] == targetUserId),
+            chat['type'] == 'dm' &&
+            (chat['participants'] as List).any((p) => (p is Map ? p['_id'] : p) == targetUserId),
+      );
+      chatId = targetChat['_id'];
+    } catch (e) {
+      chatId = null; // No existing chat found
+    }
+
+    final clientMessageId = const Uuid().v4();
+
+    final messageToSend = {
+      'clientMessageId': clientMessageId,
+      'chatId': chatId,
+      'participants': [getUserId(), targetUserId], // Only needed if chatId is null
+      'content': content,
+      'type': messageType,
+      'files': files,
+    };
+
+    try {
+      final token = user.value['token'];
+      if (token == null) {
+        throw Exception('User not authenticated');
+      }
+
+      final Map<String, dynamic> finalMessage = Map<String, dynamic>.from(messageToSend);
+      if (finalMessage['chatId'] != null && (finalMessage['chatId'] as String).isNotEmpty) {
+        finalMessage.remove('participants');
+      }
+
+      await _dio.post(
+        'api/messages',
+        data: finalMessage,
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+          validateStatus: (status) => status != null && status < 500,
+        ),
       );
     } catch (e) {
-      existingChat = null;
+      print('Error forwarding message: $e');
     }
-
-    String? chatId;
-    if (existingChat != null) {
-      chatId = existingChat['_id'];
-    }
-
-    sendChatMessage({
-      'chatId': chatId,
-      'content': content,
-      'type': message['type'],
-      'files': message['files'],
-      'participants': [getUserId(), targetUserId],
-    }, null);
   }
 
   Future<void> addReaction(String messageId, String emoji) async {
@@ -4103,20 +4218,122 @@ void clearUserPosts() {
   }
 
   Future<void> deleteMultipleChats(List<String> chatIds) async {
+    // Optimistic UI update: Remove the chats from the local list immediately.
+    final Map<String, Map<String, dynamic>> removedChats = {};
+    for (final chatId in chatIds) {
+      if (chats.containsKey(chatId)) {
+        removedChats[chatId] = chats[chatId]!;
+        chats.remove(chatId);
+      }
+    }
+    chats.refresh();
+
     try {
       final token = user.value['token'];
       if (token == null) {
         throw Exception('User not authenticated');
       }
-      await _dio.post(
-        'api/chats/delete-multiple',
+      final response = await _dio.delete(
+        'api/chats',
         data: {'chatIds': chatIds},
         options: dio.Options(
           headers: {'Authorization': 'Bearer $token'},
+          validateStatus: (status) => status != null && status < 500,
         ),
       );
+
+      if (response.statusCode != 200 || response.data['success'] != true) {
+        // If the API call fails, revert the change by adding the chats back.
+        print('Failed to delete chats on the server. Reverting local changes.');
+        chats.addAll(removedChats);
+        chats.refresh();
+      }
+      // If successful, the optimistic update is correct.
+      // The socket event `chats:deletedForMe` will be the final confirmation.
     } catch (e) {
-      // print('Error deleting multiple chats: $e');
+      print('Error deleting multiple chats: $e. Reverting local changes.');
+      // Revert UI on error
+      chats.addAll(removedChats);
+      chats.refresh();
+    }
+  }
+
+  Future<void> deleteMultipleMessages(List<String> messageIds, {required String deleteFor}) async {
+    // Optimistic UI update
+    final List<Map<String, dynamic>> removedMessages = [];
+    final Map<String, Map<String, dynamic>> originalMessages = {};
+
+    if (deleteFor == 'me') {
+      // For "delete for me", we remove the messages from the list
+      currentConversationMessages.removeWhere((message) {
+        if (messageIds.contains(message['_id'])) {
+          removedMessages.add(message);
+          return true;
+        }
+        return false;
+      });
+    } else { // for 'everyone'
+      // For "delete for everyone", we mark them as deleted
+      for (var i = 0; i < currentConversationMessages.length; i++) {
+        final message = currentConversationMessages[i];
+        if (messageIds.contains(message['_id'])) {
+          originalMessages[message['_id']] = Map<String, dynamic>.from(message);
+          currentConversationMessages[i]['deletedForEveryone'] = true;
+          currentConversationMessages[i]['content'] = '';
+          currentConversationMessages[i]['files'] = [];
+        }
+      }
+    }
+    currentConversationMessages.refresh();
+
+    try {
+      final token = user.value['token'];
+      if (token == null) {
+        throw Exception('User not authenticated');
+      }
+      final response = await _dio.delete(
+        'api/messages',
+        data: {
+          'messageIds': messageIds,
+          'deleteFor': deleteFor,
+        },
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+          validateStatus: (status) => status != null && status < 500,
+        ),
+      );
+
+      if (response.statusCode != 200 || response.data['success'] != true) {
+        print('Failed to delete messages on the server. Reverting local changes.');
+        // Revert the optimistic UI update
+        if (deleteFor == 'me') {
+          currentConversationMessages.addAll(removedMessages);
+          currentConversationMessages.sort((a, b) => DateTime.parse(a['createdAt']).compareTo(DateTime.parse(b['createdAt'])));
+        } else {
+          for (var i = 0; i < currentConversationMessages.length; i++) {
+            final message = currentConversationMessages[i];
+            if (originalMessages.containsKey(message['_id'])) {
+              currentConversationMessages[i] = originalMessages[message['_id']]!;
+            }
+          }
+        }
+        currentConversationMessages.refresh();
+      }
+    } catch (e) {
+      print('Error deleting multiple messages: $e. Reverting local changes.');
+      // Revert the optimistic UI update on error
+      if (deleteFor == 'me') {
+        currentConversationMessages.addAll(removedMessages);
+        currentConversationMessages.sort((a, b) => DateTime.parse(a['createdAt']).compareTo(DateTime.parse(b['createdAt'])));
+      } else {
+        for (var i = 0; i < currentConversationMessages.length; i++) {
+          final message = currentConversationMessages[i];
+          if (originalMessages.containsKey(message['_id'])) {
+            currentConversationMessages[i] = originalMessages[message['_id']]!;
+          }
+        }
+      }
+      currentConversationMessages.refresh();
     }
   }
 }

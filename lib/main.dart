@@ -3,6 +3,7 @@ import 'package:chatter/pages/home-feed-screen.dart';
 import 'package:chatter/pages/landing-page.dart';
 import 'package:chatter/pages/login.dart';
 import 'package:chatter/pages/admin_page.dart';
+import 'package:chatter/pages/join_group_page.dart';
 import 'package:chatter/pages/main_chats.dart';
 import 'package:chatter/pages/register.dart';
 import 'package:chatter/services/socket-service.dart';
@@ -110,52 +111,70 @@ class _ChatterAppState extends State<ChatterApp> {
   }
 
   void _handleSharedData(SharedMedia sharedMedia) {
-    Get.to(() => UsersListPage(
-          sharedData: sharedMedia,
-          onUserSelected: (user) {
-            if (sharedMedia.attachments == null || sharedMedia.attachments!.isEmpty) {
-              // Handle text sharing
-              _dataController.sendChatMessage({
-                'chatId': user['chatId'],
-                'content': sharedMedia.content,
-                'type': 'text',
-                'senderId': _dataController.user.value['user']['_id'],
-                'participants': [
-                  _dataController.user.value['user']['_id'],
-                  user['_id']
-                ],
-              }, null);
-            } else {
-              
-              final files = sharedMedia.attachments!
-                  .map((attachment) => PlatformFile(
-                        name: attachment!.path.split('/').last,
-                        path: attachment?.path,
-                        size: 0,
-                      ))
-                  .toList();
-              _dataController.sendChatMessage({
-                'chatId': user['chatId'],
-                'content': sharedMedia.content,
-                'type': 'attachment',
-                'files': files
-                    .map((file) => {
-                          'url': file.path,
-                          'type': _dataController.getMediaType(file.extension ?? ''),
-                          'size': file.size,
-                          'filename': file.name,
-                        })
-                    .toList(),
-                'senderId': _dataController.user.value['user']['_id'],
-                'participants': [
-                  _dataController.user.value['user']['_id'],
-                  user['_id']
-                ],
-              }, null);
-            }
-            Get.back();
-          },
-        ));
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Share to...'),
+        content: const Text('How would you like to share this content?'),
+        backgroundColor: const Color(0xFF252525),
+        actions: <Widget>[
+          TextButton(
+            child: const Text('As a Post'),
+            onPressed: () {
+              Get.back(); // Close the dialog
+              // Logic for sharing as a post will be implemented in the next step.
+              // For now, we can navigate to the new post screen with the shared data.
+              Get.to(() => const HomeFeedScreen(), arguments: {'sharedMedia': sharedMedia});
+            },
+          ),
+          TextButton(
+            child: const Text('As a Message'),
+            onPressed: () {
+              Get.back(); // Close the dialog
+              Get.to(() => UsersListPage(
+                    sharedData: sharedMedia,
+                    onUserSelected: (user) {
+                      // Note: This existing logic for sending attachments is flawed as it doesn't handle uploads.
+                      // It will be addressed as part of the "Share as Post" implementation which requires a robust upload flow.
+                      if (sharedMedia.attachments == null || sharedMedia.attachments!.isEmpty) {
+                        _dataController.sendChatMessage({
+                          'chatId': user['chatId'],
+                          'content': sharedMedia.content,
+                          'type': 'text',
+                          'senderId': _dataController.user.value['user']['_id'],
+                          'participants': [_dataController.user.value['user']['_id'], user['_id']],
+                        }, null);
+                      } else {
+                        final files = sharedMedia.attachments!
+                            .map((attachment) => PlatformFile(
+                                  name: attachment!.path.split('/').last,
+                                  path: attachment.path,
+                                  size: 0,
+                                ))
+                            .toList();
+                        _dataController.sendChatMessage({
+                          'chatId': user['chatId'],
+                          'content': sharedMedia.content,
+                          'type': 'attachment',
+                          'files': files
+                              .map((file) => {
+                                    'url': file.path,
+                                    'type': _dataController.getMediaType(file.extension ?? ''),
+                                    'size': file.size,
+                                    'filename': file.name,
+                                  })
+                              .toList(),
+                          'senderId': _dataController.user.value['user']['_id'],
+                          'participants': [_dataController.user.value['user']['_id'], user['_id']],
+                        }, null);
+                      }
+                      Get.back(); // Go back from UsersListPage
+                    },
+                  ));
+            },
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _checkInitialScreen() async {
@@ -228,6 +247,13 @@ class _ChatterAppState extends State<ChatterApp> {
         // main chats page
         GetPage(name: '/chats', page: () =>  MainChatsPage()),
         GetPage(name: '/admin', page: () => const AdminPage()),
+        GetPage(name: '/invites/:inviteCode', page: () {
+          final inviteCode = Get.parameters['inviteCode'];
+          if (inviteCode != null) {
+            return JoinGroupPage(inviteCode: inviteCode);
+          }
+          return const LandingPage();
+        }),
       ],
     );
   }

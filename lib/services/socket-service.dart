@@ -101,10 +101,11 @@ class SocketService {
       'message:new': (data) => _handleNewMessage(data),
       'message:update': (data) => _handleMessageUpdate(data),
       'message:delete': (data) => _handleMessageDelete(data),
+      'messages:deleted': (data) => _handleMessagesDeleted(data),
       'message:statusUpdate': (data) => _handleMessageStatusUpdate(data),
       'message:reaction': (data) => _handleMessageReaction(data),
       'message:reaction:removed': (data) => _handleMessageReactionRemoved(data),
-      'chat:deletedForMe': (data) => _handleChatDeleted(data, 'chat:deletedForMe'),
+      'chats:deletedForMe': (data) => _handleChatsDeletedForMe(data),
       'chat:hardDeleted': (data) => _handleChatDeleted(data, 'chat:hardDeleted'),
       'typing:started': (data) => _handleTyping(data, true),
       'typing:stopped': (data) => _handleTyping(data, false),
@@ -359,6 +360,25 @@ class SocketService {
       _eventController.add({'event': 'message:delete', 'data': data});
     } else {
         // print('SocketService: Invalid message:delete data format: ${data.runtimeType}');
+    }
+  }
+
+  void _handleMessagesDeleted(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      _dataController.handleMessagesDeleted(data);
+      _eventController.add({'event': 'messages:deleted', 'data': data});
+    } else {
+      print('SocketService: Invalid messages:deleted data format: ${data.runtimeType}');
+    }
+  }
+
+  void _handleChatsDeletedForMe(dynamic data) {
+    if (data is List) {
+      final chatIds = List<String>.from(data.map((item) => item.toString()));
+      _dataController.handleChatsDeletedForMe(chatIds);
+      _eventController.add({'event': 'chats:deletedForMe', 'data': chatIds});
+    } else {
+        print('SocketService: Invalid chats:deletedForMe data format: ${data.runtimeType}');
     }
   }
 

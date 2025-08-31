@@ -321,85 +321,6 @@ class _ChatScreenState extends State<ChatScreen> {
   );
 }
 
-  void _showMessageOptions(Map<String, dynamic> message) {
-    showModalBottomSheet(
-      backgroundColor: const Color.fromARGB(255, 31, 31, 31),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(20.0),
-          topRight: Radius.circular(20.0),
-        ),
-      ),
-      context: context,
-      builder: (context) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(
-            leading: const Icon(Icons.reply, color: Colors.white),
-            title: const Text('Reply', style: TextStyle(color: Colors.white)),
-            onTap: () {
-              Navigator.pop(context);
-              setState(() {
-                _replyingTo = message;
-              });
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.forward, color: Colors.white),
-            title: const Text('Forward', style: TextStyle(color: Colors.white)),
-            onTap: () {
-              Navigator.pop(context);
-              _forwardMessage(message);
-            },
-          ),
-          if ((message['content'] as String).isNotEmpty)
-            ListTile(
-              leading: const Icon(Icons.copy, color: Colors.white),
-              title: const Text('Copy', style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Navigator.pop(context);
-                _copyMessage(message);
-              },
-            ),
-          if (dataController.currentChat.value['type'] != 'group')
-            ListTile(
-              leading: const Icon(Icons.thumb_up, color: Colors.white),
-              title: const Text('React', style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Navigator.pop(context);
-                _showReactionsDialog(message);
-              },
-            ),
-          if (message['senderId']['_id'] == dataController.user.value['user']['_id'])
-            ListTile(
-              leading: const Icon(Icons.edit, color: Colors.white),
-              title: const Text('Edit', style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Navigator.pop(context);
-                _editMessage(message);
-              },
-            ),
-          ListTile(
-            leading: const Icon(Icons.delete, color: Colors.white),
-            title: const Text('Delete for me', style: TextStyle(color: Colors.white)),
-            onTap: () {
-              Navigator.pop(context);
-              _deleteMessage(message, forEveryone: false);
-            },
-          ),
-          if (message['senderId']['_id'] == dataController.user.value['user']['_id'])
-            ListTile(
-              leading: const Icon(Icons.delete_forever, color: Colors.white),
-              title: const Text('Delete for everyone', style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Navigator.pop(context);
-                _deleteMessage(message, forEveryone: true);
-              },
-            ),
-        ],
-      ),
-    );
-  }
 
 
   Widget _buildReactions(Map<String, dynamic> message, bool isYou) {
@@ -1022,6 +943,281 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  AppBar _buildNormalAppBar() {
+    return AppBar(
+      backgroundColor: Colors.black,
+      surfaceTintColor: Colors.black,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back, color: Colors.white),
+        onPressed: () => Navigator.pop(context),
+      ),
+      title: Obx(() {
+        final chat = dataController.currentChat.value;
+        final isGroup = chat['type'] == 'group';
+
+        String title;
+        String avatarUrl;
+        String avatarLetter;
+        bool isOnline = false;
+        Map<String, dynamic>? userForProfile;
+
+        if (isGroup) {
+          title = chat['name'] ?? 'Group Chat';
+          avatarUrl = chat['groupAvatar'] ?? '';
+          avatarLetter = title.isNotEmpty ? title[0].toUpperCase() : 'G';
+        } else {
+          final currentUserId = dataController.user.value['user']['_id'];
+          final otherParticipantRaw = (chat['participants'] as List<dynamic>).firstWhere(
+            (p) => (p is Map ? p['_id'] : p) != currentUserId,
+            orElse: () => null,
+          );
+
+          if (otherParticipantRaw == null) {
+            return const Text('Error: User not found', style: TextStyle(color: Colors.red, fontSize: 14));
+          }
+
+          final otherUserId = otherParticipantRaw is Map ? otherParticipantRaw['_id'] : otherParticipantRaw;
+
+          final otherUser = dataController.allUsers.firstWhere(
+            (u) => u['_id'] == otherUserId,
+            orElse: () => {
+              '_id': otherUserId,
+              'name': 'Loading...',
+              'avatar': '',
+              'online': false,
+              'lastSeen': null,
+            },
+          );
+
+          userForProfile = otherUser;
+          title = otherUser['name'] ?? 'User';
+          avatarUrl = otherUser['avatar'] ?? '';
+          avatarLetter = title.isNotEmpty ? title[0].toUpperCase() : 'U';
+          isOnline = otherUser['online'] ?? false;
+        }
+
+        Widget statusWidget;
+        if (!isGroup && userForProfile != null) {
+          final chatId = chat['_id'] as String?;
+          final isTypingMap = dataController.isTyping.value;
+          String? typingUserId;
+          if (chatId != null) {
+            typingUserId = isTypingMap[chatId];
+          }
+
+          if (typingUserId != null && typingUserId == userForProfile['_id']) {
+            statusWidget = const Text(
+              'typing...',
+              style: TextStyle(color: Colors.tealAccent, fontSize: 12, fontStyle: FontStyle.italic),
+            );
+          } else {
+            if (userForProfile['online'] == true) {
+              statusWidget = const Text('online', style: TextStyle(color: Colors.green, fontSize: 12));
+            } else if (userForProfile['lastSeen'] != null) {
+              statusWidget = Text(
+                'last seen ${formatLastSeen(DateTime.parse(userForProfile['lastSeen']))}',
+                style: const TextStyle(color: Colors.grey, fontSize: 12),
+                overflow: TextOverflow.ellipsis,
+              );
+            } else {
+              statusWidget = const Text('offline', style: TextStyle(color: Colors.grey, fontSize: 12));
+            }
+          }
+        } else {
+          statusWidget = const SizedBox.shrink();
+        }
+
+        return GestureDetector(
+          onTap: () {
+            if (isGroup) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => GroupProfilePage(chat: chat)),
+              );
+            } else if (userForProfile != null) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProfilePage(
+                    userId: userForProfile!['_id'],
+                    username: userForProfile['name'],
+                    userAvatarUrl: userForProfile['avatar'],
+                  ),
+                ),
+              );
+            }
+          },
+          child: Row(
+            children: [
+              Stack(
+                children: [
+                  DottedBorder(
+                    options: CircularDottedBorderOptions(
+                      gradient: LinearGradient(
+                        colors: [isOnline ? Colors.teal : const BorderType.Color.fromARGB(255, 161, 161, 161), Colors.black],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      strokeWidth: 1.5,
+                    ),
+                    child: CircleAvatar(
+                      backgroundColor: Colors.tealAccent,
+                      backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+                      child: avatarUrl.isEmpty ? Text(avatarLetter, style: const TextStyle(color: Colors.black)) : null,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _capitalizeFirstLetter(title),
+                      style: const TextStyle(color: Colors.white, fontSize: 16),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    statusWidget,
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      }),
+    );
+  }
+
+  AppBar _buildContextualAppBar() {
+    return AppBar(
+      backgroundColor: Colors.black,
+      leading: IconButton(
+        icon: const Icon(Icons.close, color: Colors.white),
+        onPressed: () {
+          setState(() {
+            _isSelectionMode = false;
+            _selectedMessages.clear();
+          });
+        },
+      ),
+      title: Text(
+        '${_selectedMessages.length} selected',
+        style: const TextStyle(color: Colors.white, fontSize: 18),
+      ),
+      actions: [
+        if (_selectedMessages.length == 1)
+          IconButton(
+            icon: const Icon(Icons.forward, color: Colors.white),
+            onPressed: () {
+              final messageId = _selectedMessages.first;
+              final message = dataController.currentConversationMessages.firstWhere((m) => (m['_id'] ?? m['clientMessageId']) == messageId);
+              _forwardMessage(message);
+              setState(() {
+                _isSelectionMode = false;
+                _selectedMessages.clear();
+              });
+            },
+          ),
+        if (_selectedMessages.length == 1)
+          IconButton(
+            icon: const Icon(Icons.reply, color: Colors.white),
+            onPressed: () {
+              final messageId = _selectedMessages.first;
+              final message = dataController.currentConversationMessages.firstWhere((m) => (m['_id'] ?? m['clientMessageId']) == messageId);
+              setState(() {
+                _replyingTo = message;
+                _isSelectionMode = false;
+                _selectedMessages.clear();
+              });
+            },
+          ),
+        if (_selectedMessages.every((id) => (dataController.currentConversationMessages.firstWhere((m) => (m['_id'] ?? m['clientMessageId']) == id)['content'] as String).isNotEmpty))
+          IconButton(
+            icon: const Icon(Icons.copy, color: Colors.white),
+            onPressed: () {
+              String combinedText = '';
+              List<String> sortedIds = _selectedMessages.toList();
+              sortedIds.sort((a, b) {
+                final msgA = dataController.currentConversationMessages.firstWhere((m) => (m['_id'] ?? m['clientMessageId']) == a);
+                final msgB = dataController.currentConversationMessages.firstWhere((m) => (m['_id'] ?? m['clientMessageId']) == b);
+                return DateTime.parse(msgA['createdAt']).compareTo(DateTime.parse(msgB['createdAt']));
+              });
+
+              for (var messageId in sortedIds) {
+                final message = dataController.currentConversationMessages.firstWhere((m) => (m['_id'] ?? m['clientMessageId']) == messageId);
+                combinedText += message['content'] + '\n';
+              }
+              Clipboard.setData(ClipboardData(text: combinedText.trim()));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Message(s) copied to clipboard')),
+              );
+              setState(() {
+                _isSelectionMode = false;
+                _selectedMessages.clear();
+              });
+            },
+          ),
+        if (_selectedMessages.length == 1) ...[
+          IconButton(
+            icon: const Icon(Icons.thumb_up, color: Colors.white),
+            onPressed: () {
+              final messageId = _selectedMessages.first;
+              final message = dataController.currentConversationMessages.firstWhere((m) => (m['_id'] ?? m['clientMessageId']) == messageId);
+              _showReactionsDialog(message);
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.edit, color: Colors.white),
+            onPressed: () {
+              final messageId = _selectedMessages.first;
+              final message = dataController.currentConversationMessages.firstWhere((m) => (m['_id'] ?? m['clientMessageId']) == messageId);
+              _editMessage(message);
+              setState(() {
+                _isSelectionMode = false;
+                _selectedMessages.clear();
+              });
+            },
+          ),
+        ],
+        PopupMenuButton<String>(
+          onSelected: (value) {
+            if (value == 'delete_me') {
+              dataController.deleteMultipleMessages(_selectedMessages.toList(), deleteFor: "me");
+            } else if (value == 'delete_everyone') {
+              dataController.deleteMultipleMessages(_selectedMessages.toList(), deleteFor: "everyone");
+            }
+            setState(() {
+              _isSelectionMode = false;
+              _selectedMessages.clear();
+            });
+          },
+          itemBuilder: (BuildContext context) {
+            final currentUserId = dataController.getUserId();
+            final canDeleteForEveryone = _selectedMessages.every((id) {
+              final message = dataController.currentConversationMessages.firstWhere((m) => (m['_id'] ?? m['clientMessageId']) == id);
+              final senderId = message['senderId'] is Map ? message['senderId']['_id'] : message['senderId'];
+              return senderId == currentUserId;
+            });
+
+            return <PopupMenuEntry<String>>[
+              const PopupMenuItem<String>(
+                value: 'delete_me',
+                child: Text('Delete for me'),
+              ),
+              if (canDeleteForEveryone)
+                const PopupMenuItem<String>(
+                  value: 'delete_everyone',
+                  child: Text('Delete for everyone'),
+                ),
+            ];
+          },
+          icon: const Icon(Icons.more_vert, color: Colors.white),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Obx(() {
@@ -1035,157 +1231,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
       return Scaffold(
         backgroundColor: Colors.black,
-        appBar: AppBar(
-          backgroundColor: Colors.black,
-          surfaceTintColor: Colors.black,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          ),
-          title: Obx(() {
-            // All data fetching logic is now inside Obx, ensuring reactivity.
-            final chat = dataController.currentChat.value;
-            final isGroup = chat['type'] == 'group';
-
-            String title;
-            String avatarUrl;
-            String avatarLetter;
-            bool isOnline = false;
-            Map<String, dynamic>? userForProfile; // For navigation and status
-
-            if (isGroup) {
-              title = chat['name'] ?? 'Group Chat';
-              avatarUrl = chat['groupAvatar'] ?? '';
-              avatarLetter = title.isNotEmpty ? title[0].toUpperCase() : 'G';
-            } else {
-              final currentUserId = dataController.user.value['user']['_id'];
-              final otherParticipantRaw = (chat['participants'] as List<dynamic>).firstWhere(
-                (p) => (p is Map ? p['_id'] : p) != currentUserId,
-                orElse: () => null,
-              );
-
-              if (otherParticipantRaw == null) {
-                return const Text('Error: User not found', style: TextStyle(color: Colors.red, fontSize: 14));
-              }
-
-              final otherUserId = otherParticipantRaw is Map ? otherParticipantRaw['_id'] : otherParticipantRaw;
-
-              // Reactively find the user in the global user list.
-              final otherUser = dataController.allUsers.firstWhere(
-                (u) => u['_id'] == otherUserId,
-                orElse: () => {
-                  '_id': otherUserId,
-                  'name': 'Loading...',
-                  'avatar': '',
-                  'online': false,
-                  'lastSeen': null,
-                },
-              );
-
-              userForProfile = otherUser;
-              title = otherUser['name'] ?? 'User';
-              avatarUrl = otherUser['avatar'] ?? '';
-              avatarLetter = title.isNotEmpty ? title[0].toUpperCase() : 'U';
-              isOnline = otherUser['online'] ?? false;
-            }
-
-            // This widget will now rebuild whenever the typing status, online status, or chat details change.
-            Widget statusWidget;
-            if (!isGroup && userForProfile != null) {
-              final chatId = chat['_id'] as String?;
-              // Always read an observable property to prevent GetX errors.
-              // We can use `.value` or `.length` on the RxMap.
-              final isTypingMap = dataController.isTyping.value;
-
-              String? typingUserId;
-              if (chatId != null) {
-                typingUserId = isTypingMap[chatId];
-              }
-
-              if (typingUserId != null && typingUserId == userForProfile['_id']) {
-                statusWidget = const Text(
-                  'typing...',
-                  style: TextStyle(color: Colors.tealAccent, fontSize: 12, fontStyle: FontStyle.italic),
-                );
-              } else {
-                // The user's online status is part of the userForProfile map, which is derived
-                // from the observable allUsers list. So this part is reactive.
-                if (userForProfile['online'] == true) {
-                  statusWidget = const Text('online', style: TextStyle(color: Colors.green, fontSize: 12));
-                } else if (userForProfile['lastSeen'] != null) {
-                  statusWidget = Text(
-                    'last seen ${formatLastSeen(DateTime.parse(userForProfile['lastSeen']))}',
-                    style: const TextStyle(color: Colors.grey, fontSize: 12),
-                    overflow: TextOverflow.ellipsis,
-                  );
-                } else {
-                  statusWidget = const Text('offline', style: TextStyle(color: Colors.grey, fontSize: 12));
-                }
-              }
-            } else {
-              statusWidget = const SizedBox.shrink();
-            }
-
-            return GestureDetector(
-              onTap: () {
-                if (isGroup) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => GroupProfilePage(chat: chat)),
-                  );
-                } else if (userForProfile != null) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => ProfilePage(
-                        userId: userForProfile!['_id'],
-                        username: userForProfile['name'],
-                        userAvatarUrl: userForProfile['avatar'],
-                      ),
-                    ),
-                  );
-                }
-              },
-              child: Row(
-                children: [
-                  Stack(
-                    children: [
-                      DottedBorder(
-                        options: CircularDottedBorderOptions(
-                          gradient: LinearGradient(
-                            colors: [isOnline ? Colors.teal : const BorderType.Color.fromARGB(255, 161, 161, 161), Colors.black],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          strokeWidth: 1.5,
-                        ),
-                        child: CircleAvatar(
-                          backgroundColor: Colors.tealAccent,
-                          backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
-                          child: avatarUrl.isEmpty ? Text(avatarLetter, style: const TextStyle(color: Colors.black)) : null,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _capitalizeFirstLetter(title),
-                          style: const TextStyle(color: Colors.white, fontSize: 16),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        statusWidget,
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
-        ),
+        appBar: _isSelectionMode ? _buildContextualAppBar() : _buildNormalAppBar(),
         body: Column(
           children: [
             Expanded(
@@ -1234,22 +1280,42 @@ class _ChatScreenState extends State<ChatScreen> {
                             dataController.markMessageAsRead(message);
                           }
                         },
-                        child: Padding(
-                          padding: const EdgeInsets.only(bottom: 12.0),
-                          child: Align(
-                            alignment: message['senderId']['_id'] ==
-                                    dataController.user.value['user']['_id']
-                                ? Alignment.centerRight
-                                : Alignment.centerLeft,
-                            child: MessageBubble(
-                              message: message,
-                              prevMessage: prevMessage,
-                              dataController: dataController,
-                              showMessageOptions: _showMessageOptions,
-                              openMediaView: _openMediaView,
-                              buildAttachment: _buildAttachment,
-                              getReplyPreviewText: _getReplyPreviewText,
-                              buildReactions: _buildReactions,
+                        child: GestureDetector(
+                          onLongPress: () {
+                            final messageId = message['_id'] ?? message['clientMessageId'];
+                            if (messageId != null) {
+                              _toggleSelection(messageId);
+                            }
+                          },
+                          onTap: () {
+                            if (_isSelectionMode) {
+                              final messageId = message['_id'] ?? message['clientMessageId'];
+                              if (messageId != null) {
+                                _toggleSelection(messageId);
+                              }
+                            }
+                          },
+                          child: Container(
+                            color: _selectedMessages.contains(message['_id'] ?? message['clientMessageId'])
+                                ? Colors.teal.withOpacity(0.2)
+                                : Colors.transparent,
+                            child: Padding(
+                              padding: const EdgeInsets.only(bottom: 12.0),
+                              child: Align(
+                                alignment: message['senderId']['_id'] ==
+                                        dataController.user.value['user']['_id']
+                                    ? Alignment.centerRight
+                                    : Alignment.centerLeft,
+                                child: MessageBubble(
+                                  message: message,
+                                  prevMessage: prevMessage,
+                                  dataController: dataController,
+                                  openMediaView: _openMediaView,
+                                  buildAttachment: _buildAttachment,
+                                  getReplyPreviewText: _getReplyPreviewText,
+                                  buildReactions: _buildReactions,
+                                ),
+                              ),
                             ),
                           ),
                         ),

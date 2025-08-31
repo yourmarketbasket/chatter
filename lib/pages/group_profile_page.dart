@@ -6,6 +6,7 @@ import 'package:chatter/controllers/data-controller.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter/services.dart';
 
 class GroupProfilePage extends StatelessWidget {
   final Map<String, dynamic> chat;
@@ -450,6 +451,50 @@ class GroupProfilePage extends StatelessWidget {
                 //       // TODO: Navigate to group settings page
                 //     },
                 //   ),
+                // Invite to Group via Link
+                if (isSuperAdmin || isAdmin)
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+                    leading: const Icon(Icons.link, color: Colors.tealAccent),
+                    title: const Text(
+                      'Invite to Group via Link',
+                      style: TextStyle(color: Colors.tealAccent),
+                    ),
+                    onTap: () async {
+                      final inviteLink = await dataController.generateGroupInviteLink(currentChat['_id']);
+                      if (inviteLink != null) {
+                        Get.dialog(
+                          AlertDialog(
+                            backgroundColor: const Color.fromARGB(255, 66, 66, 66),
+                            title: const Text('Group Invite Link', style: TextStyle(color: Colors.white)),
+                            content: SelectableText(inviteLink, style: const TextStyle(color: Colors.white70)),
+                            actions: [
+                              TextButton(
+                                onPressed: () {
+                                  Clipboard.setData(ClipboardData(text: inviteLink));
+                                  Get.back();
+                                  Get.snackbar('Copied', 'Invite link copied to clipboard',
+                                      snackPosition: SnackPosition.BOTTOM,
+                                      backgroundColor: Colors.black.withOpacity(0.8),
+                                      colorText: Colors.white);
+                                },
+                                child: const Text('Copy'),
+                              ),
+                              TextButton(
+                                onPressed: () => Get.back(),
+                                child: const Text('Close'),
+                              ),
+                            ],
+                          ),
+                        );
+                      } else {
+                        Get.snackbar('Error', 'Could not generate invite link.',
+                            snackPosition: SnackPosition.BOTTOM,
+                            backgroundColor: Colors.redAccent.withOpacity(0.8),
+                            colorText: Colors.white);
+                      }
+                    },
+                  ),
                 // Leave Group
                 ListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 0),

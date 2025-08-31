@@ -13,7 +13,6 @@ class MessageBubble extends StatefulWidget {
   final Map<String, dynamic> message;
   final Map<String, dynamic>? prevMessage;
   final DataController dataController;
-  final Function(Map<String, dynamic>) showMessageOptions;
   final Function(Map<String, dynamic>, int) openMediaView;
   final Widget Function(Map<String, dynamic>) buildAttachment;
   final String Function(Map<String, dynamic>) getReplyPreviewText;
@@ -24,7 +23,6 @@ class MessageBubble extends StatefulWidget {
     required this.message,
     this.prevMessage,
     required this.dataController,
-    required this.showMessageOptions,
     required this.openMediaView,
     required this.buildAttachment,
     required this.getReplyPreviewText,
@@ -245,9 +243,6 @@ class _MessageBubbleState extends State<MessageBubble> {
     );
 
     return GestureDetector(
-      onLongPress: () {
-        if (!(widget.message['deletedForEveryone'] ?? false)) widget.showMessageOptions(widget.message);
-      },
       child: Stack(
         clipBehavior: Clip.none,
         children: [
