@@ -285,26 +285,33 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  void _deleteMessage(Map<String, dynamic> message, {required bool forEveryone}) {
-    dataController.deleteChatMessage(message['_id'], forEveryone: forEveryone);
-  }
+  void _forwardSelectedMessages() {
+    final messagesToForward = _selectedMessages
+        .map((id) => dataController.currentConversationMessages.firstWhere((m) => (m['_id'] ?? m['clientMessageId']) == id))
+        .toList();
 
-  void _forwardMessage(Map<String, dynamic> message) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => UsersListPage(
           onUserSelected: (user) {
-            dataController.forwardMessage(message, user['_id']);
-            Navigator.pop(context);
-            // Optionally, show a confirmation message
+            dataController.forwardMultipleMessages(messagesToForward, user['_id']);
+            Navigator.pop(context); // Close UsersListPage
+            setState(() {
+              _isSelectionMode = false;
+              _selectedMessages.clear();
+            });
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Message forwarded to ${user['name']}')),
+              SnackBar(content: Text('Forwarding ${_selectedMessages.length} message(s) to ${user['name']}')),
             );
           },
         ),
       ),
     );
+  }
+
+  void _deleteMessage(Map<String, dynamic> message, {required bool forEveryone}) {
+    dataController.deleteChatMessage(message['_id'], forEveryone: forEveryone);
   }
 
   void _copyMessage(Map<String, dynamic> message) {
@@ -314,28 +321,52 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  void _showReactionsDialog(Map<String, dynamic> message) {
-  showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      contentPadding: EdgeInsets.all(10),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
-      backgroundColor: const Color.fromARGB(255, 46, 46, 46),
-      content: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: ['👍', '❤️', '😂', '😮', '🙏', '🤣']
-            .map((emoji) => GestureDetector(
-                  onTap: () {
-                    dataController.addReaction(message['_id'], emoji);
-                    Navigator.pop(context);
-                  },
-                  child: Text(emoji, style: const TextStyle(fontSize: 20)),
-                ))
-            .toList(),
-      ),
-    ),
-  );
-}
+  void _showReactionDialog(BuildContext context, Map<String, dynamic> message, Offset position) {
+    final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissibleLabel,
+      barrierColor: Colors.black.withOpacity(0.5),
+      transitionDuration: const Duration(milliseconds: 200),
+      pageBuilder: (BuildContext buildContext, Animation<double> animation, Animation<double> secondaryAnimation) {
+        return Stack(
+          children: [
+            Positioned(
+              top: position.dy - 80, // Adjust position to be above the press point
+              left: position.dx - 100, // Center the dialog horizontally
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[800],
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: ['👍', '❤️', '😂', '😮', '😢', '🙏']
+                        .map((emoji) => GestureDetector(
+                              onTap: () {
+                                dataController.addReaction(message['_id'], emoji);
+                                Navigator.pop(context);
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                                child: Text(emoji, style: const TextStyle(fontSize: 24)),
+                              ),
+                            ))
+                        .toList(),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
 
 
@@ -1124,19 +1155,6 @@ class _ChatScreenState extends State<ChatScreen> {
       actions: [
         if (_selectedMessages.length == 1)
           IconButton(
-            icon: const Icon(Icons.forward, color: Colors.white),
-            onPressed: () {
-              final messageId = _selectedMessages.first;
-              final message = dataController.currentConversationMessages.firstWhere((m) => (m['_id'] ?? m['clientMessageId']) == messageId);
-              _forwardMessage(message);
-              setState(() {
-                _isSelectionMode = false;
-                _selectedMessages.clear();
-              });
-            },
-          ),
-        if (_selectedMessages.length == 1)
-          IconButton(
             icon: const Icon(Icons.reply, color: Colors.white),
             onPressed: () {
               final messageId = _selectedMessages.first;
@@ -1174,31 +1192,13 @@ class _ChatScreenState extends State<ChatScreen> {
               });
             },
           ),
-        if (_selectedMessages.length == 1) ...[
-          IconButton(
-            icon: const Icon(Icons.thumb_up, color: Colors.white),
-            onPressed: () {
-              final messageId = _selectedMessages.first;
-              final message = dataController.currentConversationMessages.firstWhere((m) => (m['_id'] ?? m['clientMessageId']) == messageId);
-              _showReactionsDialog(message);
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.edit, color: Colors.white),
-            onPressed: () {
+        PopupMenuButton<String>(
+          onSelected: (value) {
+            if (value == 'edit') {
               final messageId = _selectedMessages.first;
               final message = dataController.currentConversationMessages.firstWhere((m) => (m['_id'] ?? m['clientMessageId']) == messageId);
               _editMessage(message);
-              setState(() {
-                _isSelectionMode = false;
-                _selectedMessages.clear();
-              });
-            },
-          ),
-        ],
-        PopupMenuButton<String>(
-          onSelected: (value) {
-            if (value == 'delete_me') {
+            } else if (value == 'delete_me') {
               dataController.deleteMultipleMessages(_selectedMessages.toList(), deleteFor: "me");
             } else if (value == 'delete_everyone') {
               dataController.deleteMultipleMessages(_selectedMessages.toList(), deleteFor: "everyone");
@@ -1217,6 +1217,11 @@ class _ChatScreenState extends State<ChatScreen> {
             });
 
             return <PopupMenuEntry<String>>[
+              if (_selectedMessages.length == 1)
+                const PopupMenuItem<String>(
+                  value: 'edit',
+                  child: Text('Edit'),
+                ),
               const PopupMenuItem<String>(
                 value: 'delete_me',
                 child: Text('Delete for me'),
@@ -1297,10 +1302,11 @@ class _ChatScreenState extends State<ChatScreen> {
                           }
                         },
                         child: GestureDetector(
-                          onLongPress: () {
+                          onLongPressStart: (details) {
                             final messageId = message['_id'] ?? message['clientMessageId'];
                             if (messageId != null) {
                               _toggleSelection(messageId);
+                              _showReactionDialog(context, message, details.globalPosition);
                             }
                           },
                           onTap: () {
@@ -1318,18 +1324,34 @@ class _ChatScreenState extends State<ChatScreen> {
                             child: Padding(
                               padding: const EdgeInsets.only(bottom: 12.0),
                               child: Align(
-                                alignment: message['senderId']['_id'] ==
-                                        dataController.user.value['user']['_id']
+                                alignment: message['senderId']['_id'] == dataController.getUserId()
                                     ? Alignment.centerRight
                                     : Alignment.centerLeft,
-                                child: MessageBubble(
-                                  message: message,
-                                  prevMessage: prevMessage,
-                                  dataController: dataController,
-                                  openMediaView: _openMediaView,
-                                  buildAttachment: _buildAttachment,
-                                  getReplyPreviewText: _getReplyPreviewText,
-                                  buildReactions: _buildReactions,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (message['senderId']['_id'] != dataController.getUserId() && _selectedMessages.contains(message['_id'] ?? message['clientMessageId']))
+                                      IconButton(
+                                        icon: const Icon(Icons.forward, color: Colors.white),
+                                        onPressed: _forwardSelectedMessages,
+                                      ),
+                                    Flexible(
+                                      child: MessageBubble(
+                                        message: message,
+                                        prevMessage: prevMessage,
+                                        dataController: dataController,
+                                        openMediaView: _openMediaView,
+                                        buildAttachment: _buildAttachment,
+                                        getReplyPreviewText: _getReplyPreviewText,
+                                        buildReactions: _buildReactions,
+                                      ),
+                                    ),
+                                    if (message['senderId']['_id'] == dataController.getUserId() && _selectedMessages.contains(message['_id'] ?? message['clientMessageId']))
+                                      IconButton(
+                                        icon: const Icon(Icons.forward, color: Colors.white),
+                                        onPressed: _forwardSelectedMessages,
+                                      ),
+                                  ],
                                 ),
                               ),
                             ),

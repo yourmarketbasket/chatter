@@ -19,11 +19,12 @@ import 'package:logging/logging.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:chatter/helpers/timeago_helpers.dart';
 import 'dart:async';
+import 'package:chatter/pages/new-posts-page.dart';
 import 'package:chatter/pages/users_list_page.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:share_handler/share_handler.dart';
 // import 'package:device_info_plus/device_info_plus.dart'; // No longer needed for player selection
-// import 'dart:io'; // No longer needed for player selection (Platform check)
+import 'dart:io'; // No longer needed for player selection (Platform check)
 
 final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
 
@@ -121,9 +122,7 @@ class _ChatterAppState extends State<ChatterApp> {
             child: const Text('As a Post'),
             onPressed: () {
               Get.back(); // Close the dialog
-              // Logic for sharing as a post will be implemented in the next step.
-              // For now, we can navigate to the new post screen with the shared data.
-              Get.to(() => const HomeFeedScreen(), arguments: {'sharedMedia': sharedMedia});
+              Get.to(() => NewPostScreen(sharedMedia: sharedMedia));
             },
           ),
           TextButton(
@@ -131,45 +130,11 @@ class _ChatterAppState extends State<ChatterApp> {
             onPressed: () {
               Get.back(); // Close the dialog
               Get.to(() => UsersListPage(
-                    sharedData: sharedMedia,
-                    onUserSelected: (user) {
-                      // Note: This existing logic for sending attachments is flawed as it doesn't handle uploads.
-                      // It will be addressed as part of the "Share as Post" implementation which requires a robust upload flow.
-                      if (sharedMedia.attachments == null || sharedMedia.attachments!.isEmpty) {
-                        _dataController.sendChatMessage({
-                          'chatId': user['chatId'],
-                          'content': sharedMedia.content,
-                          'type': 'text',
-                          'senderId': _dataController.user.value['user']['_id'],
-                          'participants': [_dataController.user.value['user']['_id'], user['_id']],
-                        }, null);
-                      } else {
-                        final files = sharedMedia.attachments!
-                            .map((attachment) => PlatformFile(
-                                  name: attachment!.path.split('/').last,
-                                  path: attachment.path,
-                                  size: 0,
-                                ))
-                            .toList();
-                        _dataController.sendChatMessage({
-                          'chatId': user['chatId'],
-                          'content': sharedMedia.content,
-                          'type': 'attachment',
-                          'files': files
-                              .map((file) => {
-                                    'url': file.path,
-                                    'type': _dataController.getMediaType(file.extension ?? ''),
-                                    'size': file.size,
-                                    'filename': file.name,
-                                  })
-                              .toList(),
-                          'senderId': _dataController.user.value['user']['_id'],
-                          'participants': [_dataController.user.value['user']['_id'], user['_id']],
-                        }, null);
-                      }
-                      Get.back(); // Go back from UsersListPage
-                    },
-                  ));
+                onUserSelected: (user) {
+                  _dataController.sendMessageWithSharedMedia(sharedMedia, user['_id']);
+                  Get.back(); // Go back from UsersListPage
+                },
+              ));
             },
           ),
         ],

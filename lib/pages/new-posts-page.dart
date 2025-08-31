@@ -12,6 +12,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
+import 'package:share_handler/share_handler.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_thumbnail/video_thumbnail.dart' as video_thumb;
 import 'package:image/image.dart' as img; // Added for image processing
@@ -19,7 +20,8 @@ import 'package:flutter_video_info/flutter_video_info.dart'; // Added for video 
 
 // NewPostScreen allows users to create a new post with text and attachments (image, PDF, audio, video).
 class NewPostScreen extends StatefulWidget {
-  const NewPostScreen({Key? key}) : super(key: key);
+  final SharedMedia? sharedMedia;
+  const NewPostScreen({Key? key, this.sharedMedia}) : super(key: key);
 
   @override
   _NewPostScreenState createState() => _NewPostScreenState();
@@ -59,6 +61,13 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
+    if (widget.sharedMedia != null) {
+      _postController.text = widget.sharedMedia!.content ?? '';
+      if (widget.sharedMedia!.attachments != null) {
+        _processSharedAttachments(widget.sharedMedia!.attachments!);
+      }
+    }
+
     // Helper method to add attachment and update state
     // This needs to be part of the class, not inside initState
     // Let's move its definition outside initState, directly into the class body.
@@ -73,6 +82,57 @@ class _NewPostScreenState extends State<NewPostScreen> with SingleTickerProvider
         }
       }
     });
+  }
+
+  Future<void> _processSharedAttachments(List<SharedAttachment?> attachments) async {
+    for (final attachment in attachments) {
+      if (attachment != null && attachment.path.isNotEmpty) {
+        final file = File(attachment.path);
+        final type = attachment.type;
+
+        if (type == SharedAttachmentType.image) {
+          await _processAndAddImageFile(file);
+        } else if (type == SharedAttachmentType.video) {
+          await _processAndAddVideoFile(file);
+        } else if (type == SharedAttachmentType.audio) {
+          await _processAndAddAudioFile(file);
+        }
+      }
+    }
+  }
+
+  Future<void> _processAndAddAudioFile(File file) async {
+    print('[NewPostScreen] Processing Audio: path=${file.path}, exists=${await file.exists()}, length=${await file.length()}');
+    final int fileSize = await file.length();
+    final sizeInMB = fileSize / (1024 * 1024);
+
+    if (sizeInMB <= 20) { // Updated file size limit
+      int? durationMs;
+      final tempAudioPlayer = AudioPlayer();
+      try {
+        await tempAudioPlayer.setSourceDeviceFile(file.path);
+        durationMs = (await tempAudioPlayer.getDuration())?.inMilliseconds;
+        await tempAudioPlayer.release();
+      } catch (e) {
+        print('[NewPostScreen] Error getting audio duration for shared file: $e');
+        await tempAudioPlayer.release();
+      }
+      final durationSeconds = durationMs != null ? (durationMs / 1000).round() : null;
+
+      final attachmentData = {
+        'file': file,
+        'type': 'audio',
+        'filename': file.path.split('/').last,
+        'size': fileSize,
+        if (durationSeconds != null) 'duration': durationSeconds,
+      };
+      _addAttachment(attachmentData);
+    } else {
+      _showPermissionDialog(
+        'File Size Error',
+        'Audio file "${file.path.split('/').last}" exceeds 20MB limit and was not added.',
+      );
+    }
   }
 
   Future<int?> _getAndroidSdkVersion() async {

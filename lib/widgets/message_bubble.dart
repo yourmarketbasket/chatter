@@ -242,34 +242,32 @@ class _MessageBubbleState extends State<MessageBubble> {
       ],
     );
 
-    return GestureDetector(
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            margin: EdgeInsets.only(bottom: bottomMargin),
-            padding: isOnlyLinkWithPreview
-                ? EdgeInsets.zero
-                : const EdgeInsets.symmetric(horizontal: 1.0, vertical: 1.0),
-            constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.55,
-              minWidth: MediaQuery.of(context).size.width * 0.10,
-            ),
-            decoration: BoxDecoration(
-              color: isYou ? Colors.transparent.withOpacity(0.2) : Colors.transparent,
-              border: Border.all(color: isYou ? Colors.teal.withOpacity(0.6) : const Color.fromARGB(167, 143, 141, 141), width: 1.0),
-              borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(20.0),
-                topRight: const Radius.circular(20.0),
-                bottomLeft: Radius.circular(isYou ? 20.0 : 0.0),
-                bottomRight: Radius.circular(isYou ? 0.0 : 20.0),
-              ),
-            ),
-            child: messageBubbleContent,
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          margin: EdgeInsets.only(bottom: bottomMargin),
+          padding: isOnlyLinkWithPreview
+              ? EdgeInsets.zero
+              : const EdgeInsets.symmetric(horizontal: 1.0, vertical: 1.0),
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width * 0.55,
+            minWidth: MediaQuery.of(context).size.width * 0.10,
           ),
-          widget.buildReactions(widget.message, isYou),
-        ],
-      ),
+          decoration: BoxDecoration(
+            color: isYou ? Colors.transparent.withOpacity(0.2) : Colors.transparent,
+            border: Border.all(color: isYou ? Colors.teal.withOpacity(0.6) : const Color.fromARGB(167, 143, 141, 141), width: 1.0),
+            borderRadius: BorderRadius.only(
+              topLeft: const Radius.circular(20.0),
+              topRight: const Radius.circular(20.0),
+              bottomLeft: Radius.circular(isYou ? 20.0 : 0.0),
+              bottomRight: Radius.circular(isYou ? 0.0 : 20.0),
+            ),
+          ),
+          child: messageBubbleContent,
+        ),
+        widget.buildReactions(widget.message, isYou),
+      ],
     );
   }
 }

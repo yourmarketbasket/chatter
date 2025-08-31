@@ -8,6 +8,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:dio/dio.dart' as dio; // Use prefix for dio to avoid conflicts
 import 'dart:convert';
 import 'package:path_provider/path_provider.dart';
+import 'package:share_handler/share_handler.dart';
 import 'package:uuid/uuid.dart';
 import '../models/feed_models.dart';
 import '../services/socket-service.dart';
@@ -4062,11 +4063,7 @@ void clearUserPosts() {
     }
   }
 
-  Future<void> forwardMessage(Map<String, dynamic> message, String targetUserId) async {
-    final content = message['content'];
-    final files = message['files']; // This is already a List<Map<String, dynamic>>
-    final messageType = message['type'];
-
+  Future<void> forwardMultipleMessages(List<Map<String, dynamic>> messages, String targetUserId) async {
     // Find existing DM chat with the target user
     String? chatId;
     try {
@@ -4080,38 +4077,58 @@ void clearUserPosts() {
       chatId = null; // No existing chat found
     }
 
-    final clientMessageId = const Uuid().v4();
+    // Sort messages by timestamp before forwarding
+    messages.sort((a, b) => DateTime.parse(a['createdAt']).compareTo(DateTime.parse(b['createdAt'])));
 
-    final messageToSend = {
-      'clientMessageId': clientMessageId,
-      'chatId': chatId,
-      'participants': [getUserId(), targetUserId], // Only needed if chatId is null
-      'content': content,
-      'type': messageType,
-      'files': files,
-    };
+    for (final message in messages) {
+      final content = message['content'];
+      final files = message['files'];
+      final messageType = message['type'];
+      final clientMessageId = const Uuid().v4();
 
-    try {
-      final token = user.value['token'];
-      if (token == null) {
-        throw Exception('User not authenticated');
+      final messageToSend = {
+        'clientMessageId': clientMessageId,
+        'chatId': chatId,
+        'participants': [getUserId(), targetUserId],
+        'content': content,
+        'type': messageType,
+        'files': files,
+      };
+
+      try {
+        final token = user.value['token'];
+        if (token == null) {
+          throw Exception('User not authenticated');
+        }
+
+        final Map<String, dynamic> finalMessage = Map<String, dynamic>.from(messageToSend);
+        if (chatId != null && chatId.isNotEmpty) {
+          finalMessage.remove('participants');
+        }
+
+        final response = await _dio.post(
+          'api/messages',
+          data: finalMessage,
+          options: dio.Options(
+            headers: {'Authorization': 'Bearer $token'},
+            validateStatus: (status) => status != null && status < 500,
+          ),
+        );
+
+        // If a new chat was created, update the chatId for subsequent messages in this loop
+        if (chatId == null && response.statusCode == 201 && response.data['success'] == true) {
+            final serverMessage = response.data['message'];
+            if (serverMessage != null && serverMessage['chatId'] != null) {
+                chatId = serverMessage['chatId'];
+            }
+        }
+
+      } catch (e) {
+        print('Error forwarding a message: $e');
+        // Decide if we should stop or continue forwarding other messages
       }
-
-      final Map<String, dynamic> finalMessage = Map<String, dynamic>.from(messageToSend);
-      if (finalMessage['chatId'] != null && (finalMessage['chatId'] as String).isNotEmpty) {
-        finalMessage.remove('participants');
-      }
-
-      await _dio.post(
-        'api/messages',
-        data: finalMessage,
-        options: dio.Options(
-          headers: {'Authorization': 'Bearer $token'},
-          validateStatus: (status) => status != null && status < 500,
-        ),
-      );
-    } catch (e) {
-      print('Error forwarding message: $e');
+      // Add a small delay between forwards to prevent overwhelming the server
+      await Future.delayed(const Duration(milliseconds: 200));
     }
   }
 
@@ -4335,5 +4352,86 @@ void clearUserPosts() {
       }
       currentConversationMessages.refresh();
     }
+  }
+
+  Future<void> sendMessageWithSharedMedia(SharedMedia sharedMedia, String targetUserId) async {
+    final List<PlatformFile>? files = sharedMedia.attachments?.map((attachment) {
+      return PlatformFile(
+        name: attachment!.path.split('/').last,
+        path: attachment.path,
+        size: 0 // size is not available here, but uploadChatFiles will get it.
+      );
+    }).toList();
+
+    final String? text = sharedMedia.content;
+
+    if ((text?.trim().isEmpty ?? true) && (files?.isEmpty ?? true)) {
+      return;
+    }
+
+    // Find existing chat or prepare for a new one
+    String? chatId;
+    try {
+      final targetChat = chats.values.firstWhere(
+        (chat) =>
+            chat['type'] == 'dm' &&
+            (chat['participants'] as List).any((p) => (p is Map ? p['_id'] : p) == targetUserId),
+      );
+      chatId = targetChat['_id'];
+    } catch (e) {
+      chatId = null; // No existing chat found
+    }
+
+    final clientMessageId = const Uuid().v4();
+    final messageType = (files?.isNotEmpty ?? false) ? 'attachment' : 'text';
+
+    List<Map<String, dynamic>> uploadedFiles = [];
+    if (files != null && files.isNotEmpty) {
+      final attachmentsData = files.map((file) {
+        return {
+          'file': File(file.path!),
+          'type': getMediaType(file.extension ?? ''),
+          'filename': file.name,
+        };
+      }).toList();
+
+      final uploadResults = await uploadChatFiles(
+        attachmentsData,
+        (sentBytes, totalBytes) {
+          // No progress update UI here, but the function requires a callback.
+        },
+      );
+
+      if (uploadResults.any((result) => !result['success'])) {
+        Get.snackbar('Error', 'Failed to upload some attachments.');
+        return;
+      }
+
+      uploadedFiles = uploadResults.map((result) => {
+        'url': result['url'],
+        'type': result['type'],
+        'size': result['size'],
+        'filename': result['filename'],
+      }).toList();
+    }
+
+    final finalMessage = {
+      'clientMessageId': clientMessageId,
+      'chatId': chatId,
+      'participants': [getUserId(), targetUserId],
+      'senderId': {
+        '_id': user.value['user']['_id'],
+        'name': user.value['user']['name'],
+        'avatar': user.value['user']['avatar'],
+      },
+      'content': text?.trim() ?? '',
+      'type': messageType,
+      'files': uploadedFiles,
+    };
+
+    await sendChatMessage(finalMessage, clientMessageI d);
+
+    final targetUser = allUsers.firstWhere((u) => u['_id'] == targetUserId, orElse: () => {'name': 'user'});
+    Get.snackbar('Success', 'Message sent to ${targetUser['name']}');
   }
 }

@@ -11,9 +11,8 @@ import 'package:chatter/widgets/app_drawer.dart';
 
 class UsersListPage extends StatefulWidget {
   final Function(Map<String, dynamic>)? onUserSelected;
-  final dynamic sharedData;
 
-  const UsersListPage({Key? key, this.onUserSelected, this.sharedData}) : super(key: key);
+  const UsersListPage({Key? key, this.onUserSelected}) : super(key: key);
 
   @override
   _UsersListPageState createState() => _UsersListPageState();
