@@ -887,6 +887,160 @@ class DataController extends GetxController {
     }
   }
 
+  Future<Map<String, dynamic>> deletePostByAdmin(String postId) async {
+    try {
+      final String? token = user.value['token'];
+      if (token == null) {
+        return {'success': false, 'message': 'Authentication token not found.'};
+      }
+
+      final response = await _dio.delete(
+        'api/posts/$postId/admin',
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        posts.removeWhere((post) => post['_id'] == postId);
+        userPosts.removeWhere((post) => post['_id'] == postId);
+        return {'success': true, 'message': 'Post deleted successfully'};
+      } else {
+        return {
+          'success': false,
+          'message': response.data['message'] ?? 'Failed to delete post. Status: ${response.statusCode}'
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> updateUserVerification(
+      String userId, String entityType, String level, bool paid) async {
+    try {
+      final String? token = user.value['token'];
+      if (token == null) {
+        return {'success': false, 'message': 'Authentication token not found.'};
+      }
+
+      final response = await _dio.put(
+        'api/users/verify-user',
+        data: {
+          'userId': userId,
+          'entityType': entityType,
+          'level': level,
+          'paid': paid,
+        },
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        final userIndex = allUsers.indexWhere((user) => user['_id'] == userId);
+        if (userIndex != -1) {
+          allUsers[userIndex]['verification'] = response.data['verification'];
+          allUsers.refresh();
+        }
+        return {'success': true, 'message': 'User verification updated'};
+      } else {
+        return {
+          'success': false,
+          'message': response.data['message'] ?? 'Failed to update verification. Status: ${response.statusCode}'
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> flagPostForReview(String postId) async {
+    try {
+      final String? token = user.value['token'];
+      if (token == null) {
+        return {'success': false, 'message': 'Authentication token not found.'};
+      }
+
+      final response = await _dio.put(
+        'api/posts/$postId/flag',
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return {'success': true, 'message': 'Post flagged for review'};
+      } else {
+        return {
+          'success': false,
+          'message': response.data['message'] ?? 'Failed to flag post. Status: ${response.statusCode}'
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> suspendUser(String userId) async {
+    try {
+      final String? token = user.value['token'];
+      if (token == null) {
+        return {'success': false, 'message': 'Authentication token not found.'};
+      }
+
+      final response = await _dio.put(
+        'api/users/$userId/suspend',
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return {'success': true, 'message': 'User suspended successfully'};
+      } else {
+        return {
+          'success': false,
+          'message': response.data['message'] ?? 'Failed to suspend user. Status: ${response.statusCode}'
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> registerAdmin(
+      String username, String password, String adminCode) async {
+    try {
+      final response = await _dio.post(
+        'api/auth/register-admin',
+        data: {
+          'username': username,
+          'password': password,
+          'adminRegistrationCode': adminCode,
+        },
+      );
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return {'success': true, 'message': 'Admin registered successfully'};
+      } else {
+        return {
+          'success': false,
+          'message': response.data['message'] ?? 'Registration failed'
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
   // Bookmark a post or reply
   Future<Map<String, dynamic>> bookmarkPost(String postId, {String? replyId}) async {
     final String endpoint = replyId != null
@@ -3653,6 +3807,50 @@ void clearUserPosts() {
         user['lastSeen'] = lastSeen;
       }
       allUsers[index] = user;
+    }
+  }
+
+  Future<Map<String, dynamic>> loginAdmin(String username, String password) async {
+    try {
+      final response = await _dio.post(
+        'api/auth/login-admin',
+        data: {
+          'username': username,
+          'password': password,
+        },
+      );
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        String? tokenValue = response.data['user']['token']?.toString();
+        String userJson = jsonEncode(response.data['user']);
+
+        await _storage.write(key: 'token', value: tokenValue);
+        await _storage.write(key: 'user', value: userJson);
+
+        user.value = jsonDecode(userJson);
+        user.value['user']['isAdmin'] = true;
+
+        await fetchFeeds();
+        final String? currentUserId = user.value['user']?['_id'];
+        if (currentUserId != null && currentUserId.isNotEmpty) {
+          fetchFollowers(currentUserId);
+          fetchFollowing(currentUserId);
+        }
+        await fetchAllUsers();
+        await fetchChats();
+
+        Get.find<SocketService>().initSocket();
+        final NotificationService notificationService = Get.find<NotificationService>();
+        await notificationService.init();
+
+        return {'success': true, 'message': 'Admin logged in successfully'};
+      } else {
+        return {
+          'success': false,
+          'message': response.data['message'] ?? 'Login failed'
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
     }
   }
 

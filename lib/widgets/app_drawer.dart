@@ -1,3 +1,4 @@
+import 'package:chatter/pages/admin_actions_page.dart';
 import 'package:chatter/pages/home-feed-screen.dart';
 import 'package:chatter/pages/users_list_page.dart';
 import 'package:chatter/pages/followers_page.dart';
@@ -451,14 +452,14 @@ class AppDrawer extends StatelessWidget {
                   },
                 ),
                 Obx(() {
-                  final userRole = dataController.user.value['user']?['role'];
-                  if (userRole == 'admin' || userRole == 'superuser') {
+                  final isAdmin = dataController.user.value['user']?['isAdmin'] == true;
+                  if (isAdmin) {
                     return ListTile(
                       leading: Icon(FeatherIcons.shield, color: Colors.grey[300]),
                       title: Text('Admin Panel', style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16)),
                       onTap: () {
                         Get.back();
-                        Get.toNamed('/admin');
+                        Get.to(() => const AdminActionsPage());
                       },
                     );
                   } else {

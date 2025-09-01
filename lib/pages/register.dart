@@ -1,5 +1,5 @@
 import 'package:chatter/controllers/data-controller.dart';
-import 'package:chatter/pages/admin_page.dart';
+import 'package:chatter/pages/admin_auth_page.dart';
 import 'package:chatter/pages/login.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -495,7 +495,7 @@ class _RegisterPageState extends State<RegisterPage> {
                       _tapCount = 0; // Reset counter
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const AdminPage()),
+                        MaterialPageRoute(builder: (context) => const AdminAuthPage()),
                       );
                     }
                   },
