@@ -20,6 +20,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
     super.initState();
     _filteredUsers = dataController.allUsers;
     _searchController.addListener(_searchUsers);
+    print(_filteredUsers[1]);
   }
 
   @override
@@ -66,6 +67,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                 itemCount: _filteredUsers.length,
                 itemBuilder: (context, index) {
                   final user = _filteredUsers[index];
+                  // print(user);
                   return ListTile(
                     leading: CircleAvatar(
                       backgroundImage: (user['avatar'] != null && user['avatar'].isNotEmpty)

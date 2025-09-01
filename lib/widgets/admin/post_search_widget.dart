@@ -34,11 +34,11 @@ class _PostSearchWidgetState extends State<PostSearchWidget> {
     final int postIndex = _filteredPosts.indexWhere((p) => p['_id'] == postId);
     if (postIndex == -1) return;
 
-    final bool originalFlagStatus = _filteredPosts[postIndex]['isFlagged'] ?? false;
+    final bool originalFlagStatus = _filteredPosts[postIndex]['flaggedForReview'] ?? false;
 
     // 1. Optimistic UI update
     setState(() {
-      _filteredPosts[postIndex]['isFlagged'] = !originalFlagStatus;
+      _filteredPosts[postIndex]['flaggedForReview'] = !originalFlagStatus;
     });
 
     // 2. API call
@@ -48,24 +48,16 @@ class _PostSearchWidgetState extends State<PostSearchWidget> {
 
     // 3. Handle result
     if (result['success']) {
-      Get.snackbar('Success', result['message'],
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.green,
-          colorText: Colors.white);
       // Also update the main list to be sure
       final int mainListIndex = _userPosts.indexWhere((p) => p['_id'] == postId);
       if (mainListIndex != -1) {
-        _userPosts[mainListIndex]['isFlagged'] = !originalFlagStatus;
+        _userPosts[mainListIndex]['flaggedForReview'] = !originalFlagStatus;
       }
     } else {
       // 4. Rollback on failure
       setState(() {
-        _filteredPosts[postIndex]['isFlagged'] = originalFlagStatus;
+        _filteredPosts[postIndex]['flaggedForReview'] = originalFlagStatus;
       });
-      Get.snackbar('Error', result['message'],
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red,
-          colorText: Colors.white);
     }
   }
 
@@ -163,6 +155,8 @@ class _PostSearchWidgetState extends State<PostSearchWidget> {
 
   @override
   Widget build(BuildContext context) {
+  // print(_filteredPosts);
+
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -250,9 +244,9 @@ class _PostSearchWidgetState extends State<PostSearchWidget> {
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
                               Text(
-                                post['isFlagged'] ?? false ? 'Flagged' : 'Not Flagged',
+                                post['flaggedForReview'] ?? false ? 'Flagged' : 'Not Flagged',
                                 style: GoogleFonts.roboto(
-                                  color: post['isFlagged'] ?? false ? Colors.orangeAccent : Colors.grey,
+                                  color: post['flaggedForReview'] ?? false ? Colors.orangeAccent : Colors.grey,
                                 ),
                               ),
                               const SizedBox(width: 10),
@@ -267,7 +261,7 @@ class _PostSearchWidgetState extends State<PostSearchWidget> {
                                 itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
                                   PopupMenuItem<String>(
                                     value: 'flag',
-                                    child: Text(post['isFlagged'] ?? false ? 'Unflag Post' : 'Flag for Review'),
+                                    child: Text(post['flaggedForReview'] ?? false ? 'Unflag Post' : 'Flag for Review'),
                                   ),
                                   const PopupMenuItem<String>(
                                     value: 'delete',
