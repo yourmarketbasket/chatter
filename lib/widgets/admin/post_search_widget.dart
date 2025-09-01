@@ -1,0 +1,126 @@
+import 'package:chatter/controllers/data-controller.dart';
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+class PostSearchWidget extends StatefulWidget {
+  final Function(String postId) onAction;
+  final String actionText;
+
+  const PostSearchWidget({
+    Key? key,
+    required this.onAction,
+    required this.actionText,
+  }) : super(key: key);
+
+  @override
+  _PostSearchWidgetState createState() => _PostSearchWidgetState();
+}
+
+class _PostSearchWidgetState extends State<PostSearchWidget> {
+  final DataController dataController = Get.find<DataController>();
+  final TextEditingController _userSearchController = TextEditingController();
+  final TextEditingController _postSearchController = TextEditingController();
+  Map<String, dynamic>? _foundUser;
+  List<Map<String, dynamic>> _userPosts = [];
+  List<Map<String, dynamic>> _filteredPosts = [];
+
+  void _filterPosts() {
+    final query = _postSearchController.text.toLowerCase();
+    setState(() {
+      _filteredPosts = _userPosts.where((post) {
+        final content = post['content']?.toLowerCase() ?? '';
+        return content.contains(query);
+      }).toList();
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _postSearchController.addListener(_filterPosts);
+  }
+
+  @override
+  void dispose() {
+    _userSearchController.dispose();
+    _postSearchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Column(
+        children: [
+          TextField(
+            controller: _userSearchController,
+            decoration: InputDecoration(
+              labelText: 'Search User by Username',
+              labelStyle: GoogleFonts.roboto(color: Colors.white),
+              prefixIcon: const Icon(Icons.search, color: Colors.white),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            style: GoogleFonts.roboto(color: Colors.white),
+            onSubmitted: (username) async {
+              final userResult = await dataController.searchUserByUsername(username);
+              if (userResult['success']) {
+                setState(() {
+                  _foundUser = userResult['user'];
+                });
+                final postsResult = await dataController.fetchPostsByUsername(username);
+                if (postsResult['success']) {
+                  setState(() {
+                    _userPosts = List<Map<String, dynamic>>.from(postsResult['posts']);
+                    _filteredPosts = _userPosts;
+                  });
+                } else {
+                  Get.snackbar('Error', postsResult['message']);
+                }
+              } else {
+                Get.snackbar('Error', userResult['message']);
+              }
+            },
+          ),
+          if (_foundUser != null) ...[
+            const SizedBox(height: 20),
+            TextField(
+              controller: _postSearchController,
+              decoration: InputDecoration(
+                labelText: 'Search Posts by Content',
+                labelStyle: GoogleFonts.roboto(color: Colors.white),
+                prefixIcon: const Icon(Icons.search, color: Colors.white),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              style: GoogleFonts.roboto(color: Colors.white),
+            ),
+            Expanded(
+              child: ListView.builder(
+                itemCount: _filteredPosts.length,
+                itemBuilder: (context, index) {
+                  final post = _filteredPosts[index];
+                  return Card(
+                    color: Colors.grey[900],
+                    child: ListTile(
+                      title: Text(post['content'] ?? '', style: GoogleFonts.roboto(color: Colors.white)),
+                      subtitle: Text('By: ${post['username'] ?? ''}', style: GoogleFonts.roboto(color: Colors.grey)),
+                      trailing: ElevatedButton(
+                        onPressed: () => widget.onAction(post['_id']),
+                        child: Text(widget.actionText),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}

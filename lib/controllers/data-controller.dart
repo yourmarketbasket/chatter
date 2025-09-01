@@ -887,6 +887,64 @@ class DataController extends GetxController {
     }
   }
 
+  Future<Map<String, dynamic>> fetchPostsByUsername(String username) async {
+    try {
+      final String? token = user.value['token'];
+      if (token == null) {
+        return {'success': false, 'message': 'Authentication token not found.'};
+      }
+
+      final response = await _dio.get(
+        'api/posts/by-user/$username',
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return {'success': true, 'posts': response.data['posts']};
+      } else {
+        return {
+          'success': false,
+          'message': response.data['message'] ?? 'Failed to fetch posts. Status: ${response.statusCode}'
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> searchUserByUsername(String username) async {
+    try {
+      final String? token = user.value['token'];
+      if (token == null) {
+        return {'success': false, 'message': 'Authentication token not found.'};
+      }
+
+      final response = await _dio.get(
+        'api/users/by-name/$username',
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return {'success': true, 'user': response.data['user']};
+      } else {
+        return {
+          'success': false,
+          'message': response.data['message'] ?? 'Failed to search user. Status: ${response.statusCode}'
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
   Future<Map<String, dynamic>> deletePostByAdmin(String postId) async {
     try {
       final String? token = user.value['token'];
