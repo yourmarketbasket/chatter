@@ -926,11 +926,19 @@ class DataController extends GetxController {
       return {'success': false, 'message': 'Post not found locally.'};
     }
 
-    final postToUpdate = postIndex != -1 ? posts[postIndex] : userPosts[userPostIndex];
-    final originalStatus = postToUpdate['isFlagged'] ?? false;
-    postToUpdate['isFlagged'] = false;
-    if (postIndex != -1) posts[postIndex] = postToUpdate;
-    if (userPostIndex != -1) userPosts[userPostIndex] = postToUpdate;
+    if (postIndex != -1) {
+      final postToUpdate = posts[postIndex];
+      final originalStatus = postToUpdate['isFlagged'] ?? false;
+      postToUpdate['isFlagged'] = false;
+      posts[postIndex] = postToUpdate;
+    }
+
+    if (userPostIndex != -1) {
+      final postToUpdate = userPosts[userPostIndex];
+      final originalStatus = postToUpdate['isFlagged'] ?? false;
+      postToUpdate['isFlagged'] = false;
+      userPosts[userPostIndex] = postToUpdate;
+    }
 
     try {
       final String? token = this.user['token'];
@@ -948,20 +956,41 @@ class DataController extends GetxController {
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
+        final postIndex = posts.indexWhere((post) => post['_id'] == postId);
+        if (postIndex == -1) {
+          final userPostIndex = userPosts.indexWhere((post) => post['_id'] == postId);
+          if (userPostIndex != -1) {
+            posts.add(userPosts[userPostIndex]);
+          }
+        }
         return {'success': true, 'message': 'Post unflagged successfully'};
       } else {
-        postToUpdate['isFlagged'] = originalStatus;
-        if (postIndex != -1) posts[postIndex] = postToUpdate;
-        if (userPostIndex != -1) userPosts[userPostIndex] = postToUpdate;
+        if (postIndex != -1) {
+          final postToUpdate = posts[postIndex];
+          postToUpdate['isFlagged'] = true;
+          posts[postIndex] = postToUpdate;
+        }
+        if (userPostIndex != -1) {
+          final postToUpdate = userPosts[userPostIndex];
+          postToUpdate['isFlagged'] = true;
+          userPosts[userPostIndex] = postToUpdate;
+        }
         return {
           'success': false,
           'message': response.data['message'] ?? 'Failed to unflag post. Status: ${response.statusCode}'
         };
       }
     } catch (e) {
-      postToUpdate['isFlagged'] = originalStatus;
-      if (postIndex != -1) posts[postIndex] = postToUpdate;
-      if (userPostIndex != -1) userPosts[userPostIndex] = postToUpdate;
+      if (postIndex != -1) {
+        final postToUpdate = posts[postIndex];
+        postToUpdate['isFlagged'] = true;
+        posts[postIndex] = postToUpdate;
+      }
+      if (userPostIndex != -1) {
+        final postToUpdate = userPosts[userPostIndex];
+        postToUpdate['isFlagged'] = true;
+        userPosts[userPostIndex] = postToUpdate;
+      }
       return {'success': false, 'message': e.toString()};
     }
   }
@@ -1160,11 +1189,19 @@ class DataController extends GetxController {
       return {'success': false, 'message': 'Post not found locally.'};
     }
 
-    final postToUpdate = postIndex != -1 ? posts[postIndex] : userPosts[userPostIndex];
-    final originalStatus = postToUpdate['isFlagged'] ?? false;
-    postToUpdate['isFlagged'] = true;
-    if (postIndex != -1) posts[postIndex] = postToUpdate;
-    if (userPostIndex != -1) userPosts[userPostIndex] = postToUpdate;
+    if (postIndex != -1) {
+      final postToUpdate = posts[postIndex];
+      final originalStatus = postToUpdate['isFlagged'] ?? false;
+      postToUpdate['isFlagged'] = true;
+      posts[postIndex] = postToUpdate;
+    }
+
+    if (userPostIndex != -1) {
+      final postToUpdate = userPosts[userPostIndex];
+      final originalStatus = postToUpdate['isFlagged'] ?? false;
+      postToUpdate['isFlagged'] = true;
+      userPosts[userPostIndex] = postToUpdate;
+    }
 
     try {
       final String? token = this.user['token'];
@@ -1184,18 +1221,32 @@ class DataController extends GetxController {
       if (response.statusCode == 200 && response.data['success'] == true) {
         return {'success': true, 'message': 'Post flagged for review'};
       } else {
-        postToUpdate['isFlagged'] = originalStatus;
-        if (postIndex != -1) posts[postIndex] = postToUpdate;
-        if (userPostIndex != -1) userPosts[userPostIndex] = postToUpdate;
+        if (postIndex != -1) {
+          final postToUpdate = posts[postIndex];
+          postToUpdate['isFlagged'] = false;
+          posts[postIndex] = postToUpdate;
+        }
+        if (userPostIndex != -1) {
+          final postToUpdate = userPosts[userPostIndex];
+          postToUpdate['isFlagged'] = false;
+          userPosts[userPostIndex] = postToUpdate;
+        }
         return {
           'success': false,
           'message': response.data['message'] ?? 'Failed to flag post. Status: ${response.statusCode}'
         };
       }
     } catch (e) {
-      postToUpdate['isFlagged'] = originalStatus;
-      if (postIndex != -1) posts[postIndex] = postToUpdate;
-      if (userPostIndex != -1) userPosts[userPostIndex] = postToUpdate;
+      if (postIndex != -1) {
+        final postToUpdate = posts[postIndex];
+        postToUpdate['isFlagged'] = false;
+        posts[postIndex] = postToUpdate;
+      }
+      if (userPostIndex != -1) {
+        final postToUpdate = userPosts[userPostIndex];
+        postToUpdate['isFlagged'] = false;
+        userPosts[userPostIndex] = postToUpdate;
+      }
       return {'success': false, 'message': e.toString()};
     }
   }

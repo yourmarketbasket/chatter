@@ -102,53 +102,50 @@ class _PostSearchWidgetState extends State<PostSearchWidget> {
                     child: ListTile(
                       title: Text(post['content'] ?? '', style: GoogleFonts.roboto(color: Colors.white)),
                       subtitle: Text('By: ${post['username'] ?? ''}', style: GoogleFonts.roboto(color: Colors.grey)),
-                      trailing: PopupMenuButton<String>(
-                        onSelected: (value) async {
-                          if (value == 'flag') {
-                            final isFlagged = post['isFlagged'] ?? false;
-                            final result = isFlagged
-                                ? await dataController.unflagPost(post['_id'])
-                                : await dataController.flagPostForReview(post['_id']);
-                            Get.snackbar(
-                              result['success'] ? 'Success' : 'Error',
-                              result['message'],
-                              snackPosition: SnackPosition.BOTTOM,
-                            );
-                          } else if (value == 'delete') {
-                            Get.dialog(
-                              AlertDialog(
-                                title: const Text('Delete Post'),
-                                content: const Text('Are you sure you want to delete this post?'),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Get.back(),
-                                    child: const Text('Cancel'),
-                                  ),
-                                  TextButton(
-                                    onPressed: () async {
-                                      Get.back();
-                                      final result = await dataController.deletePostByAdmin(post['_id']);
-                                      Get.snackbar(
-                                        result['success'] ? 'Success' : 'Error',
-                                        result['message'],
-                                        snackPosition: SnackPosition.BOTTOM,
-                                      );
-                                    },
-                                    child: const Text('Delete'),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }
-                        },
-                        itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-                          const PopupMenuItem<String>(
-                            value: 'flag',
-                            child: Text('Flag/Unflag'),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Switch(
+                            value: post['isFlagged'] ?? false,
+                            onChanged: (value) async {
+                              final result = value
+                                  ? await dataController.flagPostForReview(post['_id'])
+                                  : await dataController.unflagPost(post['_id']);
+                              Get.snackbar(
+                                result['success'] ? 'Success' : 'Error',
+                                result['message'],
+                                snackPosition: SnackPosition.BOTTOM,
+                              );
+                            },
                           ),
-                          const PopupMenuItem<String>(
-                            value: 'delete',
-                            child: Text('Delete'),
+                          IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            onPressed: () {
+                              Get.dialog(
+                                AlertDialog(
+                                  title: const Text('Delete Post'),
+                                  content: const Text('Are you sure you want to delete this post?'),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Get.back(),
+                                      child: const Text('Cancel'),
+                                    ),
+                                    TextButton(
+                                      onPressed: () async {
+                                        Get.back();
+                                        final result = await dataController.deletePostByAdmin(post['_id']);
+                                        Get.snackbar(
+                                          result['success'] ? 'Success' : 'Error',
+                                          result['message'],
+                                          snackPosition: SnackPosition.BOTTOM,
+                                        );
+                                      },
+                                      child: const Text('Delete'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
                           ),
                         ],
                       ),

@@ -71,7 +71,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                       backgroundImage: NetworkImage(user['avatar'] ?? ''),
                     ),
                     title: Text(user['name'] ?? '', style: GoogleFonts.roboto(color: Colors.white)),
-                    trailing: Row(
+                    trailing: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
