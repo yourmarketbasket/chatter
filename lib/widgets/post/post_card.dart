@@ -44,7 +44,7 @@ class _PostCardState extends State<PostCard> {
 
   @override
   Widget build(BuildContext context) {
-    return _buildPostContent(context, post, isReply: isReply);
+    return _buildPostContent(context, widget.post, isReply: widget.isReply);
   }
 
   List<TextSpan> _buildTextSpans(String text, {required bool isReply}) {
