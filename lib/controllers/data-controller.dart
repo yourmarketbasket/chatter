@@ -959,6 +959,18 @@ class DataController extends GetxController {
     }
   }
 
+  void handleUserSuspended(Map<String, dynamic> data) {
+    final userId = data['userId'] as String?;
+    if (userId == null) return;
+
+    final index = allUsers.indexWhere((user) => user['_id'] == userId);
+    if (index != -1) {
+      final user = allUsers[index];
+      user['suspended'] = true;
+      allUsers[index] = user;
+    }
+  }
+
   void handleUserUnsuspended(Map<String, dynamic> data) {
     final userId = data['userId'] as String?;
     if (userId == null) return;
@@ -966,7 +978,7 @@ class DataController extends GetxController {
     final index = allUsers.indexWhere((user) => user['_id'] == userId);
     if (index != -1) {
       final user = allUsers[index];
-      user['isSuspended'] = false;
+      user['suspended'] = false;
       allUsers[index] = user;
     }
   }
@@ -1130,8 +1142,8 @@ class DataController extends GetxController {
     }
 
     final userToUnsuspend = allUsers[index];
-    final originalStatus = userToUnsuspend['isSuspended'] ?? false;
-    userToUnsuspend['isSuspended'] = false;
+    final originalStatus = userToUnsuspend['suspended'] ?? false;
+    userToUnsuspend['suspended'] = false;
     allUsers[index] = userToUnsuspend;
 
     try {
@@ -1153,7 +1165,7 @@ class DataController extends GetxController {
       if (response.statusCode == 200 && response.data['success'] == true) {
         return {'success': true, 'message': 'User unsuspended successfully'};
       } else {
-        userToUnsuspend['isSuspended'] = originalStatus;
+        userToUnsuspend['suspended'] = originalStatus;
         allUsers[index] = userToUnsuspend;
         return {
           'success': false,
@@ -1161,7 +1173,7 @@ class DataController extends GetxController {
         };
       }
     } catch (e) {
-      userToUnsuspend['isSuspended'] = originalStatus;
+      userToUnsuspend['suspended'] = originalStatus;
       allUsers[index] = userToUnsuspend;
       String errorMessage = 'An error occurred while unsuspending the user.';
       if (e is dio.DioException) {
@@ -1438,8 +1450,8 @@ class DataController extends GetxController {
     }
 
     final userToSuspend = allUsers[index];
-    final originalStatus = userToSuspend['isSuspended'] ?? false;
-    userToSuspend['isSuspended'] = true;
+    final originalStatus = userToSuspend['suspended'] ?? false;
+    userToSuspend['suspended'] = true;
     allUsers[index] = userToSuspend;
 
     try {
@@ -1460,7 +1472,7 @@ class DataController extends GetxController {
       if (response.statusCode == 200 && response.data['success'] == true) {
         return {'success': true, 'message': 'User suspended successfully'};
       } else {
-        userToSuspend['isSuspended'] = originalStatus;
+        userToSuspend['suspended'] = originalStatus;
         allUsers[index] = userToSuspend;
         return {
           'success': false,
@@ -1468,7 +1480,7 @@ class DataController extends GetxController {
         };
       }
     } catch (e) {
-      userToSuspend['isSuspended'] = originalStatus;
+      userToSuspend['suspended'] = originalStatus;
       allUsers[index] = userToSuspend;
       String errorMessage = 'An error occurred while suspending the user.';
       if (e is dio.DioException) {

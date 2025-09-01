@@ -79,18 +79,18 @@ class _UserManagementPageState extends State<UserManagementPage> {
                     ),
                     title: Text(user['name'] ?? '', style: GoogleFonts.roboto(color: Colors.white)),
                     subtitle: Text(
-                      user['isSuspended'] ?? false ? 'Suspended' : 'Active',
+                      user['suspended'] == true ? 'Suspended' : 'Active',
                       style: GoogleFonts.roboto(
-                        color: user['isSuspended'] ?? false ? Colors.red : Colors.green,
+                        color: user['suspended'] == true ? Colors.red : Colors.green,
                       ),
                     ),
                     trailing: IconButton(
                       icon: Icon(
-                        user['isSuspended'] ?? false ? Icons.person_off : Icons.person,
-                        color: user['isSuspended'] ?? false ? Colors.red : Colors.green,
+                        user['suspended'] == true ? Icons.person_off : Icons.person,
+                        color: user['suspended'] == true ? Colors.red : Colors.green,
                       ),
                       onPressed: () {
-                        final bool isSuspended = user['isSuspended'] ?? false;
+                        final bool isSuspended = user['suspended'] == true;
                         Get.dialog(
                           AlertDialog(
                             title: Text(isSuspended ? 'Unsuspend User' : 'Suspend User'),
