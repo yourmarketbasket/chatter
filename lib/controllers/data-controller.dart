@@ -4171,30 +4171,6 @@ void clearUserPosts() {
     profileUpdateTrigger.value = followedId ?? DateTime.now().millisecondsSinceEpoch.toString(); // Use timestamp as unique trigger if ID is null
   }
 
-  void handleUserVerified(Map<String, dynamic> data) {
-    final String? userId = data['userId'];
-    final dynamic verification = data['verification'];
-
-    if (userId == null || verification == null) {
-      return;
-    }
-
-    // Update user in allUsers list
-    final index = allUsers.indexWhere((u) => u['_id'] == userId);
-    if (index != -1) {
-      final userToUpdate = Map<String, dynamic>.from(allUsers[index]);
-      userToUpdate['verification'] = verification;
-      allUsers[index] = userToUpdate;
-    }
-
-    // Update current user if it's them
-    if (user.value['user']?['_id'] == userId) {
-      final updatedUser = Map<String, dynamic>.from(user.value);
-      updatedUser['user']['verification'] = verification;
-      user.value = updatedUser;
-      _storage.write(key: 'user', value: jsonEncode(updatedUser));
-    }
-  }
 
   void handleUserUnfollowedSocket(Map<String, dynamic> data) {
     final String? unfollowerId = data['unfollowerId'] as String?; // The user who initiated the unfollow
