@@ -158,6 +158,11 @@ class _UpdateVerificationPageState extends State<UpdateVerificationPage> {
                       _selectedLevel!,
                       _paid,
                     );
+                    if (result['success']) {
+                      setState(() {
+                        _foundUser!['verification'] = result['verification'];
+                      });
+                    }
                     Get.snackbar(
                       result['success'] ? 'Success' : 'Error',
                       result['message'],
