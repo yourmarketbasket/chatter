@@ -40,6 +40,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
   late Animation<double> _pulseAnimation;
   late bool _isMuted;
   bool _isInitialized = false;
+  bool _isDisposing = false;
   String _videoUniqueId = "";
   bool _shouldAutoplayAfterInit = false;
   bool _shouldRenderPlayer = false;
@@ -166,7 +167,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
   }
 
   void _playVideo() {
-    if (!mounted) return;
+    if (!mounted || _isDisposing) return;
     print("[VideoAttachmentWidget-$_videoUniqueId] Play callback received.");
     if (mounted) {
       setState(() {
@@ -191,7 +192,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
   }
 
   void _pauseVideo() {
-    if (!mounted) return;
+    if (!mounted || _isDisposing) return;
     print("[VideoAttachmentWidget-$_videoUniqueId] Pause callback received.");
     if (_betterPlayerController != null && _isInitialized) {
       if (_betterPlayerController!.isPlaying()!) {
@@ -207,6 +208,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
   }
 
   void _initializeVideoPlayer({bool autoplay = false}) {
+    if (!mounted || _isDisposing) return;
     if (_betterPlayerController != null) {
       print("[VideoAttachmentWidget-$_videoUniqueId] _initializeVideoPlayer: Disposing existing controller before creating new one.");
       _betterPlayerController!.removeEventsListener(_onPlayerEvent);
@@ -258,7 +260,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
   }
 
   void _onPlayerEvent(BetterPlayerEvent event) {
-    if (!mounted || _betterPlayerController == null) return;
+    if (!mounted || _isDisposing || _betterPlayerController == null) return;
 
     switch (event.betterPlayerEventType) {
       case BetterPlayerEventType.initialized:
@@ -308,6 +310,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
 
   @override
   void dispose() {
+    _isDisposing = true;
     _mediaVisibilityService.unregisterItem(_videoUniqueId);
     _currentlyPlayingMediaSubscription?.dispose();
 
@@ -337,7 +340,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
     return VisibilityDetector(
       key: Key(visibilityDetectorKey),
       onVisibilityChanged: (visibilityInfo) {
-        if (!mounted) {
+        if (!mounted || _isDisposing) {
           return;
         }
         final visibleFraction = visibilityInfo.visibleFraction;
@@ -356,9 +359,20 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
           context: context,
         );
 
-        if (visibleFraction == 0) { // When invisible, just pause. Don't dispose.
-          if (_betterPlayerController != null && _isInitialized) {
+        if (visibleFraction == 0) { // Aggressive disposal is back, but now safe.
+          if (_betterPlayerController != null) {
             _betterPlayerController!.pause();
+            _betterPlayerController!.removeEventsListener(_onPlayerEvent);
+            _betterPlayerController!.dispose();
+            _betterPlayerController = null;
+          }
+          if (_isInitialized) {
+            // Use setState to ensure dependent widgets rebuild correctly if they
+            // rely on the _isInitialized state.
+            setState(() {
+              _isInitialized = false;
+              _shouldRenderPlayer = false;
+            });
           }
         }
       },
