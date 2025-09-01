@@ -29,6 +29,99 @@ class _PostSearchWidgetState extends State<PostSearchWidget> {
     });
   }
 
+  void _handleFlagPost(Map<String, dynamic> post) async {
+    final String postId = post['_id'];
+    final int postIndex = _filteredPosts.indexWhere((p) => p['_id'] == postId);
+    if (postIndex == -1) return;
+
+    final bool originalFlagStatus = _filteredPosts[postIndex]['isFlagged'] ?? false;
+
+    // 1. Optimistic UI update
+    setState(() {
+      _filteredPosts[postIndex]['isFlagged'] = !originalFlagStatus;
+    });
+
+    // 2. API call
+    final result = !originalFlagStatus
+        ? await dataController.flagPostForReview(postId)
+        : await dataController.unflagPost(postId);
+
+    // 3. Handle result
+    if (result['success']) {
+      Get.snackbar('Success', result['message'],
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.green,
+          colorText: Colors.white);
+      // Also update the main list to be sure
+      final int mainListIndex = _userPosts.indexWhere((p) => p['_id'] == postId);
+      if (mainListIndex != -1) {
+        _userPosts[mainListIndex]['isFlagged'] = !originalFlagStatus;
+      }
+    } else {
+      // 4. Rollback on failure
+      setState(() {
+        _filteredPosts[postIndex]['isFlagged'] = originalFlagStatus;
+      });
+      Get.snackbar('Error', result['message'],
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white);
+    }
+  }
+
+  void _handleDeletePost(Map<String, dynamic> post) {
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Delete Post'),
+        content: const Text('Are you sure you want to delete this post?'),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Get.back();
+              final String postId = post['_id'];
+              final int postIndex = _filteredPosts.indexWhere((p) => p['_id'] == postId);
+              if (postIndex == -1) return;
+
+              // Optimistic removal
+              final removedPost = _filteredPosts.removeAt(postIndex);
+              final int mainListIndex = _userPosts.indexWhere((p) => p['_id'] == postId);
+              if (mainListIndex != -1) {
+                _userPosts.removeAt(mainListIndex);
+              }
+              setState(() {});
+
+              final result = await dataController.deletePostByAdmin(postId);
+
+              if (result['success']) {
+                Get.snackbar('Success', result['message'],
+                    snackPosition: SnackPosition.BOTTOM,
+                    backgroundColor: Colors.green,
+                    colorText: Colors.white);
+              } else {
+                // Rollback
+                setState(() {
+                  _filteredPosts.insert(postIndex, removedPost);
+                  if (mainListIndex != -1) {
+                    _userPosts.insert(mainListIndex, removedPost);
+                  }
+                });
+                Get.snackbar('Error', result['message'],
+                    snackPosition: SnackPosition.BOTTOM,
+                    backgroundColor: Colors.red,
+                    colorText: Colors.white);
+              }
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -164,48 +257,11 @@ class _PostSearchWidgetState extends State<PostSearchWidget> {
                               ),
                               const SizedBox(width: 10),
                               PopupMenuButton<String>(
-                                onSelected: (value) async {
+                                onSelected: (value) {
                                   if (value == 'flag') {
-                                    final bool isFlagged = post['isFlagged'] ?? false;
-                                    final result = isFlagged
-                                        ? await dataController.unflagPost(post['_id'])
-                                        : await dataController.flagPostForReview(post['_id']);
-                                    Get.snackbar(
-                                      result['success'] ? 'Success' : 'Error',
-                                      result['message'],
-                                      snackPosition: SnackPosition.BOTTOM,
-                                    );
-                                    if (result['success']) {
-                                      _fetchUserAndPosts(_userSearchController.text);
-                                    }
+                                    _handleFlagPost(post);
                                   } else if (value == 'delete') {
-                                    Get.dialog(
-                                      AlertDialog(
-                                        title: const Text('Delete Post'),
-                                        content: const Text('Are you sure you want to delete this post?'),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () => Get.back(),
-                                            child: const Text('Cancel'),
-                                          ),
-                                          TextButton(
-                                            onPressed: () async {
-                                              Get.back();
-                                              final result = await dataController.deletePostByAdmin(post['_id']);
-                                              Get.snackbar(
-                                                result['success'] ? 'Success' : 'Error',
-                                                result['message'],
-                                                snackPosition: SnackPosition.BOTTOM,
-                                              );
-                                               if (result['success']) {
-                                                _fetchUserAndPosts(_userSearchController.text);
-                                              }
-                                            },
-                                            child: const Text('Delete'),
-                                          ),
-                                        ],
-                                      ),
-                                    );
+                                    _handleDeletePost(post);
                                   }
                                 },
                                 itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
