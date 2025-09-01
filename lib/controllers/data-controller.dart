@@ -517,6 +517,7 @@ class DataController extends GetxController {
                 'followersCount': followersCount,
                 'followingCount': followingCount,
                 'isFollowingCurrentUser': isFollowing,
+                'suspended': userData['suspended'],
                 // Include the raw followers/following arrays if present, might be useful for other operations
                 // or if socket events need to modify these specific users locally.
                 'followers': userData['followers'] ?? [], // Store the array if available
