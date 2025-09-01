@@ -76,47 +76,42 @@ class _UserManagementPageState extends State<UserManagementPage> {
                           : null,
                     ),
                     title: Text(user['name'] ?? '', style: GoogleFonts.roboto(color: Colors.white)),
-                    trailing: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          user['isSuspended'] ?? false ? 'Suspended' : 'Active',
-                          style: GoogleFonts.roboto(
-                            color: user['isSuspended'] ?? false ? Colors.red : Colors.green,
-                          ),
-                        ),
-                        Switch(
-                          value: user['isSuspended'] ?? false,
-                          onChanged: (value) {
-                            Get.dialog(
-                              AlertDialog(
-                                title: Text(value ? 'Suspend User' : 'Unsuspend User'),
-                                content: Text('Are you sure you want to ${value ? 'suspend' : 'unsuspend'} ${user['name']}?'),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Get.back(),
-                                    child: const Text('Cancel'),
-                                  ),
-                                  TextButton(
-                                    onPressed: () async {
-                                      Get.back();
-                                      final result = value
-                                          ? await dataController.suspendUser(user['_id'])
-                                          : await dataController.unsuspendUser(user['_id']);
-                                      Get.snackbar(
-                                        result['success'] ? 'Success' : 'Error',
-                                        result['message'],
-                                        snackPosition: SnackPosition.BOTTOM,
-                                      );
-                                    },
-                                    child: Text(value ? 'Suspend' : 'Unsuspend'),
-                                  ),
-                                ],
+                    subtitle: Text(
+                      user['isSuspended'] ?? false ? 'Suspended' : 'Active',
+                      style: GoogleFonts.roboto(
+                        color: user['isSuspended'] ?? false ? Colors.red : Colors.green,
+                      ),
+                    ),
+                    trailing: Switch(
+                      value: user['isSuspended'] ?? false,
+                      onChanged: (value) {
+                        Get.dialog(
+                          AlertDialog(
+                            title: Text(value ? 'Suspend User' : 'Unsuspend User'),
+                            content: Text('Are you sure you want to ${value ? 'suspend' : 'unsuspend'} ${user['name']}?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Get.back(),
+                                child: const Text('Cancel'),
                               ),
-                            );
-                          },
-                        ),
-                      ],
+                              TextButton(
+                                onPressed: () async {
+                                  Get.back();
+                                  final result = value
+                                      ? await dataController.suspendUser(user['_id'])
+                                      : await dataController.unsuspendUser(user['_id']);
+                                  Get.snackbar(
+                                    result['success'] ? 'Success' : 'Error',
+                                    result['message'],
+                                    snackPosition: SnackPosition.BOTTOM,
+                                  );
+                                },
+                                child: Text(value ? 'Suspend' : 'Unsuspend'),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
                     ),
                   );
                 },
