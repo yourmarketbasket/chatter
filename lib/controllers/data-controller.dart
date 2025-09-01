@@ -373,8 +373,9 @@ class DataController extends GetxController {
   }
 
   void handleMessageUpdate(Map<String, dynamic> data) {
-    final messageId = data['_id'] as String?;
-    final chatId = data['chatId'] as String?;
+    final updatedMessage = _processMessage(data);
+    final messageId = updatedMessage['_id'] as String?;
+    final chatId = updatedMessage['chatId'] as String?;
 
     if (messageId == null || chatId == null) {
       // print('[DataController] Invalid message:updated data received: $data');
@@ -399,7 +400,8 @@ class DataController extends GetxController {
     }
   }
 
-  void handleMessageDelete(Map<String, dynamic> deletedMessage) {
+  void handleMessageDelete(Map<String, dynamic> data) {
+    final deletedMessage = _processMessage(data);
     final messageId = deletedMessage['_id'] as String?;
     final chatId = deletedMessage['chatId'] as String?;
 
@@ -1842,7 +1844,7 @@ class DataController extends GetxController {
           : -1;
 
       if (response.statusCode == 201 && response.data['success'] == true) {
-        final serverMessage = response.data['message'];
+        final serverMessage = _processMessage(response.data['message']);
 
         // --- NEW/RESURRECTED CHAT HANDLING ---
         // If the server returns a full 'chat' object, that's the best case.
