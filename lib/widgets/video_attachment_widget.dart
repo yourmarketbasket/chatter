@@ -166,6 +166,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
   }
 
   void _playVideo() {
+    if (!mounted) return;
     print("[VideoAttachmentWidget-$_videoUniqueId] Play callback received.");
     if (mounted) {
       setState(() {
@@ -175,25 +176,28 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
 
     if (_betterPlayerController != null) {
       if (_isInitialized) {
-        _betterPlayerController!.play();
+        if (!_betterPlayerController!.isPlaying()!) {
+          _betterPlayerController!.play();
+        }
         print("[VideoAttachmentWidget-$_videoUniqueId] Player ready, playing.");
       } else {
-        // It's initializing, so just make sure it will autoplay when ready.
         _shouldAutoplayAfterInit = true;
         print("[VideoAttachmentWidget-$_videoUniqueId] Player is initializing, will play when ready.");
       }
     } else {
-      // This case should ideally not happen if VisibilityDetector works correctly
       print("[VideoAttachmentWidget-$_videoUniqueId] Play called but controller is null. Initializing now.");
       _initializeVideoPlayer(autoplay: true);
     }
   }
 
   void _pauseVideo() {
+    if (!mounted) return;
     print("[VideoAttachmentWidget-$_videoUniqueId] Pause callback received.");
     if (_betterPlayerController != null && _isInitialized) {
-      _betterPlayerController!.pause();
-       print("[VideoAttachmentWidget-$_videoUniqueId] Player paused.");
+      if (_betterPlayerController!.isPlaying()!) {
+        _betterPlayerController!.pause();
+      }
+      print("[VideoAttachmentWidget-$_videoUniqueId] Player paused.");
     }
     if (mounted) {
       setState(() {
