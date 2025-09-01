@@ -3,14 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-class SuspendUserPage extends StatefulWidget {
-  const SuspendUserPage({Key? key}) : super(key: key);
+class UserManagementPage extends StatefulWidget {
+  const UserManagementPage({Key? key}) : super(key: key);
 
   @override
-  _SuspendUserPageState createState() => _SuspendUserPageState();
+  _UserManagementPageState createState() => _UserManagementPageState();
 }
 
-class _SuspendUserPageState extends State<SuspendUserPage> {
+class _UserManagementPageState extends State<UserManagementPage> {
   final DataController dataController = Get.find<DataController>();
   final TextEditingController _searchController = TextEditingController();
   List<Map<String, dynamic>> _filteredUsers = [];
@@ -98,11 +98,6 @@ class _SuspendUserPageState extends State<SuspendUserPage> {
                                       final result = value
                                           ? await dataController.suspendUser(user['_id'])
                                           : await dataController.unsuspendUser(user['_id']);
-                                      if (result['success']) {
-                                        setState(() {
-                                          user['isSuspended'] = value;
-                                        });
-                                      }
                                       Get.snackbar(
                                         result['success'] ? 'Success' : 'Error',
                                         result['message'],

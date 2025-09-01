@@ -109,11 +109,6 @@ class _PostSearchWidgetState extends State<PostSearchWidget> {
                             final result = isFlagged
                                 ? await dataController.unflagPost(post['_id'])
                                 : await dataController.flagPostForReview(post['_id']);
-                            if (result['success']) {
-                              setState(() {
-                                post['isFlagged'] = !isFlagged;
-                              });
-                            }
                             Get.snackbar(
                               result['success'] ? 'Success' : 'Error',
                               result['message'],
@@ -133,12 +128,6 @@ class _PostSearchWidgetState extends State<PostSearchWidget> {
                                     onPressed: () async {
                                       Get.back();
                                       final result = await dataController.deletePostByAdmin(post['_id']);
-                                      if (result['success']) {
-                                        setState(() {
-                                          _userPosts.removeWhere((p) => p['_id'] == post['_id']);
-                                          _filteredPosts.removeWhere((p) => p['_id'] == post['_id']);
-                                        });
-                                      }
                                       Get.snackbar(
                                         result['success'] ? 'Success' : 'Error',
                                         result['message'],

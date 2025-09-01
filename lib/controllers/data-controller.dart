@@ -919,10 +919,23 @@ class DataController extends GetxController {
   }
 
   Future<Map<String, dynamic>> unflagPost(String postId) async {
+    final postIndex = posts.indexWhere((post) => post['_id'] == postId);
+    final userPostIndex = userPosts.indexWhere((post) => post['_id'] == postId);
+
+    if (postIndex == -1 && userPostIndex == -1) {
+      return {'success': false, 'message': 'Post not found locally.'};
+    }
+
+    final post = postIndex != -1 ? posts[postIndex] : userPosts[userPostIndex];
+    final originalStatus = post['isFlagged'] ?? false;
+    post['isFlagged'] = false;
+    if (postIndex != -1) posts[postIndex] = post;
+    if (userPostIndex != -1) userPosts[userPostIndex] = post;
+
     try {
       final String? token = user.value['token'];
       if (token == null) {
-        return {'success': false, 'message': 'Authentication token not found.'};
+        throw Exception('Authentication token not found.');
       }
 
       final response = await _dio.put(
@@ -937,21 +950,37 @@ class DataController extends GetxController {
       if (response.statusCode == 200 && response.data['success'] == true) {
         return {'success': true, 'message': 'Post unflagged successfully'};
       } else {
+        post['isFlagged'] = originalStatus;
+        if (postIndex != -1) posts[postIndex] = post;
+        if (userPostIndex != -1) userPosts[userPostIndex] = post;
         return {
           'success': false,
           'message': response.data['message'] ?? 'Failed to unflag post. Status: ${response.statusCode}'
         };
       }
     } catch (e) {
+      post['isFlagged'] = originalStatus;
+      if (postIndex != -1) posts[postIndex] = post;
+      if (userPostIndex != -1) userPosts[userPostIndex] = post;
       return {'success': false, 'message': e.toString()};
     }
   }
 
   Future<Map<String, dynamic>> unsuspendUser(String userId) async {
+    final index = allUsers.indexWhere((user) => user['_id'] == userId);
+    if (index == -1) {
+      return {'success': false, 'message': 'User not found locally.'};
+    }
+
+    final user = allUsers[index];
+    final originalStatus = user['isSuspended'] ?? false;
+    user['isSuspended'] = false;
+    allUsers[index] = user;
+
     try {
       final String? token = user.value['token'];
       if (token == null) {
-        return {'success': false, 'message': 'Authentication token not found.'};
+        throw Exception('Authentication token not found.');
       }
 
       final response = await _dio.put(
@@ -966,12 +995,16 @@ class DataController extends GetxController {
       if (response.statusCode == 200 && response.data['success'] == true) {
         return {'success': true, 'message': 'User unsuspended successfully'};
       } else {
+        user['isSuspended'] = originalStatus;
+        allUsers[index] = user;
         return {
           'success': false,
           'message': response.data['message'] ?? 'Failed to unsuspend user. Status: ${response.statusCode}'
         };
       }
     } catch (e) {
+      user['isSuspended'] = originalStatus;
+      allUsers[index] = user;
       return {'success': false, 'message': e.toString()};
     }
   }
@@ -1035,10 +1068,21 @@ class DataController extends GetxController {
   }
 
   Future<Map<String, dynamic>> deletePostByAdmin(String postId) async {
+    final postIndex = posts.indexWhere((post) => post['_id'] == postId);
+    final userPostIndex = userPosts.indexWhere((post) => post['_id'] == postId);
+    final post = postIndex != -1 ? posts[postIndex] : (userPostIndex != -1 ? userPosts[userPostIndex] : null);
+
+    if (post == null) {
+      return {'success': false, 'message': 'Post not found locally.'};
+    }
+
+    if (postIndex != -1) posts.removeAt(postIndex);
+    if (userPostIndex != -1) userPosts.removeAt(userPostIndex);
+
     try {
       final String? token = user.value['token'];
       if (token == null) {
-        return {'success': false, 'message': 'Authentication token not found.'};
+        throw Exception('Authentication token not found.');
       }
 
       final response = await _dio.delete(
@@ -1051,16 +1095,18 @@ class DataController extends GetxController {
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
-        posts.removeWhere((post) => post['_id'] == postId);
-        userPosts.removeWhere((post) => post['_id'] == postId);
         return {'success': true, 'message': 'Post deleted successfully'};
       } else {
+        if (postIndex != -1) posts.insert(postIndex, post);
+        if (userPostIndex != -1) userPosts.insert(userPostIndex, post);
         return {
           'success': false,
           'message': response.data['message'] ?? 'Failed to delete post. Status: ${response.statusCode}'
         };
       }
     } catch (e) {
+      if (postIndex != -1) posts.insert(postIndex, post);
+      if (userPostIndex != -1) userPosts.insert(userPostIndex, post);
       return {'success': false, 'message': e.toString()};
     }
   }
@@ -1107,10 +1153,23 @@ class DataController extends GetxController {
   }
 
   Future<Map<String, dynamic>> flagPostForReview(String postId) async {
+    final postIndex = posts.indexWhere((post) => post['_id'] == postId);
+    final userPostIndex = userPosts.indexWhere((post) => post['_id'] == postId);
+
+    if (postIndex == -1 && userPostIndex == -1) {
+      return {'success': false, 'message': 'Post not found locally.'};
+    }
+
+    final post = postIndex != -1 ? posts[postIndex] : userPosts[userPostIndex];
+    final originalStatus = post['isFlagged'] ?? false;
+    post['isFlagged'] = true;
+    if (postIndex != -1) posts[postIndex] = post;
+    if (userPostIndex != -1) userPosts[userPostIndex] = post;
+
     try {
       final String? token = user.value['token'];
       if (token == null) {
-        return {'success': false, 'message': 'Authentication token not found.'};
+        throw Exception('Authentication token not found.');
       }
 
       final response = await _dio.put(
@@ -1125,21 +1184,37 @@ class DataController extends GetxController {
       if (response.statusCode == 200 && response.data['success'] == true) {
         return {'success': true, 'message': 'Post flagged for review'};
       } else {
+        post['isFlagged'] = originalStatus;
+        if (postIndex != -1) posts[postIndex] = post;
+        if (userPostIndex != -1) userPosts[userPostIndex] = post;
         return {
           'success': false,
           'message': response.data['message'] ?? 'Failed to flag post. Status: ${response.statusCode}'
         };
       }
     } catch (e) {
+      post['isFlagged'] = originalStatus;
+      if (postIndex != -1) posts[postIndex] = post;
+      if (userPostIndex != -1) userPosts[userPostIndex] = post;
       return {'success': false, 'message': e.toString()};
     }
   }
 
   Future<Map<String, dynamic>> suspendUser(String userId) async {
+    final index = allUsers.indexWhere((user) => user['_id'] == userId);
+    if (index == -1) {
+      return {'success': false, 'message': 'User not found locally.'};
+    }
+
+    final user = allUsers[index];
+    final originalStatus = user['isSuspended'] ?? false;
+    user['isSuspended'] = true;
+    allUsers[index] = user;
+
     try {
       final String? token = user.value['token'];
       if (token == null) {
-        return {'success': false, 'message': 'Authentication token not found.'};
+        throw Exception('Authentication token not found.');
       }
 
       final response = await _dio.put(
@@ -1154,12 +1229,16 @@ class DataController extends GetxController {
       if (response.statusCode == 200 && response.data['success'] == true) {
         return {'success': true, 'message': 'User suspended successfully'};
       } else {
+        user['isSuspended'] = originalStatus;
+        allUsers[index] = user;
         return {
           'success': false,
           'message': response.data['message'] ?? 'Failed to suspend user. Status: ${response.statusCode}'
         };
       }
     } catch (e) {
+      user['isSuspended'] = originalStatus;
+      allUsers[index] = user;
       return {'success': false, 'message': e.toString()};
     }
   }
@@ -4049,10 +4128,23 @@ void clearUserPosts() {
   }
 
   Future<Map<String, dynamic>> deletePost(String postId) async {
+    final postIndex = posts.indexWhere((post) => post['_id'] == postId);
+    final userPostIndex = userPosts.indexWhere((post) => post['_id'] == postId);
+
+    if (postIndex == -1 && userPostIndex == -1) {
+      return {'success': false, 'message': 'Post not found locally.'};
+    }
+
+    final post = postIndex != -1 ? posts[postIndex] : userPosts[userPostIndex];
+    final originalStatus = post['isFlagged'] ?? false;
+    post['isFlagged'] = false;
+    if (postIndex != -1) posts[postIndex] = post;
+    if (userPostIndex != -1) userPosts[userPostIndex] = post;
+
     try {
       final String? token = user.value['token'];
       if (token == null) {
-        return {'success': false, 'message': 'Authentication token not found.'};
+        throw Exception('Authentication token not found.');
       }
 
       final response = await _dio.delete(
