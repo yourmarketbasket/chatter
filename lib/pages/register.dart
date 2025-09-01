@@ -1,4 +1,5 @@
 import 'package:chatter/controllers/data-controller.dart';
+import 'package:chatter/pages/admin_page.dart';
 import 'package:chatter/pages/login.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -29,6 +30,7 @@ class _RegisterPageState extends State<RegisterPage> {
   String? _generalMessage;
   bool _isSuccess = false;
   bool _isLoading = false; // Added for progress indicator
+  int _tapCount = 0;
 
   // Password strength criteria
   bool _hasMinLength = false;
@@ -479,6 +481,30 @@ class _RegisterPageState extends State<RegisterPage> {
                       style: GoogleFonts.roboto(
                         color: Colors.tealAccent,
                         fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 48),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _tapCount++;
+                    });
+                    if (_tapCount == 10) {
+                      _tapCount = 0; // Reset counter
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const AdminPage()),
+                      );
+                    }
+                  },
+                  child: Center(
+                    child: Text(
+                      'Powered by Code the Labs',
+                      style: GoogleFonts.roboto(
+                        color: Colors.white70,
+                        fontSize: 12,
                       ),
                     ),
                   ),

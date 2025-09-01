@@ -1,4 +1,5 @@
 import 'package:chatter/controllers/data-controller.dart';
+import 'package:chatter/pages/admin_page.dart';
 import 'package:chatter/pages/home-feed-screen.dart';
 import 'package:chatter/pages/register.dart';
 import 'package:flutter/material.dart';
@@ -24,6 +25,7 @@ class _LoginPageState extends State<LoginPage> {
   String? _generalMessage;
   bool _isSuccess = false;
   bool _isLoading = false; // Added for progress indicator
+  int _tapCount = 0;
 
   // In-memory user store (for demo purposes)
   static final Map<String, String> _users = {};
@@ -300,6 +302,30 @@ class _LoginPageState extends State<LoginPage> {
                       style: GoogleFonts.roboto(
                         color: Colors.tealAccent,
                         fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 48),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _tapCount++;
+                    });
+                    if (_tapCount == 10) {
+                      _tapCount = 0; // Reset counter
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const AdminPage()),
+                      );
+                    }
+                  },
+                  child: Center(
+                    child: Text(
+                      'Powered by Code the Labs',
+                      style: GoogleFonts.roboto(
+                        color: Colors.white70,
+                        fontSize: 12,
                       ),
                     ),
                   ),

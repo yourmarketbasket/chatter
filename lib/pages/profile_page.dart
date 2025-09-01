@@ -460,6 +460,38 @@ class _ProfilePageState extends State<ProfilePage> {
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                           ),
                         ),
+                        const SizedBox(width: 12),
+                        ElevatedButton.icon(
+                          onPressed: () async {
+                            final confirm = await showDialog(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: const Text('Block User'),
+                                content: Text('Are you sure you want to block ${widget.username}?'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.of(context).pop(false),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () => Navigator.of(context).pop(true),
+                                    child: const Text('Block'),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (confirm == true) {
+                              await dataController.blockUser(widget.userId);
+                            }
+                          },
+                          icon: const Icon(Icons.block),
+                          label: const Text('Block'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.redAccent,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                          ),
+                        ),
                       ],
                     ),
                 ],
@@ -573,6 +605,35 @@ class _ProfilePageState extends State<ProfilePage> {
                                         _buildActionButton(isBookmarkedByCurrentUser ? Icons.bookmark : FeatherIcons.bookmark, '', () {}, isBookmarked: isBookmarkedByCurrentUser),
                                         const SizedBox(width: 12),
                                         _buildActionButton(Icons.share_outlined, '', () => _sharePost(post)),
+                                        if (isOwnProfile) ...[
+                                          const SizedBox(width: 12),
+                                          _buildActionButton(
+                                            FeatherIcons.trash,
+                                            '',
+                                            () async {
+                                              final confirm = await showDialog(
+                                                context: context,
+                                                builder: (context) => AlertDialog(
+                                                  title: const Text('Delete Post'),
+                                                  content: const Text('Are you sure you want to delete this post?'),
+                                                  actions: [
+                                                    TextButton(
+                                                      onPressed: () => Navigator.of(context).pop(false),
+                                                      child: const Text('Cancel'),
+                                                    ),
+                                                    TextButton(
+                                                      onPressed: () => Navigator.of(context).pop(true),
+                                                      child: const Text('Delete'),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                              if (confirm == true) {
+                                                await dataController.deletePost(postId);
+                                              }
+                                            },
+                                          ),
+                                        ],
                                       ],
                                     ),
                                   ],

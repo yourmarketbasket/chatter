@@ -3656,6 +3656,92 @@ void clearUserPosts() {
     }
   }
 
+  Future<Map<String, dynamic>> blockUser(String userIdToBlock) async {
+    try {
+      final String? token = user.value['token'];
+      if (token == null) {
+        return {'success': false, 'message': 'Authentication token not found.'};
+      }
+
+      final response = await _dio.post(
+        'api/users/block',
+        data: {'userId': userIdToBlock},
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        // Optimistically update the UI
+        final currentUser = Map<String, dynamic>.from(user.value['user']);
+        final blockedUsers = List<String>.from(currentUser['blockedUsers'] ?? []);
+        if (!blockedUsers.contains(userIdToBlock)) {
+          blockedUsers.add(userIdToBlock);
+          currentUser['blockedUsers'] = blockedUsers;
+          user.value['user'] = currentUser;
+          user.refresh();
+        }
+        return {'success': true, 'message': 'User blocked successfully'};
+      } else {
+        return {
+          'success': false,
+          'message': response.data['message'] ?? 'Failed to block user. Status: ${response.statusCode}'
+        };
+      }
+    } catch (e) {
+      String errorMessage = 'An error occurred while blocking the user.';
+      if (e is dio.DioException) {
+        if (e.response?.data != null && e.response!.data['message'] != null) {
+          errorMessage = e.response!.data['message'];
+        } else {
+          errorMessage = e.message ?? errorMessage;
+        }
+      }
+      return {'success': false, 'message': errorMessage};
+    }
+  }
+
+  Future<Map<String, dynamic>> deletePost(String postId) async {
+    try {
+      final String? token = user.value['token'];
+      if (token == null) {
+        return {'success': false, 'message': 'Authentication token not found.'};
+      }
+
+      final response = await _dio.delete(
+        'api/posts/$postId/soft-delete',
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        posts.removeWhere((post) => post['_id'] == postId);
+        userPosts.removeWhere((post) => post['_id'] == postId);
+        return {'success': true, 'message': 'Post deleted successfully'};
+      } else {
+        return {
+          'success': false,
+          'message': response.data['message'] ?? 'Failed to delete post. Status: ${response.statusCode}'
+        };
+      }
+    } catch (e) {
+      String errorMessage = 'An error occurred while deleting the post.';
+      if (e is dio.DioException) {
+        if (e.response?.data != null && e.response!.data['message'] != null) {
+          errorMessage = e.response!.data['message'];
+        } else {
+          errorMessage = e.message ?? errorMessage;
+        }
+      }
+      return {'success': false, 'message': errorMessage};
+    }
+  }
+
   Future<void> _updateMessageStatusOnBackend(String messageId, String chatId, String status) async {
     try {
       final token = getAuthToken();
