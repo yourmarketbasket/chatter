@@ -356,24 +356,9 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
           context: context,
         );
 
-        if (visibleFraction == 0) { // Aggressive disposal
-          if (mounted && _shouldRenderPlayer) {
-            setState(() { _shouldRenderPlayer = false; });
-          } else {
-             _shouldRenderPlayer = false;
-          }
-
-          if (_betterPlayerController != null) {
-            print("[VideoAttachmentWidget-$_videoUniqueId] Became completely invisible. Aggressively disposing player.");
+        if (visibleFraction == 0) { // When invisible, just pause. Don't dispose.
+          if (_betterPlayerController != null && _isInitialized) {
             _betterPlayerController!.pause();
-            _betterPlayerController!.removeEventsListener(_onPlayerEvent);
-            _betterPlayerController!.dispose();
-            _betterPlayerController = null;
-          }
-          if (_isInitialized && mounted) {
-            setState(() { _isInitialized = false; });
-          } else {
-            _isInitialized = false;
           }
         }
       },
