@@ -1,4 +1,5 @@
 import 'package:chatter/controllers/data-controller.dart';
+import 'package:chatter/widgets/reply/post_content.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -41,42 +42,57 @@ class _PostSearchWidgetState extends State<PostSearchWidget> {
     super.dispose();
   }
 
+  Future<void> _fetchUserAndPosts(String username) async {
+    final userResult = await dataController.searchUserByUsername(username);
+    if (userResult['success']) {
+      setState(() {
+        _foundUser = userResult['user'];
+      });
+      final postsResult = await dataController.fetchPostsByUsername(username);
+      if (postsResult['success']) {
+        setState(() {
+          _userPosts = List<Map<String, dynamic>>.from(postsResult['posts']);
+          _filteredPosts = _userPosts;
+        });
+      } else {
+        Get.snackbar('Error', postsResult['message'],
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.red,
+            colorText: Colors.white);
+      }
+    } else {
+      Get.snackbar('Error', userResult['message'],
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(8.0),
+      padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
           TextField(
             controller: _userSearchController,
             decoration: InputDecoration(
               labelText: 'Search User by Username',
-              labelStyle: GoogleFonts.roboto(color: Colors.white),
-              prefixIcon: const Icon(Icons.search, color: Colors.white),
+              labelStyle: GoogleFonts.roboto(color: Colors.white70),
+              prefixIcon: const Icon(Icons.search, color: Colors.white70),
+              filled: true,
+              fillColor: Colors.grey[900],
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Colors.tealAccent),
               ),
             ),
             style: GoogleFonts.roboto(color: Colors.white),
-            onSubmitted: (username) async {
-              final userResult = await dataController.searchUserByUsername(username);
-              if (userResult['success']) {
-                setState(() {
-                  _foundUser = userResult['user'];
-                });
-                final postsResult = await dataController.fetchPostsByUsername(username);
-                if (postsResult['success']) {
-                  setState(() {
-                    _userPosts = List<Map<String, dynamic>>.from(postsResult['posts']);
-                    _filteredPosts = _userPosts;
-                  });
-                } else {
-                  Get.snackbar('Error', postsResult['message']);
-                }
-              } else {
-                Get.snackbar('Error', userResult['message']);
-              }
-            },
+            onSubmitted: _fetchUserAndPosts,
           ),
           if (_foundUser != null) ...[
             const SizedBox(height: 20),
@@ -84,10 +100,17 @@ class _PostSearchWidgetState extends State<PostSearchWidget> {
               controller: _postSearchController,
               decoration: InputDecoration(
                 labelText: 'Search Posts by Content',
-                labelStyle: GoogleFonts.roboto(color: Colors.white),
-                prefixIcon: const Icon(Icons.search, color: Colors.white),
+                labelStyle: GoogleFonts.roboto(color: Colors.white70),
+                prefixIcon: const Icon(Icons.search, color: Colors.white70),
+                filled: true,
+                fillColor: Colors.grey[900],
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Colors.tealAccent),
                 ),
               ),
               style: GoogleFonts.roboto(color: Colors.white),
@@ -99,67 +122,108 @@ class _PostSearchWidgetState extends State<PostSearchWidget> {
                   final post = _filteredPosts[index];
                   return Card(
                     color: Colors.grey[900],
-                    child: ListTile(
-                      title: Text(post['content'] ?? '', style: GoogleFonts.roboto(color: Colors.white)),
-                      subtitle: Text('By: ${post['username'] ?? ''}', style: GoogleFonts.roboto(color: Colors.grey)),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Column(
-                            mainAxisSize: MainAxisSize.min,
+                    margin: const EdgeInsets.symmetric(vertical: 8),
+                    child: Column(
+                      children: [
+                        PostContent(
+                          postData: post,
+                          isReply: false,
+                          isPreview: true,
+                          showSnackBar: (title, message, color) {
+                            Get.snackbar(title, message,
+                                snackPosition: SnackPosition.BOTTOM,
+                                backgroundColor: color,
+                                colorText: Colors.white);
+                          },
+                          onSharePost: (postData) {
+                            // Implement share functionality or leave empty for admin
+                          },
+                          onReplyToItem: (parentReplyId) {
+                            // Implement reply functionality or leave empty for admin
+                          },
+                          refreshReplies: () {
+                            // Implement refresh or leave empty for admin
+                          },
+                          onReplyDataUpdated: (updatedData) {
+                            setState(() {
+                              _filteredPosts[index] = updatedData;
+                            });
+                          },
+                          postDepth: 0,
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8.0, bottom: 8.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
                             children: [
                               Text(
                                 post['isFlagged'] ?? false ? 'Flagged' : 'Not Flagged',
                                 style: GoogleFonts.roboto(
-                                  color: post['isFlagged'] ?? false ? Colors.orange : Colors.grey,
+                                  color: post['isFlagged'] ?? false ? Colors.orangeAccent : Colors.grey,
                                 ),
                               ),
-                              Switch(
-                                value: post['isFlagged'] ?? false,
-                                onChanged: (value) async {
-                                  final result = value
-                                      ? await dataController.flagPostForReview(post['_id'])
-                                      : await dataController.unflagPost(post['_id']);
-                                  Get.snackbar(
-                                    result['success'] ? 'Success' : 'Error',
-                                    result['message'],
-                                    snackPosition: SnackPosition.BOTTOM,
-                                  );
+                              const SizedBox(width: 10),
+                              PopupMenuButton<String>(
+                                onSelected: (value) async {
+                                  if (value == 'flag') {
+                                    final bool isFlagged = post['isFlagged'] ?? false;
+                                    final result = isFlagged
+                                        ? await dataController.unflagPost(post['_id'])
+                                        : await dataController.flagPostForReview(post['_id']);
+                                    Get.snackbar(
+                                      result['success'] ? 'Success' : 'Error',
+                                      result['message'],
+                                      snackPosition: SnackPosition.BOTTOM,
+                                    );
+                                    if (result['success']) {
+                                      _fetchUserAndPosts(_userSearchController.text);
+                                    }
+                                  } else if (value == 'delete') {
+                                    Get.dialog(
+                                      AlertDialog(
+                                        title: const Text('Delete Post'),
+                                        content: const Text('Are you sure you want to delete this post?'),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Get.back(),
+                                            child: const Text('Cancel'),
+                                          ),
+                                          TextButton(
+                                            onPressed: () async {
+                                              Get.back();
+                                              final result = await dataController.deletePostByAdmin(post['_id']);
+                                              Get.snackbar(
+                                                result['success'] ? 'Success' : 'Error',
+                                                result['message'],
+                                                snackPosition: SnackPosition.BOTTOM,
+                                              );
+                                               if (result['success']) {
+                                                _fetchUserAndPosts(_userSearchController.text);
+                                              }
+                                            },
+                                            child: const Text('Delete'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }
                                 },
+                                itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                                  PopupMenuItem<String>(
+                                    value: 'flag',
+                                    child: Text(post['isFlagged'] ?? false ? 'Unflag Post' : 'Flag for Review'),
+                                  ),
+                                  const PopupMenuItem<String>(
+                                    value: 'delete',
+                                    child: Text('Delete Post', style: TextStyle(color: Colors.red)),
+                                  ),
+                                ],
+                                icon: const Icon(Icons.more_vert, color: Colors.white),
                               ),
                             ],
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.delete, color: Colors.red),
-                            onPressed: () {
-                              Get.dialog(
-                                AlertDialog(
-                                  title: const Text('Delete Post'),
-                                  content: const Text('Are you sure you want to delete this post?'),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Get.back(),
-                                      child: const Text('Cancel'),
-                                    ),
-                                    TextButton(
-                                      onPressed: () async {
-                                        Get.back();
-                                        final result = await dataController.deletePostByAdmin(post['_id']);
-                                        Get.snackbar(
-                                          result['success'] ? 'Success' : 'Error',
-                                          result['message'],
-                                          snackPosition: SnackPosition.BOTTOM,
-                                        );
-                                      },
-                                      child: const Text('Delete'),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   );
                 },

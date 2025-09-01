@@ -82,13 +82,17 @@ class _UserManagementPageState extends State<UserManagementPage> {
                         color: user['isSuspended'] ?? false ? Colors.red : Colors.green,
                       ),
                     ),
-                    trailing: Switch(
-                      value: user['isSuspended'] ?? false,
-                      onChanged: (value) {
+                    trailing: IconButton(
+                      icon: Icon(
+                        user['isSuspended'] ?? false ? Icons.person_off : Icons.person,
+                        color: user['isSuspended'] ?? false ? Colors.red : Colors.green,
+                      ),
+                      onPressed: () {
+                        final bool isSuspended = user['isSuspended'] ?? false;
                         Get.dialog(
                           AlertDialog(
-                            title: Text(value ? 'Suspend User' : 'Unsuspend User'),
-                            content: Text('Are you sure you want to ${value ? 'suspend' : 'unsuspend'} ${user['name']}?'),
+                            title: Text(isSuspended ? 'Unsuspend User' : 'Suspend User'),
+                            content: Text('Are you sure you want to ${isSuspended ? 'unsuspend' : 'suspend'} ${user['name']}?'),
                             actions: [
                               TextButton(
                                 onPressed: () => Get.back(),
@@ -97,16 +101,20 @@ class _UserManagementPageState extends State<UserManagementPage> {
                               TextButton(
                                 onPressed: () async {
                                   Get.back();
-                                  final result = value
-                                      ? await dataController.suspendUser(user['_id'])
-                                      : await dataController.unsuspendUser(user['_id']);
+                                  final result = isSuspended
+                                      ? await dataController.unsuspendUser(user['_id'])
+                                      : await dataController.suspendUser(user['_id']);
                                   Get.snackbar(
                                     result['success'] ? 'Success' : 'Error',
                                     result['message'],
                                     snackPosition: SnackPosition.BOTTOM,
                                   );
+                                  // Refresh the user list
+                                  setState(() {
+                                    _searchUsers();
+                                  });
                                 },
-                                child: Text(value ? 'Suspend' : 'Unsuspend'),
+                                child: Text(isSuspended ? 'Unsuspend' : 'Suspend'),
                               ),
                             ],
                           ),
