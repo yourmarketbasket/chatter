@@ -116,6 +116,15 @@ class _PostSearchWidgetState extends State<PostSearchWidget> {
                                 result['message'],
                                 snackPosition: SnackPosition.BOTTOM,
                               );
+                            if (result['success'] && _foundUser != null) {
+                              final postsResult = await dataController.fetchPostsByUsername(_foundUser!['name']);
+                              if (postsResult['success']) {
+                                setState(() {
+                                  _userPosts = List<Map<String, dynamic>>.from(postsResult['posts']);
+                                  _filterPosts(); // Re-apply content filter
+                                });
+                              }
+                            }
                             },
                           ),
                           IconButton(
