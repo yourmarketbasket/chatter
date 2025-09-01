@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:chatter/pages/media_view_page.dart';
-import 'package:chatter/widgets/video_player_widget.dart';
+import 'package:chatter/widgets/better_player_widget.dart';
 import 'package:chatter/widgets/audio_waveform_widget.dart';
 import 'dart:io';
 
@@ -23,9 +23,11 @@ class AllAttachmentsDialog extends StatelessWidget {
         );
         break;
       case 'video':
-        preview = VideoPlayerWidget(
+        preview = BetterPlayerWidget(
           url: isLocalFile ? null : attachment['url'],
           file: isLocalFile ? File(attachment['url']) : null,
+          displayPath: attachment['filename'] ?? (isLocalFile ? attachment['url'] : 'video.mp4'),
+          controlsType: VideoControlsType.simple,
         );
         break;
       case 'audio':

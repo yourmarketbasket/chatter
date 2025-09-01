@@ -68,7 +68,12 @@ class _UserManagementPageState extends State<UserManagementPage> {
                   final user = _filteredUsers[index];
                   return ListTile(
                     leading: CircleAvatar(
-                      backgroundImage: NetworkImage(user['avatar'] ?? ''),
+                      backgroundImage: (user['avatar'] != null && user['avatar'].isNotEmpty)
+                          ? NetworkImage(user['avatar'])
+                          : null,
+                      child: (user['avatar'] == null || user['avatar'].isEmpty)
+                          ? Text(user['name'] != null && user['name'].isNotEmpty ? user['name'][0].toUpperCase() : '?')
+                          : null,
                     ),
                     title: Text(user['name'] ?? '', style: GoogleFonts.roboto(color: Colors.white)),
                     trailing: Column(

@@ -3,6 +3,9 @@ import 'package:chatter/pages/admin/user_management_page.dart';
 import 'package:chatter/pages/admin/update_verification_page.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:chatter/pages/admin/user_management_page.dart';
+import 'package:chatter/pages/admin/post_management_page.dart';
+import 'package:chatter/pages/admin/update_verification_page.dart';
 
 class AdminActionsPage extends StatefulWidget {
   const AdminActionsPage({Key? key}) : super(key: key);

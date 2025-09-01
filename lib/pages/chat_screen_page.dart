@@ -744,10 +744,13 @@ class _ChatScreenState extends State<ChatScreen> {
               controlsType: VideoControlsType.simple,
             );
           } else {
-            // Use VideoPlayer for other platforms or Android 13+
-            content = VideoPlayerWidget(
+            // Use BetterPlayer for other platforms or Android 13+
+            content = BetterPlayerWidget(
               key: key,
               url: attachment['url'],
+              displayPath: attachment['filename'] ?? 'video.mp4',
+              videoAspectRatioProp: 9 / 16,
+              controlsType: VideoControlsType.simple,
             );
           }
         }

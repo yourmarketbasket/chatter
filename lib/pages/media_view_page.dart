@@ -244,7 +244,6 @@ Widget build(BuildContext context) {
                         url: optimizedUrl.isNotEmpty ? optimizedUrl : url,
                         file: file,
                         displayPath: displayPath,
-                        preferBetterPlayer: Platform.isAndroid && _androidSdkInt != null && _androidSdkInt! < 31,
                         thumbnailUrl: currentAttachment['thumbnailUrl'] as String?,
                         aspectRatioString: currentAttachment['aspectRatio'] as String?,
                         numericAspectRatio: (currentAttachment['width'] is num && currentAttachment['height'] is num && (currentAttachment['height'] as num) > 0)
@@ -636,7 +635,6 @@ class VideoPlayerContainer extends StatefulWidget {
   final String? url;
   final File? file;
   final String displayPath;
-  final bool preferBetterPlayer; // Changed from useBetterPlayer
   final String? thumbnailUrl;
   final String? aspectRatioString;
   final double? numericAspectRatio;
@@ -646,7 +644,6 @@ class VideoPlayerContainer extends StatefulWidget {
     this.url,
     this.file,
     required this.displayPath,
-    required this.preferBetterPlayer, // Changed
     this.thumbnailUrl,
     this.aspectRatioString,
     this.numericAspectRatio,
@@ -662,25 +659,15 @@ class _VideoPlayerContainerState extends State<VideoPlayerContainer> {
     final double videoAspectRatio = widget.numericAspectRatio ??
         (double.tryParse(widget.aspectRatioString ?? '') ?? 9 / 16);
 
-    Widget playerWidget;
-    if (widget.preferBetterPlayer) {
-      playerWidget = BetterPlayerWidget(
-        url: widget.url,
-        file: widget.file,
-        displayPath: widget.displayPath,
-        thumbnailUrl: widget.thumbnailUrl,
-        isFeedContext: false,
-        // Pass aspect ratio for thumbnail and loading indicator handling
-        videoAspectRatioProp: videoAspectRatio,
-      );
-    } else {
-      playerWidget = VideoPlayerWidget(
-        url: widget.url,
-        file: widget.file,
-        thumbnailUrl: widget.thumbnailUrl,
-      );
-    }
-    // Ensure the player is centered and respects the calculated aspect ratio
+    Widget playerWidget = BetterPlayerWidget(
+      url: widget.url,
+      file: widget.file,
+      displayPath: widget.displayPath,
+      thumbnailUrl: widget.thumbnailUrl,
+      isFeedContext: false,
+      videoAspectRatioProp: videoAspectRatio,
+    );
+
     return Center(
       child: AspectRatio(
         aspectRatio: videoAspectRatio,

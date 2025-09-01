@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:chatter/widgets/video_player_widget.dart';
+import 'package:chatter/widgets/better_player_widget.dart';
 import 'package:chatter/widgets/audio_waveform_widget.dart';
 
 class AttachmentPreviewDialog extends StatefulWidget {
@@ -72,9 +72,11 @@ class _AttachmentPreviewDialogState extends State<AttachmentPreviewDialog> {
       case 'mp4':
       case 'mov':
       case 'avi':
-        preview = VideoPlayerWidget(
+        preview = BetterPlayerWidget(
           file: file.path != null ? File(file.path!) : null,
           url: file.path == null ? 'data:video/mp4;base64,${base64Encode(file.bytes!)}' : null,
+          displayPath: file.name,
+          controlsType: VideoControlsType.simple,
         );
         break;
       case 'mp3':

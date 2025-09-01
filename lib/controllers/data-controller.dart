@@ -608,6 +608,70 @@ class DataController extends GetxController {
     }
   }
 
+  Future<Map<String, dynamic>> unblockUser(String userIdToUnblock) async {
+    // Optimistically update the UI
+    final currentUser = Map<String, dynamic>.from(user.value['user']);
+    final blockedUsers = List<String>.from(currentUser['blockedUsers'] ?? []);
+    final wasBlocked = blockedUsers.contains(userIdToUnblock);
+
+    if (wasBlocked) {
+      blockedUsers.remove(userIdToUnblock);
+      currentUser['blockedUsers'] = blockedUsers;
+      user.value['user'] = currentUser;
+      user.refresh();
+    }
+
+    try {
+      final String? token = this.user['token'];
+      if (token == null) {
+        throw Exception('Authentication token not found.');
+      }
+
+      final response = await _dio.post(
+        'api/users/unblock',
+        data: {'userId': userIdToUnblock},
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return {'success': true, 'message': 'User unblocked successfully'};
+      } else {
+        // Rollback on failure
+        if (wasBlocked) {
+          blockedUsers.add(userIdToUnblock);
+          currentUser['blockedUsers'] = blockedUsers;
+          user.value['user'] = currentUser;
+          user.refresh();
+        }
+        return {
+          'success': false,
+          'message': response.data['message'] ?? 'Failed to unblock user. Status: ${response.statusCode}'
+        };
+      }
+    } catch (e) {
+      // Rollback on error
+      if (wasBlocked) {
+        blockedUsers.add(userIdToUnblock);
+        currentUser['blockedUsers'] = blockedUsers;
+        user.value['user'] = currentUser;
+        user.refresh();
+      }
+      String errorMessage = 'An error occurred while unblocking the user.';
+      if (e is dio.DioException) {
+        if (e.response?.data != null && e.response!.data['message'] != null) {
+          errorMessage = e.response!.data['message'];
+        } else {
+          errorMessage = e.message ?? errorMessage;
+        }
+      }
+      return {'success': false, 'message': errorMessage};
+    }
+  }
+
   Future<Map<String, dynamic>> verifyUser(String userId, String entityType, String level, bool paid) async {
     try {
       final String? token = user.value['token'];
@@ -883,7 +947,15 @@ class DataController extends GetxController {
         return {'success': false, 'message': response.data['message'] ?? 'Post like failed'};
       }
     } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      String errorMessage = 'An error occurred while logging in.';
+      if (e is dio.DioException) {
+        if (e.response?.data != null && e.response!.data['message'] != null) {
+          errorMessage = e.response!.data['message'];
+        } else {
+          errorMessage = e.message ?? errorMessage;
+        }
+      }
+      return {'success': false, 'message': errorMessage};
     }
   }
 
@@ -922,22 +994,16 @@ class DataController extends GetxController {
     final postIndex = posts.indexWhere((post) => post['_id'] == postId);
     final userPostIndex = userPosts.indexWhere((post) => post['_id'] == postId);
 
-    if (postIndex == -1 && userPostIndex == -1) {
-      return {'success': false, 'message': 'Post not found locally.'};
-    }
-
+    bool wasModified = false;
     if (postIndex != -1) {
-      final postToUpdate = posts[postIndex];
-      final originalStatus = postToUpdate['isFlagged'] ?? false;
-      postToUpdate['isFlagged'] = false;
-      posts[postIndex] = postToUpdate;
+      posts[postIndex]['isFlagged'] = false;
+      posts.refresh();
+      wasModified = true;
     }
-
     if (userPostIndex != -1) {
-      final postToUpdate = userPosts[userPostIndex];
-      final originalStatus = postToUpdate['isFlagged'] ?? false;
-      postToUpdate['isFlagged'] = false;
-      userPosts[userPostIndex] = postToUpdate;
+      userPosts[userPostIndex]['isFlagged'] = false;
+      userPosts.refresh();
+      wasModified = true;
     }
 
     try {
@@ -956,24 +1022,18 @@ class DataController extends GetxController {
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
-        final postIndex = posts.indexWhere((post) => post['_id'] == postId);
-        if (postIndex == -1) {
-          final userPostIndex = userPosts.indexWhere((post) => post['_id'] == postId);
-          if (userPostIndex != -1) {
-            posts.add(userPosts[userPostIndex]);
-          }
-        }
+        // If not modified locally before, fetch to update UI
+        if (!wasModified) await fetchSinglePost(postId);
         return {'success': true, 'message': 'Post unflagged successfully'};
       } else {
+        // Rollback
         if (postIndex != -1) {
-          final postToUpdate = posts[postIndex];
-          postToUpdate['isFlagged'] = true;
-          posts[postIndex] = postToUpdate;
+          posts[postIndex]['isFlagged'] = true;
+          posts.refresh();
         }
         if (userPostIndex != -1) {
-          final postToUpdate = userPosts[userPostIndex];
-          postToUpdate['isFlagged'] = true;
-          userPosts[userPostIndex] = postToUpdate;
+          userPosts[userPostIndex]['isFlagged'] = true;
+          userPosts.refresh();
         }
         return {
           'success': false,
@@ -981,17 +1041,24 @@ class DataController extends GetxController {
         };
       }
     } catch (e) {
+      // Rollback
       if (postIndex != -1) {
-        final postToUpdate = posts[postIndex];
-        postToUpdate['isFlagged'] = true;
-        posts[postIndex] = postToUpdate;
+        posts[postIndex]['isFlagged'] = true;
+        posts.refresh();
       }
       if (userPostIndex != -1) {
-        final postToUpdate = userPosts[userPostIndex];
-        postToUpdate['isFlagged'] = true;
-        userPosts[userPostIndex] = postToUpdate;
+        userPosts[userPostIndex]['isFlagged'] = true;
+        userPosts.refresh();
       }
-      return {'success': false, 'message': e.toString()};
+      String errorMessage = 'An error occurred while unflagging the post.';
+      if (e is dio.DioException) {
+        if (e.response?.data != null && e.response!.data['message'] != null) {
+          errorMessage = e.response!.data['message'];
+        } else {
+          errorMessage = e.message ?? errorMessage;
+        }
+      }
+      return {'success': false, 'message': errorMessage};
     }
   }
 
@@ -1034,7 +1101,15 @@ class DataController extends GetxController {
     } catch (e) {
       userToUnsuspend['isSuspended'] = originalStatus;
       allUsers[index] = userToUnsuspend;
-      return {'success': false, 'message': e.toString()};
+      String errorMessage = 'An error occurred while unsuspending the user.';
+      if (e is dio.DioException) {
+        if (e.response?.data != null && e.response!.data['message'] != null) {
+          errorMessage = e.response!.data['message'];
+        } else {
+          errorMessage = e.message ?? errorMessage;
+        }
+      }
+      return {'success': false, 'message': errorMessage};
     }
   }
 
@@ -1063,7 +1138,15 @@ class DataController extends GetxController {
         };
       }
     } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      String errorMessage = 'An error occurred while fetching posts.';
+      if (e is dio.DioException) {
+        if (e.response?.data != null && e.response!.data['message'] != null) {
+          errorMessage = e.response!.data['message'];
+        } else {
+          errorMessage = e.message ?? errorMessage;
+        }
+      }
+      return {'success': false, 'message': errorMessage};
     }
   }
 
@@ -1092,7 +1175,15 @@ class DataController extends GetxController {
         };
       }
     } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      String errorMessage = 'An error occurred while searching for the user.';
+      if (e is dio.DioException) {
+        if (e.response?.data != null && e.response!.data['message'] != null) {
+          errorMessage = e.response!.data['message'];
+        } else {
+          errorMessage = e.message ?? errorMessage;
+        }
+      }
+      return {'success': false, 'message': errorMessage};
     }
   }
 
@@ -1126,17 +1217,33 @@ class DataController extends GetxController {
       if (response.statusCode == 200 && response.data['success'] == true) {
         return {'success': true, 'message': 'Post deleted successfully'};
       } else {
-        if (postIndex != -1) posts.insert(postIndex, postToDelete);
-        if (userPostIndex != -1) userPosts.insert(userPostIndex, postToDelete);
+        if (postIndex != -1) {
+          posts.insert(postIndex, postToDelete);
+        }
+        if (userPostIndex != -1) {
+          userPosts.insert(userPostIndex, postToDelete);
+        }
         return {
           'success': false,
           'message': response.data['message'] ?? 'Failed to delete post. Status: ${response.statusCode}'
         };
       }
     } catch (e) {
-      if (postIndex != -1) posts.insert(postIndex, postToDelete);
-      if (userPostIndex != -1) userPosts.insert(userPostIndex, postToDelete);
-      return {'success': false, 'message': e.toString()};
+      if (postIndex != -1) {
+        posts.insert(postIndex, postToDelete);
+      }
+      if (userPostIndex != -1) {
+        userPosts.insert(userPostIndex, postToDelete);
+      }
+      String errorMessage = 'An error occurred while deleting the post.';
+      if (e is dio.DioException) {
+        if (e.response?.data != null && e.response!.data['message'] != null) {
+          errorMessage = e.response!.data['message'];
+        } else {
+          errorMessage = e.message ?? errorMessage;
+        }
+      }
+      return {'success': false, 'message': errorMessage};
     }
   }
 
@@ -1177,7 +1284,15 @@ class DataController extends GetxController {
         };
       }
     } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      String errorMessage = 'An error occurred while updating verification.';
+      if (e is dio.DioException) {
+        if (e.response?.data != null && e.response!.data['message'] != null) {
+          errorMessage = e.response!.data['message'];
+        } else {
+          errorMessage = e.message ?? errorMessage;
+        }
+      }
+      return {'success': false, 'message': errorMessage};
     }
   }
 
@@ -1185,22 +1300,16 @@ class DataController extends GetxController {
     final postIndex = posts.indexWhere((post) => post['_id'] == postId);
     final userPostIndex = userPosts.indexWhere((post) => post['_id'] == postId);
 
-    if (postIndex == -1 && userPostIndex == -1) {
-      return {'success': false, 'message': 'Post not found locally.'};
-    }
-
+    bool wasModified = false;
     if (postIndex != -1) {
-      final postToUpdate = posts[postIndex];
-      final originalStatus = postToUpdate['isFlagged'] ?? false;
-      postToUpdate['isFlagged'] = true;
-      posts[postIndex] = postToUpdate;
+      posts[postIndex]['isFlagged'] = true;
+      posts.refresh();
+      wasModified = true;
     }
-
     if (userPostIndex != -1) {
-      final postToUpdate = userPosts[userPostIndex];
-      final originalStatus = postToUpdate['isFlagged'] ?? false;
-      postToUpdate['isFlagged'] = true;
-      userPosts[userPostIndex] = postToUpdate;
+      userPosts[userPostIndex]['isFlagged'] = true;
+      userPosts.refresh();
+      wasModified = true;
     }
 
     try {
@@ -1219,17 +1328,18 @@ class DataController extends GetxController {
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
+        // If not modified locally before, fetch to update UI
+        if (!wasModified) await fetchSinglePost(postId);
         return {'success': true, 'message': 'Post flagged for review'};
       } else {
+        // Rollback
         if (postIndex != -1) {
-          final postToUpdate = posts[postIndex];
-          postToUpdate['isFlagged'] = false;
-          posts[postIndex] = postToUpdate;
+          posts[postIndex]['isFlagged'] = false;
+          posts.refresh();
         }
         if (userPostIndex != -1) {
-          final postToUpdate = userPosts[userPostIndex];
-          postToUpdate['isFlagged'] = false;
-          userPosts[userPostIndex] = postToUpdate;
+          userPosts[userPostIndex]['isFlagged'] = false;
+          userPosts.refresh();
         }
         return {
           'success': false,
@@ -1237,17 +1347,24 @@ class DataController extends GetxController {
         };
       }
     } catch (e) {
+      // Rollback
       if (postIndex != -1) {
-        final postToUpdate = posts[postIndex];
-        postToUpdate['isFlagged'] = false;
-        posts[postIndex] = postToUpdate;
+        posts[postIndex]['isFlagged'] = false;
+        posts.refresh();
       }
       if (userPostIndex != -1) {
-        final postToUpdate = userPosts[userPostIndex];
-        postToUpdate['isFlagged'] = false;
-        userPosts[userPostIndex] = postToUpdate;
+        userPosts[userPostIndex]['isFlagged'] = false;
+        userPosts.refresh();
       }
-      return {'success': false, 'message': e.toString()};
+      String errorMessage = 'An error occurred while flagging the post.';
+      if (e is dio.DioException) {
+        if (e.response?.data != null && e.response!.data['message'] != null) {
+          errorMessage = e.response!.data['message'];
+        } else {
+          errorMessage = e.message ?? errorMessage;
+        }
+      }
+      return {'success': false, 'message': errorMessage};
     }
   }
 
@@ -1290,7 +1407,15 @@ class DataController extends GetxController {
     } catch (e) {
       userToSuspend['isSuspended'] = originalStatus;
       allUsers[index] = userToSuspend;
-      return {'success': false, 'message': e.toString()};
+      String errorMessage = 'An error occurred while suspending the user.';
+      if (e is dio.DioException) {
+        if (e.response?.data != null && e.response!.data['message'] != null) {
+          errorMessage = e.response!.data['message'];
+        } else {
+          errorMessage = e.message ?? errorMessage;
+        }
+      }
+      return {'success': false, 'message': errorMessage};
     }
   }
 
@@ -1314,7 +1439,15 @@ class DataController extends GetxController {
         };
       }
     } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      String errorMessage = 'An error occurred while registering the admin.';
+      if (e is dio.DioException) {
+        if (e.response?.data != null && e.response!.data['message'] != null) {
+          errorMessage = e.response!.data['message'];
+        } else {
+          errorMessage = e.message ?? errorMessage;
+        }
+      }
+      return {'success': false, 'message': errorMessage};
     }
   }
 
@@ -1686,9 +1819,12 @@ class DataController extends GetxController {
       if (response.statusCode == 200 && response.data['success'] == true) {
         List<Map<String, dynamic>> fetchedPosts = List<Map<String, dynamic>>.from(response.data['posts']);
         if (fetchedPosts.isNotEmpty) {
+          final blockedUsers = user.value['user']?['blockedUsers'] ?? [];
           List<Map<String, dynamic>> processedFetchedPosts = [];
           for (var postData in fetchedPosts) {
-            processedFetchedPosts.add(_processPostOrReply(postData));
+            if (!blockedUsers.contains(postData['user']?['_id'])) {
+              processedFetchedPosts.add(_processPostOrReply(postData));
+            }
           }
           posts.addAll(processedFetchedPosts);
           _currentPage.value++;
@@ -1979,6 +2115,16 @@ class DataController extends GetxController {
       if (token == null) {
         throw Exception('User not authenticated');
       }
+
+      final participants = message['participants'] as List?;
+      if (participants != null) {
+        final blockedUsers = user.value['user']?['blockedUsers'] ?? [];
+        final recipientId = participants.firstWhere((p) => p != user.value['user']['_id']);
+        if (blockedUsers.contains(recipientId)) {
+          Get.snackbar('Error', 'You cannot send messages to a blocked user.');
+          return;
+        }
+      }
       final response = await _dio.get(
         'api/chats',
         options: dio.Options(
@@ -1987,8 +2133,16 @@ class DataController extends GetxController {
       );
       if (response.statusCode == 200 && response.data['success'] == true) {
         final List<dynamic> chatData = response.data['chats'];
+        final blockedUsers = user.value['user']?['blockedUsers'] ?? [];
         for (var chat in chatData) {
-          chats[chat['_id']] = chat;
+          if (chat['type'] == 'dm') {
+            final participant = (chat['participants'] as List).firstWhere((p) => p['_id'] != user.value['user']['_id']);
+            if (!blockedUsers.contains(participant['_id'])) {
+              chats[chat['_id']] = chat;
+            }
+          } else {
+            chats[chat['_id']] = chat;
+          }
         }
         // After successfully fetching chats, ensure we are joined to all rooms.
         Get.find<SocketService>().syncAllChatRooms();
@@ -2983,22 +3137,26 @@ class DataController extends GetxController {
 
   void pauseCurrentMedia() {
     if (activeMediaController.value == null) {
-      // print('[DataController] pauseCurrentMedia called, but no active media.');
       return;
     }
-    // print('[DataController] Pausing currently active media.');
 
     final controller = activeMediaController.value;
 
-    // Using `is` checks to avoid casting errors with different player types.
-    if (controller is BetterPlayerController) {
-      controller.pause();
-    } else if (controller is VideoPlayerController) {
-      controller.pause();
-    } else if (controller is AudioPlayer) {
-      controller.pause();
-    } else {
-      // print('[DataController] Unknown controller type in activeMediaController: ${controller.runtimeType}');
+    try {
+      if (controller is BetterPlayerController) {
+        if (controller.isDisposed != true) {
+          controller.pause();
+        }
+      } else if (controller is VideoPlayerController) {
+        // VideoPlayerController does not have an isDisposed getter, so we rely on the try-catch.
+        controller.pause();
+      } else if (controller is AudioPlayer) {
+        // AudioPlayer does not have an isDisposed getter, rely on try-catch.
+        controller.pause();
+      }
+    } catch (e) {
+      // print('[DataController] Error pausing media, likely because it was already disposed: $e');
+      // It's safe to ignore this error as the goal was to stop the media anyway.
     }
   }
 
@@ -4177,7 +4335,7 @@ void clearUserPosts() {
     }
   }
 
-  Future<Map<String, dynamic>> deletePost(String postId) async {
+  Future<Map<String, dynamic>> deletePostByUser(String postId) async {
     final postIndex = posts.indexWhere((post) => post['_id'] == postId);
     final userPostIndex = userPosts.indexWhere((post) => post['_id'] == postId);
     final post = postIndex != -1 ? posts[postIndex] : (userPostIndex != -1 ? userPosts[userPostIndex] : null);
@@ -4196,7 +4354,7 @@ void clearUserPosts() {
       }
 
       final response = await _dio.delete(
-        'api/posts/$postId/soft-delete',
+        'api/posts/$postId',
         options: dio.Options(
           headers: {
             'Authorization': 'Bearer $token',
@@ -4205,16 +4363,26 @@ void clearUserPosts() {
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
-        posts.removeWhere((post) => post['_id'] == postId);
-        userPosts.removeWhere((post) => post['_id'] == postId);
         return {'success': true, 'message': 'Post deleted successfully'};
       } else {
+        if (postIndex != -1) {
+          posts.insert(postIndex, post);
+        }
+        if (userPostIndex != -1) {
+          userPosts.insert(userPostIndex, post);
+        }
         return {
           'success': false,
           'message': response.data['message'] ?? 'Failed to delete post. Status: ${response.statusCode}'
         };
       }
     } catch (e) {
+      if (postIndex != -1) {
+        posts.insert(postIndex, post);
+      }
+      if (userPostIndex != -1) {
+        userPosts.insert(userPostIndex, post);
+      }
       String errorMessage = 'An error occurred while deleting the post.';
       if (e is dio.DioException) {
         if (e.response?.data != null && e.response!.data['message'] != null) {
