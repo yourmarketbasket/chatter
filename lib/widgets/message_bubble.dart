@@ -130,6 +130,7 @@ class _MessageBubbleState extends State<MessageBubble> {
       },
     );
     final senderName = isYou ? 'You' : sender['name'];
+    // more
 
     final List<linkify_helper.LinkifyElement> elements = linkify_helper.linkify(content, options: const linkify_helper.LinkifyOptions(humanize: false));
     final Set<String> urls = elements.whereType<linkify_helper.LinkableElement>().map((e) => e.url).toSet();
