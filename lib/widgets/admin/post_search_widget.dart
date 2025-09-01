@@ -1,172 +1,197 @@
 import 'package:chatter/controllers/data-controller.dart';
+import 'package:chatter/widgets/admin/user_card.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-class PostSearchWidget extends StatefulWidget {
-  const PostSearchWidget({Key? key}) : super(key: key);
+class UpdateVerificationPage extends StatefulWidget {
+  const UpdateVerificationPage({Key? key}) : super(key: key);
 
   @override
-  _PostSearchWidgetState createState() => _PostSearchWidgetState();
+  _UpdateVerificationPageState createState() => _UpdateVerificationPageState();
 }
 
-class _PostSearchWidgetState extends State<PostSearchWidget> {
+class _UpdateVerificationPageState extends State<UpdateVerificationPage> {
   final DataController dataController = Get.find<DataController>();
-  final TextEditingController _userSearchController = TextEditingController();
-  final TextEditingController _postSearchController = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
   Map<String, dynamic>? _foundUser;
-  List<Map<String, dynamic>> _userPosts = [];
-  List<Map<String, dynamic>> _filteredPosts = [];
-
-  void _filterPosts() {
-    final query = _postSearchController.text.toLowerCase();
-    setState(() {
-      _filteredPosts = _userPosts.where((post) {
-        final content = post['content']?.toLowerCase() ?? '';
-        return content.contains(query);
-      }).toList();
-    });
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _postSearchController.addListener(_filterPosts);
-  }
-
-  @override
-  void dispose() {
-    _userSearchController.dispose();
-    _postSearchController.dispose();
-    super.dispose();
-  }
+  String? _selectedEntityType;
+  String? _selectedLevel;
+  bool _paid = false;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: Column(
-        children: [
-          TextField(
-            controller: _userSearchController,
-            decoration: InputDecoration(
-              labelText: 'Search User by Username',
-              labelStyle: GoogleFonts.roboto(color: Colors.white),
-              prefixIcon: const Icon(Icons.search, color: Colors.white),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            style: GoogleFonts.roboto(color: Colors.white),
-            onSubmitted: (username) async {
-              final userResult = await dataController.searchUserByUsername(username);
-              if (userResult['success']) {
-                setState(() {
-                  _foundUser = userResult['user'];
-                });
-                final postsResult = await dataController.fetchPostsByUsername(username);
-                if (postsResult['success']) {
-                  setState(() {
-                    _userPosts = List<Map<String, dynamic>>.from(postsResult['posts']);
-                    _filteredPosts = _userPosts;
-                  });
-                } else {
-                  Get.snackbar('Error', postsResult['message']);
-                }
-              } else {
-                Get.snackbar('Error', userResult['message']);
-              }
-            },
-          ),
-          if (_foundUser != null) ...[
-            const SizedBox(height: 20),
-            TextField(
-              controller: _postSearchController,
-              decoration: InputDecoration(
-                labelText: 'Search Posts by Content',
-                labelStyle: GoogleFonts.roboto(color: Colors.white),
-                prefixIcon: const Icon(Icons.search, color: Colors.white),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+    final theme = Theme.of(context);
+    final inputDecoration = InputDecoration(
+      labelStyle: GoogleFonts.roboto(color: Colors.white70),
+      filled: true,
+      fillColor: Colors.grey[900],
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey[800]!),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: theme.colorScheme.secondary),
+      ),
+    );
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: _searchController,
+                decoration: inputDecoration.copyWith(
+                  labelText: 'Search User by Username',
+                  prefixIcon: const Icon(Icons.search, color: Colors.white70),
                 ),
-              ),
-              style: GoogleFonts.roboto(color: Colors.white),
-            ),
-            Expanded(
-              child: ListView.builder(
-                itemCount: _filteredPosts.length,
-                itemBuilder: (context, index) {
-                  final post = _filteredPosts[index];
-                  return Card(
-                    color: Colors.grey[900],
-                    child: ListTile(
-                      title: Text(post['content'] ?? '', style: GoogleFonts.roboto(color: Colors.white)),
-                      subtitle: Text('By: ${post['username'] ?? ''}', style: GoogleFonts.roboto(color: Colors.grey)),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                post['isFlagged'] ?? false ? 'Flagged' : 'Not Flagged',
-                                style: GoogleFonts.roboto(
-                                  color: post['isFlagged'] ?? false ? Colors.orange : Colors.grey,
-                                ),
-                              ),
-                              Switch(
-                                value: post['isFlagged'] ?? false,
-                                onChanged: (value) async {
-                                  final result = value
-                                      ? await dataController.flagPostForReview(post['_id'])
-                                      : await dataController.unflagPost(post['_id']);
-                                  Get.snackbar(
-                                    result['success'] ? 'Success' : 'Error',
-                                    result['message'],
-                                    snackPosition: SnackPosition.BOTTOM,
-                                  );
-                                },
-                              ),
-                            ],
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete, color: Colors.red),
-                            onPressed: () {
-                              Get.dialog(
-                                AlertDialog(
-                                  title: const Text('Delete Post'),
-                                  content: const Text('Are you sure you want to delete this post?'),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Get.back(),
-                                      child: const Text('Cancel'),
-                                    ),
-                                    TextButton(
-                                      onPressed: () async {
-                                        Get.back();
-                                        final result = await dataController.deletePostByAdmin(post['_id']);
-                                        Get.snackbar(
-                                          result['success'] ? 'Success' : 'Error',
-                                          result['message'],
-                                          snackPosition: SnackPosition.BOTTOM,
-                                        );
-                                      },
-                                      child: const Text('Delete'),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
+                style: GoogleFonts.roboto(color: Colors.white),
+                onSubmitted: (username) async {
+                  final result =
+                      await dataController.searchUserByUsername(username);
+                  if (result['success']) {
+                    setState(() {
+                      _foundUser = result['user'];
+                      final verification = _foundUser?['verification'];
+                      if (verification != null) {
+                        _selectedEntityType = verification['entityType'];
+                        _selectedLevel = verification['level'];
+                        _paid = verification['paid'] ?? false;
+                      } else {
+                        _selectedEntityType = null;
+                        _selectedLevel = null;
+                        _paid = false;
+                      }
+                    });
+                  } else {
+                    setState(() {
+                      _foundUser = null;
+                    });
+                    Get.snackbar('Error', result['message'],
+                        snackPosition: SnackPosition.BOTTOM);
+                  }
                 },
               ),
-            ),
-          ],
-        ],
+              if (_foundUser != null) ...[
+                const SizedBox(height: 24),
+                UserCard(user: _foundUser!),
+                const SizedBox(height: 24),
+                DropdownButtonFormField<String>(
+                  value: _selectedEntityType,
+                  items: ['individual', 'organization', 'government']
+                      .map((label) => DropdownMenuItem(
+                            child: Text(label, style: GoogleFonts.roboto()),
+                            value: label,
+                          ))
+                      .toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedEntityType = value;
+                    });
+                  },
+                  decoration: inputDecoration.copyWith(labelText: 'Entity Type'),
+                  dropdownColor: Colors.grey[900],
+                  style: GoogleFonts.roboto(color: Colors.white),
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: _selectedLevel,
+                  items: ['free', 'basic', 'intermediate', 'premium']
+                      .map((label) => DropdownMenuItem(
+                            child: Text(label, style: GoogleFonts.roboto()),
+                            value: label,
+                          ))
+                      .toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedLevel = value;
+                    });
+                  },
+                  decoration: inputDecoration.copyWith(labelText: 'Level'),
+                  dropdownColor: Colors.grey[900],
+                  style: GoogleFonts.roboto(color: Colors.white),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.grey[900],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey[800]!),
+                  ),
+                  child: CheckboxListTile(
+                    title: Text('Paid', style: GoogleFonts.roboto(color: Colors.white)),
+                    value: _paid,
+                    onChanged: (value) {
+                      setState(() {
+                        _paid = value ?? false;
+                      });
+                    },
+                    activeColor: theme.colorScheme.secondary,
+                    checkColor: Colors.black,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (_foundUser != null &&
+                        _selectedEntityType != null &&
+                        _selectedLevel != null) {
+                      final result =
+                          await dataController.updateUserVerification(
+                        _foundUser!['_id'],
+                        _selectedEntityType!,
+                        _selectedLevel!,
+                        _paid,
+                      );
+                      Get.snackbar(
+                        result['success'] ? 'Success' : 'Error',
+                        result['message'],
+                        snackPosition: SnackPosition.BOTTOM,
+                      );
+                      if (result['success']) {
+                        // Refetch user to show updated verification
+                        final updatedUserResult = await dataController
+                            .searchUserByUsername(_searchController.text);
+                        if (updatedUserResult['success']) {
+                          setState(() {
+                            _foundUser = updatedUserResult['user'];
+                          });
+                        }
+                      }
+                    } else {
+                      Get.snackbar(
+                        'Error',
+                        'Please fill out all fields.',
+                        snackPosition: SnackPosition.BOTTOM,
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.colorScheme.secondary,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    'Update Verification',
+                    style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.bold, color: Colors.black),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
