@@ -926,14 +926,14 @@ class DataController extends GetxController {
       return {'success': false, 'message': 'Post not found locally.'};
     }
 
-    final post = postIndex != -1 ? posts[postIndex] : userPosts[userPostIndex];
-    final originalStatus = post['isFlagged'] ?? false;
-    post['isFlagged'] = false;
-    if (postIndex != -1) posts[postIndex] = post;
-    if (userPostIndex != -1) userPosts[userPostIndex] = post;
+    final postToUpdate = postIndex != -1 ? posts[postIndex] : userPosts[userPostIndex];
+    final originalStatus = postToUpdate['isFlagged'] ?? false;
+    postToUpdate['isFlagged'] = false;
+    if (postIndex != -1) posts[postIndex] = postToUpdate;
+    if (userPostIndex != -1) userPosts[userPostIndex] = postToUpdate;
 
     try {
-      final String? token = user.value['token'];
+      final String? token = this.user['token'];
       if (token == null) {
         throw Exception('Authentication token not found.');
       }
@@ -950,18 +950,18 @@ class DataController extends GetxController {
       if (response.statusCode == 200 && response.data['success'] == true) {
         return {'success': true, 'message': 'Post unflagged successfully'};
       } else {
-        post['isFlagged'] = originalStatus;
-        if (postIndex != -1) posts[postIndex] = post;
-        if (userPostIndex != -1) userPosts[userPostIndex] = post;
+        postToUpdate['isFlagged'] = originalStatus;
+        if (postIndex != -1) posts[postIndex] = postToUpdate;
+        if (userPostIndex != -1) userPosts[userPostIndex] = postToUpdate;
         return {
           'success': false,
           'message': response.data['message'] ?? 'Failed to unflag post. Status: ${response.statusCode}'
         };
       }
     } catch (e) {
-      post['isFlagged'] = originalStatus;
-      if (postIndex != -1) posts[postIndex] = post;
-      if (userPostIndex != -1) userPosts[userPostIndex] = post;
+      postToUpdate['isFlagged'] = originalStatus;
+      if (postIndex != -1) posts[postIndex] = postToUpdate;
+      if (userPostIndex != -1) userPosts[userPostIndex] = postToUpdate;
       return {'success': false, 'message': e.toString()};
     }
   }
@@ -972,13 +972,13 @@ class DataController extends GetxController {
       return {'success': false, 'message': 'User not found locally.'};
     }
 
-    final user = allUsers[index];
-    final originalStatus = user['isSuspended'] ?? false;
-    user['isSuspended'] = false;
-    allUsers[index] = user;
+    final userToUnsuspend = allUsers[index];
+    final originalStatus = userToUnsuspend['isSuspended'] ?? false;
+    userToUnsuspend['isSuspended'] = false;
+    allUsers[index] = userToUnsuspend;
 
     try {
-      final String? token = user.value['token'];
+      final String? token = this.user['token'];
       if (token == null) {
         throw Exception('Authentication token not found.');
       }
@@ -995,23 +995,23 @@ class DataController extends GetxController {
       if (response.statusCode == 200 && response.data['success'] == true) {
         return {'success': true, 'message': 'User unsuspended successfully'};
       } else {
-        user['isSuspended'] = originalStatus;
-        allUsers[index] = user;
+        userToUnsuspend['isSuspended'] = originalStatus;
+        allUsers[index] = userToUnsuspend;
         return {
           'success': false,
           'message': response.data['message'] ?? 'Failed to unsuspend user. Status: ${response.statusCode}'
         };
       }
     } catch (e) {
-      user['isSuspended'] = originalStatus;
-      allUsers[index] = user;
+      userToUnsuspend['isSuspended'] = originalStatus;
+      allUsers[index] = userToUnsuspend;
       return {'success': false, 'message': e.toString()};
     }
   }
 
   Future<Map<String, dynamic>> fetchPostsByUsername(String username) async {
     try {
-      final String? token = user.value['token'];
+      final String? token = this.user['token'];
       if (token == null) {
         return {'success': false, 'message': 'Authentication token not found.'};
       }
@@ -1040,7 +1040,7 @@ class DataController extends GetxController {
 
   Future<Map<String, dynamic>> searchUserByUsername(String username) async {
     try {
-      final String? token = user.value['token'];
+      final String? token = this.user['token'];
       if (token == null) {
         return {'success': false, 'message': 'Authentication token not found.'};
       }
@@ -1070,9 +1070,9 @@ class DataController extends GetxController {
   Future<Map<String, dynamic>> deletePostByAdmin(String postId) async {
     final postIndex = posts.indexWhere((post) => post['_id'] == postId);
     final userPostIndex = userPosts.indexWhere((post) => post['_id'] == postId);
-    final post = postIndex != -1 ? posts[postIndex] : (userPostIndex != -1 ? userPosts[userPostIndex] : null);
+    final postToDelete = postIndex != -1 ? posts[postIndex] : (userPostIndex != -1 ? userPosts[userPostIndex] : null);
 
-    if (post == null) {
+    if (postToDelete == null) {
       return {'success': false, 'message': 'Post not found locally.'};
     }
 
@@ -1080,7 +1080,7 @@ class DataController extends GetxController {
     if (userPostIndex != -1) userPosts.removeAt(userPostIndex);
 
     try {
-      final String? token = user.value['token'];
+      final String? token = this.user['token'];
       if (token == null) {
         throw Exception('Authentication token not found.');
       }
@@ -1097,16 +1097,16 @@ class DataController extends GetxController {
       if (response.statusCode == 200 && response.data['success'] == true) {
         return {'success': true, 'message': 'Post deleted successfully'};
       } else {
-        if (postIndex != -1) posts.insert(postIndex, post);
-        if (userPostIndex != -1) userPosts.insert(userPostIndex, post);
+        if (postIndex != -1) posts.insert(postIndex, postToDelete);
+        if (userPostIndex != -1) userPosts.insert(userPostIndex, postToDelete);
         return {
           'success': false,
           'message': response.data['message'] ?? 'Failed to delete post. Status: ${response.statusCode}'
         };
       }
     } catch (e) {
-      if (postIndex != -1) posts.insert(postIndex, post);
-      if (userPostIndex != -1) userPosts.insert(userPostIndex, post);
+      if (postIndex != -1) posts.insert(postIndex, postToDelete);
+      if (userPostIndex != -1) userPosts.insert(userPostIndex, postToDelete);
       return {'success': false, 'message': e.toString()};
     }
   }
@@ -1114,12 +1114,12 @@ class DataController extends GetxController {
   Future<Map<String, dynamic>> updateUserVerification(
       String userId, String entityType, String level, bool paid) async {
     try {
-      final String? token = user.value['token'];
+      final String? token = this.user['token'];
       if (token == null) {
         return {'success': false, 'message': 'Authentication token not found.'};
       }
 
-      final response = await _dio.put(
+      final response = await _dio.post(
         'api/users/verify-user',
         data: {
           'userId': userId,
@@ -1160,14 +1160,14 @@ class DataController extends GetxController {
       return {'success': false, 'message': 'Post not found locally.'};
     }
 
-    final post = postIndex != -1 ? posts[postIndex] : userPosts[userPostIndex];
-    final originalStatus = post['isFlagged'] ?? false;
-    post['isFlagged'] = true;
-    if (postIndex != -1) posts[postIndex] = post;
-    if (userPostIndex != -1) userPosts[userPostIndex] = post;
+    final postToUpdate = postIndex != -1 ? posts[postIndex] : userPosts[userPostIndex];
+    final originalStatus = postToUpdate['isFlagged'] ?? false;
+    postToUpdate['isFlagged'] = true;
+    if (postIndex != -1) posts[postIndex] = postToUpdate;
+    if (userPostIndex != -1) userPosts[userPostIndex] = postToUpdate;
 
     try {
-      final String? token = user.value['token'];
+      final String? token = this.user['token'];
       if (token == null) {
         throw Exception('Authentication token not found.');
       }
@@ -1184,18 +1184,18 @@ class DataController extends GetxController {
       if (response.statusCode == 200 && response.data['success'] == true) {
         return {'success': true, 'message': 'Post flagged for review'};
       } else {
-        post['isFlagged'] = originalStatus;
-        if (postIndex != -1) posts[postIndex] = post;
-        if (userPostIndex != -1) userPosts[userPostIndex] = post;
+        postToUpdate['isFlagged'] = originalStatus;
+        if (postIndex != -1) posts[postIndex] = postToUpdate;
+        if (userPostIndex != -1) userPosts[userPostIndex] = postToUpdate;
         return {
           'success': false,
           'message': response.data['message'] ?? 'Failed to flag post. Status: ${response.statusCode}'
         };
       }
     } catch (e) {
-      post['isFlagged'] = originalStatus;
-      if (postIndex != -1) posts[postIndex] = post;
-      if (userPostIndex != -1) userPosts[userPostIndex] = post;
+      postToUpdate['isFlagged'] = originalStatus;
+      if (postIndex != -1) posts[postIndex] = postToUpdate;
+      if (userPostIndex != -1) userPosts[userPostIndex] = postToUpdate;
       return {'success': false, 'message': e.toString()};
     }
   }
@@ -1206,13 +1206,13 @@ class DataController extends GetxController {
       return {'success': false, 'message': 'User not found locally.'};
     }
 
-    final user = allUsers[index];
-    final originalStatus = user['isSuspended'] ?? false;
-    user['isSuspended'] = true;
-    allUsers[index] = user;
+    final userToSuspend = allUsers[index];
+    final originalStatus = userToSuspend['isSuspended'] ?? false;
+    userToSuspend['isSuspended'] = true;
+    allUsers[index] = userToSuspend;
 
     try {
-      final String? token = user.value['token'];
+      final String? token = this.user['token'];
       if (token == null) {
         throw Exception('Authentication token not found.');
       }
@@ -1229,16 +1229,16 @@ class DataController extends GetxController {
       if (response.statusCode == 200 && response.data['success'] == true) {
         return {'success': true, 'message': 'User suspended successfully'};
       } else {
-        user['isSuspended'] = originalStatus;
-        allUsers[index] = user;
+        userToSuspend['isSuspended'] = originalStatus;
+        allUsers[index] = userToSuspend;
         return {
           'success': false,
           'message': response.data['message'] ?? 'Failed to suspend user. Status: ${response.statusCode}'
         };
       }
     } catch (e) {
-      user['isSuspended'] = originalStatus;
-      allUsers[index] = user;
+      userToSuspend['isSuspended'] = originalStatus;
+      allUsers[index] = userToSuspend;
       return {'success': false, 'message': e.toString()};
     }
   }
@@ -4052,8 +4052,7 @@ void clearUserPosts() {
         await _storage.write(key: 'token', value: tokenValue);
         await _storage.write(key: 'user', value: userJson);
 
-        user.value = jsonDecode(userJson);
-        user.value['user']['isAdmin'] = true;
+        this.user.value = jsonDecode(userJson);
 
         await fetchFeeds();
         final String? currentUserId = user.value['user']?['_id'];
@@ -4082,7 +4081,7 @@ void clearUserPosts() {
 
   Future<Map<String, dynamic>> blockUser(String userIdToBlock) async {
     try {
-      final String? token = user.value['token'];
+      final String? token = this.user['token'];
       if (token == null) {
         return {'success': false, 'message': 'Authentication token not found.'};
       }
@@ -4130,19 +4129,17 @@ void clearUserPosts() {
   Future<Map<String, dynamic>> deletePost(String postId) async {
     final postIndex = posts.indexWhere((post) => post['_id'] == postId);
     final userPostIndex = userPosts.indexWhere((post) => post['_id'] == postId);
+    final post = postIndex != -1 ? posts[postIndex] : (userPostIndex != -1 ? userPosts[userPostIndex] : null);
 
-    if (postIndex == -1 && userPostIndex == -1) {
+    if (post == null) {
       return {'success': false, 'message': 'Post not found locally.'};
     }
 
-    final post = postIndex != -1 ? posts[postIndex] : userPosts[userPostIndex];
-    final originalStatus = post['isFlagged'] ?? false;
-    post['isFlagged'] = false;
-    if (postIndex != -1) posts[postIndex] = post;
-    if (userPostIndex != -1) userPosts[userPostIndex] = post;
+    if (postIndex != -1) posts.removeAt(postIndex);
+    if (userPostIndex != -1) userPosts.removeAt(userPostIndex);
 
     try {
-      final String? token = user.value['token'];
+      final String? token = this.user['token'];
       if (token == null) {
         throw Exception('Authentication token not found.');
       }

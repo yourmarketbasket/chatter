@@ -452,8 +452,8 @@ class AppDrawer extends StatelessWidget {
                   },
                 ),
                 Obx(() {
-                  final isAdmin = dataController.user.value['user']?['isAdmin'] == true;
-                  if (isAdmin) {
+                  final userRole = dataController.user.value['user']?['role'];
+                  if (userRole == 'admin' || userRole == 'superuser') {
                     return ListTile(
                       leading: Icon(FeatherIcons.shield, color: Colors.grey[300]),
                       title: Text('Admin Panel', style: GoogleFonts.roboto(color: Colors.grey[300], fontSize: 16)),

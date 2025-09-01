@@ -33,8 +33,8 @@ class _UserManagementPageState extends State<UserManagementPage> {
     final query = _searchController.text.toLowerCase();
     setState(() {
       _filteredUsers = dataController.allUsers.where((user) {
-        final username = user['username']?.toLowerCase() ?? '';
-        return username.contains(query);
+        final name = user['name']?.toLowerCase() ?? '';
+        return name.contains(query);
       }).toList();
     });
   }
@@ -70,7 +70,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                     leading: CircleAvatar(
                       backgroundImage: NetworkImage(user['avatar'] ?? ''),
                     ),
-                    title: Text(user['username'] ?? '', style: GoogleFonts.roboto(color: Colors.white)),
+                    title: Text(user['name'] ?? '', style: GoogleFonts.roboto(color: Colors.white)),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -86,7 +86,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                             Get.dialog(
                               AlertDialog(
                                 title: Text(value ? 'Suspend User' : 'Unsuspend User'),
-                                content: Text('Are you sure you want to ${value ? 'suspend' : 'unsuspend'} ${user['username']}?'),
+                                content: Text('Are you sure you want to ${value ? 'suspend' : 'unsuspend'} ${user['name']}?'),
                                 actions: [
                                   TextButton(
                                     onPressed: () => Get.back(),

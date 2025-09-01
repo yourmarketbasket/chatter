@@ -50,7 +50,7 @@ class _UpdateVerificationPageState extends State<UpdateVerificationPage> {
             ),
             if (_foundUser != null) ...[
               const SizedBox(height: 20),
-              Text('Found User: ${_foundUser!['username']}', style: GoogleFonts.roboto(color: Colors.white)),
+              Text('Found User: ${_foundUser!['name']}', style: GoogleFonts.roboto(color: Colors.white)),
               Text('Current Verification: ${_foundUser!['verification'] ?? 'Not Verified'}', style: GoogleFonts.roboto(color: Colors.white)),
               const SizedBox(height: 20),
               DropdownButtonFormField<String>(
