@@ -71,45 +71,52 @@ class _SuspendUserPageState extends State<SuspendUserPage> {
                       backgroundImage: NetworkImage(user['avatar'] ?? ''),
                     ),
                     title: Text(user['username'] ?? '', style: GoogleFonts.roboto(color: Colors.white)),
-                    trailing: ElevatedButton(
-                      onPressed: () {
-                        final isSuspended = user['isSuspended'] ?? false;
-                        Get.dialog(
-                          AlertDialog(
-                            title: Text(isSuspended ? 'Unsuspend User' : 'Suspend User'),
-                            content: Text('Are you sure you want to ${isSuspended ? 'unsuspend' : 'suspend'} ${user['username']}?'),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Get.back(),
-                                child: const Text('Cancel'),
-                              ),
-                              TextButton(
-                                onPressed: () async {
-                                  Get.back();
-                                  final result = isSuspended
-                                      ? await dataController.unsuspendUser(user['_id'])
-                                      : await dataController.suspendUser(user['_id']);
-                                  if (result['success']) {
-                                    setState(() {
-                                      user['isSuspended'] = !isSuspended;
-                                    });
-                                  }
-                                  Get.snackbar(
-                                    result['success'] ? 'Success' : 'Error',
-                                    result['message'],
-                                    snackPosition: SnackPosition.BOTTOM,
-                                  );
-                                },
-                                child: Text(isSuspended ? 'Unsuspend' : 'Suspend'),
-                              ),
-                            ],
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          user['isSuspended'] ?? false ? 'Suspended' : 'Active',
+                          style: GoogleFonts.roboto(
+                            color: user['isSuspended'] ?? false ? Colors.red : Colors.green,
                           ),
-                        );
-                      },
-                      child: Text(user['isSuspended'] ?? false ? 'Unsuspend' : 'Suspend'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: (user['isSuspended'] ?? false) ? Colors.green : Colors.red,
-                      ),
+                        ),
+                        Switch(
+                          value: user['isSuspended'] ?? false,
+                          onChanged: (value) {
+                            Get.dialog(
+                              AlertDialog(
+                                title: Text(value ? 'Suspend User' : 'Unsuspend User'),
+                                content: Text('Are you sure you want to ${value ? 'suspend' : 'unsuspend'} ${user['username']}?'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Get.back(),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () async {
+                                      Get.back();
+                                      final result = value
+                                          ? await dataController.suspendUser(user['_id'])
+                                          : await dataController.unsuspendUser(user['_id']);
+                                      if (result['success']) {
+                                        setState(() {
+                                          user['isSuspended'] = value;
+                                        });
+                                      }
+                                      Get.snackbar(
+                                        result['success'] ? 'Success' : 'Error',
+                                        result['message'],
+                                        snackPosition: SnackPosition.BOTTOM,
+                                      );
+                                    },
+                                    child: Text(value ? 'Suspend' : 'Unsuspend'),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ),
                   );
                 },

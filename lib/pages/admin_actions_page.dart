@@ -1,6 +1,5 @@
-import 'package:chatter/pages/admin/delete_post_page.dart';
-import 'package:chatter/pages/admin/flag_post_page.dart';
-import 'package:chatter/pages/admin/suspend_user_page.dart';
+import 'package:chatter/pages/admin/post_management_page.dart';
+import 'package:chatter/pages/admin/user_management_page.dart';
 import 'package:chatter/pages/admin/update_verification_page.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -17,9 +16,8 @@ class _AdminActionsPageState extends State<AdminActionsPage> {
   final PageController _pageController = PageController();
 
   final List<Widget> _pages = [
-    const SuspendUserPage(),
-    const FlagPostPage(),
-    const DeletePostPage(),
+    const UserManagementPage(),
+    const PostManagementPage(),
     const UpdateVerificationPage(),
   ];
 
@@ -54,16 +52,12 @@ class _AdminActionsPageState extends State<AdminActionsPage> {
         },
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.block),
-            label: 'Suspend User',
+            icon: Icon(Icons.person),
+            label: 'User Management',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.flag),
-            label: 'Flag Post',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.delete),
-            label: 'Delete Post',
+            icon: Icon(Icons.article),
+            label: 'Post Management',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.verified_user),

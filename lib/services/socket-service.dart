@@ -119,6 +119,8 @@ class SocketService {
       'member:muted': (data) => _handleMemberMuted(data),
       'member:unmuted': (data) => _handleMemberUnmuted(data),
       'group:closed': (data) => _handleGroupClosed(data),
+      'user:unsuspended': (data) => _handleUserUnsuspended(data),
+      'post:unflagged': (data) => _handlePostUnflagged(data),
     };
 // more canges
     eventHandlers.forEach((event, handler) {
@@ -413,6 +415,18 @@ class SocketService {
   void _handleUserVerified(dynamic data) {
     if (data is Map<String, dynamic>) {
       _dataController.handleUserVerified(data);
+    }
+  }
+
+  void _handleUserUnsuspended(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      _dataController.handleUserUnsuspended(data);
+    }
+  }
+
+  void _handlePostUnflagged(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      _dataController.handlePostUnflagged(data);
     }
   }
 

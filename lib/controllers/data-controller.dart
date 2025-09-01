@@ -887,6 +887,37 @@ class DataController extends GetxController {
     }
   }
 
+  void handleUserUnsuspended(Map<String, dynamic> data) {
+    final userId = data['userId'] as String?;
+    if (userId == null) return;
+
+    final index = allUsers.indexWhere((user) => user['_id'] == userId);
+    if (index != -1) {
+      final user = allUsers[index];
+      user['isSuspended'] = false;
+      allUsers[index] = user;
+    }
+  }
+
+  void handlePostUnflagged(Map<String, dynamic> data) {
+    final postId = data['postId'] as String?;
+    if (postId == null) return;
+
+    final postIndex = posts.indexWhere((post) => post['_id'] == postId);
+    if (postIndex != -1) {
+      final post = posts[postIndex];
+      post['isFlagged'] = false;
+      posts[postIndex] = post;
+    }
+
+    final userPostIndex = userPosts.indexWhere((post) => post['_id'] == postId);
+    if (userPostIndex != -1) {
+      final post = userPosts[userPostIndex];
+      post['isFlagged'] = false;
+      userPosts[userPostIndex] = post;
+    }
+  }
+
   Future<Map<String, dynamic>> unflagPost(String postId) async {
     try {
       final String? token = user.value['token'];
