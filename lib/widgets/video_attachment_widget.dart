@@ -337,6 +337,9 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
     return VisibilityDetector(
       key: Key(visibilityDetectorKey),
       onVisibilityChanged: (visibilityInfo) {
+        if (!mounted) {
+          return;
+        }
         final visibleFraction = visibilityInfo.visibleFraction;
 
         if (visibleFraction > 0 && !_isInitialized && _betterPlayerController == null) {
