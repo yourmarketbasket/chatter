@@ -887,6 +887,64 @@ class DataController extends GetxController {
     }
   }
 
+  Future<Map<String, dynamic>> unflagPost(String postId) async {
+    try {
+      final String? token = user.value['token'];
+      if (token == null) {
+        return {'success': false, 'message': 'Authentication token not found.'};
+      }
+
+      final response = await _dio.put(
+        'api/posts/$postId/unflag',
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return {'success': true, 'message': 'Post unflagged successfully'};
+      } else {
+        return {
+          'success': false,
+          'message': response.data['message'] ?? 'Failed to unflag post. Status: ${response.statusCode}'
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> unsuspendUser(String userId) async {
+    try {
+      final String? token = user.value['token'];
+      if (token == null) {
+        return {'success': false, 'message': 'Authentication token not found.'};
+      }
+
+      final response = await _dio.put(
+        'api/users/$userId/unsuspend',
+        options: dio.Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return {'success': true, 'message': 'User unsuspended successfully'};
+      } else {
+        return {
+          'success': false,
+          'message': response.data['message'] ?? 'Failed to unsuspend user. Status: ${response.statusCode}'
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
   Future<Map<String, dynamic>> fetchPostsByUsername(String username) async {
     try {
       final String? token = user.value['token'];

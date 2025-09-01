@@ -73,10 +73,11 @@ class _SuspendUserPageState extends State<SuspendUserPage> {
                     title: Text(user['username'] ?? '', style: GoogleFonts.roboto(color: Colors.white)),
                     trailing: ElevatedButton(
                       onPressed: () {
+                        final isSuspended = user['isSuspended'] ?? false;
                         Get.dialog(
                           AlertDialog(
-                            title: const Text('Suspend User'),
-                            content: Text('Are you sure you want to suspend ${user['username']}?'),
+                            title: Text(isSuspended ? 'Unsuspend User' : 'Suspend User'),
+                            content: Text('Are you sure you want to ${isSuspended ? 'unsuspend' : 'suspend'} ${user['username']}?'),
                             actions: [
                               TextButton(
                                 onPressed: () => Get.back(),
@@ -85,22 +86,29 @@ class _SuspendUserPageState extends State<SuspendUserPage> {
                               TextButton(
                                 onPressed: () async {
                                   Get.back();
-                                  final result = await dataController.suspendUser(user['_id']);
+                                  final result = isSuspended
+                                      ? await dataController.unsuspendUser(user['_id'])
+                                      : await dataController.suspendUser(user['_id']);
+                                  if (result['success']) {
+                                    setState(() {
+                                      user['isSuspended'] = !isSuspended;
+                                    });
+                                  }
                                   Get.snackbar(
                                     result['success'] ? 'Success' : 'Error',
                                     result['message'],
                                     snackPosition: SnackPosition.BOTTOM,
                                   );
                                 },
-                                child: const Text('Suspend'),
+                                child: Text(isSuspended ? 'Unsuspend' : 'Suspend'),
                               ),
                             ],
                           ),
                         );
                       },
-                      child: const Text('Suspend'),
+                      child: Text(user['isSuspended'] ?? false ? 'Unsuspend' : 'Suspend'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
+                        backgroundColor: (user['isSuspended'] ?? false) ? Colors.green : Colors.red,
                       ),
                     ),
                   );

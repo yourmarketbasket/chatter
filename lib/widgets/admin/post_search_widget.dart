@@ -111,7 +111,12 @@ class _PostSearchWidgetState extends State<PostSearchWidget> {
                       subtitle: Text('By: ${post['username'] ?? ''}', style: GoogleFonts.roboto(color: Colors.grey)),
                       trailing: ElevatedButton(
                         onPressed: () => widget.onAction(post['_id']),
-                        child: Text(widget.actionText),
+                        child: Text(
+                          (post['isFlagged'] ?? false) ? 'Unflag' : widget.actionText,
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: (post['isFlagged'] ?? false) ? Colors.green : Colors.orange,
+                        ),
                       ),
                     ),
                   );
