@@ -40,6 +40,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
   late Animation<double> _pulseAnimation;
   late bool _isMuted;
   bool _isInitialized = false;
+  bool _isDisposing = false;
   String _videoUniqueId = "";
   bool _shouldAutoplayAfterInit = false;
   bool _shouldRenderPlayer = false;
@@ -166,6 +167,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
   }
 
   void _playVideo() {
+    if (!mounted || _isDisposing) return;
     print("[VideoAttachmentWidget-$_videoUniqueId] Play callback received.");
     if (mounted) {
       setState(() {
@@ -175,25 +177,28 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
 
     if (_betterPlayerController != null) {
       if (_isInitialized) {
-        _betterPlayerController!.play();
+        if (!_betterPlayerController!.isPlaying()!) {
+          _betterPlayerController!.play();
+        }
         print("[VideoAttachmentWidget-$_videoUniqueId] Player ready, playing.");
       } else {
-        // It's initializing, so just make sure it will autoplay when ready.
         _shouldAutoplayAfterInit = true;
         print("[VideoAttachmentWidget-$_videoUniqueId] Player is initializing, will play when ready.");
       }
     } else {
-      // This case should ideally not happen if VisibilityDetector works correctly
       print("[VideoAttachmentWidget-$_videoUniqueId] Play called but controller is null. Initializing now.");
       _initializeVideoPlayer(autoplay: true);
     }
   }
 
   void _pauseVideo() {
+    if (!mounted || _isDisposing) return;
     print("[VideoAttachmentWidget-$_videoUniqueId] Pause callback received.");
     if (_betterPlayerController != null && _isInitialized) {
-      _betterPlayerController!.pause();
-       print("[VideoAttachmentWidget-$_videoUniqueId] Player paused.");
+      if (_betterPlayerController!.isPlaying()!) {
+        _betterPlayerController!.pause();
+      }
+      print("[VideoAttachmentWidget-$_videoUniqueId] Player paused.");
     }
     if (mounted) {
       setState(() {
@@ -203,6 +208,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
   }
 
   void _initializeVideoPlayer({bool autoplay = false}) {
+    if (!mounted || _isDisposing) return;
     if (_betterPlayerController != null) {
       print("[VideoAttachmentWidget-$_videoUniqueId] _initializeVideoPlayer: Disposing existing controller before creating new one.");
       _betterPlayerController!.removeEventsListener(_onPlayerEvent);
@@ -254,7 +260,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
   }
 
   void _onPlayerEvent(BetterPlayerEvent event) {
-    if (!mounted || _betterPlayerController == null) return;
+    if (!mounted || _isDisposing || _betterPlayerController == null) return;
 
     switch (event.betterPlayerEventType) {
       case BetterPlayerEventType.initialized:
@@ -304,6 +310,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
 
   @override
   void dispose() {
+    _isDisposing = true;
     _mediaVisibilityService.unregisterItem(_videoUniqueId);
     _currentlyPlayingMediaSubscription?.dispose();
 
@@ -333,6 +340,9 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
     return VisibilityDetector(
       key: Key(visibilityDetectorKey),
       onVisibilityChanged: (visibilityInfo) {
+        if (!mounted || _isDisposing) {
+          return;
+        }
         final visibleFraction = visibilityInfo.visibleFraction;
 
         if (visibleFraction > 0 && !_isInitialized && _betterPlayerController == null) {
@@ -349,24 +359,20 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
           context: context,
         );
 
-        if (visibleFraction == 0) { // Aggressive disposal
-          if (mounted && _shouldRenderPlayer) {
-            setState(() { _shouldRenderPlayer = false; });
-          } else {
-             _shouldRenderPlayer = false;
-          }
-
+        if (visibleFraction == 0) { // Aggressive disposal is back, but now safe.
           if (_betterPlayerController != null) {
-            print("[VideoAttachmentWidget-$_videoUniqueId] Became completely invisible. Aggressively disposing player.");
             _betterPlayerController!.pause();
             _betterPlayerController!.removeEventsListener(_onPlayerEvent);
             _betterPlayerController!.dispose();
             _betterPlayerController = null;
           }
-          if (_isInitialized && mounted) {
-            setState(() { _isInitialized = false; });
-          } else {
-            _isInitialized = false;
+          if (_isInitialized) {
+            // Use setState to ensure dependent widgets rebuild correctly if they
+            // rely on the _isInitialized state.
+            setState(() {
+              _isInitialized = false;
+              _shouldRenderPlayer = false;
+            });
           }
         }
       },
