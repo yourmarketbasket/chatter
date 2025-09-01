@@ -2116,15 +2116,6 @@ class DataController extends GetxController {
         throw Exception('User not authenticated');
       }
 
-      final participants = message['participants'] as List?;
-      if (participants != null) {
-        final blockedUsers = user.value['user']?['blockedUsers'] ?? [];
-        final recipientId = participants.firstWhere((p) => p != user.value['user']['_id']);
-        if (blockedUsers.contains(recipientId)) {
-          Get.snackbar('Error', 'You cannot send messages to a blocked user.');
-          return;
-        }
-      }
       final response = await _dio.get(
         'api/chats',
         options: dio.Options(
@@ -3144,9 +3135,7 @@ class DataController extends GetxController {
 
     try {
       if (controller is BetterPlayerController) {
-        if (controller.isDisposed != true) {
-          controller.pause();
-        }
+        controller.pause();
       } else if (controller is VideoPlayerController) {
         // VideoPlayerController does not have an isDisposed getter, so we rely on the try-catch.
         controller.pause();
