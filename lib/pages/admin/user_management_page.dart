@@ -106,11 +106,11 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                   final result = isSuspended
                                       ? await dataController.unsuspendUser(user['_id'])
                                       : await dataController.suspendUser(user['_id']);
-                                  Get.snackbar(
-                                    result['success'] ? 'Success' : 'Error',
-                                    result['message'],
-                                    snackPosition: SnackPosition.BOTTOM,
-                                  );
+                                  // Get.snackbar(
+                                  //   result['success'] ? 'Success' : 'Error',
+                                  //   result['message'],
+                                  //   snackPosition: SnackPosition.BOTTOM,
+                                  // );
                                   // Refresh the user list
                                   setState(() {
                                     _searchUsers();
