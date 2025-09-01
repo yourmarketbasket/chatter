@@ -971,6 +971,48 @@ class DataController extends GetxController {
     }
   }
 
+  void handleUserVerified(Map<String, dynamic> data) {
+    final String? userId = data['userId'];
+    final dynamic verification = data['verification'];
+
+    if (userId == null || verification == null) {
+      return;
+    }
+
+    // Update user in allUsers list
+    final index = allUsers.indexWhere((u) => u['_id'] == userId);
+    if (index != -1) {
+      final userToUpdate = Map<String, dynamic>.from(allUsers[index]);
+      userToUpdate['verification'] = verification;
+      allUsers[index] = userToUpdate;
+    }
+
+    // Update current user if it's them
+    if (user.value['user']?['_id'] == userId) {
+      final updatedUser = Map<String, dynamic>.from(user.value);
+      updatedUser['user']['verification'] = verification;
+      user.value = updatedUser;
+      _storage.write(key: 'user', value: jsonEncode(updatedUser));
+    }
+
+    // Update user in posts lists
+    for (int i = 0; i < posts.length; i++) {
+      if (posts[i]['user']?['_id'] == userId) {
+        final postToUpdate = Map<String, dynamic>.from(posts[i]);
+        postToUpdate['user']['verification'] = verification;
+        posts[i] = postToUpdate;
+      }
+    }
+
+    for (int i = 0; i < userPosts.length; i++) {
+      if (userPosts[i]['user']?['_id'] == userId) {
+        final postToUpdate = Map<String, dynamic>.from(userPosts[i]);
+        postToUpdate['user']['verification'] = verification;
+        userPosts[i] = postToUpdate;
+      }
+    }
+  }
+
   void handlePostFlagged(Map<String, dynamic> data) {
     final postId = data['postId'] as String?;
     if (postId == null) return;
@@ -1290,12 +1332,13 @@ class DataController extends GetxController {
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
-        final userIndex = allUsers.indexWhere((user) => user['_id'] == userId);
-        if (userIndex != -1) {
-          allUsers[userIndex]['verification'] = response.data['verification'];
-          allUsers.refresh();
-        }
-        return {'success': true, 'message': 'User verification updated'};
+        final verificationData = response.data['verification'];
+        handleUserVerified({'userId': userId, 'verification': verificationData});
+        return {
+          'success': true,
+          'message': 'User verification updated',
+          'verification': verificationData
+        };
       } else {
         return {
           'success': false,

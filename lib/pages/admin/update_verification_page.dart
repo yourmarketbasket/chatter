@@ -160,7 +160,11 @@ class _UpdateVerificationPageState extends State<UpdateVerificationPage> {
                     );
                     if (result['success']) {
                       setState(() {
-                        _foundUser!['verification'] = result['verification'];
+                        _foundUser!['verification'] = {
+                          'entityType': _selectedEntityType,
+                          'level': _selectedLevel,
+                          'paid': _paid,
+                        };
                       });
                     }
                     Get.snackbar(
