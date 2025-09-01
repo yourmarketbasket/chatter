@@ -121,6 +121,7 @@ class SocketService {
       'group:closed': (data) => _handleGroupClosed(data),
       'user:unsuspended': (data) => _handleUserUnsuspended(data),
       'post:unflagged': (data) => _handlePostUnflagged(data),
+      'post:flagged': (data) => _handlePostFlagged(data),
     };
 // more canges
     eventHandlers.forEach((event, handler) {
@@ -427,6 +428,12 @@ class SocketService {
   void _handlePostUnflagged(dynamic data) {
     if (data is Map<String, dynamic>) {
       _dataController.handlePostUnflagged(data);
+    }
+  }
+
+  void _handlePostFlagged(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      _dataController.handlePostFlagged(data);
     }
   }
 

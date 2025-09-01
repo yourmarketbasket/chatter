@@ -971,6 +971,25 @@ class DataController extends GetxController {
     }
   }
 
+  void handlePostFlagged(Map<String, dynamic> data) {
+    final postId = data['postId'] as String?;
+    if (postId == null) return;
+
+    final postIndex = posts.indexWhere((post) => post['_id'] == postId);
+    if (postIndex != -1) {
+      final post = posts[postIndex];
+      post['isFlagged'] = true;
+      posts[postIndex] = post;
+    }
+
+    final userPostIndex = userPosts.indexWhere((post) => post['_id'] == postId);
+    if (userPostIndex != -1) {
+      final post = userPosts[userPostIndex];
+      post['isFlagged'] = true;
+      userPosts[userPostIndex] = post;
+    }
+  }
+
   void handlePostUnflagged(Map<String, dynamic> data) {
     final postId = data['postId'] as String?;
     if (postId == null) return;

@@ -105,27 +105,29 @@ class _PostSearchWidgetState extends State<PostSearchWidget> {
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Switch(
-                            value: post['isFlagged'] ?? false,
-                            onChanged: (value) async {
-                              final result = value
-                                  ? await dataController.flagPostForReview(post['_id'])
-                                  : await dataController.unflagPost(post['_id']);
-                              Get.snackbar(
-                                result['success'] ? 'Success' : 'Error',
-                                result['message'],
-                                snackPosition: SnackPosition.BOTTOM,
-                              );
-                            if (result['success'] && _foundUser != null) {
-                              final postsResult = await dataController.fetchPostsByUsername(_foundUser!['name']);
-                              if (postsResult['success']) {
-                                setState(() {
-                                  _userPosts = List<Map<String, dynamic>>.from(postsResult['posts']);
-                                  _filterPosts(); // Re-apply content filter
-                                });
-                              }
-                            }
-                            },
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                post['isFlagged'] ?? false ? 'Flagged' : 'Not Flagged',
+                                style: GoogleFonts.roboto(
+                                  color: post['isFlagged'] ?? false ? Colors.orange : Colors.grey,
+                                ),
+                              ),
+                              Switch(
+                                value: post['isFlagged'] ?? false,
+                                onChanged: (value) async {
+                                  final result = value
+                                      ? await dataController.flagPostForReview(post['_id'])
+                                      : await dataController.unflagPost(post['_id']);
+                                  Get.snackbar(
+                                    result['success'] ? 'Success' : 'Error',
+                                    result['message'],
+                                    snackPosition: SnackPosition.BOTTOM,
+                                  );
+                                },
+                              ),
+                            ],
                           ),
                           IconButton(
                             icon: const Icon(Icons.delete, color: Colors.red),
