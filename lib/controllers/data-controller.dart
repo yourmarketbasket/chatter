@@ -4850,14 +4850,20 @@ void clearUserPosts() {
       final messageType = message['type'];
       final clientMessageId = const Uuid().v4();
 
-      final messageToSend = {
+      // Create a completely new map for the message to send.
+      final Map<String, dynamic> messageData = {
         'clientMessageId': clientMessageId,
-        'chatId': chatId,
-        'participants': [getUserId(), targetUserId],
         'content': content,
         'type': messageType,
         'files': files,
       };
+
+      // Add either chatId or participants, but not both.
+      if (chatId != null && chatId.isNotEmpty) {
+        messageData['chatId'] = chatId;
+      } else {
+        messageData['participants'] = [getUserId(), targetUserId];
+      }
 
       try {
         final token = user.value['token'];
@@ -4865,14 +4871,9 @@ void clearUserPosts() {
           throw Exception('User not authenticated');
         }
 
-        final Map<String, dynamic> finalMessage = Map<String, dynamic>.from(messageToSend);
-        if (chatId != null && chatId.isNotEmpty) {
-          finalMessage.remove('participants');
-        }
-
         final response = await _dio.post(
           'api/messages',
-          data: finalMessage,
+          data: messageData, // Use the new clean map
           options: dio.Options(
             headers: {'Authorization': 'Bearer $token'},
             validateStatus: (status) => status != null && status < 500,
