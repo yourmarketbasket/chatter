@@ -1367,50 +1367,55 @@ class _ChatScreenState extends State<ChatScreen> {
                             dataController.markMessageAsRead(message);
                           }
                         },
-                        child: GestureDetector(
-                          onLongPress: () {
-                            final messageId = message['_id'] ?? message['clientMessageId'];
-                            if (messageId != null) {
-                              _toggleSelection(messageId);
-                            }
+                        child: Dismissible(
+                          key: Key(message['_id'] ?? message['clientMessageId']),
+                          direction: DismissDirection.startToEnd,
+                          onDismissed: (direction) {
+                            setState(() {
+                              _replyingTo = message;
+                            });
                           },
-                          onTap: () {
-                            if (_isSelectionMode) {
+                          background: Container(
+                            color: Colors.teal.withOpacity(0.2),
+                            alignment: Alignment.centerLeft,
+                            padding: const EdgeInsets.only(left: 20.0),
+                            child: const Icon(Icons.reply, color: Colors.white),
+                          ),
+                          child: GestureDetector(
+                            onLongPressStart: (details) {
                               final messageId = message['_id'] ?? message['clientMessageId'];
                               if (messageId != null) {
                                 _toggleSelection(messageId);
                               }
-                            }
-                          },
-                          child: Container(
-                            color: _selectedMessages.contains(message['_id'] ?? message['clientMessageId'])
-                                ? Colors.teal.withOpacity(0.2)
-                                : Colors.transparent,
-                            child: Padding(
-                              padding: const EdgeInsets.only(bottom: 12.0),
-                              child: Align(
-                                alignment: message['senderId']['_id'] == dataController.getUserId()
-                                    ? Alignment.centerRight
-                                    : Alignment.centerLeft,
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (message['senderId']['_id'] != dataController.getUserId() && _selectedMessages.contains(message['_id'] ?? message['clientMessageId']))
-                                      IconButton(
-                                        icon: const Icon(Icons.forward, color: Colors.white),
-                                        onPressed: _forwardSelectedMessages,
-                                      ),
-                                    Flexible(
-                                      child: GestureDetector(
-                                        onHorizontalDragUpdate: (details) {
-                                          // NOTE: This is a basic implementation. A more robust
-                                          // solution would use a proper swipe detection widget.
-                                          if (details.delta.dx > 10) { // Swipe right
-                                            setState(() {
-                                              _replyingTo = message;
-                                            });
-                                          }
-                                        },
+                              _showReactionDialog(context, message, details.globalPosition);
+                            },
+                            onTap: () {
+                              if (_isSelectionMode) {
+                                final messageId = message['_id'] ?? message['clientMessageId'];
+                                if (messageId != null) {
+                                  _toggleSelection(messageId);
+                                }
+                              }
+                            },
+                            child: Container(
+                              color: _selectedMessages.contains(message['_id'] ?? message['clientMessageId'])
+                                  ? Colors.teal.withOpacity(0.2)
+                                  : Colors.transparent,
+                              child: Padding(
+                                padding: const EdgeInsets.only(bottom: 12.0),
+                                child: Align(
+                                  alignment: message['senderId']['_id'] == dataController.getUserId()
+                                      ? Alignment.centerRight
+                                      : Alignment.centerLeft,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (message['senderId']['_id'] != dataController.getUserId() && _selectedMessages.contains(message['_id'] ?? message['clientMessageId']))
+                                        IconButton(
+                                          icon: const Icon(Icons.forward, color: Colors.white),
+                                          onPressed: _forwardSelectedMessages,
+                                        ),
+                                      Flexible(
                                         child: MessageBubble(
                                           message: message,
                                           prevMessage: prevMessage,
@@ -1421,13 +1426,13 @@ class _ChatScreenState extends State<ChatScreen> {
                                           buildReactions: _buildReactions,
                                         ),
                                       ),
-                                    ),
-                                    if (message['senderId']['_id'] == dataController.getUserId() && _selectedMessages.contains(message['_id'] ?? message['clientMessageId']))
-                                      IconButton(
-                                        icon: const Icon(Icons.forward, color: Colors.white),
-                                        onPressed: _forwardSelectedMessages,
-                                      ),
-                                  ],
+                                      if (message['senderId']['_id'] == dataController.getUserId() && _selectedMessages.contains(message['_id'] ?? message['clientMessageId']))
+                                        IconButton(
+                                          icon: const Icon(Icons.forward, color: Colors.white),
+                                          onPressed: _forwardSelectedMessages,
+                                        ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
