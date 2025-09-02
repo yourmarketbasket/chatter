@@ -20,6 +20,8 @@ class BetterPlayerWidget extends StatefulWidget {
   final bool isFeedContext;
   final double? videoAspectRatioProp;
   final VideoControlsType controlsType;
+  final Duration? startAt;
+  final bool autoplay;
 
   const BetterPlayerWidget({
     Key? key,
@@ -30,6 +32,8 @@ class BetterPlayerWidget extends StatefulWidget {
     this.isFeedContext = false,
     this.videoAspectRatioProp,
     this.controlsType = VideoControlsType.all,
+    this.startAt,
+    this.autoplay = false,
   }) : super(key: key);
 
   @override
@@ -180,7 +184,7 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
 
       _controller = BetterPlayerController(
         BetterPlayerConfiguration(
-          autoPlay: false,
+          autoPlay: widget.autoplay,
           looping: false, // Explicitly ensure no looping
           aspectRatio: widget.videoAspectRatioProp ?? 9 / 16,
           fit: BoxFit.fitWidth,
@@ -198,6 +202,9 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
       _eventListener = (BetterPlayerEvent event) {
         if (event.betterPlayerEventType == BetterPlayerEventType.initialized) {
           if (mounted) {
+            if (widget.startAt != null) {
+              _controller!.seekTo(widget.startAt!);
+            }
             setState(() {
               _isLoading = false;
               _isInitialized = true;

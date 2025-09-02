@@ -15,8 +15,9 @@ import '../services/socket-service.dart';
 import '../services/notification_service.dart';
 import '../services/upload_service.dart'; 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/services.dart';
 
-class DataController extends GetxController {
+class DataController extends GetxController with WidgetsBindingObserver {
   final UploadService _uploadService = UploadService(); // Instantiate UploadService
 
   final RxBool isLoading = false.obs;
@@ -87,6 +88,7 @@ class DataController extends GetxController {
   final Rxn<String> currentlyPlayingMediaId = Rxn<String>();
   final Rxn<String> currentlyPlayingMediaType = Rxn<String>(); // 'video' or 'audio'
   final Rxn<Object> activeMediaController = Rxn<Object>(); // Can be VideoPlayerController, BetterPlayerController, or AudioPlayer
+  final RxMap<String, Duration> videoTimestamps = <String, Duration>{}.obs;
 
   // Progress tracking for post creation
   final RxDouble uploadProgress = 0.0.obs;
@@ -102,12 +104,29 @@ class DataController extends GetxController {
   void onInit() {
     super.onInit();
     init();
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void onClose() {
     _dio.close(); // Clean up Dio instance
+    WidgetsBinding.instance.removeObserver(this);
     super.onClose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
+      pauseCurrentMedia();
+    }
+  }
+
+  void setVideoTimestamp(String videoUrl, Duration timestamp) {
+    videoTimestamps[videoUrl] = timestamp;
+  }
+
+  Duration? getVideoTimestamp(String videoUrl) {
+    return videoTimestamps[videoUrl];
   }
 
   void init() async {

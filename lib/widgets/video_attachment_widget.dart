@@ -18,6 +18,8 @@ class VideoAttachmentWidget extends StatefulWidget {
   final Function(String videoId)? onVideoCompletedInGrid;
   final bool enforceFeedConstraints; // New parameter
   final bool startMuted;
+  final bool autoplay;
+  final Duration? startAt;
 
   const VideoAttachmentWidget({
     required Key key,
@@ -28,6 +30,8 @@ class VideoAttachmentWidget extends StatefulWidget {
     this.onVideoCompletedInGrid,
     this.enforceFeedConstraints = false, // Default to false (native aspect ratio)
     this.startMuted = true,
+    this.autoplay = false,
+    this.startAt,
   }) : super(key: key);
 
   @override
@@ -237,7 +241,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
     _betterPlayerController = BetterPlayerController(
       BetterPlayerConfiguration(
         aspectRatio: _currentAspectRatio, // Use state variable set by _updateAspectAndFit
-        autoPlay: false,
+        autoPlay: widget.autoplay,
         looping: widget.onVideoCompletedInGrid == null,
         fit: _currentBoxFit, // Use state variable set by _updateAspectAndFit
         controlsConfiguration: BetterPlayerControlsConfiguration(
@@ -265,6 +269,9 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
     switch (event.betterPlayerEventType) {
       case BetterPlayerEventType.initialized:
         if (mounted) {
+          if (widget.startAt != null) {
+            _betterPlayerController!.seekTo(widget.startAt!);
+          }
           setState(() => _isInitialized = true);
 
           if (!widget.enforceFeedConstraints) {

@@ -297,6 +297,15 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> with RouteAware {
     super.didPushNext();
   }
 
+  @override
+  void didPopNext() {
+    // This method is called when the user navigates back to this screen.
+    if (mediaVisibilityService.currentlyPlayingByVisibility.value != null) {
+      mediaVisibilityService.playItem(mediaVisibilityService.currentlyPlayingByVisibility.value!);
+    }
+    super.didPopNext();
+  }
+
   void _navigateToPostScreen() async {
     final result = await Get.bottomSheet<Map<String, dynamic>>(
       Container(
@@ -563,6 +572,16 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> with RouteAware {
   }
 
   Future<void> _navigateToReplyPage(Map<String, dynamic> post) async {
+    if (dataController.activeMediaController.value != null &&
+        dataController.currentlyPlayingMediaType.value == 'video') {
+      final controller = dataController.activeMediaController.value as BetterPlayerController;
+      final position = await controller.videoPlayerController?.position;
+      final videoUrl = dataController.currentlyPlayingMediaId.value;
+      if (position != null && videoUrl != null) {
+        dataController.setVideoTimestamp(videoUrl, position);
+      }
+      dataController.pauseCurrentMedia();
+    }
     // print(post);
     final newReply = await Navigator.push(
       context,
@@ -1102,6 +1121,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> with RouteAware {
         isFeedContext: true, // This is the home feed context
         enforceFeedConstraints: true, // Enforce 4:3 for home feed
         startMuted: false, // Start videos unmuted in the feed
+        autoplay: true,
         onVideoCompletedInGrid: isVideoGrid
             ? (completedVideoId) => _handleVideoCompletionInGrid(
                 completedVideoId,
@@ -1158,7 +1178,17 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> with RouteAware {
     }
 
     return GestureDetector(
-      onTap: () {
+      onTap: () async {
+        if (dataController.activeMediaController.value != null &&
+            dataController.currentlyPlayingMediaType.value == 'video') {
+          final controller = dataController.activeMediaController.value as BetterPlayerController;
+          final position = await controller.videoPlayerController?.position;
+          final videoUrl = dataController.currentlyPlayingMediaId.value;
+          if (position != null && videoUrl != null) {
+            dataController.setVideoTimestamp(videoUrl, position);
+          }
+          dataController.pauseCurrentMedia();
+        }
         // Determine initial index for MediaViewPage
         int currentIdxInAllAttachments = correctlyTypedPostAttachments.indexWhere((att) =>
             (att['url'] != null && att['url'] == attachmentMap['url']) ||

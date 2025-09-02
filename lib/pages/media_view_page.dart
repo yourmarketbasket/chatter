@@ -240,6 +240,9 @@ Widget build(BuildContext context) {
                       mediaWidget = _buildPdfViewer(context, currentAttachment, displayPath, optimizedUrl);
                       break;
                     case 'video':
+                      final dataController = Get.find<DataController>();
+                      final videoUrl = currentAttachment['url'] as String?;
+                      final startAt = videoUrl != null ? dataController.getVideoTimestamp(videoUrl) : null;
                       mediaWidget = VideoPlayerContainer(
                         url: optimizedUrl.isNotEmpty ? optimizedUrl : url,
                         file: file,
@@ -249,6 +252,8 @@ Widget build(BuildContext context) {
                         numericAspectRatio: (currentAttachment['width'] is num && currentAttachment['height'] is num && (currentAttachment['height'] as num) > 0)
                             ? (currentAttachment['width'] as num) / (currentAttachment['height'] as num)
                             : null,
+                        autoplay: true,
+                        startAt: startAt,
                       );
                       break;
                     case 'audio':
@@ -638,6 +643,8 @@ class VideoPlayerContainer extends StatefulWidget {
   final String? thumbnailUrl;
   final String? aspectRatioString;
   final double? numericAspectRatio;
+  final bool autoplay;
+  final Duration? startAt;
 
   const VideoPlayerContainer({
     Key? key,
@@ -647,6 +654,8 @@ class VideoPlayerContainer extends StatefulWidget {
     this.thumbnailUrl,
     this.aspectRatioString,
     this.numericAspectRatio,
+    this.autoplay = false,
+    this.startAt,
   }) : super(key: key);
 
   @override
@@ -666,6 +675,8 @@ class _VideoPlayerContainerState extends State<VideoPlayerContainer> {
       thumbnailUrl: widget.thumbnailUrl,
       isFeedContext: false,
       videoAspectRatioProp: videoAspectRatio,
+      autoplay: widget.autoplay,
+      startAt: widget.startAt,
     );
 
     return Center(

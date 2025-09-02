@@ -62,12 +62,17 @@ class ReplyAttachmentDisplayWidget extends StatelessWidget {
 
     switch (attachmentType) {
       case 'video':
+        final dataController = Get.find<DataController>();
+        final videoUrl = attachmentMap['url'] as String?;
+        final startAt = videoUrl != null ? dataController.getVideoTimestamp(videoUrl) : null;
         contentWidget = VideoAttachmentWidget(
           key: Key('video_reply_att_$attachmentKeySuffix'),
           attachment: attachmentMap,
           post: postOrReplyData,
           borderRadius: borderRadius,
           enforceFeedConstraints: true,
+          autoplay: true,
+          startAt: startAt,
         );
         break;
 
@@ -116,7 +121,19 @@ class ReplyAttachmentDisplayWidget extends StatelessWidget {
     }
 
     return GestureDetector(
-      onTap: () {
+      onTap: () async {
+        final dataController = Get.find<DataController>();
+        if (dataController.activeMediaController.value != null &&
+            dataController.currentlyPlayingMediaType.value == 'video') {
+          final controller = dataController.activeMediaController.value as BetterPlayerController;
+          final position = await controller.videoPlayerController?.position;
+          final videoUrl = dataController.currentlyPlayingMediaId.value;
+          if (position != null && videoUrl != null) {
+            dataController.setVideoTimestamp(videoUrl, position);
+          }
+          dataController.pauseCurrentMedia();
+        }
+
         final initialIndex = allAttachmentsInThisPost.indexWhere((att) =>
             att['url']?.toString() == attachmentMap['url']?.toString() ||
             (att['_id']?.toString() == attachmentMap['_id']?.toString() &&
