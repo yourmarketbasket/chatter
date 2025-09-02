@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' as BorderType;
 
 import 'package:better_player_enhanced/better_player.dart';
@@ -41,8 +42,6 @@ class ChatScreen extends StatefulWidget {
   @override
   State<ChatScreen> createState() => _ChatScreenState();
 }
-
-import 'dart:async';
 
 class _ChatScreenState extends State<ChatScreen> {
   final DataController dataController = Get.find<DataController>();
