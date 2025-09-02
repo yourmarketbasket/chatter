@@ -136,13 +136,12 @@ class DataController extends GetxController {
         });
       }
 
+      // Initialize socket service after user data is loaded
+      Get.find<SocketService>().initSocket();
       // For chat functionality, we need all users before we can correctly display chats.
       // So we await these calls in sequence.
       await fetchAllUsers();
       await fetchChats();
-
-      // Initialize socket service after user data is loaded
-      Get.find<SocketService>().initSocket();
 
       // Initialize NotificationService after user data is loaded to ensure token is sent correctly
       final NotificationService notificationService = Get.find<NotificationService>();
@@ -233,6 +232,9 @@ class DataController extends GetxController {
       }
       chats[chatId] = chat;
       chats.refresh();
+    } else {
+      // If chat is not in the list, fetch all chats again to get the new one.
+      fetchChats();
     }
 
     // --- Update Conversation View ---
@@ -2088,10 +2090,9 @@ class DataController extends GetxController {
                 // print('Error fetching following post-login: $e');
               });
             }
+            Get.find<SocketService>().initSocket();
             await fetchAllUsers();
             await fetchChats();
-
-            Get.find<SocketService>().initSocket();
 
             // Initialize NotificationService after user data is loaded to ensure token is sent correctly
             final NotificationService notificationService = Get.find<NotificationService>();
@@ -2167,8 +2168,6 @@ class DataController extends GetxController {
   // Add these placeholder methods inside DataController class
 
   Future<void> fetchChats() async {
-    final NotificationService notificationService = Get.find<NotificationService>();
-    notificationService.init();
     isLoadingChats.value = true;
     try {
       final token = user.value['token'];
