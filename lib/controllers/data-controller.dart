@@ -418,6 +418,39 @@ class DataController extends GetxController {
     // who has already handled it optimistically.
   }
 
+  @override
+  void handleMessageReaction(Map<String, dynamic> data) {
+    final messageId = data['messageId'] as String?;
+    final reactions = data['reactions'] as List<dynamic>?;
+    final chatId = data['chatId'] as String?;
+
+    if (messageId == null || reactions == null || chatId == null) return;
+
+    // Update message in the current conversation if it's the active one
+    if (activeChatId.value == chatId) {
+      final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
+      if (messageIndex != -1) {
+        final message = currentConversationMessages[messageIndex];
+        message['reactions'] = reactions;
+        currentConversationMessages[messageIndex] = message;
+        currentConversationMessages.refresh();
+      }
+    }
+
+    // Also update the lastMessage in the chat list if it was the one reacted to
+    if (chats.containsKey(chatId) && chats[chatId]!['lastMessage']?['_id'] == messageId) {
+      final chat = chats[chatId]!;
+      chat['lastMessage']['reactions'] = reactions;
+      chats.refresh();
+    }
+  }
+
+  @override
+  void handleMessageReactionRemoved(Map<String, dynamic> data) {
+    // The logic is identical to adding/updating a reaction, as the server sends the final state of reactions.
+    handleMessageReaction(data);
+  }
+
   void markMessageAsReadById(String messageId) {
     if (messageId.isEmpty) return;
     // This is called from a notification, so we don't have the message object.
@@ -4828,9 +4861,25 @@ void clearUserPosts() {
   }
 
   Future<void> forwardMultipleMessages(List<Map<String, dynamic>> messages, String targetUserId) async {
-    if (messages.isEmpty) return;
+    // Sort messages by timestamp to ensure they are forwarded in chronological order.
+    messages.sort((a, b) => DateTime.parse(a['createdAt']).compareTo(DateTime.parse(b['createdAt'])));
 
-    // Find existing DM chat with the target user
+    for (final message in messages) {
+      // Awaiting each message ensures they are sent sequentially.
+      // The `forwardMessage` method already contains the necessary logic to find the chat and send the message.
+      await forwardMessage(message, targetUserId);
+      // A small delay can be helpful to prevent potential rate-limiting issues on the backend.
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
+  }
+
+  Future<void> forwardMessage(Map<String, dynamic> message, String targetUserId) async {
+    // 1. Extract content from the original message.
+    final content = message['content'];
+    final files = message['files']; // These are already uploaded files, so just pass the data.
+    final messageType = message['type']; // or determine based on content/files
+
+    // 2. Find or prepare chat with targetUserId.
     String? chatId;
     try {
       final targetChat = chats.values.firstWhere(
@@ -4840,37 +4889,37 @@ void clearUserPosts() {
       );
       chatId = targetChat['_id'];
     } catch (e) {
-      chatId = null; // No existing chat found
+      chatId = null; // No existing chat found, so we'll send with participant IDs.
     }
 
-    // --- ONLY FORWARD THE FIRST MESSAGE ---
-    final message = messages.first;
-
-    final content = message['content'];
-    final files = message['files'];
-    final messageType = message['type'];
+    // 3. Construct the new message payload.
     final clientMessageId = const Uuid().v4();
-
     final Map<String, dynamic> messageData = {
       'clientMessageId': clientMessageId,
       'content': content,
       'type': messageType,
       'files': files,
+      // Add a flag to indicate this is a forwarded message
+      'isForwarded': true,
     };
 
+    // If we don't have a chatId, we need to specify participants for the backend to create a new chat.
     if (chatId != null && chatId.isNotEmpty) {
       messageData['chatId'] = chatId;
     } else {
+      // The backend expects a list of participant IDs to create a new DM chat.
       messageData['participants'] = [getUserId(), targetUserId];
     }
 
+    // 4. Send the message to the backend.
     try {
       final token = user.value['token'];
       if (token == null) {
         throw Exception('User not authenticated');
       }
 
-      await _dio.post(
+      // Directly call the API, similar to sendChatMessage but without all the optimistic UI updates.
+      final response = await _dio.post(
         'api/messages',
         data: messageData,
         options: dio.Options(
@@ -4879,8 +4928,23 @@ void clearUserPosts() {
         ),
       );
 
+      if (response.statusCode == 201 && response.data['success'] == true) {
+        // Handle new chat creation if it happened
+        if (response.data.containsKey('chat')) {
+          final newChat = response.data['chat'];
+          final newChatId = newChat['_id'];
+          if (!chats.containsKey(newChatId)) {
+            chats[newChatId] = newChat;
+            Get.find<SocketService>().joinChatRoom(newChatId);
+            chats.refresh();
+          }
+        }
+        print('Message forwarded successfully.');
+      } else {
+         print('Failed to forward message: ${response.data?['message']}');
+      }
     } catch (e) {
-      print('Error forwarding a message: $e');
+      print('Error forwarding message: $e');
     }
   }
 

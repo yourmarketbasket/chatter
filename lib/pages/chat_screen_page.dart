@@ -389,15 +389,27 @@ class _ChatScreenState extends State<ChatScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => UsersListPage(
-          onUserSelected: (user) {
-            dataController.forwardMultipleMessages(messagesToForward, user['_id']);
-            Navigator.pop(context); // Close UsersListPage
+          onUserSelected: (user) async {
+            final targetUserId = user['_id'];
+            final targetUserName = user['name'];
+            final totalMessages = messagesToForward.length;
+
+            Navigator.pop(context); // Close user selection
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Forwarding $totalMessages message(s) to $targetUserName...')),
+            );
+
+            // Call the new batch forwarding method
+            await dataController.forwardMultipleMessages(messagesToForward, targetUserId);
+
             setState(() {
               _isSelectionMode = false;
               _selectedMessages.clear();
             });
+
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Forwarding ${_selectedMessages.length} message(s) to ${user['name']}')),
+              SnackBar(content: Text('Successfully forwarded messages to $targetUserName.')),
             );
           },
         ),
