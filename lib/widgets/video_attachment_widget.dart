@@ -241,7 +241,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
     _betterPlayerController = BetterPlayerController(
       BetterPlayerConfiguration(
         aspectRatio: _currentAspectRatio, // Use state variable set by _updateAspectAndFit
-        autoPlay: widget.autoplay,
+        autoPlay: autoplay,
         looping: widget.onVideoCompletedInGrid == null,
         fit: _currentBoxFit, // Use state variable set by _updateAspectAndFit
         controlsConfiguration: BetterPlayerControlsConfiguration(
@@ -354,7 +354,7 @@ class _VideoAttachmentWidgetState extends State<VideoAttachmentWidget> with Sing
 
         if (visibleFraction > 0 && !_isInitialized && _betterPlayerController == null) {
             print("[VideoAttachmentWidget-$_videoUniqueId] Becoming visible (fraction: $visibleFraction), ensuring player is initialized.");
-            _initializeVideoPlayer(autoplay: false); // Autoplay decision is managed by MediaVisibilityService
+            _initializeVideoPlayer(autoplay: widget.autoplay);
         }
 
         _mediaVisibilityService.itemVisibilityChanged(
