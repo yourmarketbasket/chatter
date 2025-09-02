@@ -188,10 +188,13 @@ class _ChatScreenState extends State<ChatScreen> {
     if (otherParticipantRaw == null) return null;
 
     final otherUserId = otherParticipantRaw is Map ? otherParticipantRaw['_id'] : otherParticipantRaw;
-    return dataController.allUsers.firstWhere(
-      (u) => u['_id'] == otherUserId,
-      orElse: () => null,
-    );
+    try {
+      return dataController.allUsers.firstWhere(
+        (u) => u['_id'] == otherUserId,
+      );
+    } catch (e) {
+      return null;
+    }
   }
 
   void _getAndroidSdkInt() async {
