@@ -177,8 +177,8 @@ class DataController extends GetxController {
 
     // If a new chat is created, it might be the one we are about to view,
     // especially if we just sent the first message.
-    // We can check if the current chat is "empty" (i.e., doesn't have an ID yet).
-    if (currentChat.value['_id'] == null) {
+    // This should only happen if we are not currently in a chat.
+    if (activeChatId.value == null) {
       final currentUserId = getUserId();
       final participants = (newChatData['participants'] as List?)?.map((p) => p is Map ? p['_id'] : p).toList();
       if (participants != null && participants.contains(currentUserId)) {
@@ -4840,76 +4840,36 @@ void clearUserPosts() {
     }
   }
 
-  Future<void> forwardMessage(Map<String, dynamic> message, String targetUserId) async {
-    // 1. Extract content from the original message.
-    final content = message['content'];
-    final files = message['files']; // These are already uploaded files, so just pass the data.
-    final messageType = message['type']; // or determine based on content/files
-
-    // 2. Find or prepare chat with targetUserId.
-    String? chatId;
-    try {
-      final targetChat = chats.values.firstWhere(
-        (chat) =>
-            chat['type'] == 'dm' &&
-            (chat['participants'] as List).any((p) => (p is Map ? p['_id'] : p) == targetUserId),
-      );
-      chatId = targetChat['_id'];
-    } catch (e) {
-      chatId = null; // No existing chat found, so we'll send with participant IDs.
-    }
-
-    // 3. Construct the new message payload.
-    final clientMessageId = const Uuid().v4();
-    final Map<String, dynamic> messageData = {
-      'clientMessageId': clientMessageId,
-      'content': content,
-      'type': messageType,
-      'files': files,
-      // Add a flag to indicate this is a forwarded message
+  Future<void> forwardMessage(Map<String, dynamic> originalMessage, String targetUserId) async {
+    // Create the payload by copying only the necessary fields.
+    // Crucially, we ALWAYS send the participants. The backend will handle
+    // finding the existing chat or creating a new one. This is more robust
+    // and avoids any client-side logic trying to guess the chatId.
+    final Map<String, dynamic> payload = {
+      'clientMessageId': const Uuid().v4(),
+      'content': originalMessage['content'],
+      'type': originalMessage['type'],
+      'files': originalMessage['files'],
       'isForwarded': true,
+      'participants': [getUserId(), targetUserId],
     };
 
-    // If we don't have a chatId, we need to specify participants for the backend to create a new chat.
-    if (chatId != null && chatId.isNotEmpty) {
-      messageData['chatId'] = chatId;
-    } else {
-      // The backend expects a list of participant IDs to create a new DM chat.
-      messageData['participants'] = [getUserId(), targetUserId];
-    }
-
-    // 4. Send the message to the backend.
+    // Send the request
     try {
       final token = user.value['token'];
-      if (token == null) {
-        throw Exception('User not authenticated');
-      }
+      if (token == null) throw Exception('User not authenticated');
 
-      // Directly call the API, similar to sendChatMessage but without all the optimistic UI updates.
-      final response = await _dio.post(
+      await _dio.post(
         'api/messages',
-        data: messageData,
+        data: payload,
         options: dio.Options(
           headers: {'Authorization': 'Bearer $token'},
           validateStatus: (status) => status != null && status < 500,
         ),
       );
-
-      if (response.statusCode == 201 && response.data['success'] == true) {
-        // Handle new chat creation if it happened
-        if (response.data.containsKey('chat')) {
-          final newChat = response.data['chat'];
-          final newChatId = newChat['_id'];
-          if (!chats.containsKey(newChatId)) {
-            chats[newChatId] = newChat;
-            Get.find<SocketService>().joinChatRoom(newChatId);
-            chats.refresh();
-          }
-        }
-        print('Message forwarded successfully.');
-      } else {
-         print('Failed to forward message: ${response.data?['message']}');
-      }
+      // The HTTP response is not used. We rely on the socket events (`chat:new`
+      // and `message:new`) to update the UI state, which is handled by
+      // other listeners.
     } catch (e) {
       print('Error forwarding message: $e');
     }
