@@ -42,8 +42,12 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
+import 'dart:async';
+
 class _ChatScreenState extends State<ChatScreen> {
   final DataController dataController = Get.find<DataController>();
+  final SocketService socketService = Get.find<SocketService>();
+  StreamSubscription<Map<String, dynamic>>? _socketSubscription;
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   Map<String, dynamic>? _replyingTo;
@@ -74,29 +78,85 @@ class _ChatScreenState extends State<ChatScreen> {
     dataController.activeChatId.value = chatId;
 
     if (chatId != null) {
-      Get.find<SocketService>().joinChatRoom(chatId);
+      socketService.joinChatRoom(chatId);
       _loadMessages();
     } else {
       dataController.currentConversationMessages.clear();
     }
 
+    // Listen for socket events
+    _socketSubscription = socketService.events.listen(_handleSocketEvent);
+
     // Add a listener to the chats map to detect if the current chat is deleted.
     dataController.chats.listen((chatsMap) {
       final currentChatId = dataController.currentChat.value['_id'];
-      // If the chat we are currently viewing has disappeared from the map
-      if (currentChatId != null && !chatsMap.containsKey(currentChatId)) {
-        // And if this screen is still mounted
-        if (mounted) {
-          // Pop the screen
-          print('[ChatScreen] Current chat $currentChatId was deleted. Navigating back.');
-          Navigator.of(context).pop();
-        }
+      if (currentChatId != null && !chatsMap.containsKey(currentChatId) && mounted) {
+        Navigator.of(context).pop();
       }
     });
 
     dataController.currentConversationMessages.listen((_) {
       Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
     });
+  }
+
+  void _handleSocketEvent(Map<String, dynamic> event) {
+    final eventName = event['event'];
+    final data = event['data'];
+    final currentChatId = dataController.activeChatId.value;
+
+    if (currentChatId == null) return;
+
+    // A map of event handlers
+    final handlers = {
+      'message:new': () {
+        if (data['chatId'] == currentChatId) {
+          // The DataController's handleNewMessage already adds the message
+          // and refreshes the list. We just need to ensure the UI rebuilds.
+          setState(() {}); // Trigger a rebuild to show the new message
+        }
+      },
+      'message:update': () {
+        if (data['chatId'] == currentChatId) {
+          setState(() {}); // Trigger a rebuild
+        }
+      },
+      'message:delete': () {
+         if (data['chatId'] == currentChatId) {
+          setState(() {}); // Trigger a rebuild
+        }
+      },
+      'message:reaction': () {
+        if (data['chatId'] == currentChatId) {
+          setState(() {}); // Trigger a rebuild
+        }
+      },
+      'message:reaction:removed': () {
+        if (data['chatId'] == currentChatId) {
+          setState(() {}); // Trigger a rebuild
+        }
+      },
+      'typing:started': () {
+        if (data['chatId'] == currentChatId) {
+          setState(() {}); // Rebuild to show typing indicator
+        }
+      },
+      'typing:stopped': () {
+         if (data['chatId'] == currentChatId) {
+          setState(() {}); // Rebuild to hide typing indicator
+        }
+      },
+      'chat:updated': () {
+        if (data['_id'] == currentChatId) {
+          setState(() {}); // Rebuild app bar with new details
+        }
+      }
+    };
+
+    // Execute the handler if it exists
+    if (handlers.containsKey(eventName)) {
+      handlers[eventName]!();
+    }
   }
 
   void _loadMessages() async {
@@ -116,6 +176,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    _socketSubscription?.cancel();
     _messageController.dispose();
     _scrollController.dispose();
     dataController.currentConversationMessages.clear();
@@ -1337,14 +1398,25 @@ class _ChatScreenState extends State<ChatScreen> {
                                         onPressed: _forwardSelectedMessages,
                                       ),
                                     Flexible(
-                                      child: MessageBubble(
-                                        message: message,
-                                        prevMessage: prevMessage,
-                                        dataController: dataController,
-                                        openMediaView: _openMediaView,
-                                        buildAttachment: _buildAttachment,
-                                        getReplyPreviewText: _getReplyPreviewText,
-                                        buildReactions: _buildReactions,
+                                      child: GestureDetector(
+                                        onHorizontalDragUpdate: (details) {
+                                          // NOTE: This is a basic implementation. A more robust
+                                          // solution would use a proper swipe detection widget.
+                                          if (details.delta.dx > 10) { // Swipe right
+                                            setState(() {
+                                              _replyingTo = message;
+                                            });
+                                          }
+                                        },
+                                        child: MessageBubble(
+                                          message: message,
+                                          prevMessage: prevMessage,
+                                          dataController: dataController,
+                                          openMediaView: _openMediaView,
+                                          buildAttachment: _buildAttachment,
+                                          getReplyPreviewText: _getReplyPreviewText,
+                                          buildReactions: _buildReactions,
+                                        ),
                                       ),
                                     ),
                                     if (message['senderId']['_id'] == dataController.getUserId() && _selectedMessages.contains(message['_id'] ?? message['clientMessageId']))

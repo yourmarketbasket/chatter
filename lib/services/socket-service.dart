@@ -357,10 +357,14 @@ class SocketService {
   // End of message events
 
   void _handleMessageDelete(dynamic data) {
-    // The payload is the full, updated message object. Its identifier is `_id`.
-    if (data is Map<String, dynamic> && data['_id'] is String) {
-      _dataController.handleMessageDelete(data);
-      _eventController.add({'event': 'message:delete', 'data': data});
+    // The payload contains the ID of the deleted message.
+    if (data is Map<String, dynamic> && data['messageId'] is String) {
+      // The DataController needs the chatId to find the right conversation.
+      // We assume the backend includes it in the payload.
+      if (data['chatId'] != null) {
+         _dataController.handleMessageDelete(data);
+        _eventController.add({'event': 'message:delete', 'data': data});
+      }
     } else {
         // print('SocketService: Invalid message:delete data format: ${data.runtimeType}');
     }
