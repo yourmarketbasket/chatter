@@ -149,6 +149,19 @@ class _ChatScreenState extends State<ChatScreen> {
         if (data['_id'] == currentChatId) {
           setState(() {}); // Rebuild app bar with new details
         }
+      },
+      'user:online': () {
+        // Find the other participant in the chat
+        final otherParticipant = _getOtherParticipant();
+        if (otherParticipant != null && data['userId'] == otherParticipant['_id']) {
+          setState(() {}); // Rebuild app bar
+        }
+      },
+      'user:offline': () {
+        final otherParticipant = _getOtherParticipant();
+        if (otherParticipant != null && data['userId'] == otherParticipant['_id']) {
+          setState(() {}); // Rebuild app bar
+        }
       }
     };
 
@@ -160,6 +173,25 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _loadMessages() async {
     await dataController.fetchMessages(dataController.currentChat.value['_id']!);
+  }
+
+  Map<String, dynamic>? _getOtherParticipant() {
+    final chat = dataController.currentChat.value;
+    if (chat['type'] != 'dm') return null;
+
+    final currentUserId = dataController.getUserId();
+    final otherParticipantRaw = (chat['participants'] as List<dynamic>).firstWhere(
+      (p) => (p is Map ? p['_id'] : p) != currentUserId,
+      orElse: () => null,
+    );
+
+    if (otherParticipantRaw == null) return null;
+
+    final otherUserId = otherParticipantRaw is Map ? otherParticipantRaw['_id'] : otherParticipantRaw;
+    return dataController.allUsers.firstWhere(
+      (u) => u['_id'] == otherUserId,
+      orElse: () => null,
+    );
   }
 
   void _getAndroidSdkInt() async {
@@ -387,6 +419,7 @@ class _ChatScreenState extends State<ChatScreen> {
     showGeneralDialog(
       context: context,
       barrierDismissible: true,
+      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
       barrierColor: Colors.black.withOpacity(0.5),
       transitionDuration: const Duration(milliseconds: 200),
       pageBuilder: (BuildContext buildContext, Animation<double> animation, Animation<double> secondaryAnimation) {
