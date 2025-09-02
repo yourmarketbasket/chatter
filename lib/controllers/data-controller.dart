@@ -4841,45 +4841,23 @@ void clearUserPosts() {
   }
 
   Future<void> forwardMessage(Map<String, dynamic> originalMessage, String targetUserId) async {
-    // Create a mutable copy of the original message.
-    final Map<String, dynamic> forwardPayload = Map<String, dynamic>.from(originalMessage);
+    // This is the correct approach. We create a new message object for forwarding,
+    // ensuring it has no `chatId` and the correct new `participants`.
+    // Then we pass it to the robust `sendChatMessage` method which handles
+    // both new and existing conversations correctly.
+    final newClientMessageId = const Uuid().v4();
+    final Map<String, dynamic> payload = {
+      'clientMessageId': newClientMessageId,
+      'content': originalMessage['content'],
+      'type': originalMessage['type'],
+      'files': originalMessage['files'],
+      'isForwarded': true,
+      'participants': [getUserId(), targetUserId],
+      // No chatId is included, so sendChatMessage will use participants to find/create a chat.
+    };
 
-    // Remove all fields that are specific to the original message's context.
-    forwardPayload.remove('_id');
-    forwardPayload.remove('chatId');
-    forwardPayload.remove('participants');
-    forwardPayload.remove('senderId');
-    forwardPayload.remove('createdAt');
-    forwardPayload.remove('updatedAt');
-    forwardPayload.remove('readReceipts');
-    forwardPayload.remove('reactions');
-    forwardPayload.remove('deletedFor');
-    forwardPayload.remove('deletedForEveryone');
-    forwardPayload.remove('status');
-    forwardPayload.remove('replyTo');
-
-    // Add/overwrite fields for the new forwarded message.
-    forwardPayload['clientMessageId'] = const Uuid().v4();
-    forwardPayload['isForwarded'] = true;
-    forwardPayload['participants'] = [getUserId(), targetUserId];
-
-
-    // Send the request
-    try {
-      final token = user.value['token'];
-      if (token == null) throw Exception('User not authenticated');
-
-      await _dio.post(
-        'api/messages',
-        data: forwardPayload, // Use the cleaned and prepared payload.
-        options: dio.Options(
-          headers: {'Authorization': 'Bearer $token'},
-          validateStatus: (status) => status != null && status < 500,
-        ),
-      );
-    } catch (e) {
-      print('Error forwarding message: $e');
-    }
+    // Delegate to the existing sendChatMessage function.
+    await sendChatMessage(payload, newClientMessageId);
   }
 
   Future<void> addReaction(String messageId, String emoji) async {
