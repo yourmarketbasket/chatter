@@ -384,6 +384,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final messagesToForward = _selectedMessages
         .map((id) => dataController.currentConversationMessages.firstWhere((m) => (m['_id'] ?? m['clientMessageId']) == id))
         .toList();
+        
 
     Navigator.push(
       context,
