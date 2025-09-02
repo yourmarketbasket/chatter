@@ -384,7 +384,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final messagesToForward = _selectedMessages
         .map((id) => dataController.currentConversationMessages.firstWhere((m) => (m['_id'] ?? m['clientMessageId']) == id))
         .toList();
-        
+
 
     Navigator.push(
       context,
@@ -397,9 +397,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
             Navigator.pop(context); // Close user selection
 
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Forwarding $totalMessages message(s) to $targetUserName...')),
-            );
+            // ScaffoldMessenger.of(context).showSnackBar(
+            //   SnackBar(content: Text('Forwarding $totalMessages message(s) to $targetUserName...')),
+            // );
 
             // Call the new batch forwarding method
             await dataController.forwardMultipleMessages(messagesToForward, targetUserId);
@@ -409,9 +409,9 @@ class _ChatScreenState extends State<ChatScreen> {
               _selectedMessages.clear();
             });
 
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Successfully forwarded messages to $targetUserName.')),
-            );
+            // ScaffoldMessenger.of(context).showSnackBar(
+            //   SnackBar(content: Text('Successfully forwarded messages to $targetUserName.')),
+            // );
           },
         ),
       ),
