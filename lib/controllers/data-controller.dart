@@ -418,39 +418,6 @@ class DataController extends GetxController {
     // who has already handled it optimistically.
   }
 
-  @override
-  void handleMessageReaction(Map<String, dynamic> data) {
-    final messageId = data['messageId'] as String?;
-    final reactions = data['reactions'] as List<dynamic>?;
-    final chatId = data['chatId'] as String?;
-
-    if (messageId == null || reactions == null || chatId == null) return;
-
-    // Update message in the current conversation if it's the active one
-    if (activeChatId.value == chatId) {
-      final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
-      if (messageIndex != -1) {
-        final message = currentConversationMessages[messageIndex];
-        message['reactions'] = reactions;
-        currentConversationMessages[messageIndex] = message;
-        currentConversationMessages.refresh();
-      }
-    }
-
-    // Also update the lastMessage in the chat list if it was the one reacted to
-    if (chats.containsKey(chatId) && chats[chatId]!['lastMessage']?['_id'] == messageId) {
-      final chat = chats[chatId]!;
-      chat['lastMessage']['reactions'] = reactions;
-      chats.refresh();
-    }
-  }
-
-  @override
-  void handleMessageReactionRemoved(Map<String, dynamic> data) {
-    // The logic is identical to adding/updating a reaction, as the server sends the final state of reactions.
-    handleMessageReaction(data);
-  }
-
   void markMessageAsReadById(String messageId) {
     if (messageId.isEmpty) return;
     // This is called from a notification, so we don't have the message object.
