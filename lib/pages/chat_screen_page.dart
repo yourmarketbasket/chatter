@@ -417,8 +417,6 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _showReactionDialog(BuildContext context, Map<String, dynamic> message, Offset position) {
-    final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
-
     showGeneralDialog(
       context: context,
       barrierDismissible: true,
@@ -426,11 +424,18 @@ class _ChatScreenState extends State<ChatScreen> {
       barrierColor: Colors.black.withOpacity(0.5),
       transitionDuration: const Duration(milliseconds: 200),
       pageBuilder: (BuildContext buildContext, Animation<double> animation, Animation<double> secondaryAnimation) {
+        final screenSize = MediaQuery.of(context).size;
+        const dialogWidth = 280.0; // Estimated width of the dialog
+        double left = position.dx - (dialogWidth / 2);
+
+        // Clamp the position to stay within screen bounds, with some padding
+        left = left.clamp(16.0, screenSize.width - dialogWidth - 16.0);
+
         return Stack(
           children: [
             Positioned(
               top: position.dy - 80, // Adjust position to be above the press point
-              left: position.dx - 100, // Center the dialog horizontally
+              left: left,
               child: Material(
                 color: Colors.transparent,
                 child: Container(
@@ -567,10 +572,19 @@ class _ChatScreenState extends State<ChatScreen> {
       orElse: () {
         // Fallback to searching participants list if not in allUsers
         final participants = dataController.currentChat.value['participants'] as List? ?? [];
-        return participants.firstWhere(
+        final participant = participants.firstWhere(
           (p) => (p is Map ? p['_id'] : p) == replyToSenderId,
-          orElse: () => {'_id': replyToSenderId, 'name': 'Unknown User'},
+          orElse: () => null,
         );
+
+        if (participant is Map<String, dynamic>) {
+          return participant;
+        }
+
+        // If participant is a String ID, we should have found it in allUsers.
+        // If we are here, it means it's not in allUsers, so we have to return a placeholder.
+        // Or if participant is null.
+        return {'_id': replyToSenderId, 'name': 'Unknown User'};
       },
     );
 
