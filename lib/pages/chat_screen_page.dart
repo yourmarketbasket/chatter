@@ -521,15 +521,19 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildReplyPreview(Map<String, dynamic> replyTo) {
+    final replyToSenderId = replyTo['senderId'] is Map
+        ? replyTo['senderId']['_id']
+        : replyTo['senderId'];
+
     final sender = (dataController.currentChat.value['participants'] as List)
         .firstWhere(
-      (p) => p['_id'] == replyTo['senderId']['_id'],
-      orElse: () => {'_id': replyTo['senderId']['_id'], 'name': 'Unknown User'},
+      (p) => (p is Map ? p['_id'] : p) == replyToSenderId,
+      orElse: () => {'_id': replyToSenderId, 'name': 'Unknown User'},
     );
-    final senderName = replyTo['senderId']['_id'] ==
-            dataController.user.value['user']['_id']
+
+    final senderName = replyToSenderId == dataController.user.value['user']['_id']
         ? 'You'
-        : sender['name'];
+        : (sender is Map ? sender['name'] : 'Unknown User');
 
     Widget contentPreview;
     if (replyTo['files'] != null && (replyTo['files'] as List).isNotEmpty) {
