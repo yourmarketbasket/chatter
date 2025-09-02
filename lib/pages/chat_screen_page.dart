@@ -397,11 +397,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
             Navigator.pop(context); // Close user selection
 
-            // ScaffoldMessenger.of(context).showSnackBar(
-            //   SnackBar(content: Text('Forwarding $totalMessages message(s) to $targetUserName...')),
-            // );
-
-            // Call the new batch forwarding method
+            
             await dataController.forwardMultipleMessages(messagesToForward, targetUserId);
 
             setState(() {
