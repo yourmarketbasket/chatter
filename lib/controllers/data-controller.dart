@@ -96,7 +96,16 @@ class DataController extends GetxController {
 
   // Observable to notify ProfilePage to refresh
   final RxString profileUpdateTrigger = ''.obs;
+  final RxMap<String, Duration> videoProgress = <String, Duration>{}.obs;
 
+
+  void updateVideoProgress(String mediaId, Duration progress) {
+    videoProgress[mediaId] = progress;
+  }
+
+  Duration? getSavedVideoProgress(String mediaId) {
+    return videoProgress[mediaId];
+  }
 
   @override
   void onInit() {
@@ -3260,16 +3269,15 @@ class DataController extends GetxController {
       if (controller is BetterPlayerController) {
         controller.pause();
       } else if (controller is VideoPlayerController) {
-        // VideoPlayerController does not have an isDisposed getter, so we rely on the try-catch.
         controller.pause();
       } else if (controller is AudioPlayer) {
-        // AudioPlayer does not have an isDisposed getter, rely on try-catch.
         controller.pause();
       }
     } catch (e) {
       // print('[DataController] Error pausing media, likely because it was already disposed: $e');
-      // It's safe to ignore this error as the goal was to stop the media anyway.
     }
+  }
+
   }
 
   // Method to update a post in the local list with data from a socket event (e.g. like, unlike, view)

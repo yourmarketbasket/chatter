@@ -17,6 +17,7 @@ class MessageBubble extends StatefulWidget {
   final Widget Function(Map<String, dynamic>) buildAttachment;
   final String Function(Map<String, dynamic>) getReplyPreviewText;
   final Widget Function(Map<String, dynamic>, bool) buildReactions;
+  final void Function(Map<String, dynamic>) onReply;
 
   const MessageBubble({
     Key? key,
@@ -27,14 +28,18 @@ class MessageBubble extends StatefulWidget {
     required this.buildAttachment,
     required this.getReplyPreviewText,
     required this.buildReactions,
+    required this.onReply,
   }) : super(key: key);
 
   @override
   _MessageBubbleState createState() => _MessageBubbleState();
 }
 
-class _MessageBubbleState extends State<MessageBubble> {
+class _MessageBubbleState extends State<MessageBubble> with SingleTickerProviderStateMixin {
   final Set<String> _successfulPreviewUrls = {};
+  late AnimationController _controller;
+  late Animation<Offset> _animation;
+  double _dragOffsetX = 0.0;
 
   String _getAggregateStatus(Map<String, dynamic> message) {
     if (message['status'] == 'sending') return 'sending';
@@ -106,6 +111,25 @@ class _MessageBubbleState extends State<MessageBubble> {
     }
     return spans;
 }
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+    _animation = Tween<Offset>(
+      begin: Offset.zero,
+      end: const Offset(1, 0),
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -244,30 +268,70 @@ class _MessageBubbleState extends State<MessageBubble> {
     );
 
     return Stack(
-      clipBehavior: Clip.none,
+      alignment: Alignment.center,
       children: [
-        Container(
-          margin: EdgeInsets.only(bottom: bottomMargin),
-          padding: isOnlyLinkWithPreview
-              ? EdgeInsets.zero
-              : const EdgeInsets.symmetric(horizontal: 1.0, vertical: 1.0),
-          constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.55,
-            minWidth: MediaQuery.of(context).size.width * 0.10,
-          ),
-          decoration: BoxDecoration(
-            color: isYou ? Colors.transparent.withOpacity(0.2) : Colors.transparent,
-            border: Border.all(color: isYou ? Colors.teal.withOpacity(0.6) : const Color.fromARGB(167, 143, 141, 141), width: 1.0),
-            borderRadius: BorderRadius.only(
-              topLeft: const Radius.circular(20.0),
-              topRight: const Radius.circular(20.0),
-              bottomLeft: Radius.circular(isYou ? 20.0 : 0.0),
-              bottomRight: Radius.circular(isYou ? 0.0 : 20.0),
+        if (_dragOffsetX.abs() > 0)
+          Positioned(
+            left: isYou ? null : 20,
+            right: isYou ? 20 : null,
+            child: Icon(
+              Icons.reply,
+              color: Colors.white.withOpacity(0.5),
+              size: 24,
             ),
           ),
-          child: messageBubbleContent,
+        GestureDetector(
+          onHorizontalDragUpdate: (details) {
+            final newOffset = _dragOffsetX + details.delta.dx;
+            if (isYou && newOffset < 0) {
+              setState(() {
+                _dragOffsetX = newOffset.clamp(-100.0, 0.0);
+              });
+            } else if (!isYou && newOffset > 0) {
+              setState(() {
+                _dragOffsetX = newOffset.clamp(0.0, 100.0);
+              });
+            }
+          },
+          onHorizontalDragEnd: (details) {
+            if (_dragOffsetX.abs() > 60) {
+              widget.onReply(widget.message);
+            }
+            setState(() {
+              _dragOffsetX = 0;
+            });
+          },
+          child: Transform.translate(
+            offset: Offset(_dragOffsetX, 0),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  margin: EdgeInsets.only(bottom: bottomMargin),
+                  padding: isOnlyLinkWithPreview
+                      ? EdgeInsets.zero
+                      : const EdgeInsets.symmetric(horizontal: 1.0, vertical: 1.0),
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.55,
+                    minWidth: MediaQuery.of(context).size.width * 0.10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isYou ? Colors.transparent.withOpacity(0.2) : Colors.transparent,
+                    border: Border.all(color: isYou ? Colors.teal.withOpacity(0.6) : const Color.fromARGB(167, 143, 141, 141), width: 1.0),
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(20.0),
+                      topRight: const Radius.circular(20.0),
+                      bottomLeft: Radius.circular(isYou ? 20.0 : 0.0),
+                      bottomRight: Radius.circular(isYou ? 0.0 : 20.0),
+                    ),
+                  ),
+                  child: messageBubbleContent,
+                ),
+                widget.buildReactions(widget.message, isYou),
+              ],
+            ),
+          ),
         ),
-        widget.buildReactions(widget.message, isYou),
       ],
     );
   }

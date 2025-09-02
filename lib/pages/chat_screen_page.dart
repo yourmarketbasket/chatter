@@ -1195,20 +1195,23 @@ class _ChatScreenState extends State<ChatScreen> {
             },
           ),
         PopupMenuButton<String>(
-          onSelected: (value) {
+          onSelected: (value) async {
             if (value == 'edit') {
               final messageId = _selectedMessages.first;
               final message = dataController.currentConversationMessages.firstWhere((m) => (m['_id'] ?? m['clientMessageId']) == messageId);
               _editMessage(message);
             } else if (value == 'delete_me') {
-              dataController.deleteMultipleMessages(_selectedMessages.toList(), deleteFor: "me");
+              await dataController.deleteMultipleMessages(_selectedMessages.toList(), deleteFor: "me");
             } else if (value == 'delete_everyone') {
-              dataController.deleteMultipleMessages(_selectedMessages.toList(), deleteFor: "everyone");
+              await dataController.deleteMultipleMessages(_selectedMessages.toList(), deleteFor: "everyone");
             }
-            setState(() {
-              _isSelectionMode = false;
-              _selectedMessages.clear();
-            });
+
+            if (mounted) {
+              setState(() {
+                _isSelectionMode = false;
+                _selectedMessages.clear();
+              });
+            }
           },
           itemBuilder: (BuildContext context) {
             final currentUserId = dataController.getUserId();
@@ -1345,6 +1348,11 @@ class _ChatScreenState extends State<ChatScreen> {
                                         buildAttachment: _buildAttachment,
                                         getReplyPreviewText: _getReplyPreviewText,
                                         buildReactions: _buildReactions,
+                                        onReply: (message) {
+                                          setState(() {
+                                            _replyingTo = message;
+                                          });
+                                        },
                                       ),
                                     ),
                                     if (message['senderId']['_id'] == dataController.getUserId() && _selectedMessages.contains(message['_id'] ?? message['clientMessageId']))

@@ -47,7 +47,7 @@ class HomeFeedScreen extends StatefulWidget {
   _HomeFeedScreenState createState() => _HomeFeedScreenState();
 }
 
-class _HomeFeedScreenState extends State<HomeFeedScreen> with RouteAware {
+class _HomeFeedScreenState extends State<HomeFeedScreen> with RouteAware, WidgetsBindingObserver {
   final DataController dataController = Get.find<DataController>();
   final MediaVisibilityService mediaVisibilityService = Get.find<MediaVisibilityService>();
   final ScrollController _scrollController = ScrollController();
@@ -61,6 +61,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> with RouteAware {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     dataController.fetchFeeds(isRefresh: true);
     _scrollController.addListener(() {
       if (_scrollController.position.pixels ==
@@ -285,9 +286,18 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> with RouteAware {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     routeObserver.unsubscribe(this);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.paused) {
+      dataController.pauseCurrentMedia();
+    }
   }
 
   @override

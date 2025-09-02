@@ -93,8 +93,9 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
         bool changed = false;
         if (event.betterPlayerEventType == BetterPlayerEventType.progress) {
           final newPosition = event.parameters?['progress'] as Duration? ?? _position;
-          if (_position != newPosition) {
+          if ((newPosition - _position).abs().inSeconds > 1) {
             _position = newPosition;
+            _dataController.updateVideoProgress(_videoUniqueId!, newPosition);
             changed = true;
           }
         }
@@ -178,6 +179,8 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
         return;
       }
 
+      final savedProgress = _dataController.getSavedVideoProgress(_videoUniqueId!);
+
       _controller = BetterPlayerController(
         BetterPlayerConfiguration(
           autoPlay: false,
@@ -185,6 +188,7 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
           aspectRatio: widget.videoAspectRatioProp ?? 9 / 16,
           fit: BoxFit.fitWidth,
           placeholder: _buildPlaceholder(),
+          startAt: savedProgress,
           controlsConfiguration: const BetterPlayerControlsConfiguration(
             showControls: false,
             loadingWidget: SizedBox.shrink(),
@@ -264,6 +268,10 @@ class _BetterPlayerWidgetState extends State<BetterPlayerWidget> with SingleTick
 
   @override
   void dispose() {
+    final lastPosition = _controller?.videoPlayerController?.value.position;
+    if (lastPosition != null) {
+      _dataController.updateVideoProgress(_videoUniqueId!, lastPosition);
+    }
     _currentlyPlayingVideoSubscription?.cancel();
     if (_eventListener != null && _controller != null) {
       _controller!.removeEventsListener(_eventListener!);
