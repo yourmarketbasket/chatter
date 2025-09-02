@@ -2264,12 +2264,9 @@ class DataController extends GetxController {
       );
       print('[DataController.sendChatMessage] Received response: ${response.data}');
 
-      final messageIndex = clientMessageId != null
-          ? currentConversationMessages.indexWhere((m) => m['clientMessageId'] == clientMessageId)
-          : -1;
-
       if (response.statusCode == 201 && response.data['success'] == true) {
         final serverMessage = response.data['message'];
+        final messageChatId = serverMessage['chatId'] as String?;
 
         // --- NEW/RESURRECTED CHAT HANDLING ---
         // If the server returns a full 'chat' object, that's the best case.
@@ -2287,7 +2284,6 @@ class DataController extends GetxController {
         }
         // --- FALLBACK for resurrected chats that don't return the full object ---
         else {
-          final messageChatId = serverMessage['chatId'] as String?;
           // If our currentChat doesn't have an ID yet, but the returned message does,
           // it means this is the first message of a new/resurrected chat.
           if (messageChatId != null && currentChat.value['_id'] == null) {
@@ -2313,23 +2309,31 @@ class DataController extends GetxController {
           }
         }
 
-        if (messageIndex != -1) {
-          final localMessage = currentConversationMessages[messageIndex];
-          var finalMessage = Map<String, dynamic>.from(serverMessage);
-          if (clientMessageId != null) {
-            finalMessage['clientMessageId'] = clientMessageId; // Preserve client ID
-          }
+        // --- UPDATE CONVERSATION VIEW ---
+        // Only update the current conversation if the new message belongs to it.
+        if (activeChatId.value == messageChatId) {
+          final messageIndex = clientMessageId != null
+            ? currentConversationMessages.indexWhere((m) => m['clientMessageId'] == clientMessageId)
+            : -1;
 
-          // Preserve read receipts if they were updated by a socket event in the meantime
-          if ((localMessage['readReceipts'] as List?)?.isNotEmpty ?? false) {
-            finalMessage['readReceipts'] = localMessage['readReceipts'];
+          if (messageIndex != -1) {
+            final localMessage = currentConversationMessages[messageIndex];
+            var finalMessage = Map<String, dynamic>.from(serverMessage);
+            if (clientMessageId != null) {
+              finalMessage['clientMessageId'] = clientMessageId;
+            }
+            if ((localMessage['readReceipts'] as List?)?.isNotEmpty ?? false) {
+              finalMessage['readReceipts'] = localMessage['readReceipts'];
+            }
+            currentConversationMessages[messageIndex] = finalMessage;
+          } else {
+            currentConversationMessages.add(serverMessage);
           }
-
-          currentConversationMessages[messageIndex] = finalMessage;
-        } else {
-          currentConversationMessages.add(serverMessage);
         }
       } else {
+        final messageIndex = clientMessageId != null
+            ? currentConversationMessages.indexWhere((m) => m['clientMessageId'] == clientMessageId)
+            : -1;
         if (messageIndex != -1) {
           currentConversationMessages[messageIndex]['status_for_failed_only'] = 'failed';
         }
