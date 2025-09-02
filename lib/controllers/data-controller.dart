@@ -4841,18 +4841,28 @@ void clearUserPosts() {
   }
 
   Future<void> forwardMessage(Map<String, dynamic> originalMessage, String targetUserId) async {
-    // Create the payload by copying only the necessary fields.
-    // Crucially, we ALWAYS send the participants. The backend will handle
-    // finding the existing chat or creating a new one. This is more robust
-    // and avoids any client-side logic trying to guess the chatId.
-    final Map<String, dynamic> payload = {
-      'clientMessageId': const Uuid().v4(),
-      'content': originalMessage['content'],
-      'type': originalMessage['type'],
-      'files': originalMessage['files'],
-      'isForwarded': true,
-      'participants': [getUserId(), targetUserId],
-    };
+    // Create a mutable copy of the original message.
+    final Map<String, dynamic> forwardPayload = Map<String, dynamic>.from(originalMessage);
+
+    // Remove all fields that are specific to the original message's context.
+    forwardPayload.remove('_id');
+    forwardPayload.remove('chatId');
+    forwardPayload.remove('participants');
+    forwardPayload.remove('senderId');
+    forwardPayload.remove('createdAt');
+    forwardPayload.remove('updatedAt');
+    forwardPayload.remove('readReceipts');
+    forwardPayload.remove('reactions');
+    forwardPayload.remove('deletedFor');
+    forwardPayload.remove('deletedForEveryone');
+    forwardPayload.remove('status');
+    forwardPayload.remove('replyTo');
+
+    // Add/overwrite fields for the new forwarded message.
+    forwardPayload['clientMessageId'] = const Uuid().v4();
+    forwardPayload['isForwarded'] = true;
+    forwardPayload['participants'] = [getUserId(), targetUserId];
+
 
     // Send the request
     try {
@@ -4861,15 +4871,12 @@ void clearUserPosts() {
 
       await _dio.post(
         'api/messages',
-        data: payload,
+        data: forwardPayload, // Use the cleaned and prepared payload.
         options: dio.Options(
           headers: {'Authorization': 'Bearer $token'},
           validateStatus: (status) => status != null && status < 500,
         ),
       );
-      // The HTTP response is not used. We rely on the socket events (`chat:new`
-      // and `message:new`) to update the UI state, which is handled by
-      // other listeners.
     } catch (e) {
       print('Error forwarding message: $e');
     }
