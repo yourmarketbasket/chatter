@@ -120,6 +120,14 @@ class DataController extends GetxController {
 
     // Only proceed with network calls if user is logged in
     if (user.value['token'] != null) {
+      // Initialize socket service right away.
+      // It can now connect and start receiving online status events while other data is being fetched.
+      Get.find<SocketService>().initSocket();
+
+      // Initialize NotificationService concurrently.
+      final NotificationService notificationService = Get.find<NotificationService>();
+      notificationService.init(); // No need to await if it can run in parallel.
+
       // Fetch non-essential data in parallel (fire and forget)
       fetchFeeds().catchError((e) {
           // print('Error fetching initial feeds: $e');
@@ -136,17 +144,12 @@ class DataController extends GetxController {
         });
       }
 
-      // For chat functionality, we need all users before we can correctly display chats.
-      // So we await these calls in sequence.
-      await fetchAllUsers();
-      await fetchChats();
-
-      // Initialize socket service after user data is loaded
-      Get.find<SocketService>().initSocket();
-
-      // Initialize NotificationService after user data is loaded to ensure token is sent correctly
-      final NotificationService notificationService = Get.find<NotificationService>();
-      await notificationService.init();
+      // For chat functionality, we still need all users and chats before the main UI is useful.
+      // We can run these fetches in parallel to save time.
+      await Future.wait([
+        fetchAllUsers(),
+        fetchChats(),
+      ]);
     }
   }
 
@@ -203,7 +206,7 @@ class DataController extends GetxController {
     }
   }
 
-    void handleNewMessage(Map<String, dynamic> newMessage) {
+  Future<void> handleNewMessage(Map<String, dynamic> newMessage) async {
     final chatId = newMessage['chatId'] as String?;
 
     if (chatId == null || newMessage['_id'] == null) {
@@ -260,9 +263,19 @@ class DataController extends GetxController {
       chats[chatId] = chat;
       chats.refresh();
     } else {
-      // print('[DataController] Received message for unknown chat: $chatId. Ignoring.');
-      // Do nothing. The chat might have been deleted by the user.
-      // Re-fetching all chats could re-introduce a chat the user explicitly deleted.
+      // print('[DataController] Received message for unknown chat: $chatId. Fetching chat details.');
+      await fetchChatById(chatId);
+      // After fetching, the chat should exist in the map. We can now process the message.
+      if (chats.containsKey(chatId)) {
+         final chat = chats[chatId]!;
+         chat['lastMessage'] = newMessage;
+         final senderId = newMessage['senderId'] is Map ? newMessage['senderId']['_id'] : newMessage['senderId'];
+         if (senderId != null && senderId != getUserId()) {
+           chat['unreadCount'] = (chat['unreadCount'] ?? 0) + 1;
+         }
+         chats[chatId] = chat;
+         chats.refresh();
+      }
     }
   }
 
@@ -2221,6 +2234,40 @@ class DataController extends GetxController {
       // Optionally, show a snackbar or some error message to the user
     } finally {
       isLoadingChats.value = false;
+    }
+  }
+
+  Future<void> fetchChatById(String chatId) async {
+    // print('[DataController] Fetching chat by ID: $chatId');
+    try {
+      final token = user.value['token'];
+      if (token == null) {
+        throw Exception('User not authenticated');
+      }
+
+      final response = await _dio.get(
+        'api/chats/$chatId', // Assuming this endpoint exists
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        final chatData = response.data['chat'];
+        if (chatData != null) {
+          final fetchedChatId = chatData['_id'];
+          if (fetchedChatId != null && !chats.containsKey(fetchedChatId)) {
+            chats[fetchedChatId] = chatData;
+            Get.find<SocketService>().joinChatRoom(fetchedChatId);
+            chats.refresh();
+            // print('[DataController] Successfully fetched and added new chat $fetchedChatId');
+          }
+        }
+      } else {
+        // print('[DataController] Failed to fetch chat $chatId: ${response.data?['message']}');
+      }
+    } catch (e) {
+      // print('[DataController] Error fetching chat by ID $chatId: $e');
     }
   }
 

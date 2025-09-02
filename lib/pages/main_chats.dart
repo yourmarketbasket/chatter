@@ -222,324 +222,342 @@ class _MainChatsPageState extends State<MainChatsPage> {
             }).toList();
           }
 
-          return ClipRRect(
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(24.0),
-              topRight: Radius.circular(24.0),
-            ),
-            child: Container(
-              color: Colors.black,
-              child: RefreshIndicator(
-                onRefresh: () => _dataController.fetchChats(),
-                color: Colors.tealAccent.shade400,
-                child: CustomScrollView(
-                  slivers: <Widget>[
-                    SliverAppBar(
-                      pinned: true,
-                      floating: true,
-                      snap: true,
-                      stretch: true,
-                      expandedHeight: 120.0,
-                      automaticallyImplyLeading: true,
-                      flexibleSpace: FlexibleSpaceBar(
-                        stretchModes: const [StretchMode.blurBackground],
-                        background: Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [Colors.black, Colors.grey.shade900.withOpacity(0.8)],
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                            ),
-                          ),
-                          child: SafeArea(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 56.0, top: 16.0, bottom: 8.0),
-                                  child: Text(
-                                    'Chats',
-                                    style: GoogleFonts.poppins(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 18,
-                                    ),
-                                  ),
+          return RefreshIndicator(
+            onRefresh: () => _dataController.fetchChats(),
+            color: Colors.tealAccent.shade400,
+            child: CustomScrollView(
+              slivers: <Widget>[
+                SliverAppBar(
+                  pinned: true,
+                  floating: true,
+                  snap: true,
+                  stretch: true,
+                  expandedHeight: 120.0,
+                  automaticallyImplyLeading: true,
+                  backgroundColor: Colors.transparent, // Making AppBar transparent
+                  flexibleSpace: FlexibleSpaceBar(
+                    stretchModes: const [StretchMode.blurBackground],
+                    background: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Colors.black, Colors.grey.shade900.withOpacity(0.8)],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                      ),
+                      child: SafeArea(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(left: 56.0, top: 16.0, bottom: 8.0),
+                              child: Text(
+                                'Chats',
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 18,
                                 ),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                                  child: TextField(
-                                    controller: _searchController,
-                                    decoration: InputDecoration(
-                                      hintText: 'Search chats...',
-                                      hintStyle: GoogleFonts.poppins(color: Colors.grey.shade500, fontSize: 14),
-                                      filled: true,
-                                      fillColor: Colors.grey.shade900.withOpacity(0.4),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(30),
-                                        borderSide: BorderSide.none,
-                                      ),
-                                      prefixIcon: Icon(Icons.search, color: Colors.tealAccent.shade400, size: 20),
-                                      contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-                                    ),
-                                    style: GoogleFonts.poppins(color: Colors.white, fontSize: 14),
-                                  ),
-                                ),
-                              ],
+                              ),
                             ),
-                          ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                              child: TextField(
+                                controller: _searchController,
+                                decoration: InputDecoration(
+                                  hintText: 'Search chats...',
+                                  hintStyle: GoogleFonts.poppins(color: Colors.grey.shade500, fontSize: 14),
+                                  filled: true,
+                                  fillColor: Colors.grey.shade900.withOpacity(0.4),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(30),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  prefixIcon: Icon(Icons.search, color: Colors.tealAccent.shade400, size: 20),
+                                  contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                                ),
+                                style: GoogleFonts.poppins(color: Colors.white, fontSize: 14),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                    if (allChats.isEmpty)
-                      SliverFillRemaining(
-                        child: Center(
-                          child: Text(
-                            'No conversations match your search.',
-                            style: GoogleFonts.poppins(color: Colors.grey.shade500, fontSize: 14),
-                          ),
+                  ),
+                ),
+                if (allChats.isEmpty)
+                  SliverFillRemaining(
+                    child: Center(
+                      child: Text(
+                        'No conversations match your search.',
+                        style: GoogleFonts.poppins(color: Colors.grey.shade500, fontSize: 14),
+                      ),
+                    ),
+                  )
+                else
+                  SliverToBoxAdapter(
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        color: Colors.black,
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(24.0),
+                          topRight: Radius.circular(24.0),
                         ),
-                      )
-                    else
-                      SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            final chat = allChats[index];
-                            final currentUserId = _dataController.user.value['user']['_id'];
+                      ),
+                      child: ListView.builder(
+                        padding: EdgeInsets.zero,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: allChats.length,
+                        itemBuilder: (context, index) {
+                          final chat = allChats[index];
+                          final currentUserId = _dataController.user.value['user']['_id'];
 
-                            // Wrap the entire ListTile generation in an Obx
-                            return Obx(() {
-                              // Ensure this Obx always has a reactive dependency. For group chats,
-                              // the dependency on `allUsers` isn't hit, which causes the GetX error.
-                              // Accessing the length of the chats map is a safe way to subscribe to any change.
-                              _dataController.chats.length;
+                          // Wrap the entire ListTile generation in an Obx
+                          return Obx(() {
+                            // Ensure this Obx always has a reactive dependency. For group chats,
+                            // the dependency on `allUsers` isn't hit, which causes the GetX error.
+                            // Accessing the length of the chats map is a safe way to subscribe to any change.
+                            _dataController.chats.length;
 
-                              final isGroup = chat['type'] == "group";
+                            final isGroup = chat['type'] == "group";
 
-                              // --- All data lookup happens inside Obx ---
-                              String title;
-                              String avatarUrl;
-                              String avatarLetter;
-                              bool isUserOnline = false;
-                              Map<String, dynamic> verificationData;
-                              Map<String, dynamic>? otherUser; // Can be null for groups
+                            // --- All data lookup happens inside Obx ---
+                            String title;
+                            String avatarUrl;
+                            String avatarLetter;
+                            bool isUserOnline = false;
+                            Map<String, dynamic> verificationData;
+                            Map<String, dynamic>? otherUser; // Can be null for groups
 
-                              if (isGroup) {
-                                title = chat['name'] ?? 'Group Chat';
-                                avatarUrl = chat['groupAvatar'] ?? '';
-                                avatarLetter = title.isNotEmpty ? title[0].toUpperCase() : 'G';
-                                verificationData = chat['verification'] ?? {'entityType': null, 'level': null};
+                            if (isGroup) {
+                              title = chat['name'] ?? 'Group Chat';
+                              avatarUrl = chat['groupAvatar'] ?? '';
+                              avatarLetter = title.isNotEmpty ? title[0].toUpperCase() : 'G';
+                              verificationData = chat['verification'] ?? {'entityType': null, 'level': null};
+                            } else {
+                              final otherParticipantRaw = (chat['participants'] as List<dynamic>).firstWhere(
+                                (p) => (p is Map<String, dynamic> ? p['_id'] : p) != currentUserId,
+                                orElse: () => null,
+                              );
+
+                              if (otherParticipantRaw == null) {
+                                return ListTile(title: Text("Invalid Chat", style: GoogleFonts.poppins(color: Colors.red)));
+                              }
+
+                              final otherUserId = otherParticipantRaw is Map<String, dynamic> ? otherParticipantRaw['_id'] : otherParticipantRaw;
+
+                              otherUser = _dataController.allUsers.firstWhere(
+                                  (u) => u['_id'] == otherUserId,
+                                  orElse: () => {
+                                    '_id': otherUserId,
+                                    'name': otherParticipantRaw is Map ? otherParticipantRaw['name'] : 'User',
+                                    'avatar': otherParticipantRaw is Map ? otherParticipantRaw['avatar'] : '',
+                                    'online': false,
+                                    'lastSeen': null,
+                                    'verification': null,
+                                  },
+                              );
+
+                              title = otherUser['name'] ?? 'User';
+                              avatarUrl = otherUser['avatar'] ?? '';
+                              avatarLetter = title.isNotEmpty ? title[0].toUpperCase() : 'U';
+                              isUserOnline = otherUser['online'] ?? false;
+                              verificationData = otherUser['verification'] ?? {'entityType': null, 'level': null};
+                            }
+
+                            final lastMessageData = chat['lastMessage'];
+                            String preview = '';
+                            if (lastMessageData != null && lastMessageData is Map<String, dynamic>) {
+                              final senderId = lastMessageData['senderId'];
+                              final senderIdString = senderId is Map ? senderId['_id'] : senderId;
+
+                              if (lastMessageData['deletedForEveryone'] == true) {
+                                preview = 'Message deleted';
+                              } else if ((lastMessageData['files'] as List?)?.isNotEmpty ?? false) {
+                                preview = 'Attachment';
                               } else {
-                                final otherParticipantRaw = (chat['participants'] as List<dynamic>).firstWhere(
-                                  (p) => (p is Map<String, dynamic> ? p['_id'] : p) != currentUserId,
-                                  orElse: () => null,
-                                );
-
-                                if (otherParticipantRaw == null) {
-                                  return ListTile(title: Text("Invalid Chat", style: GoogleFonts.poppins(color: Colors.red)));
-                                }
-
-                                final otherUserId = otherParticipantRaw is Map<String, dynamic> ? otherParticipantRaw['_id'] : otherParticipantRaw;
-
-                                otherUser = _dataController.allUsers.firstWhere(
-                                    (u) => u['_id'] == otherUserId,
-                                    orElse: () => {
-                                      '_id': otherUserId,
-                                      'name': otherParticipantRaw is Map ? otherParticipantRaw['name'] : 'User',
-                                      'avatar': otherParticipantRaw is Map ? otherParticipantRaw['avatar'] : '',
-                                      'online': false,
-                                      'lastSeen': null,
-                                      'verification': null,
-                                    },
-                                );
-
-                                title = otherUser['name'] ?? 'User';
-                                avatarUrl = otherUser['avatar'] ?? '';
-                                avatarLetter = title.isNotEmpty ? title[0].toUpperCase() : 'U';
-                                isUserOnline = otherUser['online'] ?? false;
-                                verificationData = otherUser['verification'] ?? {'entityType': null, 'level': null};
+                                preview = lastMessageData['content'] ?? '';
                               }
 
-                              final lastMessageData = chat['lastMessage'];
-                              String preview = '';
-                              if (lastMessageData != null && lastMessageData is Map<String, dynamic>) {
-                                final senderId = lastMessageData['senderId'];
-                                final senderIdString = senderId is Map ? senderId['_id'] : senderId;
-
-                                if (lastMessageData['deletedForEveryone'] == true) {
-                                  preview = 'Message deleted';
-                                } else if ((lastMessageData['files'] as List?)?.isNotEmpty ?? false) {
-                                  preview = 'Attachment';
-                                } else {
-                                  preview = lastMessageData['content'] ?? '';
-                                }
-
-                                if (senderIdString == currentUserId) {
-                                  preview = 'You: $preview';
-                                } else if (isGroup) {
-                                  final senderName = (chat['participants'] as List)
-                                          .firstWhere((p) => p['_id'] == senderIdString, orElse: () => {'name': '...'})['name'];
-                                  preview = '$senderName: $preview';
-                                }
+                              if (senderIdString == currentUserId) {
+                                preview = 'You: $preview';
+                              } else if (isGroup) {
+                                final senderName = (chat['participants'] as List)
+                                        .firstWhere((p) => p['_id'] == senderIdString, orElse: () => {'name': '...'})['name'];
+                                preview = '$senderName: $preview';
                               }
+                            }
 
-                              final String status = lastMessageData != null ? _getAggregateStatus(lastMessageData) : 'none';
-                              final IconData statusIcon = _getStatusIcon(status);
-                              final Color statusColor = _getStatusColor(status);
-                              final bool isMyMessage = lastMessageData != null && (lastMessageData['senderId'] is Map ? lastMessageData['senderId']['_id'] : lastMessageData['senderId']) == currentUserId;
-                              final int unreadCount = chat['unreadCount'] as int? ?? 0;
-                              final bool isSelected = _selectedChats.contains(chat['_id']);
+                            final String status = lastMessageData != null ? _getAggregateStatus(lastMessageData) : 'none';
+                            final IconData statusIcon = _getStatusIcon(status);
+                            final Color statusColor = _getStatusColor(status);
+                            final bool isMyMessage = lastMessageData != null && (lastMessageData['senderId'] is Map ? lastMessageData['senderId']['_id'] : lastMessageData['senderId']) == currentUserId;
+                            final int unreadCount = chat['unreadCount'] as int? ?? 0;
+                            final bool isSelected = _selectedChats.contains(chat['_id']);
 
-                              return GestureDetector(
-                                onLongPress: () {
-                                  _toggleSelection(chat['_id']);
-                                },
-                                child: ListTile(
-                                  selected: isSelected,
-                                  selectedTileColor: Colors.teal.withOpacity(0.2),
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                                  leading: Stack(
-                                    clipBehavior: Clip.none,
-                                    children: [
-                                      CircleAvatar(
-                                        radius: 22,
-                                        backgroundColor: Colors.tealAccent.shade400.withOpacity(0.2),
-                                        backgroundImage: avatarUrl.isNotEmpty ? CachedNetworkImageProvider(avatarUrl) : null,
-                                        child: isSelected
-                                            ? const Icon(Icons.check, color: Colors.white)
-                                            : (avatarUrl.isEmpty
-                                                ? Text(avatarLetter, style: GoogleFonts.poppins(color: Colors.tealAccent.shade400, fontWeight: FontWeight.w600, fontSize: 16))
-                                                : null),
+                            return GestureDetector(
+                              onLongPress: () {
+                                _toggleSelection(chat['_id']);
+                              },
+                              child: ListTile(
+                                selected: isSelected,
+                                selectedTileColor: Colors.teal.withOpacity(0.2),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                                leading: Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 22,
+                                      backgroundColor: Colors.tealAccent.shade400.withOpacity(0.2),
+                                      backgroundImage: avatarUrl.isNotEmpty ? CachedNetworkImageProvider(avatarUrl) : null,
+                                      child: avatarUrl.isEmpty
+                                          ? Text(avatarLetter, style: GoogleFonts.poppins(color: Colors.tealAccent.shade400, fontWeight: FontWeight.w600, fontSize: 16))
+                                          : null,
+                                    ),
+                                    if (isGroup)
+                                      Positioned(
+                                        right: -4,
+                                        bottom: -4,
+                                        child: CircleAvatar(
+                                          radius: 10,
+                                          backgroundColor: Colors.black,
+                                          child: Icon(Icons.group, size: 14, color: Colors.tealAccent.shade400),
+                                        ),
                                       ),
-                                      if (isGroup)
-                                        Positioned(
-                                          right: -4,
-                                          bottom: -4,
-                                          child: CircleAvatar(
-                                            radius: 10,
-                                            backgroundColor: Colors.black,
-                                            child: Icon(Icons.group, size: 14, color: Colors.tealAccent.shade400),
+                                    if (!isGroup && isUserOnline)
+                                      Positioned(
+                                        right: 0,
+                                        bottom: 0,
+                                        child: Container(
+                                          width: 12,
+                                          height: 12,
+                                          decoration: BoxDecoration(
+                                            color: Colors.green,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(color: Colors.black, width: 2),
                                           ),
                                         ),
-                                      if (!isGroup && isUserOnline)
-                                        Positioned(
-                                          right: 0,
-                                          bottom: 0,
-                                          child: Container(
-                                            width: 12,
-                                            height: 12,
-                                            decoration: BoxDecoration(
-                                              color: Colors.green,
-                                              shape: BoxShape.circle,
-                                              border: Border.all(color: Colors.black, width: 2),
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                  title: Row(
-                                    children: [
-                                      Text(
-                                        _capitalizeFirstLetter(title),
-                                        style: GoogleFonts.poppins(color: Colors.white, fontSize: 15),
                                       ),
-                                      if (verificationData['entityType'] != null && verificationData['level'] != null)
-                                        Padding(
-                                          padding: const EdgeInsets.only(left: 4.0),
-                                          child: Icon(
-                                            Icons.verified,
-                                            color: getVerificationBadgeColor(verificationData['entityType'], verificationData['level']),
+                                    if (isSelected)
+                                      Positioned(
+                                        right: -2,
+                                        bottom: -2,
+                                        child: Container(
+                                          decoration: const BoxDecoration(
+                                            color: Colors.black,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.check_circle,
+                                            color: Colors.teal,
                                             size: 20,
                                           ),
                                         ),
-                                    ],
-                                  ),
-                                  subtitle: Obx(() {
-                                    final typingUserId = _dataController.isTyping[chat['_id']];
-                                    if (typingUserId != null) {
-                                      final typingUser = _dataController.allUsers.firstWhere(
-                                        (u) => u['_id'] == typingUserId,
-                                        orElse: () => {'name': 'Someone'},
-                                      );
-                                      return Text(
-                                        '${typingUser['name']} is typing...',
-                                        style: GoogleFonts.poppins(
-                                          color: Colors.teal.shade400,
-                                          fontStyle: FontStyle.italic,
-                                          fontSize: 12,
+                                      ),
+                                  ],
+                                ),
+                                title: Row(
+                                  children: [
+                                    Text(
+                                      _capitalizeFirstLetter(title),
+                                      style: GoogleFonts.poppins(color: Colors.white, fontSize: 15),
+                                    ),
+                                    if (verificationData['entityType'] != null && verificationData['level'] != null)
+                                      Padding(
+                                        padding: const EdgeInsets.only(left: 4.0),
+                                        child: Icon(
+                                          Icons.verified,
+                                          color: getVerificationBadgeColor(verificationData['entityType'], verificationData['level']),
+                                          size: 20,
                                         ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      );
-                                    }
+                                      ),
+                                  ],
+                                ),
+                                subtitle: Obx(() {
+                                  final typingUserId = _dataController.isTyping[chat['_id']];
+                                  if (typingUserId != null) {
+                                    final typingUser = _dataController.allUsers.firstWhere(
+                                      (u) => u['_id'] == typingUserId,
+                                      orElse: () => {'name': 'Someone'},
+                                    );
                                     return Text(
-                                      preview,
-                                      style: GoogleFonts.poppins(color: Colors.grey.shade500, fontSize: 12),
+                                      '${typingUser['name']} is typing...',
+                                      style: GoogleFonts.poppins(
+                                        color: Colors.teal.shade400,
+                                        fontStyle: FontStyle.italic,
+                                        fontSize: 12,
+                                      ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     );
-                                  }),
-                                  trailing: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      if (!isGroup && otherUser != null)
-                                        Text(
-                                          isUserOnline
-                                              ? 'online'
-                                              : (otherUser['lastSeen'] != null
-                                                  ? 'last seen ${formatLastSeen(DateTime.parse(otherUser['lastSeen']))}'
-                                                  : 'offline'),
-                                          style: GoogleFonts.poppins(
-                                            color: isUserOnline ? Colors.tealAccent.shade400 : Colors.grey.shade500,
-                                            fontSize: 11,
-                                            fontWeight: isUserOnline ? FontWeight.w600 : FontWeight.normal,
-                                          ),
+                                  }
+                                  return Text(
+                                    preview,
+                                    style: GoogleFonts.poppins(color: Colors.grey.shade500, fontSize: 12),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  );
+                                }),
+                                trailing: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    if (!isGroup && otherUser != null)
+                                      Text(
+                                        isUserOnline
+                                            ? 'online'
+                                            : (otherUser['lastSeen'] != null
+                                                ? 'last seen ${formatLastSeen(DateTime.parse(otherUser['lastSeen']))}'
+                                                : 'offline'),
+                                        style: GoogleFonts.poppins(
+                                          color: isUserOnline ? Colors.tealAccent.shade400 : Colors.grey.shade500,
+                                          fontSize: 11,
+                                          fontWeight: isUserOnline ? FontWeight.w600 : FontWeight.normal,
                                         ),
-                                      if (lastMessageData != null)
-                                        Text(
-                                          formatLastSeen(DateTime.parse(lastMessageData['createdAt'] as String).toLocal()),
-                                          style: GoogleFonts.poppins(color: Colors.grey.shade500, fontSize: 11),
+                                      ),
+                                    if (lastMessageData != null)
+                                      Text(
+                                        formatLastSeen(DateTime.parse(lastMessageData['createdAt'] as String).toLocal()),
+                                        style: GoogleFonts.poppins(color: Colors.grey.shade500, fontSize: 11),
+                                      ),
+                                    const SizedBox(height: 4),
+                                    if (unreadCount > 0)
+                                      Container(
+                                        width: 10,
+                                        height: 10,
+                                        decoration: const BoxDecoration(
+                                          color: Colors.teal,
+                                          shape: BoxShape.circle,
                                         ),
-                                      const SizedBox(height: 4),
-                                      if (unreadCount > 0)
-                                        Container(
-                                          width: 10,
-                                          height: 10,
-                                          decoration: const BoxDecoration(
-                                            color: Colors.teal,
-                                            shape: BoxShape.circle,
-                                          ),
-                                        )
-                                      else if (isMyMessage && status != 'none')
-                                        Padding(
-                                          padding: const EdgeInsets.only(top: 4.0),
-                                          child: Icon(statusIcon, size: 14, color: statusColor),
-                                        ),
-                                    ],
-                                  ),
-                                  onTap: () {
-                                    if (_isSelectionMode) {
-                                      _toggleSelection(chat['_id']);
-                                    } else {
-                                      _dataController.currentChat.value = chat;
-                                      if (unreadCount > 0) {
-                                        _dataController.chats[chat['_id']]!['unreadCount'] = 0;
-                                        _dataController.chats.refresh();
-                                      }
-                                      Get.to(() => const ChatScreen());
-                                    }
-                                  },
+                                      )
+                                    else if (isMyMessage && status != 'none')
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 4.0),
+                                        child: Icon(statusIcon, size: 14, color: statusColor),
+                                      ),
+                                  ],
                                 ),
-                              );
-                            });
-                          },
-                          childCount: allChats.length,
-                        ),
+                                onTap: () {
+                                  if (_isSelectionMode) {
+                                    _toggleSelection(chat['_id']);
+                                  } else {
+                                    _dataController.currentChat.value = chat;
+                                    if (unreadCount > 0) {
+                                      _dataController.chats[chat['_id']]!['unreadCount'] = 0;
+                                      _dataController.chats.refresh();
+                                    }
+                                    Get.to(() => const ChatScreen());
+                                  }
+                                },
+                              ),
+                            );
+                          });
+                        },
                       ),
-                  ],
-                ),
-              ),
+                    ),
+                  ),
+              ],
             ),
           );
         }),
