@@ -4828,6 +4828,8 @@ void clearUserPosts() {
   }
 
   Future<void> forwardMultipleMessages(List<Map<String, dynamic>> messages, String targetUserId) async {
+    if (messages.isEmpty) return;
+
     // Find existing DM chat with the target user
     String? chatId;
     try {
@@ -4841,59 +4843,44 @@ void clearUserPosts() {
       chatId = null; // No existing chat found
     }
 
-    // Sort messages by timestamp before forwarding
-    messages.sort((a, b) => DateTime.parse(a['createdAt']).compareTo(DateTime.parse(b['createdAt'])));
+    // --- ONLY FORWARD THE FIRST MESSAGE ---
+    final message = messages.first;
 
-    for (final message in messages) {
-      final content = message['content'];
-      final files = message['files'];
-      final messageType = message['type'];
-      final clientMessageId = const Uuid().v4();
+    final content = message['content'];
+    final files = message['files'];
+    final messageType = message['type'];
+    final clientMessageId = const Uuid().v4();
 
-      // Create a completely new map for the message to send.
-      final Map<String, dynamic> messageData = {
-        'clientMessageId': clientMessageId,
-        'content': content,
-        'type': messageType,
-        'files': files,
-      };
+    final Map<String, dynamic> messageData = {
+      'clientMessageId': clientMessageId,
+      'content': content,
+      'type': messageType,
+      'files': files,
+    };
 
-      // Add either chatId or participants, but not both.
-      if (chatId != null && chatId.isNotEmpty) {
-        messageData['chatId'] = chatId;
-      } else {
-        messageData['participants'] = [getUserId(), targetUserId];
+    if (chatId != null && chatId.isNotEmpty) {
+      messageData['chatId'] = chatId;
+    } else {
+      messageData['participants'] = [getUserId(), targetUserId];
+    }
+
+    try {
+      final token = user.value['token'];
+      if (token == null) {
+        throw Exception('User not authenticated');
       }
 
-      try {
-        final token = user.value['token'];
-        if (token == null) {
-          throw Exception('User not authenticated');
-        }
+      await _dio.post(
+        'api/messages',
+        data: messageData,
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+          validateStatus: (status) => status != null && status < 500,
+        ),
+      );
 
-        final response = await _dio.post(
-          'api/messages',
-          data: messageData, // Use the new clean map
-          options: dio.Options(
-            headers: {'Authorization': 'Bearer $token'},
-            validateStatus: (status) => status != null && status < 500,
-          ),
-        );
-
-        // If a new chat was created, update the chatId for subsequent messages in this loop
-        if (chatId == null && response.statusCode == 201 && response.data['success'] == true) {
-            final serverMessage = response.data['message'];
-            if (serverMessage != null && serverMessage['chatId'] != null) {
-                chatId = serverMessage['chatId'];
-            }
-        }
-
-      } catch (e) {
-        print('Error forwarding a message: $e');
-        // Decide if we should stop or continue forwarding other messages
-      }
-      // Add a small delay between forwards to prevent overwhelming the server
-      await Future.delayed(const Duration(milliseconds: 200));
+    } catch (e) {
+      print('Error forwarding a message: $e');
     }
   }
 
