@@ -525,15 +525,22 @@ class _ChatScreenState extends State<ChatScreen> {
         ? replyTo['senderId']['_id']
         : replyTo['senderId'];
 
-    final sender = (dataController.currentChat.value['participants'] as List)
-        .firstWhere(
-      (p) => (p is Map ? p['_id'] : p) == replyToSenderId,
-      orElse: () => {'_id': replyToSenderId, 'name': 'Unknown User'},
+    // Find the sender in the allUsers list for more reliable name resolution
+    final sender = dataController.allUsers.firstWhere(
+      (u) => u['_id'] == replyToSenderId,
+      orElse: () {
+        // Fallback to searching participants list if not in allUsers
+        final participants = dataController.currentChat.value['participants'] as List? ?? [];
+        return participants.firstWhere(
+          (p) => (p is Map ? p['_id'] : p) == replyToSenderId,
+          orElse: () => {'_id': replyToSenderId, 'name': 'Unknown User'},
+        );
+      },
     );
 
-    final senderName = replyToSenderId == dataController.user.value['user']['_id']
+    final senderName = replyToSenderId == dataController.getUserId()
         ? 'You'
-        : (sender is Map ? sender['name'] : 'Unknown User');
+        : (sender['name'] ?? 'Unknown User');
 
     Widget contentPreview;
     if (replyTo['files'] != null && (replyTo['files'] as List).isNotEmpty) {
@@ -1370,10 +1377,11 @@ class _ChatScreenState extends State<ChatScreen> {
                         child: Dismissible(
                           key: Key(message['_id'] ?? message['clientMessageId']),
                           direction: DismissDirection.startToEnd,
-                          onDismissed: (direction) {
+                          confirmDismiss: (direction) async {
                             setState(() {
                               _replyingTo = message;
                             });
+                            return false; // This prevents the widget from being dismissed
                           },
                           background: Container(
                             color: Colors.teal.withOpacity(0.2),
@@ -1387,7 +1395,11 @@ class _ChatScreenState extends State<ChatScreen> {
                               if (messageId != null) {
                                 _toggleSelection(messageId);
                               }
-                              _showReactionDialog(context, message, details.globalPosition);
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                if (mounted) {
+                                  _showReactionDialog(context, message, details.globalPosition);
+                                }
+                              });
                             },
                             onTap: () {
                               if (_isSelectionMode) {
