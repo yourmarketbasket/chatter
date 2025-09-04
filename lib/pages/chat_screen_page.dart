@@ -99,6 +99,12 @@ class _ChatScreenState extends State<ChatScreen> {
     });
 
     dataController.currentConversationMessages.listen((_) {
+      if (mounted) {
+        setState(() {
+          // Force a rebuild whenever the message list changes.
+          // This ensures the UI reflects the latest messages.
+        });
+      }
       Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
     });
   }
