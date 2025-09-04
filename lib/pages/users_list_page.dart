@@ -110,43 +110,55 @@ class _UsersListPageState extends State<UsersListPage> {
 
   void _createGroup() {
     final groupNameController = TextEditingController();
+    bool isCreating = false;
+
     Get.dialog(
-      AlertDialog(
-        title: const Text('New Group'),
-        content: TextField(
-          controller: groupNameController,
-          decoration: const InputDecoration(hintText: 'Group Name'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              if (groupNameController.text.isNotEmpty) {
-                final participantIds = _selectedUsers.map((u) => u['_id'] as String).toList();
-                final currentUserId = _dataController.user.value['user']['_id'];
-                participantIds.add(currentUserId);
+      StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: const Text('New Group'),
+            content: isCreating
+                ? const Center(child: CircularProgressIndicator())
+                : TextField(
+                    controller: groupNameController,
+                    decoration: const InputDecoration(hintText: 'Group Name'),
+                  ),
+            actions: [
+              TextButton(
+                onPressed: isCreating ? null : () => Get.back(),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: isCreating ? null : () async {
+                  if (groupNameController.text.isNotEmpty) {
+                    setState(() {
+                      isCreating = true;
+                    });
 
-                final newChat = await _dataController.createGroupChat(
-                  participantIds,
-                  groupNameController.text,
-                );
+                    final participantIds = _selectedUsers.map((u) => u['_id'] as String).toList();
+                    final currentUserId = _dataController.user.value['user']['_id'];
+                    participantIds.add(currentUserId);
 
-                Get.back();
+                    final newChat = await _dataController.createGroupChat(
+                      participantIds,
+                      groupNameController.text,
+                    );
 
-                if (newChat != null) {
-                  _dataController.currentChat.value = newChat;
-                  Get.to(() => const ChatScreen());
-                } else {
-                  Get.snackbar('Error', 'Could not create group chat.');
-                }
-              }
-            },
-            child: const Text('Create'),
-          ),
-        ],
+                    Get.back();
+
+                    if (newChat != null) {
+                      _dataController.currentChat.value = newChat;
+                      Get.off(() => const ChatScreen());
+                    } else {
+                      Get.snackbar('Error', 'Could not create group chat.');
+                    }
+                  }
+                },
+                child: const Text('Create'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
