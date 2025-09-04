@@ -74,7 +74,7 @@ class ChatterApp extends StatefulWidget {
   _ChatterAppState createState() => _ChatterAppState();
 }
 
-class _ChatterAppState extends State<ChatterApp> {
+class _ChatterAppState extends State<ChatterApp> with WidgetsBindingObserver {
   late FlutterSecureStorage _storage;
   final  DataController _dataController = Get.put(DataController());
   late StreamSubscription _shareSubscription;
@@ -83,6 +83,7 @@ class _ChatterAppState extends State<ChatterApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _dataController.init(); // Initialize DataController
     // Initialize secure storage with platform-specific options
     _storage = const FlutterSecureStorage(
@@ -96,6 +97,16 @@ class _ChatterAppState extends State<ChatterApp> {
     // Check initial screen after initialization
     _checkInitialScreen();
     _initShareHandler();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // When the app is resumed, ensure the socket is connected.
+      // This handles cases where the OS might have closed the connection
+      // while the app was in the background.
+      Get.find<SocketService>().connect();
+    }
   }
 
   Future<void> _initShareHandler() async {
@@ -162,6 +173,7 @@ class _ChatterAppState extends State<ChatterApp> {
   @override
   void dispose() {
     // Clean up SocketService when the app is disposed
+    WidgetsBinding.instance.removeObserver(this);
     final socketService = Get.find<SocketService>();
     socketService.disconnect();
     socketService.dispose();

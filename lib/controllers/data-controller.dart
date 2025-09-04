@@ -221,17 +221,20 @@ class DataController extends GetxController {
 
     // --- Update Chat List First ---
     if (chats.containsKey(chatId)) {
-      final chat = chats[chatId]!;
-      chat['lastMessage'] = newMessage;
+      // Create a new map to ensure GetX detects the change
+      final oldChat = chats[chatId]!;
+      final newChat = Map<String, dynamic>.from(oldChat);
+
+      newChat['lastMessage'] = newMessage;
       final senderId = newMessage['senderId'] is Map ? newMessage['senderId']['_id'] : newMessage['senderId'];
       if (senderId != null && senderId != getUserId()) {
-        // Only increment unread count if the chat is not the active one
-        if (activeChatId.value != chatId) {
-          chat['unreadCount'] = (chat['unreadCount'] ?? 0) + 1;
+        // Only increment unread count if the chat is not the active one or if the user is not on the chats screen
+        if (activeChatId.value != chatId || Get.currentRoute != '/chats') {
+          newChat['unreadCount'] = (newChat['unreadCount'] ?? 0) + 1;
         }
       }
-      chats[chatId] = chat;
-      chats.refresh();
+
+      chats[chatId] = newChat; // Assign the new map, which triggers reactivity
     } else {
       // If chat is not in the list, fetch all chats again to get the new one.
       fetchChats();
