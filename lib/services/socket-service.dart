@@ -8,21 +8,16 @@ class SocketService {
   final StreamController<Map<String, dynamic>> _eventController = StreamController<Map<String, dynamic>>.broadcast();
   final DataController _dataController = Get.find<DataController>();
   bool _isInitialized = false;
-  String? _userId; // Store userId for joining rooms and emitting events
-  final Set<String> _joinedChatRooms = {};
+  String? _userId;
 
-  SocketService() {
-    // print('SocketService: Instance created.');
-  }
+  SocketService();
 
   void initSocket() {
     if (_isInitialized) {
-      // print('SocketService: Already initialized, skipping.');
       return;
     }
 
     try {
-      // print('SocketService: Creating socket with http://192.168.1.104:3000');
       _socket = IO.io('https://chatter-api-little-field-3471.fly.dev', <String, dynamic>{
         'transports': ['websocket'],
         'autoConnect': false,
@@ -30,51 +25,38 @@ class SocketService {
         'reconnectionAttempts': 10,
         'reconnectionDelay': 3000,
         'forceNew': true,
-        // Add authentication token for backend's socketAuthenticator
         'auth': {
-          'token': _dataController.getAuthToken(), // Assume DataController provides JWT token
+          'token': _dataController.getAuthToken(),
         },
       });
 
       _setupSocketListeners();
       _isInitialized = true;
-      // print('SocketService: Initialization complete.');
       connect();
     } catch (e) {
-      // print('SocketService: Failed to initialize socket: $e');
+      // Error handling for socket initialization can be added here.
     }
   }
 
   void _setupSocketListeners() {
     if (_socket == null) {
-      // print('SocketService: Cannot setup listeners, socket is null.');
       return;
     }
 
     _socket!.onConnect((_) {
-      // print('SocketService: Connected to server');
-      _userId = _dataController.getUserId(); // Assume DataController provides userId
-      if (_userId != null) {
-        // Join user's own room (matches backend's socket.join(userId))
-        _socket!.emit('join', {'userId': _userId});
-        // Fetch and join active chat rooms
-        syncAllChatRooms();
-      }
+      _userId = _dataController.getUserId();
       _eventController.add({'event': 'connect', 'data': null});
     });
 
     _socket!.onDisconnect((_) {
-      // print('SocketService: Disconnected from server');
       _eventController.add({'event': 'disconnect', 'data': null});
     });
 
     _socket!.onConnectError((error) {
-      // print('SocketService: Connection error: $error');
       _eventController.add({'event': 'connect_error', 'data': error.toString()});
     });
 
     _socket!.onError((error) {
-      // print('SocketService: Socket error: $error');
       _eventController.add({'event': 'error', 'data': error.toString()});
     });
 
@@ -125,28 +107,10 @@ class SocketService {
     };
 // more canges
     eventHandlers.forEach((event, handler) {
-      _socket!.on(event, (data) {
-          // print('SocketService: Received event $event with data: $data');
-        handler(data);
-      });
+      _socket!.on(event, handler);
     });
   }
   // more changes
-
-  // Syncs all chat rooms by joining the socket room for each chat ID.
-  void syncAllChatRooms() async {
-    if (_socket == null || !_socket!.connected) return;
-    try {
-      // print('[SocketService] Starting sync of all chat rooms...');
-      List<String> chatIds = await _dataController.getActiveChatIds();
-      for (String chatId in chatIds) {
-        joinChatRoom(chatId);
-      }
-      // print('[SocketService] Finished syncing all chat rooms.');
-    } catch (e) {
-        // print('[SocketService] Error during syncAllChatRooms: $e');
-    }
-  }
 
   void _handleGroupUpdated(dynamic data) {
     if (data is Map<String, dynamic>) {
@@ -277,14 +241,9 @@ class SocketService {
   }
 
   void _handleNewChat(dynamic data) {
-    // print('SocketService: Received chat:new event with data: $data');
     if (data is Map<String, dynamic> && data['_id'] is String) {
       _dataController.handleNewChat(data);
-      // Join the new chat room
-      joinChatRoom(data['_id'] as String);
       _eventController.add({'event': 'chat:new', 'data': data});
-    } else {
-        // print('SocketService: Invalid chat:new data format: ${data.runtimeType}');
     }
   }
 
@@ -308,13 +267,6 @@ class SocketService {
 
   void _handleNewMessage(dynamic data) {
     if (data is Map<String, dynamic> && data['chatId'] is String) {
-      final chatId = data['chatId'] as String;
-      // Auto-join room if a message is received for a chat we're not in.
-      if (!_joinedChatRooms.contains(chatId)) {
-        // print('[SocketService] Received message for un-joined room $chatId. Auto-joining.');
-        joinChatRoom(chatId);
-      }
-
       _dataController.handleNewMessage(data);
       // Emit message:delivered to backend
       if (data['messageId'] is String && _userId != null) {
@@ -324,8 +276,6 @@ class SocketService {
         });
       }
       _eventController.add({'event': 'message:new', 'data': data});
-    } else {
-        // print('SocketService: Invalid message event data format: ${data.runtimeType}');
     }
   }
 
@@ -542,42 +492,21 @@ class SocketService {
     }
   }
 
-  void joinChatRoom(String chatId) {
-    if (_socket != null && _socket!.connected) {
-      if (_joinedChatRooms.contains(chatId)) {
-        // print('[SocketService] Already joined chat room $chatId. Skipping.');
-        return;
-      }
-      // print('[SocketService] ==> Emitting join for chat ID: $chatId');
-      _socket!.emit('join', {'chatId': chatId});
-      _joinedChatRooms.add(chatId);
-    } else {
-      // print('[SocketService] Cannot join room. Socket is null or not connected.');
-    }
-  }
-
   Stream<Map<String, dynamic>> get events => _eventController.stream;
 
   void addListener(String event, void Function(dynamic) handler) {
     if (_socket != null) {
-        // print('SocketService: Adding listener for event $event');
       _socket!.on(event, handler);
-    } else {
-        // print('SocketService: Cannot add listener, socket is null');
     }
   }
-// more
+
   void removeListener(String event, void Function(dynamic) handler) {
     if (_socket != null) {
-        // print('SocketService: Removing listener for event $event');
       _socket!.off(event, handler);
-    } else {
-        // print('SocketService: Cannot remove listener, socket is null');
     }
   }
 
   void dispose() {
-    // print('SocketService: Disposing socket service');
     disconnect();
     _socket?.clearListeners();
     _socket?.dispose();

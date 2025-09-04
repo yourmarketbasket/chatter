@@ -171,9 +171,6 @@ class DataController extends GetxController {
     // Add or update the chat in the main list
     chats[chatId] = newChatData;
 
-    // Join the socket room for real-time updates
-    Get.find<SocketService>().joinChatRoom(chatId);
-
     // If a new chat is created, it might be the one we are about to view,
     // especially if we just sent the first message.
     // This should only happen if we are not currently in a chat.
@@ -2194,8 +2191,8 @@ class DataController extends GetxController {
             chats[chat['_id']] = chat;
           }
         }
-        // After successfully fetching chats, ensure we are joined to all rooms.
-        Get.find<SocketService>().syncAllChatRooms();
+        // After successfully fetching chats, the backend will have already
+        // joined the socket to all necessary rooms.
       } else {
         throw Exception('Failed to fetch chats');
       }
@@ -2273,12 +2270,14 @@ class DataController extends GetxController {
           print('[DataController.sendChatMessage] Response contains full chat object.');
           final newChat = response.data['chat'];
           final newChatId = newChat['_id'];
-          print('[DataController.sendChatMessage] Chat ID is $newChatId. Updating state and joining room.');
+          print('[DataController.sendChatMessage] Response contains full chat object.');
+          final newChat = response.data['chat'];
+          final newChatId = newChat['_id'];
+          print('[DataController.sendChatMessage] Chat ID is $newChatId. Updating state.');
 
           chats[newChatId] = newChat;
           currentChat.value = newChat; // This updates the whole object
           activeChatId.value = newChatId;
-          Get.find<SocketService>().joinChatRoom(newChatId);
           chats.refresh();
         }
         // --- FALLBACK for resurrected chats that don't return the full object ---
@@ -2286,7 +2285,7 @@ class DataController extends GetxController {
           // If our currentChat doesn't have an ID yet, but the returned message does,
           // it means this is the first message of a new/resurrected chat.
           if (messageChatId != null && currentChat.value['_id'] == null) {
-            print('[DataController.sendChatMessage] New/resurrected chat detected via message. Chat ID: $messageChatId. Joining room.');
+            print('[DataController.sendChatMessage] New/resurrected chat detected via message. Chat ID: $messageChatId.');
 
             // We don't have the full chat object, but we have the ID.
             // Update the currentChat object with the ID.
@@ -2294,9 +2293,6 @@ class DataController extends GetxController {
             tempChat['_id'] = messageChatId;
             currentChat.value = tempChat;
             activeChatId.value = messageChatId;
-
-            // Join the room.
-            Get.find<SocketService>().joinChatRoom(messageChatId);
 
             // We should probably add this partial chat to the main chats list too,
             // so it doesn't feel like it's missing. The server will likely send a
@@ -4535,8 +4531,6 @@ void clearUserPosts() {
         final newChat = response.data['group']; // Corrected key based on docs
         // Add to local chats list
         chats[newChat['_id']] = newChat;
-        // Join the new socket room
-        Get.find<SocketService>().joinChatRoom(newChat['_id']);
         chats.refresh();
         return newChat;
       } else {
