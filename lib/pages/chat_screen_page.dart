@@ -77,7 +77,6 @@ class _ChatScreenState extends State<ChatScreen> {
     dataController.activeChatId.value = chatId;
 
     if (chatId != null) {
-      socketService.joinChatRoom(chatId);
       _loadMessages();
     } else {
       dataController.currentConversationMessages.clear();

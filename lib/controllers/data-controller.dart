@@ -2270,9 +2270,6 @@ class DataController extends GetxController {
           print('[DataController.sendChatMessage] Response contains full chat object.');
           final newChat = response.data['chat'];
           final newChatId = newChat['_id'];
-          print('[DataController.sendChatMessage] Response contains full chat object.');
-          final newChat = response.data['chat'];
-          final newChatId = newChat['_id'];
           print('[DataController.sendChatMessage] Chat ID is $newChatId. Updating state.');
 
           chats[newChatId] = newChat;
