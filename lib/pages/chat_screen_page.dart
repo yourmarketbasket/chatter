@@ -702,9 +702,9 @@ class _ChatScreenState extends State<ChatScreen> {
         ? message['senderId']['_id']
         : message['senderId'];
 
-    final sender = (dataController.currentChat.value['participants'] as List)
-        .firstWhere(
-      (p) => p['_id'] == senderId,
+    // Look up sender in the allUsers list to prevent crashes when participants are just IDs
+    final sender = dataController.allUsers.firstWhere(
+      (u) => u['_id'] == senderId,
       orElse: () => {'_id': senderId, 'name': 'Unknown User', 'avatar': ''},
     );
 
