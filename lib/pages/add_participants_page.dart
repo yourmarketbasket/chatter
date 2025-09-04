@@ -189,8 +189,6 @@ class _AddParticipantsPageState extends State<AddParticipantsPage> {
                 );
               }
               return ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
                 itemCount: _filteredUsers.length,
                 separatorBuilder: (context, index) => Divider(
                   color: Colors.grey[850],
