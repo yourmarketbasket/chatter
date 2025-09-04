@@ -168,6 +168,14 @@ class DataController extends GetxController {
     final chatId = newChatData['_id'];
     if (chatId == null) return;
 
+    // Update participant statuses from new chat data
+    if (newChatData['participants'] is List) {
+      for (var participant in (newChatData['participants'] as List)) {
+        _updateUserStatusFromParticipantData(participant);
+      }
+      allUsers.refresh();
+    }
+
     // Add or update the chat in the main list
     chats[chatId] = newChatData;
 
@@ -2170,6 +2178,38 @@ class DataController extends GetxController {
 
   // Add these placeholder methods inside DataController class
 
+  void _updateUserStatusFromParticipantData(dynamic participantData) {
+    if (participantData is! Map<String, dynamic>) return;
+
+    final userId = participantData['_id'] as String?;
+    if (userId == null) return;
+
+    final index = allUsers.indexWhere((user) => user['_id'] == userId);
+
+    if (index != -1) {
+      // User exists, update them
+      final user = Map<String, dynamic>.from(allUsers[index]);
+      bool wasUpdated = false;
+
+      if (participantData.containsKey('online') && (!user.containsKey('online') || user['online'] != participantData['online'])) {
+        user['online'] = participantData['online'];
+        wasUpdated = true;
+      }
+
+      if (participantData.containsKey('lastSeen') && (!user.containsKey('lastSeen') || user['lastSeen'] != participantData['lastSeen'])) {
+        user['lastSeen'] = participantData['lastSeen'];
+        wasUpdated = true;
+      }
+
+      if (wasUpdated) {
+        allUsers[index] = user;
+      }
+    } else {
+      // User does not exist, add them.
+      allUsers.add(Map<String, dynamic>.from(participantData));
+    }
+  }
+
   Future<void> fetchChats() async {
     isLoadingChats.value = true;
     try {
@@ -2187,7 +2227,16 @@ class DataController extends GetxController {
       if (response.statusCode == 200 && response.data['success'] == true) {
         final List<dynamic> chatData = response.data['chats'];
         final blockedUsers = user.value['user']?['blockedUsers'] ?? [];
+        bool statusWasUpdated = false;
         for (var chat in chatData) {
+          // Update participant statuses from chat data
+          if (chat['participants'] is List) {
+            for (var participant in (chat['participants'] as List)) {
+              _updateUserStatusFromParticipantData(participant);
+            }
+            statusWasUpdated = true;
+          }
+
           if (chat['type'] == 'dm') {
             final participant = (chat['participants'] as List).firstWhere((p) => p['_id'] != user.value['user']['_id']);
             if (!blockedUsers.contains(participant['_id'])) {
@@ -2196,6 +2245,9 @@ class DataController extends GetxController {
           } else {
             chats[chat['_id']] = chat;
           }
+        }
+        if (statusWasUpdated) {
+          allUsers.refresh();
         }
         // After successfully fetching chats, the backend will have already
         // joined the socket to all necessary rooms.
@@ -4263,12 +4315,13 @@ void clearUserPosts() {
   void handleUserOnlineStatus(String userId, bool isOnline, {String? lastSeen}) {
     final index = allUsers.indexWhere((user) => user['_id'] == userId);
     if (index != -1) {
-      final user = allUsers[index];
+      final user = Map<String, dynamic>.from(allUsers[index]);
       user['online'] = isOnline;
       if (lastSeen != null) {
         user['lastSeen'] = lastSeen;
       }
       allUsers[index] = user;
+      allUsers.refresh();
     }
   }
 
