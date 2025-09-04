@@ -8,6 +8,8 @@ import 'package:feather_icons/feather_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:chatter/services/socket-service.dart';
+import 'dart:async';
 // added som enew stuff
 
 class MainChatsPage extends StatefulWidget {
@@ -16,9 +18,6 @@ class MainChatsPage extends StatefulWidget {
   @override
   _MainChatsPageState createState() => _MainChatsPageState();
 }
-
-import 'package:chatter/services/socket-service.dart';
-import 'dart:async';
 
 class _MainChatsPageState extends State<MainChatsPage> {
   final TextEditingController _searchController = TextEditingController();
