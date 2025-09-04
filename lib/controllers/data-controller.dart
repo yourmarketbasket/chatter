@@ -425,12 +425,13 @@ class DataController extends GetxController {
 
   void markMessageAsReadById(String messageId) {
     if (messageId.isEmpty) return;
-    // This is called from a notification, so we don't have the message object.
-    // We can just send the event to the server. The server will then broadcast
-    // the message:statusUpdate event, which will be handled by handleMessageStatusUpdate.
-    // This assumes handleMessageStatusUpdate is correctly implemented.
-    Get.find<SocketService>().sendMessageRead(messageId);
-    // print('[DataController] Sent mark as read event for message $messageId');
+    // This is called from a notification.
+    // According to the new architecture, the client should send an HTTP request
+    // to the backend to mark a message as read, not emit a socket event.
+    // The backend would then broadcast the 'message:statusUpdate' event.
+    // Since the backend endpoint for this is not defined, we will leave this commented out.
+    // Example: _dio.post('api/messages/$messageId/read');
+    // print('[DataController] Mark as read event for message $messageId should be an HTTP request.');
   }
 
   String? getUserId() {

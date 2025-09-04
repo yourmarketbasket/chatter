@@ -91,7 +91,7 @@ class SocketService {
       'typing:started', 'typing:stopped', 'user:verified', 'group:updated',
       'group:removedFrom', 'member:joined', 'member:removed', 'member:promoted',
       'member:demoted', 'member:muted', 'member:unmuted', 'group:closed',
-      'user:unsuspended', 'post:unflagged', 'post:flagged'
+      'user:unsuspended', 'post:unflagged', 'post:flagged', 'join:success'
     ];
 
     // Listen to all events and push them into the broadcast stream.
@@ -101,6 +101,11 @@ class SocketService {
         _eventController.add({'event': event, 'data': data});
       });
     }
+
+    // Add a specific listener for join success for debugging purposes.
+    _socket!.on('join:success', (data) {
+      print('[SocketService] ACK: Successfully joined room: ${data['chatId']}');
+    });
   }
   // more changes
 
@@ -145,41 +150,6 @@ class SocketService {
       _socket!.emit(event, data);
     } else {
         // print('SocketService: Cannot emit event: Socket not connected or data is null');
-    }
-  }
-
-  void sendMessage(String chatId, String message, String clientMessageId) {
-    if (_userId != null) {
-      emitEvent('message:new', {
-        'chatId': chatId,
-        'content': message,
-        'userId': _userId,
-        'clientMessageId': clientMessageId, // Include clientMessageId for correlation
-      });
-    } else {
-        // print('SocketService: Cannot send message, userId is null');
-    }
-  }
-
-  void sendMessageDelivered(String messageId) {
-    if (_userId != null) {
-      emitEvent('message:delivered', {
-        'messageId': messageId,
-        'userId': _userId,
-      });
-    } else {
-        // print('SocketService: Cannot send message:delivered, userId is null');
-    }
-  }
-
-  void sendMessageRead(String messageId) {
-    if (_userId != null) {
-      emitEvent('message:read', {
-        'messageId': messageId,
-        'userId': _userId,
-      });
-    } else {
-        // print('SocketService: Cannot send message:read, userId is null');
     }
   }
 
