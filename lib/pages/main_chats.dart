@@ -160,8 +160,6 @@ class _MainChatsPageState extends State<MainChatsPage> {
           children: [
             Row(
               children: [
-                const Text("New Group", style: TextStyle(color: Colors.white, fontSize: 12)),
-                const SizedBox(width: 8),
                 FloatingActionButton.small(
                   backgroundColor: Colors.tealAccent.shade400.withOpacity(0.2),
                   child: const Icon(Icons.group_add, color: Colors.tealAccent),
@@ -169,12 +167,12 @@ class _MainChatsPageState extends State<MainChatsPage> {
                     Get.to(() => const UsersListPage(isGroupCreationMode: true));
                   },
                 ),
+                const SizedBox(width: 8),
+                const Text("New Group", style: TextStyle(color: Colors.white, fontSize: 12)),
               ],
             ),
             Row(
               children: [
-                const Text("New Chat", style: TextStyle(color: Colors.white, fontSize: 12)),
-                const SizedBox(width: 8),
                 FloatingActionButton.small(
                   backgroundColor: Colors.tealAccent.shade400.withOpacity(0.2),
                   child: const Icon(Icons.person_add, color: Colors.tealAccent),
@@ -182,6 +180,8 @@ class _MainChatsPageState extends State<MainChatsPage> {
                     Get.to(() => const FollowersPage());
                   },
                 ),
+                const SizedBox(width: 8),
+                const Text("New Chat", style: TextStyle(color: Colors.white, fontSize: 12)),
               ],
             ),
           ],
