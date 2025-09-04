@@ -338,7 +338,10 @@ class DataController extends GetxController {
     if (currentChat.value['_id'] == chatId) {
       final index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
       if (index != -1) {
-        currentConversationMessages[index] = data;
+        // Merge new data into the existing message map to preserve details like sender info
+        final existingMessage = Map<String, dynamic>.from(currentConversationMessages[index]);
+        existingMessage.addAll(data);
+        currentConversationMessages[index] = existingMessage;
         currentConversationMessages.refresh(); // Use refresh for nested changes
       }
     }
@@ -346,7 +349,10 @@ class DataController extends GetxController {
     // Update the lastMessage in the chats list if this message is the last one
     if (chats.containsKey(chatId) && chats[chatId]!['lastMessage']?['_id'] == messageId) {
       final chat = chats[chatId]!;
-      chat['lastMessage'] = data;
+      // Also merge for the lastMessage to preserve details there too
+      final existingLastMessage = Map<String, dynamic>.from(chat['lastMessage'] ?? {});
+      existingLastMessage.addAll(data);
+      chat['lastMessage'] = existingLastMessage;
       chats[chatId] = chat;
       chats.refresh();
     }
