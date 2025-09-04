@@ -1201,6 +1201,43 @@ class _ChatScreenState extends State<ChatScreen> {
               statusWidget = const Text('offline', style: TextStyle(color: Colors.grey, fontSize: 12));
             }
           }
+        } else if (isGroup) {
+          final currentUserId = dataController.getUserId();
+          final participants = (chat['participants'] as List<dynamic>?)
+              ?.map((p) => p is Map<String, dynamic> ? p : null)
+              .where((p) => p != null)
+              .cast<Map<String, dynamic>>()
+              .toList() ?? [];
+
+          final otherParticipants = participants.where((p) => p['_id'] != currentUserId).toList();
+
+          final onlineMembers = otherParticipants.where((p) {
+            final userFromAllUsers = dataController.allUsers.firstWhere(
+              (u) => u['_id'] == p['_id'],
+              orElse: () => <String, dynamic>{},
+            );
+            return userFromAllUsers['online'] == true;
+          }).toList();
+
+          if (onlineMembers.isNotEmpty) {
+            statusWidget = Text(
+              '${onlineMembers.length} online',
+              style: const TextStyle(color: Colors.green, fontSize: 12),
+            );
+          } else {
+            final memberNames = otherParticipants.map((p) => p['name'] ?? 'User').toList();
+            String subtitleText;
+            if (memberNames.length > 3) {
+              subtitleText = memberNames.sublist(0, 3).join(', ') + '...';
+            } else {
+              subtitleText = memberNames.join(', ');
+            }
+            statusWidget = Text(
+              subtitleText,
+              style: const TextStyle(color: Colors.grey, fontSize: 12),
+              overflow: TextOverflow.ellipsis,
+            );
+          }
         } else {
           statusWidget = const SizedBox.shrink();
         }

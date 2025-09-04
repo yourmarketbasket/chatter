@@ -2589,36 +2589,25 @@ class DataController extends GetxController {
 
   void handleMemberJoined(Map<String, dynamic> data) {
     final chatId = data['chatId'] as String?;
-    final memberId = data['memberId'] as String?;
-    if (chatId == null || memberId == null) return;
+    // The backend should send the full user object of the member who joined.
+    final member = data['member'] as Map<String, dynamic>?;
+
+    if (chatId == null || member == null) return;
 
     if (chats.containsKey(chatId)) {
       final chat = chats[chatId]!;
-      final participants =
-          List<Map<String, dynamic>>.from(chat['participants'] ?? []);
+      final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
 
-      Map<String, dynamic>? member;
-      try {
-        member = allUsers.firstWhere((u) => u['_id'] == memberId);
-      } catch (e) {
-        member = null;
-      }
-
-      if (member != null) {
+      // Avoid adding duplicates
+      if (!participants.any((p) => p['_id'] == member['_id'])) {
         participants.add(member);
         chat['participants'] = participants;
         chats[chatId] = chat;
+
         if (currentChat.value['_id'] == chatId) {
           currentChat.value = chat;
         }
         chats.refresh();
-        if (currentChat.value['_id'] == chatId) {
-          currentChat.refresh();
-        }
-      }
-      chats.refresh();
-      if (currentChat.value['_id'] == chatId) {
-        currentChat.refresh();
       }
     }
   }
@@ -2628,14 +2617,22 @@ class DataController extends GetxController {
     final memberId = data['memberId'] as String?;
     if (chatId == null || memberId == null) return;
 
+    // If the removed member is the current user, they have been kicked.
+    // The entire chat should be removed from their list.
+    if (memberId == getUserId()) {
+      handleGroupRemovedFrom(data);
+      return;
+    }
+
     if (chats.containsKey(chatId)) {
       final chat = chats[chatId]!;
-      final participants =
-          List<Map<String, dynamic>>.from(chat['participants'] ?? []);
+
+      // Remove from participants list
+      final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
       participants.removeWhere((p) => p['_id'] == memberId);
       chat['participants'] = participants;
 
-      // Also remove from admins if they were an admin
+      // Also remove from admins list if they were an admin
       final admins = List<Map<String, dynamic>>.from(chat['admins'] ?? []);
       admins.removeWhere((a) => a['_id'] == memberId);
       chat['admins'] = admins;
@@ -2644,6 +2641,7 @@ class DataController extends GetxController {
       if (currentChat.value['_id'] == chatId) {
         currentChat.value = chat;
       }
+      chats.refresh();
     }
   }
 
@@ -2654,27 +2652,21 @@ class DataController extends GetxController {
 
     if (chats.containsKey(chatId)) {
       final chat = chats[chatId]!;
-      final participants =
-          List<Map<String, dynamic>>.from(chat['participants'] ?? []);
-      Map<String, dynamic>? member;
-      try {
-        member = participants.firstWhere((p) => p['_id'] == memberId);
-      } catch (e) {
-        member = null;
-      }
+      final admins = List<Map<String, dynamic>>.from(chat['admins'] ?? []);
 
-      if (member != null) {
-        final admins = List<Map<String, dynamic>>.from(chat['admins'] ?? []);
-        admins.add(member);
+      // Find the full participant object to add to the admins list
+      final participant = (chat['participants'] as List?)
+          ?.firstWhere((p) => p['_id'] == memberId, orElse: () => null);
+
+      if (participant != null && !admins.any((a) => a['_id'] == memberId)) {
+        admins.add(participant);
         chat['admins'] = admins;
         chats[chatId] = chat;
+
         if (currentChat.value['_id'] == chatId) {
           currentChat.value = chat;
         }
         chats.refresh();
-        if (currentChat.value['_id'] == chatId) {
-          currentChat.refresh();
-        }
       }
     }
   }
@@ -2689,14 +2681,12 @@ class DataController extends GetxController {
       final admins = List<Map<String, dynamic>>.from(chat['admins'] ?? []);
       admins.removeWhere((a) => a['_id'] == memberId);
       chat['admins'] = admins;
+
       chats[chatId] = chat;
       if (currentChat.value['_id'] == chatId) {
         currentChat.value = chat;
       }
       chats.refresh();
-      if (currentChat.value['_id'] == chatId) {
-        currentChat.refresh();
-      }
     }
   }
 
@@ -2707,8 +2697,7 @@ class DataController extends GetxController {
 
     if (chats.containsKey(chatId)) {
       final chat = chats[chatId]!;
-      final participants =
-          List<Map<String, dynamic>>.from(chat['participants'] ?? []);
+      final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
       final memberIndex = participants.indexWhere((p) => p['_id'] == memberId);
 
       if (memberIndex != -1) {
@@ -2719,9 +2708,6 @@ class DataController extends GetxController {
           currentChat.value = chat;
         }
         chats.refresh();
-        if (currentChat.value['_id'] == chatId) {
-          currentChat.refresh();
-        }
       }
     }
   }
@@ -2733,8 +2719,7 @@ class DataController extends GetxController {
 
     if (chats.containsKey(chatId)) {
       final chat = chats[chatId]!;
-      final participants =
-          List<Map<String, dynamic>>.from(chat['participants'] ?? []);
+      final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
       final memberIndex = participants.indexWhere((p) => p['_id'] == memberId);
 
       if (memberIndex != -1) {
@@ -2745,9 +2730,6 @@ class DataController extends GetxController {
           currentChat.value = chat;
         }
         chats.refresh();
-        if (currentChat.value['_id'] == chatId) {
-          currentChat.refresh();
-        }
       }
     }
   }
