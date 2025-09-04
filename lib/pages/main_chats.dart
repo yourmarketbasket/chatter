@@ -155,19 +155,22 @@ class _MainChatsPageState extends State<MainChatsPage> {
       child: Scaffold(
         extendBody: true,
         floatingActionButton: ExpandableFab(
+          type: ExpandableFabType.up,
           distance: 70,
           children: [
             FloatingActionButton.extended(
-              heroTag: "newGroup",
-              icon: const Icon(Icons.group_add, color: Colors.white),
+              backgroundColor: Colors.tealAccent.shade400.withOpacity(0.2),
+              shape: const CircleBorder(),
+              icon: const Icon(Icons.group_add, color: Colors.tealAccent),
               label: const Text("New Group", style: TextStyle(color: Colors.white)),
               onPressed: () {
                 Get.to(() => const UsersListPage(isGroupCreationMode: true));
               },
             ),
             FloatingActionButton.extended(
-              heroTag: "newChat",
-              icon: const Icon(Icons.person_add, color: Colors.white),
+              backgroundColor: Colors.tealAccent.shade400.withOpacity(0.2),
+              shape: const CircleBorder(),
+              icon: const Icon(Icons.person_add, color: Colors.tealAccent),
               label: const Text("New Chat", style: TextStyle(color: Colors.white)),
               onPressed: () {
                 Get.to(() => const FollowersPage());
