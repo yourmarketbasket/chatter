@@ -47,6 +47,13 @@ class _MessageInputAreaState extends State<MessageInputArea> {
     _messageController.dispose();
     _audioRecorder.dispose();
     _typingTimer?.cancel();
+    // Ensure we send a 'typing:stop' event if the user was typing
+    if (_isTypingEventSent) {
+      final chatId = _dataController.currentChat.value['_id'];
+      if (chatId != null) {
+        _socketService.sendTypingStop(chatId);
+      }
+    }
     super.dispose();
   }
 
