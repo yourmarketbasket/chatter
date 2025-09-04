@@ -399,8 +399,11 @@ class _MainChatsPageState extends State<MainChatsPage> {
                                 if (senderIdString == currentUserId) {
                                   preview = 'You: $preview';
                                 } else if (isGroup) {
-                                  final senderName = (chat['participants'] as List)
-                                          .firstWhere((p) => p['_id'] == senderIdString, orElse: () => {'name': '...'})['name'];
+                                  // Look up sender in the allUsers list to prevent crashes when participants are just IDs
+                                  final sender = _dataController.allUsers.firstWhere(
+                                      (u) => u['_id'] == senderIdString,
+                                      orElse: () => {'name': '...'});
+                                  final senderName = sender['name'];
                                   preview = '$senderName: $preview';
                                 }
                               }
