@@ -405,9 +405,7 @@ class _ChatScreenState extends State<ChatScreen> {
               _selectedMessages.clear();
             });
 
-            // ScaffoldMessenger.of(context).showSnackBar(
-            //   SnackBar(content: Text('Successfully forwarded messages to $targetUserName.')),
-            // );
+           
           },
         ),
       ),
