@@ -163,6 +163,7 @@ class _MainChatsPageState extends State<MainChatsPage> {
                 const Text("New Group", style: TextStyle(color: Colors.white, fontSize: 12)),
                 const SizedBox(width: 8),
                 FloatingActionButton.small(
+                  heroTag: "newGroup",
                   backgroundColor: Colors.tealAccent.shade400.withOpacity(0.2),
                   child: const Icon(Icons.group_add, color: Colors.tealAccent),
                   onPressed: () {
@@ -176,6 +177,7 @@ class _MainChatsPageState extends State<MainChatsPage> {
                 const Text("New Chat", style: TextStyle(color: Colors.white, fontSize: 12)),
                 const SizedBox(width: 8),
                 FloatingActionButton.small(
+                  heroTag: "newChat",
                   backgroundColor: Colors.tealAccent.shade400.withOpacity(0.2),
                   child: const Icon(Icons.person_add, color: Colors.tealAccent),
                   onPressed: () {
