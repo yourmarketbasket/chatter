@@ -2273,10 +2273,9 @@ class DataController extends GetxController {
         // --- NEW/RESURRECTED CHAT HANDLING ---
         // If the server returns a full 'chat' object, that's the best case.
         if (response.data.containsKey('chat')) {
-          print('[DataController.sendChatMessage] Response contains full chat object.');
           final newChat = response.data['chat'];
           final newChatId = newChat['_id'];
-          print('[DataController.sendChatMessage] Chat ID is $newChatId. Updating state and joining room.');
+          print('[DataController.sendChatMessage] Response contains full chat object. Joining room $newChatId.');
 
           chats[newChatId] = newChat;
           currentChat.value = newChat; // This updates the whole object
@@ -2289,7 +2288,7 @@ class DataController extends GetxController {
           // If our currentChat doesn't have an ID yet, but the returned message does,
           // it means this is the first message of a new/resurrected chat.
           if (messageChatId != null && currentChat.value['_id'] == null) {
-            print('[DataController.sendChatMessage] New/resurrected chat detected via message. Chat ID: $messageChatId. Joining room.');
+            print('[DataController.sendChatMessage] New/resurrected chat detected via message. Joining room $messageChatId.');
 
             // We don't have the full chat object, but we have the ID.
             // Update the currentChat object with the ID.

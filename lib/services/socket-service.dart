@@ -311,7 +311,7 @@ class SocketService {
       final chatId = data['chatId'] as String;
       // Auto-join room if a message is received for a chat we're not in.
       if (!_joinedChatRooms.contains(chatId)) {
-        // print('[SocketService] Received message for un-joined room $chatId. Auto-joining.');
+        print('[SocketService] Received message for un-joined room $chatId. Auto-joining.');
         joinChatRoom(chatId);
       }
 
@@ -545,14 +545,14 @@ class SocketService {
   void joinChatRoom(String chatId) {
     if (_socket != null && _socket!.connected) {
       if (_joinedChatRooms.contains(chatId)) {
-        // print('[SocketService] Already joined chat room $chatId. Skipping.');
+        print('[SocketService] Already joined chat room $chatId. Skipping.');
         return;
       }
-      // print('[SocketService] ==> Emitting join for chat ID: $chatId');
+      print('[SocketService] ==> Emitting join for chat ID: $chatId');
       _socket!.emit('join', {'chatId': chatId});
       _joinedChatRooms.add(chatId);
     } else {
-      // print('[SocketService] Cannot join room. Socket is null or not connected.');
+      print('[SocketService] Cannot join room. Socket is null or not connected.');
     }
   }
 
