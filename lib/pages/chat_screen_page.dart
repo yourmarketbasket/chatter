@@ -379,7 +379,7 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
     );
   }
-// more changes
+
   void _forwardSelectedMessages() {
     final messagesToForward = _selectedMessages
         .map((id) => dataController.currentConversationMessages.firstWhere((m) => (m['_id'] ?? m['clientMessageId']) == id))
@@ -395,7 +395,7 @@ class _ChatScreenState extends State<ChatScreen> {
             final targetUserName = user['name'];
             final totalMessages = messagesToForward.length;
 
-            Navigator.pop(context); // Close user selection
+            Navigator.pop(context); 
 
             
             await dataController.forwardMultipleMessages(messagesToForward, targetUserId);
