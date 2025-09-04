@@ -17,9 +17,14 @@ class MainChatsPage extends StatefulWidget {
   _MainChatsPageState createState() => _MainChatsPageState();
 }
 
+import 'package:chatter/services/socket-service.dart';
+import 'dart:async';
+
 class _MainChatsPageState extends State<MainChatsPage> {
   final TextEditingController _searchController = TextEditingController();
   final DataController _dataController = Get.find<DataController>();
+  final SocketService _socketService = Get.find<SocketService>();
+  StreamSubscription? _socketSubscription;
   String _searchQuery = '';
   bool _isSelectionMode = false;
   final Set<String> _selectedChats = {};
@@ -63,11 +68,41 @@ class _MainChatsPageState extends State<MainChatsPage> {
         });
       }
     });
+
+    _socketSubscription = _socketService.events.listen(_handleSocketEvent);
+  }
+
+  void _handleSocketEvent(Map<String, dynamic> event) {
+    final eventName = event['event'];
+    final data = event['data'];
+
+    final relevantEvents = ['chat:new', 'chat:updated', 'chat:hardDeleted'];
+    if (!relevantEvents.contains(eventName)) {
+      return;
+    }
+
+    // Call the appropriate handler in the DataController
+    if (eventName == 'chat:new') {
+      _dataController.handleNewChat(data);
+    } else if (eventName == 'chat:updated') {
+      _dataController.handleChatUpdated(data);
+    } else if (eventName == 'chat:hardDeleted' && data is Map<String, dynamic>) {
+      final chatId = data['_id'] as String?;
+      if (chatId != null) {
+        _dataController.handleChatDeleted(chatId);
+      }
+    }
+
+    // Force a rebuild of the widget to reflect the changes
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _socketSubscription?.cancel();
     _dataController.isMainChatsActive.value = false;
     super.dispose();
   }
