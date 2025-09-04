@@ -5168,4 +5168,25 @@ void clearUserPosts() {
     final targetUser = allUsers.firstWhere((u) => u['_id'] == targetUserId, orElse: () => {'name': 'user'});
     Get.snackbar('Success', 'Message sent to ${targetUser['name']}');
   }
+
+  Future<void> fetchUserStatus(String userId) async {
+    try {
+      final token = getAuthToken();
+      if (token == null) return;
+
+      final response = await _dio.get(
+        'api/users/status/$userId',
+        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        final statusData = response.data['status'];
+        final isOnline = statusData['online'] as bool;
+        final lastSeen = statusData['lastSeen'] as String?;
+        handleUserOnlineStatus(userId, isOnline, lastSeen: lastSeen);
+      }
+    } catch (e) {
+      // print('Error fetching user status for $userId: $e');
+    }
+  }
 }

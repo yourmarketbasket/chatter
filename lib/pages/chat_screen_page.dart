@@ -46,6 +46,7 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final DataController dataController = Get.find<DataController>();
   final SocketService socketService = Get.find<SocketService>();
+  StreamSubscription<Map<String, dynamic>>? _socketSubscription;
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   Map<String, dynamic>? _replyingTo;
@@ -78,9 +79,16 @@ class _ChatScreenState extends State<ChatScreen> {
     if (chatId != null) {
       socketService.joinChatRoom(chatId);
       _loadMessages();
+      final otherParticipant = _getOtherParticipant();
+      if (otherParticipant != null) {
+        dataController.fetchUserStatus(otherParticipant['_id']);
+      }
     } else {
       dataController.currentConversationMessages.clear();
     }
+
+    // Listen for socket events
+    _socketSubscription = socketService.events.listen(_handleSocketEvent);
 
     // Add a listener to the chats map to detect if the current chat is deleted.
     dataController.chats.listen((chatsMap) {
@@ -93,6 +101,78 @@ class _ChatScreenState extends State<ChatScreen> {
     dataController.currentConversationMessages.listen((_) {
       Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
     });
+  }
+
+  void _handleSocketEvent(Map<String, dynamic> event) {
+    final eventName = event['event'];
+    final data = event['data'];
+    final currentChatId = dataController.activeChatId.value;
+
+    if (currentChatId == null) return;
+
+    // A map of event handlers
+    final handlers = {
+      'message:new': () {
+        if (data['chatId'] == currentChatId) {
+          // The DataController's handleNewMessage already adds the message
+          // and refreshes the list. We just need to ensure the UI rebuilds.
+          setState(() {}); // Trigger a rebuild to show the new message
+        }
+      },
+      'message:update': () {
+        if (data['chatId'] == currentChatId) {
+          setState(() {}); // Trigger a rebuild
+        }
+      },
+      'message:delete': () {
+         if (data['chatId'] == currentChatId) {
+          setState(() {}); // Trigger a rebuild
+        }
+      },
+      'message:reaction': () {
+        if (data['chatId'] == currentChatId) {
+          setState(() {}); // Trigger a rebuild
+        }
+      },
+      'message:reaction:removed': () {
+        if (data['chatId'] == currentChatId) {
+          setState(() {}); // Trigger a rebuild
+        }
+      },
+      'typing:started': () {
+        if (data['chatId'] == currentChatId) {
+          setState(() {}); // Rebuild to show typing indicator
+        }
+      },
+      'typing:stopped': () {
+         if (data['chatId'] == currentChatId) {
+          setState(() {}); // Rebuild to hide typing indicator
+        }
+      },
+      'chat:updated': () {
+        if (data['_id'] == currentChatId) {
+          setState(() {}); // Rebuild app bar with new details
+        }
+      },
+      'user:online': () {
+        // Find the other participant in the chat
+        final otherParticipant = _getOtherParticipant();
+        if (otherParticipant != null && data['userId'] == otherParticipant['_id']) {
+          setState(() {}); // Rebuild app bar
+        }
+      },
+      'user:offline': () {
+        final otherParticipant = _getOtherParticipant();
+        if (otherParticipant != null && data['userId'] == otherParticipant['_id']) {
+          setState(() {}); // Rebuild app bar
+        }
+      }
+    };
+
+    // Execute the handler if it exists
+    if (handlers.containsKey(eventName)) {
+      handlers[eventName]!();
+    }
   }
 
   void _loadMessages() async {
@@ -134,6 +214,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    _socketSubscription?.cancel();
     _messageController.dispose();
     _scrollController.dispose();
     dataController.currentConversationMessages.clear();
