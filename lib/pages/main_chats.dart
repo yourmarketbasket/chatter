@@ -158,23 +158,31 @@ class _MainChatsPageState extends State<MainChatsPage> {
           type: ExpandableFabType.up,
           distance: 70,
           children: [
-            FloatingActionButton.extended(
-              backgroundColor: Colors.tealAccent.shade400.withOpacity(0.2),
-              shape: const CircleBorder(),
-              icon: const Icon(Icons.group_add, color: Colors.tealAccent),
-              label: const Text("New Group", style: TextStyle(color: Colors.white)),
-              onPressed: () {
-                Get.to(() => const UsersListPage(isGroupCreationMode: true));
-              },
+            Row(
+              children: [
+                const Text("New Group", style: TextStyle(color: Colors.white, fontSize: 12)),
+                const SizedBox(width: 8),
+                FloatingActionButton.small(
+                  backgroundColor: Colors.tealAccent.shade400.withOpacity(0.2),
+                  child: const Icon(Icons.group_add, color: Colors.tealAccent),
+                  onPressed: () {
+                    Get.to(() => const UsersListPage(isGroupCreationMode: true));
+                  },
+                ),
+              ],
             ),
-            FloatingActionButton.extended(
-              backgroundColor: Colors.tealAccent.shade400.withOpacity(0.2),
-              shape: const CircleBorder(),
-              icon: const Icon(Icons.person_add, color: Colors.tealAccent),
-              label: const Text("New Chat", style: TextStyle(color: Colors.white)),
-              onPressed: () {
-                Get.to(() => const FollowersPage());
-              },
+            Row(
+              children: [
+                const Text("New Chat", style: TextStyle(color: Colors.white, fontSize: 12)),
+                const SizedBox(width: 8),
+                FloatingActionButton.small(
+                  backgroundColor: Colors.tealAccent.shade400.withOpacity(0.2),
+                  child: const Icon(Icons.person_add, color: Colors.tealAccent),
+                  onPressed: () {
+                    Get.to(() => const FollowersPage());
+                  },
+                ),
+              ],
             ),
           ],
         ),
