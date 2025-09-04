@@ -47,6 +47,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final DataController dataController = Get.find<DataController>();
   final SocketService socketService = Get.find<SocketService>();
   StreamSubscription<Map<String, dynamic>>? _socketSubscription;
+  StreamSubscription? _messagesSubscription;
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   Map<String, dynamic>? _replyingTo;
@@ -76,13 +77,15 @@ class _ChatScreenState extends State<ChatScreen> {
     final chatId = dataController.currentChat.value['_id'] as String?;
     dataController.activeChatId.value = chatId;
 
+    // Fetch status for the other user regardless of whether it's a new or existing chat.
+    final otherParticipant = _getOtherParticipant();
+    if (otherParticipant != null) {
+      dataController.fetchUserStatus(otherParticipant['_id']);
+    }
+
     if (chatId != null) {
       socketService.joinChatRoom(chatId);
       _loadMessages();
-      final otherParticipant = _getOtherParticipant();
-      if (otherParticipant != null) {
-        dataController.fetchUserStatus(otherParticipant['_id']);
-      }
     } else {
       dataController.currentConversationMessages.clear();
     }
@@ -98,7 +101,7 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     });
 
-    dataController.currentConversationMessages.listen((_) {
+    _messagesSubscription = dataController.currentConversationMessages.listen((_) {
       if (mounted) {
         setState(() {
           // Force a rebuild whenever the message list changes.
@@ -221,6 +224,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     _socketSubscription?.cancel();
+    _messagesSubscription?.cancel();
     _messageController.dispose();
     _scrollController.dispose();
     dataController.currentConversationMessages.clear();
