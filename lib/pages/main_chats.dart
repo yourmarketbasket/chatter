@@ -4,6 +4,8 @@ import 'package:chatter/helpers/time_helper.dart';
 import 'package:chatter/helpers/verification_helper.dart';
 import 'package:chatter/pages/chat_screen_page.dart';
 import 'package:chatter/pages/followers_page.dart';
+import 'package:chatter/pages/users_list_page.dart';
+import 'package:flutter_expandable_fab/flutter_expandable_fab.dart';
 import 'package:feather_icons/feather_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -152,17 +154,26 @@ class _MainChatsPageState extends State<MainChatsPage> {
       ),
       child: Scaffold(
         extendBody: true,
-        floatingActionButton: FloatingActionButton(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => FollowersPage()),
-            );
-          },
-          backgroundColor: Colors.tealAccent.shade400.withOpacity(0.2),
-          shape: const CircleBorder(),
-          elevation: 2,
-          child: Icon(FeatherIcons.userPlus, color: Colors.tealAccent.shade400, size: 20),
+        floatingActionButton: ExpandableFab(
+          distance: 70,
+          children: [
+            FloatingActionButton.extended(
+              heroTag: "newGroup",
+              icon: const Icon(Icons.group_add, color: Colors.white),
+              label: const Text("New Group", style: TextStyle(color: Colors.white)),
+              onPressed: () {
+                Get.to(() => const UsersListPage(isGroupCreationMode: true));
+              },
+            ),
+            FloatingActionButton.extended(
+              heroTag: "newChat",
+              icon: const Icon(Icons.person_add, color: Colors.white),
+              label: const Text("New Chat", style: TextStyle(color: Colors.white)),
+              onPressed: () {
+                Get.to(() => const FollowersPage());
+              },
+            ),
+          ],
         ),
         appBar: _isSelectionMode
             ? AppBar(

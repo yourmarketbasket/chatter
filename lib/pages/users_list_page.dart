@@ -11,8 +11,9 @@ import 'package:chatter/widgets/app_drawer.dart';
 
 class UsersListPage extends StatefulWidget {
   final Function(Map<String, dynamic>)? onUserSelected;
+  final bool isGroupCreationMode;
 
-  const UsersListPage({Key? key, this.onUserSelected}) : super(key: key);
+  const UsersListPage({Key? key, this.onUserSelected, this.isGroupCreationMode = false}) : super(key: key);
 
   @override
   _UsersListPageState createState() => _UsersListPageState();
@@ -29,6 +30,7 @@ class _UsersListPageState extends State<UsersListPage> {
   @override
   void initState() {
     super.initState();
+    _isGroupCreationMode = widget.isGroupCreationMode;
     // Data is now primarily loaded by DataController's init method.
     // This page will reactively display the users from _dataController.allUsers.
     // We still need to initialize the filteredUsers list and listen for search changes.
