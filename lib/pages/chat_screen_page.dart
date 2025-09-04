@@ -212,7 +212,9 @@ class _ChatScreenState extends State<ChatScreen> {
     _socketSubscription?.cancel();
     _messageController.dispose();
     _scrollController.dispose();
-    dataController.currentConversationMessages.clear();
+    Future.delayed(Duration.zero, () {
+      dataController.currentConversationMessages.clear();
+    });
     dataController.activeChatId.value = null;
     super.dispose();
   }
