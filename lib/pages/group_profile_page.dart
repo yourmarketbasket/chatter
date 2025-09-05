@@ -308,7 +308,8 @@ class GroupProfilePage extends StatelessWidget {
                 ),
                 const SizedBox(height: 2.4),
                 ...?(currentChat['participants'] as List<dynamic>?)
-                    ?.map((participant) {
+                    ?.where((p) => p != null) // Add a filter for null participants
+                    .map((participant) {
                   final p = (participant is Map<String, dynamic>)
                       ? participant
                       : dataController.allUsers.firstWhere(

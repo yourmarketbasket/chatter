@@ -2602,7 +2602,6 @@ class DataController extends GetxController {
 
   void handleMemberJoined(Map<String, dynamic> data) {
     final chatId = data['chatId'] as String?;
-    // The backend should send the full user object of the member who joined.
     final member = data['member'] as Map<String, dynamic>?;
 
     if (chatId == null || member == null) return;
@@ -2611,18 +2610,15 @@ class DataController extends GetxController {
       final chat = chats[chatId]!;
       final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
 
-      // Avoid adding duplicates
       if (!participants.any((p) => p['_id'] == member['_id'])) {
         participants.add(member);
-        final newChat = Map<String, dynamic>.from(chat);
-        newChat['participants'] = participants;
-
-        final newChats = Map<String, Map<String, dynamic>>.from(chats);
-        newChats[chatId] = newChat;
-        chats.value = newChats;
+        chat['participants'] = participants;
+        chats[chatId] = chat;
+        chats.refresh();
 
         if (currentChat.value['_id'] == chatId) {
-          currentChat.value = newChat;
+          currentChat.value = chat;
+          currentChat.refresh();
         }
       }
     }
@@ -2646,16 +2642,14 @@ class DataController extends GetxController {
       final admins = List<Map<String, dynamic>>.from(chat['admins'] ?? []);
       admins.removeWhere((a) => a['_id'] == memberId);
 
-      final newChat = Map<String, dynamic>.from(chat);
-      newChat['participants'] = participants;
-      newChat['admins'] = admins;
-
-      final newChats = Map<String, Map<String, dynamic>>.from(chats);
-      newChats[chatId] = newChat;
-      chats.value = newChats;
+      chat['participants'] = participants;
+      chat['admins'] = admins;
+      chats[chatId] = chat;
+      chats.refresh();
 
       if (currentChat.value['_id'] == chatId) {
-        currentChat.value = newChat;
+        currentChat.value = chat;
+        currentChat.refresh();
       }
     }
   }
@@ -2669,7 +2663,6 @@ class DataController extends GetxController {
       final chat = chats[chatId]!;
       final admins = List<Map<String, dynamic>>.from(chat['admins'] ?? []);
 
-      // Find the full participant object to add to the admins list
       final participant = (chat['participants'] as List?)
           ?.firstWhere((p) => p['_id'] == memberId, orElse: () => null);
 
@@ -2677,11 +2670,12 @@ class DataController extends GetxController {
         admins.add(participant);
         chat['admins'] = admins;
         chats[chatId] = chat;
+        chats.refresh();
 
         if (currentChat.value['_id'] == chatId) {
           currentChat.value = chat;
+          currentChat.refresh();
         }
-        chats.refresh();
       }
     }
   }
@@ -2698,10 +2692,12 @@ class DataController extends GetxController {
       chat['admins'] = admins;
 
       chats[chatId] = chat;
+      chats.refresh();
+
       if (currentChat.value['_id'] == chatId) {
         currentChat.value = chat;
+        currentChat.refresh();
       }
-      chats.refresh();
     }
   }
 
@@ -4667,7 +4663,7 @@ void clearUserPosts() {
     if (memberToAdd == null) return false; // User to add not found
 
     // 2. Optimistic UI Update
-    if (!participants.any((p) => p['_id'] == memberId)) {
+    if (memberToAdd != null && !participants.any((p) => p['_id'] == memberId)) {
       participants.add(memberToAdd);
       chat['participants'] = participants;
       chats[chatId] = chat;
