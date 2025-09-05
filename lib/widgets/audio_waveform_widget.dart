@@ -26,17 +26,16 @@ class _AudioWaveformWidgetState extends State<AudioWaveformWidget> {
     _preparePlayer();
     _playerController.onPlayerStateChanged.listen((state) {
       if (mounted) {
-        setState(() {
-          _isPlaying = state == PlayerState.playing;
-        });
-      }
-    });
-     _playerController.onCompletion.listen((_) {
-      if (mounted) {
-        _playerController.seekTo(0);
-        setState(() {
-          _isPlaying = false;
-        });
+        if (state == PlayerState.stopped) {
+          _playerController.seekTo(0);
+          setState(() {
+            _isPlaying = false;
+          });
+        } else {
+          setState(() {
+            _isPlaying = state == PlayerState.playing;
+          });
+        }
       }
     });
   }
@@ -100,7 +99,7 @@ class _AudioWaveformWidgetState extends State<AudioWaveformWidget> {
                     if (_isPlaying) {
                       await _playerController.pausePlayer();
                     } else {
-                      await _playerController.startPlayer(finishMode: FinishMode.stop);
+                      await _playerController.startPlayer();
                     }
                   },
           ),
