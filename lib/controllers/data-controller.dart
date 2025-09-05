@@ -2604,22 +2604,20 @@ class DataController extends GetxController {
     final chatId = data['chatId'] as String?;
     final member = data['member'] as Map<String, dynamic>?;
 
-    if (chatId == null || member == null) return;
+    if (chatId == null || member == null || !chats.containsKey(chatId)) return;
 
-    if (chats.containsKey(chatId)) {
-      final chat = chats[chatId]!;
-      final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
+    final newChats = Map<String, Map<String, dynamic>>.from(chats);
+    final chat = Map<String, dynamic>.from(newChats[chatId]!);
+    final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
 
-      if (!participants.any((p) => p['_id'] == member['_id'])) {
-        participants.add(member);
-        chat['participants'] = participants;
-        chats[chatId] = chat;
-        chats.refresh();
+    if (!participants.any((p) => p['_id'] == member['_id'])) {
+      participants.add(member);
+      chat['participants'] = participants;
+      newChats[chatId] = chat;
+      chats.value = newChats;
 
-        if (currentChat.value['_id'] == chatId) {
-          currentChat.value = chat;
-          currentChat.refresh();
-        }
+      if (currentChat.value['_id'] == chatId) {
+        currentChat.value = chat;
       }
     }
   }
@@ -2627,55 +2625,59 @@ class DataController extends GetxController {
   void handleMemberRemoved(Map<String, dynamic> data) {
     final chatId = data['chatId'] as String?;
     final memberId = data['memberId'] as String?;
-    if (chatId == null || memberId == null) return;
+
+    if (chatId == null || memberId == null || !chats.containsKey(chatId)) return;
 
     if (memberId == getUserId()) {
       handleGroupRemovedFrom(data);
       return;
     }
 
-    if (chats.containsKey(chatId)) {
-      final chat = chats[chatId]!;
-      final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
-      participants.removeWhere((p) => p['_id'] == memberId);
+    final newChats = Map<String, Map<String, dynamic>>.from(chats);
+    final chat = Map<String, dynamic>.from(newChats[chatId]!);
+    final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
+    final admins = List<Map<String, dynamic>>.from(chat['admins'] ?? []);
 
-      final admins = List<Map<String, dynamic>>.from(chat['admins'] ?? []);
-      admins.removeWhere((a) => a['_id'] == memberId);
+    participants.removeWhere((p) => p is Map && p['_id'] == memberId);
+    admins.removeWhere((a) => a is Map && a['_id'] == memberId);
 
-      chat['participants'] = participants;
-      chat['admins'] = admins;
-      chats[chatId] = chat;
-      chats.refresh();
+    chat['participants'] = participants;
+    chat['admins'] = admins;
+    newChats[chatId] = chat;
+    chats.value = newChats;
 
-      if (currentChat.value['_id'] == chatId) {
-        currentChat.value = chat;
-        currentChat.refresh();
-      }
+    if (currentChat.value['_id'] == chatId) {
+      currentChat.value = chat;
     }
   }
 
   void handleMemberPromoted(Map<String, dynamic> data) {
     final chatId = data['chatId'] as String?;
     final memberId = data['memberId'] as String?;
-    if (chatId == null || memberId == null) return;
 
-    if (chats.containsKey(chatId)) {
-      final chat = chats[chatId]!;
-      final admins = List<Map<String, dynamic>>.from(chat['admins'] ?? []);
+    if (chatId == null || memberId == null || !chats.containsKey(chatId)) return;
 
-      final participant = (chat['participants'] as List?)
-          ?.firstWhere((p) => p['_id'] == memberId, orElse: () => null);
+    final newChats = Map<String, Map<String, dynamic>>.from(chats);
+    final chat = Map<String, dynamic>.from(newChats[chatId]!);
+    final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
+    final admins = List<Map<String, dynamic>>.from(chat['admins'] ?? []);
 
-      if (participant != null && !admins.any((a) => a['_id'] == memberId)) {
-        admins.add(participant);
-        chat['admins'] = admins;
-        chats[chatId] = chat;
-        chats.refresh();
+    Map<String, dynamic>? participant;
+    for (var p in participants) {
+      if (p is Map && p['_id'] == memberId) {
+        participant = p;
+        break;
+      }
+    }
 
-        if (currentChat.value['_id'] == chatId) {
-          currentChat.value = chat;
-          currentChat.refresh();
-        }
+    if (participant != null && !admins.any((a) => a is Map && a['_id'] == memberId)) {
+      admins.add(participant);
+      chat['admins'] = admins;
+      newChats[chatId] = chat;
+      chats.value = newChats;
+
+      if (currentChat.value['_id'] == chatId) {
+        currentChat.value = chat;
       }
     }
   }
@@ -2683,21 +2685,21 @@ class DataController extends GetxController {
   void handleMemberDemoted(Map<String, dynamic> data) {
     final chatId = data['chatId'] as String?;
     final memberId = data['memberId'] as String?;
-    if (chatId == null || memberId == null) return;
 
-    if (chats.containsKey(chatId)) {
-      final chat = chats[chatId]!;
-      final admins = List<Map<String, dynamic>>.from(chat['admins'] ?? []);
-      admins.removeWhere((a) => a['_id'] == memberId);
-      chat['admins'] = admins;
+    if (chatId == null || memberId == null || !chats.containsKey(chatId)) return;
 
-      chats[chatId] = chat;
-      chats.refresh();
+    final newChats = Map<String, Map<String, dynamic>>.from(chats);
+    final chat = Map<String, dynamic>.from(newChats[chatId]!);
+    final admins = List<Map<String, dynamic>>.from(chat['admins'] ?? []);
 
-      if (currentChat.value['_id'] == chatId) {
-        currentChat.value = chat;
-        currentChat.refresh();
-      }
+    admins.removeWhere((a) => a is Map && a['_id'] == memberId);
+
+    chat['admins'] = admins;
+    newChats[chatId] = chat;
+    chats.value = newChats;
+
+    if (currentChat.value['_id'] == chatId) {
+      currentChat.value = chat;
     }
   }
 
