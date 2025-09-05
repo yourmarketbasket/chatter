@@ -462,37 +462,47 @@ class _ProfilePageState extends State<ProfilePage> {
                             ),
                           ),
                           const SizedBox(width: 12),
-                          ElevatedButton.icon(
-                            onPressed: () async {
-                              final confirm = await showDialog(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: const Text('Block User'),
-                                  content: Text('Are you sure you want to block ${widget.username}?'),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.of(context).pop(false),
-                                      child: const Text('Cancel'),
+                          Obx(() {
+                            final blockedUsers = List<String>.from(dataController.user.value['user']?['blockedUsers'] ?? []);
+                            final isBlocked = blockedUsers.contains(widget.userId);
+
+                            return ElevatedButton.icon(
+                              onPressed: () async {
+                                if (isBlocked) {
+                                  // No confirmation needed for unblocking
+                                  await dataController.unblockUser(widget.userId);
+                                } else {
+                                  final confirm = await showDialog(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      title: const Text('Block User'),
+                                      content: Text('Are you sure you want to block ${widget.username}?'),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.of(context).pop(false),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () => Navigator.of(context).pop(true),
+                                          child: const Text('Block'),
+                                        ),
+                                      ],
                                     ),
-                                    TextButton(
-                                      onPressed: () => Navigator.of(context).pop(true),
-                                      child: const Text('Block'),
-                                    ),
-                                  ],
-                                ),
-                              );
-                              if (confirm == true) {
-                                await dataController.blockUser(widget.userId);
-                              }
-                            },
-                            icon: const Icon(Icons.block),
-                            label: const Text('Block'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.redAccent,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                            ),
-                          ),
+                                  );
+                                  if (confirm == true) {
+                                    await dataController.blockUser(widget.userId);
+                                  }
+                                }
+                              },
+                              icon: Icon(isBlocked ? Icons.check_circle_outline : Icons.block),
+                              label: Text(isBlocked ? 'Unblock' : 'Block'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: isBlocked ? Colors.green : Colors.redAccent,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                              ),
+                            );
+                          }),
                         ],
                       ),
                   ],
