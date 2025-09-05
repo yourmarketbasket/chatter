@@ -343,7 +343,7 @@ class GroupProfilePage extends StatelessWidget {
                         const EdgeInsets.symmetric(horizontal: 0, vertical: 0.8),
                     leading: CircleAvatar(
                       radius: 20,
-                      backgroundImage: p['avatar'] != null && p['avatar'].isNotEmpty
+                      backgroundImage: p!['avatar'] != null && p['avatar'].isNotEmpty
                           ? NetworkImage(p['avatar'])
                           : null,
                       child: p['avatar'] == null || p['avatar'].isEmpty
@@ -425,24 +425,24 @@ class GroupProfilePage extends StatelessWidget {
                                     );
                                   } else {
                                     dataController.removeMember(
-                                        currentChat['_id'], p['_id']);
+                                        currentChat['_id'], p!['_id']);
                                   }
                                   break;
                                 case 'promote':
                                   dataController.promoteAdmin(
-                                      currentChat['_id'], p['_id']);
+                                      currentChat['_id'], p!['_id']);
                                   break;
                                 case 'demote':
                                   dataController.demoteAdmin(
-                                      currentChat['_id'], p['_id']);
+                                      currentChat['_id'], p!['_id']);
                                   break;
                                 case 'mute':
                                   if (isMuted) {
                                     dataController.unmuteMember(
-                                        currentChat['_id'], p['_id']);
+                                        currentChat['_id'], p!['_id']);
                                   } else {
                                     dataController.muteMember(
-                                        currentChat['_id'], p['_id']);
+                                        currentChat['_id'], p!['_id']);
                                   }
                                   break;
                               }
