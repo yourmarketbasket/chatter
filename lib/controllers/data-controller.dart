@@ -2675,19 +2675,17 @@ class DataController extends GetxController {
     }
   }
 
-  void handleMemberMuted(Map<String, dynamic> data) {
-    final chatId = data['chatId'] as String?;
-    final memberId = data['memberId'] as String?;
-    if (chatId == null || memberId == null) return;
-
+  void _updateLocalMuteStatus(String chatId, String memberId, bool isMuted) {
     if (chats.containsKey(chatId)) {
       final chat = chats[chatId]!;
-      final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
+      final participants =
+          List<Map<String, dynamic>>.from(chat['participants'] ?? []);
       final memberIndex = participants.indexWhere((p) => p['_id'] == memberId);
 
       if (memberIndex != -1) {
-        var updatedParticipant = Map<String, dynamic>.from(participants[memberIndex]);
-        updatedParticipant['isMuted'] = true;
+        var updatedParticipant =
+            Map<String, dynamic>.from(participants[memberIndex]);
+        updatedParticipant['isMuted'] = isMuted;
         participants[memberIndex] = updatedParticipant;
         chat['participants'] = participants;
         chats[chatId] = chat;
@@ -2699,28 +2697,18 @@ class DataController extends GetxController {
     }
   }
 
+  void handleMemberMuted(Map<String, dynamic> data) {
+    final chatId = data['chatId'] as String?;
+    final memberId = data['memberId'] as String?;
+    if (chatId == null || memberId == null) return;
+    _updateLocalMuteStatus(chatId, memberId, true);
+  }
+
   void handleMemberUnmuted(Map<String, dynamic> data) {
     final chatId = data['chatId'] as String?;
     final memberId = data['memberId'] as String?;
     if (chatId == null || memberId == null) return;
-
-    if (chats.containsKey(chatId)) {
-      final chat = chats[chatId]!;
-      final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
-      final memberIndex = participants.indexWhere((p) => p['_id'] == memberId);
-
-      if (memberIndex != -1) {
-        var updatedParticipant = Map<String, dynamic>.from(participants[memberIndex]);
-        updatedParticipant['isMuted'] = false;
-        participants[memberIndex] = updatedParticipant;
-        chat['participants'] = participants;
-        chats[chatId] = chat;
-        if (currentChat.value['_id'] == chatId) {
-          currentChat.value = Map<String, dynamic>.from(chat);
-        }
-        chats.refresh();
-      }
-    }
+    _updateLocalMuteStatus(chatId, memberId, false);
   }
 
   // --- Attachment Download Logic ---
@@ -4746,6 +4734,7 @@ void clearUserPosts() {
   }
 
   Future<bool> muteMember(String chatId, String memberId) async {
+    _updateLocalMuteStatus(chatId, memberId, true); // Optimistic update
     try {
       final token = user.value['token'];
       if (token == null) {
@@ -4758,14 +4747,21 @@ void clearUserPosts() {
           headers: {'Authorization': 'Bearer $token'},
         ),
       );
-      return response.statusCode == 200 && response.data['success'] == true;
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return true;
+      } else {
+        _updateLocalMuteStatus(chatId, memberId, false); // Rollback
+        return false;
+      }
     } catch (e) {
-      // print('Error muting member: $e');
+      print('Error muting member: $e');
+      _updateLocalMuteStatus(chatId, memberId, false); // Rollback
       return false;
     }
   }
 
   Future<bool> unmuteMember(String chatId, String memberId) async {
+    _updateLocalMuteStatus(chatId, memberId, false); // Optimistic update
     try {
       final token = user.value['token'];
       if (token == null) {
@@ -4778,9 +4774,15 @@ void clearUserPosts() {
           headers: {'Authorization': 'Bearer $token'},
         ),
       );
-      return response.statusCode == 200 && response.data['success'] == true;
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return true;
+      } else {
+        _updateLocalMuteStatus(chatId, memberId, true); // Rollback
+        return false;
+      }
     } catch (e) {
-      // print('Error unmuting member: $e');
+      print('Error unmuting member: $e');
+      _updateLocalMuteStatus(chatId, memberId, true); // Rollback
       return false;
     }
   }
