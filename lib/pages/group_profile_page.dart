@@ -431,24 +431,44 @@ class GroupProfilePage extends StatelessWidget {
                                   break;
                               }
                             },
-                            itemBuilder: (BuildContext context) =>
-                                <PopupMenuEntry<String>>[
-                              const PopupMenuItem<String>(
-                                value: 'remove',
-                                child: Text('Remove'),
-                              ),
-                              if (isSuperAdmin)
-                                PopupMenuItem<String>(
-                                  value: isParticipantAdmin ? 'demote' : 'promote',
-                                  child: Text(isParticipantAdmin
-                                      ? 'Demote from Admin'
-                                      : 'Promote to Admin'),
-                                ),
-                              PopupMenuItem<String>(
-                                value: 'mute',
-                                child: Text(isMuted ? 'Unmute' : 'Mute'),
-                              ),
-                            ],
+                            itemBuilder: (BuildContext context) {
+                              final List<PopupMenuEntry<String>> items = [];
+
+                              // Promote/Demote logic
+                              if (isSuperAdmin) {
+                                if (isParticipantAdmin && !isParticipantSuperAdmin) {
+                                  items.add(const PopupMenuItem<String>(
+                                    value: 'demote',
+                                    child: Text('Demote from Admin'),
+                                  ));
+                                } else if (!isParticipantAdmin) {
+                                  items.add(const PopupMenuItem<String>(
+                                    value: 'promote',
+                                    child: Text('Promote to Admin'),
+                                  ));
+                                }
+                              } else if (isAdmin && isParticipantAdmin && !isParticipantSuperAdmin) {
+                                // Admins can demote other admins (but not super-admin)
+                                items.add(const PopupMenuItem<String>(
+                                  value: 'demote',
+                                  child: Text('Demote from Admin'),
+                                ));
+                              }
+
+                              // Mute/Unmute and Remove logic
+                              if (!isParticipantAdmin) {
+                                items.add(PopupMenuItem<String>(
+                                  value: 'mute',
+                                  child: Text(isMuted ? 'Unmute' : 'Mute'),
+                                ));
+                                items.add(const PopupMenuItem<String>(
+                                  value: 'remove',
+                                  child: Text('Remove'),
+                                ));
+                              }
+
+                              return items;
+                            },
                           )
                         : null,
                   );

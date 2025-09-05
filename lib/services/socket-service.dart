@@ -43,6 +43,10 @@ class SocketService {
       return;
     }
 
+    _socket!.onAny((event, data) {
+      print('Socket event received: $event, data: $data');
+    });
+
     _socket!.onConnect((_) {
       _userId = _dataController.getUserId();
       _eventController.add({'event': 'connect', 'data': null});
