@@ -74,7 +74,7 @@ class _AddParticipantsPageState extends State<AddParticipantsPage> {
     }
 
     final participantIds = (currentChat['participants'] as List)
-        .map<String>((p) => p['_id'] as String)
+        .map<String>((p) => p['userId']['_id'] as String)
         .toSet();
 
     var availableUsers = _dataController.allUsers

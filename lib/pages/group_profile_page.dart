@@ -314,26 +314,26 @@ class GroupProfilePage extends StatelessWidget {
                 const SizedBox(height: 2.4),
                 ...?(currentChat['participants'] as List<dynamic>?)
                     ?.map((participant) {
-                  // The participant object is now the user object itself.
-                  final p = participant as Map<String, dynamic>?;
-
-                  if (p == null) {
+                  final userObject = participant['userId'] as Map<String, dynamic>?;
+                  if (userObject == null) {
                     return const SizedBox.shrink();
                   }
+                  final p = userObject; // p is the user object
 
                   final isParticipantAdmin = (currentChat['admins'] as List<dynamic>?)?.any((admin) {
                         final adminId = admin is Map ? admin['_id'] : admin;
-                        return adminId == p!['_id'];
+                        return adminId == p['_id'];
                       }) ?? false;
                   final isParticipantSuperAdmin = currentChat['superAdmin'] == p['_id'];
-                  final isMuted = p['isMuted'] as bool? ?? false;
+                  final isMuted = participant['isMuted'] as bool? ?? false;
+                  final rank = participant['rank'] as String?;
 
                   return ListTile(
                     contentPadding:
                         const EdgeInsets.symmetric(horizontal: 0, vertical: 0.8),
                     leading: CircleAvatar(
                       radius: 20,
-                      backgroundImage: p!['avatar'] != null && p['avatar'].isNotEmpty
+                      backgroundImage: p['avatar'] != null && p['avatar'].isNotEmpty
                           ? NetworkImage(p['avatar'])
                           : null,
                       child: p['avatar'] == null || p['avatar'].isEmpty
@@ -342,7 +342,7 @@ class GroupProfilePage extends StatelessWidget {
                     ),
                     title: Row(
                       children: [
-                        Text(p['username'] ?? p['name'] ?? 'Unknown',
+                        Text(p['name'] ?? 'Unknown',
                             style: const TextStyle(color: Colors.white)),
                         if (isParticipantSuperAdmin)
                           const Padding(
@@ -362,9 +362,9 @@ class GroupProfilePage extends StatelessWidget {
                       ],
                     ),
                     subtitle: Text(
-                      (p['rank'] as String?)?.capitalizeFirst ?? 'Member',
+                      rank?.capitalizeFirst ?? 'Member',
                       style: GoogleFonts.poppins(
-                        color: p['rank'] == 'superadmin'
+                        color: rank == 'superadmin'
                             ? Colors.amber
                             : Colors.tealAccent,
                         fontSize: 10,

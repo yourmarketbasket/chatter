@@ -2208,12 +2208,8 @@ class DataController extends GetxController {
         final blockedUsers = user.value['user']?['blockedUsers'] ?? [];
         for (var chat in chatData) {
           if (chat['type'] == 'dm') {
-            // Correctly find the other participant based on the new data structure
-            final participant = (chat['participants'] as List).firstWhere(
-              (p) => p['_id'] != user.value['user']['_id'],
-              orElse: () => null,
-            );
-            if (participant != null && !blockedUsers.contains(participant['_id'])) {
+            final participant = (chat['participants'] as List).firstWhere((p) => p['userId']['_id'] != user.value['user']['_id']);
+            if (!blockedUsers.contains(participant['userId']['_id'])) {
               chats[chat['_id']] = chat;
             }
           } else {
@@ -2614,34 +2610,28 @@ class DataController extends GetxController {
 
   void handleMemberJoined(Map<String, dynamic> data) {
     final chatId = data['chatId'] as String?;
-    final memberId = data['memberId'] as String?; // Docs say only memberId is sent
+    final memberData = data['member'] as Map<String, dynamic>?;
 
-    if (chatId == null || memberId == null || !chats.containsKey(chatId)) return;
-
-    // Find the full user object from the allUsers list
-    final memberData = allUsers.firstWhere((u) => u['_id'] == memberId, orElse: () => <String, dynamic>{});
-    if (memberData.isEmpty) {
-        // Maybe fetch the user if not found? For now, we'll just return.
-        print('Error: Joined member with ID $memberId not found in allUsers.');
-        return;
-    }
+    if (chatId == null || memberData == null || !chats.containsKey(chatId)) return;
 
     final chat = chats[chatId]!;
     final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
 
-    // Check if member is already in the list to avoid duplicates
-    if (!participants.any((p) => p['_id'] == memberId)) {
-        // Add the new member. The structure should be just the user object.
-        final newParticipant = Map<String, dynamic>.from(memberData);
-        newParticipant['rank'] = 'member'; // Add default rank
+    final newParticipant = {
+      "userId": memberData,
+      "joinedAt": DateTime.now().toIso8601String(),
+      "isMuted": false,
+      "rank": "member"
+    };
 
-        participants.add(newParticipant);
-        chat['participants'] = participants;
+    if (!participants.any((p) => p['userId']['_id'] == memberData['_id'])) {
+      participants.add(newParticipant);
+      chat['participants'] = participants;
 
-        if (currentChat.value['_id'] == chatId) {
-            currentChat.value = Map<String, dynamic>.from(chat);
-        }
-        chats.refresh();
+      if (currentChat.value['_id'] == chatId) {
+        currentChat.value = Map<String, dynamic>.from(chat);
+      }
+      chats.refresh();
     }
   }
 
@@ -2661,7 +2651,7 @@ class DataController extends GetxController {
     final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
     final admins = List<String>.from(chat['admins']?.map((e) => e.toString()) ?? []);
 
-    participants.removeWhere((p) => p['_id'] == memberId);
+    participants.removeWhere((p) => p['userId']['_id'] == memberId);
     admins.remove(memberId);
 
     chat['participants'] = participants;
@@ -4663,6 +4653,39 @@ void clearUserPosts() {
   }
 
   Future<bool> addMember(String chatId, String memberId) async {
+    // 1. Find chat and user to add
+    if (!chats.containsKey(chatId)) return false;
+    final chat = chats[chatId]!;
+    final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
+    final originalParticipants = List<Map<String, dynamic>>.from(participants); // For rollback
+
+    Map<String, dynamic>? memberToAdd;
+    try {
+      memberToAdd = allUsers.firstWhere((u) => u['_id'] == memberId);
+    } catch (e) {
+      memberToAdd = null;
+    }
+
+    if (memberToAdd == null) return false; // User to add not found
+
+    // 2. Optimistic UI Update
+    if (memberToAdd != null && !participants.any((p) => p['userId']['_id'] == memberId)) {
+      final newParticipant = {
+        "userId": memberToAdd,
+        "joinedAt": DateTime.now().toIso8601String(),
+        "isMuted": false,
+        "rank": "member"
+      };
+      participants.add(newParticipant);
+      chat['participants'] = participants;
+      chats[chatId] = chat;
+      if (currentChat.value['_id'] == chatId) {
+        currentChat.value = Map<String, dynamic>.from(chat);
+      }
+      chats.refresh();
+    }
+
+    // 3. Make API call
     try {
       final token = user.value['token'];
       if (token == null) {
@@ -4676,10 +4699,11 @@ void clearUserPosts() {
         ),
       );
 
+      // 4. Handle API response
       if (response.statusCode == 200 && response.data['success'] == true) {
         // The response contains the updated group object. Use it to update the local state.
         final updatedGroup = response.data['group'];
-        if (updatedGroup != null && chats.containsKey(chatId)) {
+        if (updatedGroup != null) {
           chats[chatId] = updatedGroup;
           if (currentChat.value['_id'] == chatId) {
             currentChat.value = Map<String, dynamic>.from(updatedGroup);
@@ -4688,10 +4712,17 @@ void clearUserPosts() {
         }
         return true;
       } else {
+        // API call failed, revert the change
         throw Exception('Failed to add member on server: ${response.data?['message']}');
       }
     } catch (e) {
-      // print('Error adding member: $e');
+      // 5. Revert on error
+      chat['participants'] = originalParticipants;
+      chats[chatId] = chat;
+      if (currentChat.value['_id'] == chatId) {
+        currentChat.value = Map<String, dynamic>.from(chat);
+      }
+      chats.refresh();
       return false;
     }
   }
@@ -4722,7 +4753,7 @@ void clearUserPosts() {
     final chat = chats[chatId]!;
     final originalAdmins = List<String>.from(chat['admins']?.map((e) => e.toString()) ?? []);
     final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
-    final participantIndex = participants.indexWhere((p) => p['_id'] == memberId);
+    final participantIndex = participants.indexWhere((p) => p['userId']['_id'] == memberId);
     if (participantIndex == -1) return false;
     final originalRank = participants[participantIndex]['rank'];
 
@@ -4730,7 +4761,11 @@ void clearUserPosts() {
     if (!originalAdmins.contains(memberId)) {
         final newAdmins = List<String>.from(originalAdmins)..add(memberId);
         chat['admins'] = newAdmins;
-        participants[participantIndex]['rank'] = 'admin';
+        // The participant object itself needs to be updated
+        var updatedParticipant = Map<String, dynamic>.from(participants[participantIndex]);
+        updatedParticipant['rank'] = 'admin';
+        participants[participantIndex] = updatedParticipant;
+
         chat['participants'] = participants;
         chats[chatId] = chat;
         if (currentChat.value['_id'] == chatId) {
@@ -4753,6 +4788,15 @@ void clearUserPosts() {
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
+        // The server response should contain the updated group. Let's use it.
+        final updatedGroup = response.data['group'];
+        if (updatedGroup != null) {
+          chats[chatId] = updatedGroup;
+          if (currentChat.value['_id'] == chatId) {
+            currentChat.value = Map<String, dynamic>.from(updatedGroup);
+          }
+          chats.refresh();
+        }
         return true;
       } else {
         throw Exception('Failed to promote admin on server');
@@ -4760,7 +4804,7 @@ void clearUserPosts() {
     } catch (e) {
       // Revert on error
       chat['admins'] = originalAdmins;
-      participants[participantIndex]['rank'] = originalRank;
+      participants[participantIndex]['rank'] = originalRank; // This needs to be reverted on the participant map
       chat['participants'] = participants;
       chats[chatId] = chat;
       if (currentChat.value['_id'] == chatId) {
@@ -4777,7 +4821,7 @@ void clearUserPosts() {
     final chat = chats[chatId]!;
     final originalAdmins = List<String>.from(chat['admins']?.map((e) => e.toString()) ?? []);
     final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
-    final participantIndex = participants.indexWhere((p) => p['_id'] == memberId);
+    final participantIndex = participants.indexWhere((p) => p['userId']['_id'] == memberId);
     if (participantIndex == -1) return false;
     final originalRank = participants[participantIndex]['rank'];
 
@@ -4785,7 +4829,10 @@ void clearUserPosts() {
     if (originalAdmins.contains(memberId)) {
       final newAdmins = List<String>.from(originalAdmins)..remove(memberId);
       chat['admins'] = newAdmins;
-      participants[participantIndex]['rank'] = 'member';
+      var updatedParticipant = Map<String, dynamic>.from(participants[participantIndex]);
+      updatedParticipant['rank'] = 'member';
+      participants[participantIndex] = updatedParticipant;
+
       chat['participants'] = participants;
       chats[chatId] = chat;
       if (currentChat.value['_id'] == chatId) {
@@ -4807,6 +4854,15 @@ void clearUserPosts() {
         ),
       );
       if (response.statusCode == 200 && response.data['success'] == true) {
+        // The server response should contain the updated group. Let's use it.
+        final updatedGroup = response.data['group'];
+        if (updatedGroup != null) {
+          chats[chatId] = updatedGroup;
+          if (currentChat.value['_id'] == chatId) {
+            currentChat.value = Map<String, dynamic>.from(updatedGroup);
+          }
+          chats.refresh();
+        }
         return true;
       } else {
         throw Exception('Failed to demote admin on server');
