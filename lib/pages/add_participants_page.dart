@@ -53,12 +53,27 @@ class _AddParticipantsPageState extends State<AddParticipantsPage> {
     _searchController.addListener(() {
       _filterUsers();
     });
+
+    // Add a listener to react to changes in the chat data
+    _dataController.chats.listen((_) {
+      if (mounted) {
+        _filterUsers();
+      }
+    });
   }
 
   void _filterUsers() {
     final query = _searchController.text.toLowerCase();
-    final participantIds = (widget.chat['participants'] as List)
-        .map((p) => p['_id'] as String)
+
+    // Get the latest chat data from the controller, not the stale widget property
+    final currentChat = _dataController.chats[widget.chat['_id']];
+    if (currentChat == null) {
+      _filteredUsers.clear();
+      return;
+    }
+
+    final participantIds = (currentChat['participants'] as List)
+        .map((p) => (p is Map ? p['_id'] : p.toString()) as String)
         .toSet();
 
     var availableUsers = _dataController.allUsers
@@ -126,10 +141,14 @@ class _AddParticipantsPageState extends State<AddParticipantsPage> {
 
   void _addMembers() async {
     final chatId = widget.chat['_id'];
-    for (var user in _selectedUsers) {
+    final usersToAdd = List<Map<String, dynamic>>.from(_selectedUsers);
+    for (var user in usersToAdd) {
       await _dataController.addMember(chatId, user['_id']);
     }
-    Get.back();
+    if (mounted) {
+      _selectedUsers.clear();
+      Get.back();
+    }
   }
 
   @override
