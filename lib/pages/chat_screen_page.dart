@@ -1158,7 +1158,7 @@ class _ChatScreenState extends State<ChatScreen> {
             (p) => p['userId'] != null && p['userId']['_id'] != currentUserId,
             orElse: () => null,
           );
-
+// akuku danger
           if (otherParticipantRaw == null) {
             return const Text('Error: User not found', style: TextStyle(color: Colors.red, fontSize: 14));
           }
