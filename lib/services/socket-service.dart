@@ -250,11 +250,12 @@ class SocketService {
   }
 
   void _handleChatUpdated(dynamic data) {
+    print('[SocketService] Received chat:updated with data: $data');
     if (data is Map<String, dynamic> && data['_id'] is String) {
       _dataController.handleChatUpdated(data);
       _eventController.add({'event': 'chat:updated', 'data': data});
     } else {
-        // print('SocketService: Invalid chat:updated data format: ${data.runtimeType}');
+        print('SocketService: Invalid chat:updated data format: ${data.runtimeType}');
     }
   }
 
