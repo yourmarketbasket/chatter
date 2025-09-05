@@ -2697,23 +2697,26 @@ class DataController extends GetxController {
   void handleMemberMuted(Map<String, dynamic> data) {
     final chatId = data['chatId'] as String?;
     final memberId = data['memberId'] as String?;
-    if (chatId == null || memberId == null) return;
+    if (chatId == null || memberId == null || !chats.containsKey(chatId)) return;
 
-    if (chats.containsKey(chatId)) {
-      final chat = chats[chatId]!;
-      final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
-      final memberIndex = participants.indexWhere((p) => p['_id'] == memberId);
+    // Create a new map from the existing chat to ensure immutability
+    final chat = Map<String, dynamic>.from(chats[chatId]!);
+    final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
+    final memberIndex = participants.indexWhere((p) => p['_id'] == memberId);
 
-      if (memberIndex != -1) {
-        var updatedParticipant = Map<String, dynamic>.from(participants[memberIndex]);
-        updatedParticipant['isMuted'] = true;
-        participants[memberIndex] = updatedParticipant;
-        chat['participants'] = participants;
-        chats[chatId] = chat;
-        if (currentChat.value['_id'] == chatId) {
-          currentChat.value = Map<String, dynamic>.from(chat);
-        }
-        chats.refresh();
+    if (memberIndex != -1) {
+      // Create a new map for the participant being updated
+      var updatedParticipant = Map<String, dynamic>.from(participants[memberIndex]);
+      updatedParticipant['isMuted'] = true;
+      participants[memberIndex] = updatedParticipant;
+
+      // Assign the new list to the new chat map
+      chat['participants'] = participants;
+
+      // Update the main chats list and the current chat if it's active
+      chats[chatId] = chat;
+      if (activeChatId.value == chatId) {
+        currentChat.value = chat;
       }
     }
   }
@@ -2721,23 +2724,26 @@ class DataController extends GetxController {
   void handleMemberUnmuted(Map<String, dynamic> data) {
     final chatId = data['chatId'] as String?;
     final memberId = data['memberId'] as String?;
-    if (chatId == null || memberId == null) return;
+    if (chatId == null || memberId == null || !chats.containsKey(chatId)) return;
 
-    if (chats.containsKey(chatId)) {
-      final chat = chats[chatId]!;
-      final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
-      final memberIndex = participants.indexWhere((p) => p['_id'] == memberId);
+    // Create a new map from the existing chat to ensure immutability
+    final chat = Map<String, dynamic>.from(chats[chatId]!);
+    final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
+    final memberIndex = participants.indexWhere((p) => p['_id'] == memberId);
 
-      if (memberIndex != -1) {
-        var updatedParticipant = Map<String, dynamic>.from(participants[memberIndex]);
-        updatedParticipant['isMuted'] = false;
-        participants[memberIndex] = updatedParticipant;
-        chat['participants'] = participants;
-        chats[chatId] = chat;
-        if (currentChat.value['_id'] == chatId) {
-          currentChat.value = Map<String, dynamic>.from(chat);
-        }
-        chats.refresh();
+    if (memberIndex != -1) {
+      // Create a new map for the participant being updated
+      var updatedParticipant = Map<String, dynamic>.from(participants[memberIndex]);
+      updatedParticipant['isMuted'] = false;
+      participants[memberIndex] = updatedParticipant;
+
+      // Assign the new list to the new chat map
+      chat['participants'] = participants;
+
+      // Update the main chats list and the current chat if it's active
+      chats[chatId] = chat;
+      if (activeChatId.value == chatId) {
+        currentChat.value = chat;
       }
     }
   }
