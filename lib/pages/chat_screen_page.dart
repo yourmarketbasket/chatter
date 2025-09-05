@@ -80,7 +80,9 @@ class _ChatScreenState extends State<ChatScreen> {
     if (chatId != null) {
       _loadMessages();
     } else {
-      dataController.currentConversationMessages.clear();
+      Future.delayed(Duration.zero, () {
+        dataController.currentConversationMessages.clear();
+      });
     }
 
     // Listen for socket events
