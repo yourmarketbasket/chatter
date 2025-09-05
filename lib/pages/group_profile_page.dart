@@ -98,7 +98,7 @@ class GroupProfilePage extends StatelessWidget {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
 
-        final isSuperAdmin = currentChat['superAdmin']?['_id'] ==
+        final isSuperAdmin = currentChat['superAdmin'] ==
             dataController.user.value['user']['_id'];
         final isAdmin = currentChat['admins']?.any((admin) {
           if (admin is Map) {
