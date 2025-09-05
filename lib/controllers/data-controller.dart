@@ -2614,16 +2614,10 @@ class DataController extends GetxController {
       return;
     }
 
-    final newChats = Map<String, Map<String, dynamic>>.from(chats);
-    final chat = Map<String, dynamic>.from(newChats[chatId]!);
+    final chat = chats[chatId]!;
     final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
-    final admins = List<String>.from(chat['admins']?.map((e) => e.toString()) ?? []);
-
     participants.removeWhere((p) => p['_id'] == memberId);
-    admins.remove(memberId);
-
     chat['participants'] = participants;
-    chat['admins'] = admins;
 
     if (currentChat.value['_id'] == chatId) {
       currentChat.value = Map<String, dynamic>.from(chat);
@@ -2637,20 +2631,17 @@ class DataController extends GetxController {
 
     if (chatId == null || memberId == null || !chats.containsKey(chatId)) return;
 
-    final newChats = Map<String, Map<String, dynamic>>.from(chats);
-    final chat = Map<String, dynamic>.from(newChats[chatId]!);
+    final chat = chats[chatId]!;
     final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
-    final admins = List<String>.from(chat['admins']?.map((e) => e.toString()) ?? []);
+    final memberIndex = participants.indexWhere((p) => p['_id'] == memberId);
 
-    if (!admins.contains(memberId)) {
-      admins.add(memberId);
-      chat['admins'] = admins;
-      newChats[chatId] = chat;
-      chats.value = newChats;
-
+    if (memberIndex != -1) {
+      participants[memberIndex]['rank'] = 'admin';
+      chat['participants'] = participants;
       if (currentChat.value['_id'] == chatId) {
-        currentChat.value = chat;
+        currentChat.value = Map<String, dynamic>.from(chat);
       }
+      chats.refresh();
     }
   }
 
@@ -2660,18 +2651,17 @@ class DataController extends GetxController {
 
     if (chatId == null || memberId == null || !chats.containsKey(chatId)) return;
 
-    final newChats = Map<String, Map<String, dynamic>>.from(chats);
-    final chat = Map<String, dynamic>.from(newChats[chatId]!);
-    final admins = List<String>.from(chat['admins']?.map((e) => e.toString()) ?? []);
+    final chat = chats[chatId]!;
+    final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
+    final memberIndex = participants.indexWhere((p) => p['_id'] == memberId);
 
-    admins.remove(memberId);
-
-    chat['admins'] = admins;
-    newChats[chatId] = chat;
-    chats.value = newChats;
-
-    if (currentChat.value['_id'] == chatId) {
-      currentChat.value = chat;
+    if (memberIndex != -1) {
+      participants[memberIndex]['rank'] = 'member';
+      chat['participants'] = participants;
+      if (currentChat.value['_id'] == chatId) {
+        currentChat.value = Map<String, dynamic>.from(chat);
+      }
+      chats.refresh();
     }
   }
 

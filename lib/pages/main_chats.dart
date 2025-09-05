@@ -399,10 +399,7 @@ class _MainChatsPageState extends State<MainChatsPage> {
                         if (senderIdString == currentUserId) {
                           preview = 'You: $preview';
                         } else if (isGroup) {
-                          final sender = _dataController.allUsers.firstWhere(
-                              (u) => u['_id'] == senderIdString,
-                              orElse: () => {'name': '...'});
-                          final senderName = sender['name'] ?? '...';
+                          final senderName = (senderId is Map ? senderId['name'] as String? : null) ?? '...';
                           preview = '$senderName: $preview';
                         }
                         

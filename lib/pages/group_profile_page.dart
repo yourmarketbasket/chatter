@@ -98,16 +98,17 @@ class GroupProfilePage extends StatelessWidget {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
 
-        final isSuperAdmin = currentChat['superAdmin'] ==
-            dataController.user.value['user']['_id'];
-        final isAdmin = currentChat['admins']?.any((admin) {
-          if (admin is Map) {
-            return admin['_id'] == dataController.user.value['user']['_id'];
-          } else if (admin is String) {
-            return admin == dataController.user.value['user']['_id'];
-          }
-          return false;
-        }) ?? false;
+        final participants = (currentChat['participants'] as List<dynamic>?)
+            ?.map((p) => p as Map<String, dynamic>)
+            .toList() ?? [];
+        final currentUserParticipant = participants.firstWhere(
+          (p) => p['_id'] == dataController.user.value['user']['_id'],
+          orElse: () => {},
+        );
+
+        final isSuperAdmin = currentUserParticipant['rank'] == 'superadmin';
+        final isAdmin = currentUserParticipant['rank'] == 'admin';
+        final hasSuperAdmin = participants.any((p) => p['rank'] == 'superadmin');
 
         return Scaffold(
           appBar: AppBar(
@@ -312,18 +313,9 @@ class GroupProfilePage extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 2.4),
-                ...?(currentChat['participants'] as List<dynamic>?)
-                    ?.map((participant) {
-                  final p = participant as Map<String, dynamic>?;
-                  if (p == null) {
-                    return const SizedBox.shrink();
-                  }
-
-                  final isParticipantAdmin = (currentChat['admins'] as List<dynamic>?)?.any((admin) {
-                        final adminId = admin is Map ? admin['_id'] : admin;
-                        return adminId == p['_id'];
-                      }) ?? false;
-                  final isParticipantSuperAdmin = currentChat['superAdmin'] == p['_id'];
+                ...participants.map((p) {
+                  final isParticipantAdmin = p['rank'] == 'admin';
+                  final isParticipantSuperAdmin = p['rank'] == 'superadmin';
                   final isMuted = p['isMuted'] as bool? ?? false;
                   final rank = p['rank'] as String?;
 
@@ -354,7 +346,7 @@ class GroupProfilePage extends StatelessWidget {
                             child: Icon(Icons.admin_panel_settings, color: Colors.teal, size: 14),
                           ),
                         if (isMuted)
-                           const Padding(
+                          const Padding(
                             padding: EdgeInsets.only(left: 4.0),
                             child: Icon(Icons.mic_off_outlined, color: Colors.redAccent, size: 14),
                           ),
@@ -365,7 +357,7 @@ class GroupProfilePage extends StatelessWidget {
                       style: GoogleFonts.poppins(
                         color: rank == 'superadmin'
                             ? Colors.amber
-                            : Colors.tealAccent,
+                            : (rank == 'admin' ? Colors.tealAccent : Colors.grey),
                         fontSize: 10,
                         fontWeight: FontWeight.w500,
                       ),
@@ -377,9 +369,7 @@ class GroupProfilePage extends StatelessWidget {
                             onSelected: (value) {
                               switch (value) {
                                 case 'remove':
-                                  if ((currentChat['participants']?.length ??
-                                          0) <=
-                                      3) {
+                                  if ((participants.length) <= 3) {
                                     Get.dialog(
                                       AlertDialog(
                                         title: const Text('Cannot Remove User'),
@@ -390,59 +380,53 @@ class GroupProfilePage extends StatelessWidget {
                                             onPressed: () => Get.back(),
                                             child: const Text('Cancel'),
                                           ),
-                                          if (isSuperAdmin ||
-                                              (isAdmin &&
-                                                  currentChat['superAdmin'] ==
-                                                      null))
+                                          if (isSuperAdmin || (isAdmin && !hasSuperAdmin))
                                             TextButton(
                                               onPressed: () {
-                                                dataController.closeGroup(
-                                                    currentChat['_id']);
+                                                dataController.closeGroup(currentChat['_id']);
                                                 Get.back();
                                               },
                                               child: const Text('Close Group',
-                                                  style: TextStyle(
-                                                      color: Colors.redAccent)),
+                                                  style: TextStyle(color: Colors.redAccent)),
                                             ),
                                         ],
                                       ),
                                     );
                                   } else {
-                                    dataController.removeMember(
-                                        currentChat['_id'], p!['_id']);
+                                    dataController.removeMember(currentChat['_id'], p['_id']);
                                   }
                                   break;
                                 case 'promote':
-                                  dataController.promoteAdmin(
-                                      currentChat['_id'], p!['_id']);
+                                  dataController.promoteAdmin(currentChat['_id'], p['_id']);
                                   break;
                                 case 'demote':
-                                  dataController.demoteAdmin(
-                                      currentChat['_id'], p!['_id']);
+                                  dataController.demoteAdmin(currentChat['_id'], p['_id']);
                                   break;
                                 case 'mute':
                                   if (isMuted) {
-                                    dataController.unmuteMember(
-                                        currentChat['_id'], p!['_id']);
+                                    dataController.unmuteMember(currentChat['_id'], p['_id']);
                                   } else {
-                                    dataController.muteMember(
-                                        currentChat['_id'], p!['_id']);
+                                    dataController.muteMember(currentChat['_id'], p['_id']);
                                   }
                                   break;
                               }
                             },
-                            itemBuilder: (BuildContext context) =>
-                                <PopupMenuEntry<String>>[
+                            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
                               const PopupMenuItem<String>(
                                 value: 'remove',
                                 child: Text('Remove'),
                               ),
-                              if (isSuperAdmin)
+                              if (isSuperAdmin && !isParticipantSuperAdmin)
                                 PopupMenuItem<String>(
                                   value: isParticipantAdmin ? 'demote' : 'promote',
                                   child: Text(isParticipantAdmin
                                       ? 'Demote from Admin'
                                       : 'Promote to Admin'),
+                                ),
+                              if (isAdmin && !isSuperAdmin && !isParticipantSuperAdmin && !isParticipantAdmin)
+                                const PopupMenuItem<String>(
+                                  value: 'promote',
+                                  child: Text('Promote to Admin'),
                                 ),
                               PopupMenuItem<String>(
                                 value: 'mute',
