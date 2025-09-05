@@ -1447,6 +1447,20 @@ class _ChatScreenState extends State<ChatScreen> {
                       return _buildDateChip(item);
                     } else {
                       final message = item as Map<String, dynamic>;
+
+                      // Handle system messages separately to avoid accessing senderId
+                      if (message['type'] == 'system') {
+                        return MessageBubble(
+                          message: message,
+                          prevMessage: null,
+                          dataController: dataController,
+                          openMediaView: (m, i) {},
+                          buildAttachment: (m) => const SizedBox(),
+                          getReplyPreviewText: (a) => '',
+                          buildReactions: (m, b) => const SizedBox(),
+                        );
+                      }
+
                       final currentUserId = dataController.getUserId();
 
                       // Priority 1: Check if message was deleted for everyone

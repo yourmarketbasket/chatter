@@ -9,7 +9,12 @@ class ApiUpgraderStore extends UpgraderStore {
   ApiUpgraderStore();
 
   @override
-  Future<UpgraderVersionInfo> getVersionInfo({String? country, String? language}) async {
+  Future<UpgraderVersionInfo> getVersionInfo({
+    required String? country,
+    required Version installedVersion,
+    required String? language,
+    required UpgraderState state,
+  }) async {
     print('[ApiUpgraderStore] Getting version info from custom API.');
 
     final updateData = await _dataController.getLatestAppUpdate();
