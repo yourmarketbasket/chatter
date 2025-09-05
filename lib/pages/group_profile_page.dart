@@ -313,20 +313,15 @@ class GroupProfilePage extends StatelessWidget {
                 ),
                 const SizedBox(height: 2.4),
                 ...?(currentChat['participants'] as List<dynamic>?)
-                    ?.where((p) => p != null) // Add a filter for null participants
+                    ?.where((p) => p['userId'] != null) // Add a filter for null participants
                     .map((participant) {
-                  final p = (participant is Map<String, dynamic>)
-                      ? participant
-                      : dataController.allUsers.firstWhere(
-                          (u) => u['_id'] == participant,
-                          orElse: () => {'_id': participant, 'name': 'Unknown User', 'avatar': ''},
-                        );
+                  final p = participant['userId'];
                   final isParticipantAdmin = currentChat['admins']
-                          ?.any((admin) => admin['_id'] == p['_id']) ??
+                          ?.any((admin) => admin == p['_id']) ??
                       false;
                   final isParticipantSuperAdmin =
                       currentChat['superAdmin']?['_id'] == p['_id'];
-                  final isMuted = p['isMuted'] ?? false;
+                  final isMuted = participant['isMuted'] ?? false;
             
                   return ListTile(
                     contentPadding:

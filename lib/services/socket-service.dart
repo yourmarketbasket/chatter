@@ -95,6 +95,7 @@ class SocketService {
       'group:updated': (data) => _handleGroupUpdated(data),
       'group:removedFrom': (data) => _handleGroupRemovedFrom(data),
       'member:joined': (data) => _handleMemberJoined(data),
+      'member:added': (data) => _handleMemberJoined(data),
       'member:removed': (data) => _handleMemberRemoved(data),
       'member:promoted': (data) => _handleMemberPromoted(data),
       'member:demoted': (data) => _handleMemberDemoted(data),

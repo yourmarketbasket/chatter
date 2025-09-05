@@ -23,19 +23,15 @@ class ApiUpgraderStore extends UpgraderStore {
       final versionStr = updateData['version'] as String?;
       final notes = updateData['notes'] as String?;
       final url = updateData['url'] as String?;
-      final minAppVersionStr = updateData['minAppVersion'] as String?;
-
       if (versionStr != null && url != null) {
         print('[ApiUpgraderStore] Found update: $versionStr, URL: $url');
 
         final appStoreVersion = Version.parse(versionStr);
-        final minAppVersion = minAppVersionStr != null ? Version.parse(minAppVersionStr) : null;
 
         return UpgraderVersionInfo(
           appStoreVersion: appStoreVersion,
           releaseNotes: notes,
           appStoreListingURL: url,
-          minAppVersion: minAppVersion,
         );
       }
     }

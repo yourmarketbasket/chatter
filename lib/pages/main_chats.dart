@@ -231,7 +231,7 @@ class _MainChatsPageState extends State<MainChatsPage> {
               } else {
                 final currentUserId = _dataController.user.value['user']['_id'];
                 final otherUserRaw = (chat['participants'] as List<dynamic>).firstWhere(
-                  (p) => p['_id'] != currentUserId,
+                  (p) => p['userId']['_id'] != currentUserId,
                   orElse: () => (chat['participants'] as List<dynamic>).first,
                 );
                 final otherUser = otherUserRaw is Map<String, dynamic>
@@ -353,7 +353,7 @@ class _MainChatsPageState extends State<MainChatsPage> {
                                 verificationData = chat['verification'] ?? {'entityType': null, 'level': null};
                               } else {
                                 final otherParticipantRaw = (chat['participants'] as List<dynamic>).firstWhere(
-                                  (p) => (p is Map<String, dynamic> ? p['_id'] : p) != currentUserId,
+                                  (p) => p['userId']['_id'] != currentUserId,
                                   orElse: () => null,
                                 );
 
@@ -361,7 +361,7 @@ class _MainChatsPageState extends State<MainChatsPage> {
                                   return ListTile(title: Text("Invalid Chat", style: GoogleFonts.poppins(color: Colors.red)));
                                 }
 
-                                final otherUserId = otherParticipantRaw is Map<String, dynamic> ? otherParticipantRaw['_id'] : otherParticipantRaw;
+                                final otherUserId = otherParticipantRaw['userId']['_id'];
 
                                 otherUser = _dataController.allUsers.firstWhere(
                                     (u) => u['_id'] == otherUserId,

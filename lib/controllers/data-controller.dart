@@ -188,7 +188,9 @@ class DataController extends GetxController {
     // This should only happen if we are not currently in a chat.
     if (activeChatId.value == null) {
       final currentUserId = getUserId();
-      final participants = (newChatData['participants'] as List?)?.map((p) => p is Map ? p['_id'] : p).toList();
+      final participants = (newChatData['participants'] as List?)
+          ?.map((p) => p['userId']?['_id'] ?? p['userId'])
+          .toList();
       if (participants != null && participants.contains(currentUserId)) {
         currentChat.value = newChatData;
         activeChatId.value = chatId;
@@ -2198,8 +2200,8 @@ class DataController extends GetxController {
         final blockedUsers = user.value['user']?['blockedUsers'] ?? [];
         for (var chat in chatData) {
           if (chat['type'] == 'dm') {
-            final participant = (chat['participants'] as List).firstWhere((p) => p['_id'] != user.value['user']['_id']);
-            if (!blockedUsers.contains(participant['_id'])) {
+            final participant = (chat['participants'] as List).firstWhere((p) => p['userId']['_id'] != user.value['user']['_id']);
+            if (!blockedUsers.contains(participant['userId']['_id'])) {
               chats[chat['_id']] = chat;
             }
           } else {
@@ -2260,7 +2262,7 @@ class DataController extends GetxController {
         messageToSend.remove('participants');
       } else {
         final List<dynamic> participants = messageToSend['participants'];
-        final List<String> participantIds = participants.map((p) => (p is Map ? p['_id'] : p) as String).toList();
+        final List<String> participantIds = participants.map((p) => (p is Map ? p['userId']['_id'] : p) as String).toList();
         participantIds.remove(user.value['user']['_id']);
         messageToSend['participants'] = participantIds;
       }
@@ -2600,16 +2602,21 @@ class DataController extends GetxController {
 
   void handleMemberJoined(Map<String, dynamic> data) {
     final chatId = data['chatId'] as String?;
-    final member = data['member'] as Map<String, dynamic>?;
+    final memberData = data['member'] as Map<String, dynamic>?;
 
-    if (chatId == null || member == null || !chats.containsKey(chatId)) return;
+    if (chatId == null || memberData == null || !chats.containsKey(chatId)) return;
 
     final newChats = Map<String, Map<String, dynamic>>.from(chats);
     final chat = Map<String, dynamic>.from(newChats[chatId]!);
     final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
 
-    if (!participants.any((p) => p['_id'] == member['_id'])) {
-      participants.add(member);
+    final newParticipant = {
+      "userId": memberData,
+      "joinedAt": DateTime.now().toIso8601String(),
+    };
+
+    if (!participants.any((p) => p['userId']['_id'] == memberData['_id'])) {
+      participants.add(newParticipant);
       chat['participants'] = participants;
       newChats[chatId] = chat;
       chats.value = newChats;
@@ -2636,8 +2643,8 @@ class DataController extends GetxController {
     final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
     final admins = List<Map<String, dynamic>>.from(chat['admins'] ?? []);
 
-    participants.removeWhere((p) => p is Map && p['_id'] == memberId);
-    admins.removeWhere((a) => a is Map && a['_id'] == memberId);
+    participants.removeWhere((p) => p['userId']['_id'] == memberId);
+    admins.removeWhere((a) => a == memberId);
 
     chat['participants'] = participants;
     chat['admins'] = admins;
@@ -2660,16 +2667,8 @@ class DataController extends GetxController {
     final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
     final admins = List<Map<String, dynamic>>.from(chat['admins'] ?? []);
 
-    Map<String, dynamic>? participant;
-    for (var p in participants) {
-      if (p is Map && p['_id'] == memberId) {
-        participant = p;
-        break;
-      }
-    }
-
-    if (participant != null && !admins.any((a) => a is Map && a['_id'] == memberId)) {
-      admins.add(participant);
+    if (!admins.any((a) => a == memberId)) {
+      admins.add(memberId);
       chat['admins'] = admins;
       newChats[chatId] = chat;
       chats.value = newChats;
@@ -2690,7 +2689,7 @@ class DataController extends GetxController {
     final chat = Map<String, dynamic>.from(newChats[chatId]!);
     final admins = List<Map<String, dynamic>>.from(chat['admins'] ?? []);
 
-    admins.removeWhere((a) => a is Map && a['_id'] == memberId);
+    admins.removeWhere((a) => a == memberId);
 
     chat['admins'] = admins;
     newChats[chatId] = chat;
@@ -2709,7 +2708,7 @@ class DataController extends GetxController {
     if (chats.containsKey(chatId)) {
       final chat = chats[chatId]!;
       final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
-      final memberIndex = participants.indexWhere((p) => p['_id'] == memberId);
+      final memberIndex = participants.indexWhere((p) => p['userId']['_id'] == memberId);
 
       if (memberIndex != -1) {
         participants[memberIndex]['isMuted'] = true;
@@ -2731,7 +2730,7 @@ class DataController extends GetxController {
     if (chats.containsKey(chatId)) {
       final chat = chats[chatId]!;
       final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
-      final memberIndex = participants.indexWhere((p) => p['_id'] == memberId);
+      final memberIndex = participants.indexWhere((p) => p['userId']['_id'] == memberId);
 
       if (memberIndex != -1) {
         participants[memberIndex]['isMuted'] = false;
@@ -4663,8 +4662,12 @@ void clearUserPosts() {
     if (memberToAdd == null) return false; // User to add not found
 
     // 2. Optimistic UI Update
-    if (memberToAdd != null && !participants.any((p) => p['_id'] == memberId)) {
-      participants.add(memberToAdd);
+    if (memberToAdd != null && !participants.any((p) => p['userId']['_id'] == memberId)) {
+      final newParticipant = {
+        "userId": memberToAdd,
+        "joinedAt": DateTime.now().toIso8601String(),
+      };
+      participants.add(newParticipant);
       chat['participants'] = participants;
       chats[chatId] = chat;
       chats.refresh(); // Notify listeners
@@ -5133,7 +5136,7 @@ void clearUserPosts() {
       final targetChat = chats.values.firstWhere(
         (chat) =>
             chat['type'] == 'dm' &&
-            (chat['participants'] as List).any((p) => (p is Map ? p['_id'] : p) == targetUserId),
+            (chat['participants'] as List).any((p) => p['userId']['_id'] == targetUserId),
       );
       chatId = targetChat['_id'];
     } catch (e) {

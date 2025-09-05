@@ -181,13 +181,13 @@ class _ChatScreenState extends State<ChatScreen> {
 
     final currentUserId = dataController.getUserId();
     final otherParticipantRaw = (chat['participants'] as List<dynamic>).firstWhere(
-      (p) => (p is Map ? p['_id'] : p) != currentUserId,
+      (p) => p['userId']['_id'] != currentUserId,
       orElse: () => null,
     );
 
     if (otherParticipantRaw == null) return null;
 
-    final otherUserId = otherParticipantRaw is Map ? otherParticipantRaw['_id'] : otherParticipantRaw;
+    final otherUserId = otherParticipantRaw['userId']['_id'];
     try {
       return dataController.allUsers.firstWhere(
         (u) => u['_id'] == otherUserId,
@@ -1155,7 +1155,7 @@ class _ChatScreenState extends State<ChatScreen> {
         } else {
           final currentUserId = dataController.user.value['user']['_id'];
           final otherParticipantRaw = (chat['participants'] as List<dynamic>).firstWhere(
-            (p) => (p is Map ? p['_id'] : p) != currentUserId,
+            (p) => p['userId']['_id'] != currentUserId,
             orElse: () => null,
           );
 
@@ -1163,7 +1163,7 @@ class _ChatScreenState extends State<ChatScreen> {
             return const Text('Error: User not found', style: TextStyle(color: Colors.red, fontSize: 14));
           }
 
-          final otherUserId = otherParticipantRaw is Map ? otherParticipantRaw['_id'] : otherParticipantRaw;
+          final otherUserId = otherParticipantRaw['userId']['_id'];
 
           final otherUser = dataController.allUsers.firstWhere(
             (u) => u['_id'] == otherUserId,
