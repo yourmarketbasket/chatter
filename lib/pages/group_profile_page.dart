@@ -313,16 +313,31 @@ class GroupProfilePage extends StatelessWidget {
                 ),
                 const SizedBox(height: 2.4),
                 ...?(currentChat['participants'] as List<dynamic>?)
-                    ?.where((p) => p['userId'] != null) // Add a filter for null participants
-                    .map((participant) {
-                  final p = participant['userId'];
-                  final isParticipantAdmin = currentChat['admins']
-                          ?.any((admin) => admin == p['_id']) ??
-                      false;
-                  final isParticipantSuperAdmin =
-                      currentChat['superAdmin'] == p['_id'];
+                    ?.map((participant) {
+                  final userIdValue = participant['userId'];
+                  Map<String, dynamic>? p;
+
+                  if (userIdValue is Map<String, dynamic>) {
+                    p = userIdValue;
+                  } else if (userIdValue is String) {
+                    try {
+                      p = dataController.allUsers.firstWhere((u) => u['_id'] == userIdValue);
+                    } catch (e) {
+                      p = null;
+                    }
+                  }
+
+                  if (p == null) {
+                    return const SizedBox.shrink();
+                  }
+
+                  final isParticipantAdmin = (currentChat['admins'] as List<dynamic>?)?.any((admin) {
+                        final adminId = admin is Map ? admin['_id'] : admin;
+                        return adminId == p!['_id'];
+                      }) ?? false;
+                  final isParticipantSuperAdmin = currentChat['superAdmin'] == p['_id'];
                   final isMuted = participant['isMuted'] ?? false;
-            
+
                   return ListTile(
                     contentPadding:
                         const EdgeInsets.symmetric(horizontal: 0, vertical: 0.8),
@@ -337,12 +352,23 @@ class GroupProfilePage extends StatelessWidget {
                     ),
                     title: Row(
                       children: [
-                    
                         Text(p['username'] ?? p['name'] ?? 'Unknown',
                             style: const TextStyle(color: Colors.white)),
-                        isParticipantSuperAdmin ? const Icon(Icons.verified, color: Colors.amber, size: 12) : const SizedBox(),
-                        isParticipantAdmin ? const Icon(Icons.admin_panel_settings, color: Colors.teal, size: 12) : const SizedBox(),
-                        isMuted ? const Icon(Icons.mic_off_outlined, color: Colors.redAccent, size: 12) : const SizedBox(),
+                        if (isParticipantSuperAdmin)
+                          const Padding(
+                            padding: EdgeInsets.only(left: 4.0),
+                            child: Icon(Icons.verified, color: Colors.amber, size: 14),
+                          ),
+                        if (isParticipantAdmin && !isParticipantSuperAdmin)
+                          const Padding(
+                            padding: EdgeInsets.only(left: 4.0),
+                            child: Icon(Icons.admin_panel_settings, color: Colors.teal, size: 14),
+                          ),
+                        if (isMuted)
+                           const Padding(
+                            padding: EdgeInsets.only(left: 4.0),
+                            child: Icon(Icons.mic_off_outlined, color: Colors.redAccent, size: 14),
+                          ),
                       ],
                     ),
                     subtitle: Row(
