@@ -172,7 +172,6 @@ class SocketService {
   }
 
   void _handleMemberMuted(dynamic data) {
-    print('[SocketService] Received member:muted with data: $data');
     if (data is Map<String, dynamic>) {
       _dataController.handleMemberMuted(data);
       _eventController.add({'event': 'member:muted', 'data': data});
@@ -180,7 +179,6 @@ class SocketService {
   }
 
   void _handleMemberUnmuted(dynamic data) {
-    print('[SocketService] Received member:unmuted with data: $data');
     if (data is Map<String, dynamic>) {
       _dataController.handleMemberUnmuted(data);
       _eventController.add({'event': 'member:unmuted', 'data': data});

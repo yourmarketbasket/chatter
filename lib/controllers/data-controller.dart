@@ -2696,13 +2696,13 @@ class DataController extends GetxController {
 
   void handleMemberMuted(Map<String, dynamic> data) {
     final chatId = data['chatId'] as String?;
-    final memberId = data['memberId'] as String?;
-    if (chatId == null || memberId == null || !chats.containsKey(chatId)) return;
+    final userId = data['userId'] as String?; // Corrected from memberId to userId
+    if (chatId == null || userId == null || !chats.containsKey(chatId)) return;
 
     // Create a new map from the existing chat to ensure immutability
     final chat = Map<String, dynamic>.from(chats[chatId]!);
     final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
-    final memberIndex = participants.indexWhere((p) => p['_id'] == memberId);
+    final memberIndex = participants.indexWhere((p) => p['_id'] == userId);
 
     if (memberIndex != -1) {
       // Create a new map for the participant being updated
@@ -2723,13 +2723,13 @@ class DataController extends GetxController {
 
   void handleMemberUnmuted(Map<String, dynamic> data) {
     final chatId = data['chatId'] as String?;
-    final memberId = data['memberId'] as String?;
-    if (chatId == null || memberId == null || !chats.containsKey(chatId)) return;
+    final userId = data['userId'] as String?; // Corrected from memberId to userId
+    if (chatId == null || userId == null || !chats.containsKey(chatId)) return;
 
     // Create a new map from the existing chat to ensure immutability
     final chat = Map<String, dynamic>.from(chats[chatId]!);
     final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
-    final memberIndex = participants.indexWhere((p) => p['_id'] == memberId);
+    final memberIndex = participants.indexWhere((p) => p['_id'] == userId);
 
     if (memberIndex != -1) {
       // Create a new map for the participant being updated
