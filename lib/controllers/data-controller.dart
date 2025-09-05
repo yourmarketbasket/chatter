@@ -257,13 +257,21 @@ class DataController extends GetxController {
     final chatId = updatedChatData['_id'] as String?;
     if (chatId == null) return;
 
-    // Add or replace the chat object. This handles both new chats and updates.
-    chats[chatId] = updatedChatData;
+    if (chats.containsKey(chatId)) {
+      final chat = chats[chatId]!;
+      // Merge the updated data into the existing chat object
+      chat.addAll(updatedChatData);
+      chats[chatId] = chat;
 
-    if (activeChatId.value == chatId) {
-      currentChat.value = Map<String, dynamic>.from(updatedChatData);
+      if (activeChatId.value == chatId) {
+        currentChat.value = Map<String, dynamic>.from(chat);
+      }
+      chats.refresh();
+    } else {
+      // If the chat is not in the local list, add it.
+      chats[chatId] = updatedChatData;
+      chats.refresh();
     }
-    chats.refresh();
   }
 
   void handleMessageStatusUpdate(Map<String, dynamic> data) {
