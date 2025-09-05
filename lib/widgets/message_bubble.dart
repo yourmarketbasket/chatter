@@ -114,7 +114,7 @@ class _MessageBubbleState extends State<MessageBubble> {
         padding: const EdgeInsets.symmetric(vertical: 2.0, horizontal: 4.0),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(15.0),
-          // border: Border.all(color: Colors.grey[850]!, width: 0.5),
+          
         ),
         child: Text(
           widget.message['content'] ?? '',
