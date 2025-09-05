@@ -279,15 +279,11 @@ class DataController extends GetxController {
     if (chatId == null) return;
 
     if (chats.containsKey(chatId)) {
-      final chat = chats[chatId]!;
-      // Merge new data into the existing chat map to preserve fields like 'participants'
-      updatedChatData.forEach((key, value) {
-        chat[key] = value;
-      });
-      chats[chatId] = chat; // Put the updated map back
+      // Replace the old chat object with the new, authoritative data from the server
+      chats[chatId] = updatedChatData;
 
       if (activeChatId.value == chatId) {
-        currentChat.value = Map<String, dynamic>.from(chat);
+        currentChat.value = Map<String, dynamic>.from(updatedChatData);
       }
       chats.refresh();
     } else {
@@ -2208,8 +2204,11 @@ class DataController extends GetxController {
         final blockedUsers = user.value['user']?['blockedUsers'] ?? [];
         for (var chat in chatData) {
           if (chat['type'] == 'dm') {
-            final participant = (chat['participants'] as List).firstWhere((p) => p['userId']['_id'] != user.value['user']['_id']);
-            if (!blockedUsers.contains(participant['userId']['_id'])) {
+            final otherParticipant = (chat['participants'] as List).firstWhere(
+              (p) => p['_id'] != user.value['user']['_id'],
+              orElse: () => null
+            );
+            if (otherParticipant != null && !blockedUsers.contains(otherParticipant['_id'])) {
               chats[chat['_id']] = chat;
             }
           } else {
@@ -2269,9 +2268,12 @@ class DataController extends GetxController {
       if (messageToSend['chatId'] != null && (messageToSend['chatId'] as String).isNotEmpty) {
         messageToSend.remove('participants');
       } else {
+        // For a new chat, we only need to send the other participant's ID.
         final List<dynamic> participants = messageToSend['participants'];
-        final List<String> participantIds = participants.map((p) => (p is Map ? p['userId']['_id'] : p) as String).toList();
-        participantIds.remove(user.value['user']['_id']);
+        final List<String> participantIds = participants
+            .map((p) => (p is Map ? p['_id'] : p) as String)
+            .toList();
+        participantIds.remove(getUserId());
         messageToSend['participants'] = participantIds;
       }
 
@@ -2610,29 +2612,22 @@ class DataController extends GetxController {
 
   void handleMemberJoined(Map<String, dynamic> data) {
     final chatId = data['chatId'] as String?;
-    final memberData = data['member'] as Map<String, dynamic>?;
+    final newMember = data['member'] as Map<String, dynamic>?;
 
-    if (chatId == null || memberData == null || !chats.containsKey(chatId)) return;
+    if (chatId == null || newMember == null || !chats.containsKey(chatId)) return;
 
     final chat = chats[chatId]!;
     final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
 
-    final newParticipant = {
-      "userId": memberData,
-      "joinedAt": DateTime.now().toIso8601String(),
-      "isMuted": false,
-      "rank": "member"
-    };
+    // Remove existing entry if any, then add the new one to ensure data is fresh
+    participants.removeWhere((p) => p['_id'] == newMember['_id']);
+    participants.add(newMember);
+    chat['participants'] = participants;
 
-    if (!participants.any((p) => p['userId']['_id'] == memberData['_id'])) {
-      participants.add(newParticipant);
-      chat['participants'] = participants;
-
-      if (currentChat.value['_id'] == chatId) {
-        currentChat.value = Map<String, dynamic>.from(chat);
-      }
-      chats.refresh();
+    if (currentChat.value['_id'] == chatId) {
+      currentChat.value = Map<String, dynamic>.from(chat);
     }
+    chats.refresh();
   }
 
   void handleMemberRemoved(Map<String, dynamic> data) {
@@ -2651,7 +2646,7 @@ class DataController extends GetxController {
     final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
     final admins = List<String>.from(chat['admins']?.map((e) => e.toString()) ?? []);
 
-    participants.removeWhere((p) => p['userId']['_id'] == memberId);
+    participants.removeWhere((p) => p['_id'] == memberId);
     admins.remove(memberId);
 
     chat['participants'] = participants;
@@ -2715,14 +2710,16 @@ class DataController extends GetxController {
     if (chats.containsKey(chatId)) {
       final chat = chats[chatId]!;
       final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
-      final memberIndex = participants.indexWhere((p) => p['userId']['_id'] == memberId);
+      final memberIndex = participants.indexWhere((p) => p['_id'] == memberId);
 
       if (memberIndex != -1) {
-        participants[memberIndex]['isMuted'] = true;
+        var updatedParticipant = Map<String, dynamic>.from(participants[memberIndex]);
+        updatedParticipant['isMuted'] = true;
+        participants[memberIndex] = updatedParticipant;
         chat['participants'] = participants;
         chats[chatId] = chat;
         if (currentChat.value['_id'] == chatId) {
-          currentChat.value = chat;
+          currentChat.value = Map<String, dynamic>.from(chat);
         }
         chats.refresh();
       }
@@ -2737,14 +2734,16 @@ class DataController extends GetxController {
     if (chats.containsKey(chatId)) {
       final chat = chats[chatId]!;
       final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
-      final memberIndex = participants.indexWhere((p) => p['userId']['_id'] == memberId);
+      final memberIndex = participants.indexWhere((p) => p['_id'] == memberId);
 
       if (memberIndex != -1) {
-        participants[memberIndex]['isMuted'] = false;
+        var updatedParticipant = Map<String, dynamic>.from(participants[memberIndex]);
+        updatedParticipant['isMuted'] = false;
+        participants[memberIndex] = updatedParticipant;
         chat['participants'] = participants;
         chats[chatId] = chat;
         if (currentChat.value['_id'] == chatId) {
-          currentChat.value = chat;
+          currentChat.value = Map<String, dynamic>.from(chat);
         }
         chats.refresh();
       }
@@ -4653,57 +4652,20 @@ void clearUserPosts() {
   }
 
   Future<bool> addMember(String chatId, String memberId) async {
-    // 1. Find chat and user to add
-    if (!chats.containsKey(chatId)) return false;
-    final chat = chats[chatId]!;
-    final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
-    final originalParticipants = List<Map<String, dynamic>>.from(participants); // For rollback
-
-    Map<String, dynamic>? memberToAdd;
-    try {
-      memberToAdd = allUsers.firstWhere((u) => u['_id'] == memberId);
-    } catch (e) {
-      memberToAdd = null;
-    }
-
-    if (memberToAdd == null) return false; // User to add not found
-
-    // 2. Optimistic UI Update
-    if (memberToAdd != null && !participants.any((p) => p['userId']['_id'] == memberId)) {
-      final newParticipant = {
-        "userId": memberToAdd,
-        "joinedAt": DateTime.now().toIso8601String(),
-        "isMuted": false,
-        "rank": "member"
-      };
-      participants.add(newParticipant);
-      chat['participants'] = participants;
-      chats[chatId] = chat;
-      if (currentChat.value['_id'] == chatId) {
-        currentChat.value = Map<String, dynamic>.from(chat);
-      }
-      chats.refresh();
-    }
-
-    // 3. Make API call
     try {
       final token = user.value['token'];
-      if (token == null) {
-        throw Exception('User not authenticated');
-      }
+      if (token == null) throw Exception('User not authenticated');
+
       final response = await _dio.post(
         'api/chats/$chatId/add-member',
         data: {'memberId': memberId},
-        options: dio.Options(
-          headers: {'Authorization': 'Bearer $token'},
-        ),
+        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
       );
 
-      // 4. Handle API response
       if (response.statusCode == 200 && response.data['success'] == true) {
-        // The response contains the updated group object. Use it to update the local state.
         final updatedGroup = response.data['group'];
         if (updatedGroup != null) {
+          // Replace the local chat data with the authoritative response from the server
           chats[chatId] = updatedGroup;
           if (currentChat.value['_id'] == chatId) {
             currentChat.value = Map<String, dynamic>.from(updatedGroup);
@@ -4712,17 +4674,10 @@ void clearUserPosts() {
         }
         return true;
       } else {
-        // API call failed, revert the change
         throw Exception('Failed to add member on server: ${response.data?['message']}');
       }
     } catch (e) {
-      // 5. Revert on error
-      chat['participants'] = originalParticipants;
-      chats[chatId] = chat;
-      if (currentChat.value['_id'] == chatId) {
-        currentChat.value = Map<String, dynamic>.from(chat);
-      }
-      chats.refresh();
+      print('Error adding member: $e');
       return false;
     }
   }
@@ -4730,65 +4685,45 @@ void clearUserPosts() {
   Future<bool> removeMember(String chatId, String memberId) async {
     try {
       final token = user.value['token'];
-      if (token == null) {
-        throw Exception('User not authenticated');
-      }
+      if (token == null) throw Exception('User not authenticated');
+
       final response = await _dio.post(
         'api/chats/$chatId/remove-member',
         data: {'memberId': memberId},
-        options: dio.Options(
-          headers: {'Authorization': 'Bearer $token'},
-        ),
+        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
       );
-      return response.statusCode == 200 && response.data['success'] == true;
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        final updatedGroup = response.data['group'];
+        if (updatedGroup != null) {
+          chats[chatId] = updatedGroup;
+          if (currentChat.value['_id'] == chatId) {
+            currentChat.value = Map<String, dynamic>.from(updatedGroup);
+          }
+          chats.refresh();
+        }
+        return true;
+      } else {
+        throw Exception('Failed to remove member on server: ${response.data?['message']}');
+      }
     } catch (e) {
-      // print('Error removing member: $e');
+      print('Error removing member: $e');
       return false;
     }
   }
 
   Future<bool> promoteAdmin(String chatId, String memberId) async {
-    if (!chats.containsKey(chatId)) return false;
-
-    final chat = chats[chatId]!;
-    final originalAdmins = List<String>.from(chat['admins']?.map((e) => e.toString()) ?? []);
-    final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
-    final participantIndex = participants.indexWhere((p) => p['userId']['_id'] == memberId);
-    if (participantIndex == -1) return false;
-    final originalRank = participants[participantIndex]['rank'];
-
-    // Optimistic UI Update
-    if (!originalAdmins.contains(memberId)) {
-        final newAdmins = List<String>.from(originalAdmins)..add(memberId);
-        chat['admins'] = newAdmins;
-        // The participant object itself needs to be updated
-        var updatedParticipant = Map<String, dynamic>.from(participants[participantIndex]);
-        updatedParticipant['rank'] = 'admin';
-        participants[participantIndex] = updatedParticipant;
-
-        chat['participants'] = participants;
-        chats[chatId] = chat;
-        if (currentChat.value['_id'] == chatId) {
-            currentChat.value = Map<String, dynamic>.from(chat);
-        }
-        chats.refresh();
-    }
-
     try {
       final token = user.value['token'];
-      if (token == null) {
-        throw Exception('User not authenticated');
-      }
+      if (token == null) throw Exception('User not authenticated');
+
       final response = await _dio.post(
         'api/chats/$chatId/promote-admin',
         data: {'memberId': memberId},
-        options: dio.Options(
-          headers: {'Authorization': 'Bearer $token'},
-        ),
+        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
-        // The server response should contain the updated group. Let's use it.
         final updatedGroup = response.data['group'];
         if (updatedGroup != null) {
           chats[chatId] = updatedGroup;
@@ -4799,62 +4734,26 @@ void clearUserPosts() {
         }
         return true;
       } else {
-        throw Exception('Failed to promote admin on server');
+        throw Exception('Failed to promote admin on server: ${response.data?['message']}');
       }
     } catch (e) {
-      // Revert on error
-      chat['admins'] = originalAdmins;
-      participants[participantIndex]['rank'] = originalRank; // This needs to be reverted on the participant map
-      chat['participants'] = participants;
-      chats[chatId] = chat;
-      if (currentChat.value['_id'] == chatId) {
-          currentChat.value = Map<String, dynamic>.from(chat);
-      }
-      chats.refresh();
+      print('Error promoting admin: $e');
       return false;
     }
   }
 
   Future<bool> demoteAdmin(String chatId, String memberId) async {
-    if (!chats.containsKey(chatId)) return false;
-
-    final chat = chats[chatId]!;
-    final originalAdmins = List<String>.from(chat['admins']?.map((e) => e.toString()) ?? []);
-    final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
-    final participantIndex = participants.indexWhere((p) => p['userId']['_id'] == memberId);
-    if (participantIndex == -1) return false;
-    final originalRank = participants[participantIndex]['rank'];
-
-    // Optimistic UI Update
-    if (originalAdmins.contains(memberId)) {
-      final newAdmins = List<String>.from(originalAdmins)..remove(memberId);
-      chat['admins'] = newAdmins;
-      var updatedParticipant = Map<String, dynamic>.from(participants[participantIndex]);
-      updatedParticipant['rank'] = 'member';
-      participants[participantIndex] = updatedParticipant;
-
-      chat['participants'] = participants;
-      chats[chatId] = chat;
-      if (currentChat.value['_id'] == chatId) {
-        currentChat.value = Map<String, dynamic>.from(chat);
-      }
-      chats.refresh();
-    }
-
     try {
       final token = user.value['token'];
-      if (token == null) {
-        throw Exception('User not authenticated');
-      }
+      if (token == null) throw Exception('User not authenticated');
+
       final response = await _dio.post(
         'api/chats/$chatId/demote-admin',
         data: {'memberId': memberId},
-        options: dio.Options(
-          headers: {'Authorization': 'Bearer $token'},
-        ),
+        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
       );
+
       if (response.statusCode == 200 && response.data['success'] == true) {
-        // The server response should contain the updated group. Let's use it.
         final updatedGroup = response.data['group'];
         if (updatedGroup != null) {
           chats[chatId] = updatedGroup;
@@ -4865,18 +4764,10 @@ void clearUserPosts() {
         }
         return true;
       } else {
-        throw Exception('Failed to demote admin on server');
+        throw Exception('Failed to demote admin on server: ${response.data?['message']}');
       }
     } catch (e) {
-      // Revert on error
-      chat['admins'] = originalAdmins;
-      participants[participantIndex]['rank'] = originalRank;
-      chat['participants'] = participants;
-      chats[chatId] = chat;
-      if (currentChat.value['_id'] == chatId) {
-        currentChat.value = Map<String, dynamic>.from(chat);
-      }
-      chats.refresh();
+      print('Error demoting admin: $e');
       return false;
     }
   }

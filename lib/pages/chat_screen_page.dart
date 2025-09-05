@@ -1154,22 +1154,21 @@ class _ChatScreenState extends State<ChatScreen> {
           avatarLetter = title.isNotEmpty ? title[0].toUpperCase() : 'G';
         } else {
           final currentUserId = dataController.user.value['user']['_id'];
-          final otherParticipantRaw = (chat['participants'] as List<dynamic>).firstWhere(
-            (p) => p['userId'] != null && p['userId']['_id'] != currentUserId,
+          final otherParticipant = (chat['participants'] as List<dynamic>).firstWhere(
+            (p) => p['_id'] != currentUserId,
             orElse: () => null,
           );
 
-          if (otherParticipantRaw == null) {
-            return const Text('Error: User not found', style: TextStyle(color: Colors.red, fontSize: 14));
+          if (otherParticipant == null) {
+            // This can happen briefly if a chat is being created. A loading state is better.
+            return const Text('Loading...', style: TextStyle(color: Colors.white, fontSize: 14));
           }
 
-          final otherUser = otherParticipantRaw['userId'];
-
-          userForProfile = otherUser;
-          title = otherUser['name'] ?? 'User';
-          avatarUrl = otherUser['avatar'] ?? '';
+          userForProfile = otherParticipant;
+          title = userForProfile!['name'] ?? 'User';
+          avatarUrl = userForProfile['avatar'] ?? '';
           avatarLetter = title.isNotEmpty ? title[0].toUpperCase() : 'U';
-          isOnline = otherUser['online'] ?? false;
+          isOnline = userForProfile['online'] ?? false;
         }
 
         Widget statusWidget;
@@ -1201,9 +1200,7 @@ class _ChatScreenState extends State<ChatScreen> {
           }
         } else if (isGroup) {
           final participants = (chat['participants'] as List<dynamic>?)
-              ?.map((p) => p['userId'])
-              .where((p) => p != null)
-              .cast<Map<String, dynamic>>()
+              ?.cast<Map<String, dynamic>>()
               .toList() ?? [];
 
           final onlineCount = participants.where((p) => p['online'] == true).length;

@@ -314,19 +314,18 @@ class GroupProfilePage extends StatelessWidget {
                 const SizedBox(height: 2.4),
                 ...?(currentChat['participants'] as List<dynamic>?)
                     ?.map((participant) {
-                  final userObject = participant['userId'] as Map<String, dynamic>?;
-                  if (userObject == null) {
+                  final p = participant as Map<String, dynamic>?;
+                  if (p == null) {
                     return const SizedBox.shrink();
                   }
-                  final p = userObject; // p is the user object
 
                   final isParticipantAdmin = (currentChat['admins'] as List<dynamic>?)?.any((admin) {
                         final adminId = admin is Map ? admin['_id'] : admin;
                         return adminId == p['_id'];
                       }) ?? false;
                   final isParticipantSuperAdmin = currentChat['superAdmin'] == p['_id'];
-                  final isMuted = participant['isMuted'] as bool? ?? false;
-                  final rank = participant['rank'] as String?;
+                  final isMuted = p['isMuted'] as bool? ?? false;
+                  final rank = p['rank'] as String?;
 
                   return ListTile(
                     contentPadding:
