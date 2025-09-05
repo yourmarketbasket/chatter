@@ -5244,4 +5244,21 @@ void clearUserPosts() {
     print('[DataController] Received app update nudge: $data');
     appUpdateNudgeData.value = data;
   }
+
+  void handleSoftNotification(Map<String, dynamic> data) {
+    final title = data['title'] as String?;
+    final message = data['message'] as String?;
+
+    if (title != null && message != null) {
+      Get.snackbar(
+        title,
+        message,
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.blue.withOpacity(0.8),
+        colorText: Colors.white,
+        margin: const EdgeInsets.all(10),
+        borderRadius: 8,
+      );
+    }
+  }
 }

@@ -82,7 +82,7 @@ class SocketService {
       'chat:updated': (data) => _handleChatUpdated(data),
       'message:new': (data) => _handleNewMessage(data),
       'message:update': (data) => _handleMessageUpdate(data),
-      'message:delete': (data) => _handleMessageDelete(data),
+      'message:deleted': (data) => _handleMessageDelete(data),
       'messages:deleted': (data) => _handleMessagesDeleted(data),
       'message:statusUpdate': (data) => _handleMessageStatusUpdate(data),
       'message:reaction': (data) => _handleMessageReaction(data),
@@ -106,13 +106,20 @@ class SocketService {
       'post:unflagged': (data) => _handlePostUnflagged(data),
       'post:flagged': (data) => _handlePostFlagged(data),
       'app:update_nudge': (data) => _handleAppUpdateNudge(data),
+      'notification:soft': (data) => _handleSoftNotification(data),
     };
-// more canges
+
     eventHandlers.forEach((event, handler) {
       _socket!.on(event, handler);
     });
   }
-  // more changes
+
+  void _handleSoftNotification(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      _dataController.handleSoftNotification(data);
+      _eventController.add({'event': 'notification:soft', 'data': data});
+    }
+  }
 
   void _handleGroupUpdated(dynamic data) {
     if (data is Map<String, dynamic>) {
@@ -490,7 +497,7 @@ class SocketService {
 
   void sendTypingStart(String chatId) {
     if (_userId != null) {
-      emitEvent('typing:start', {'chatId': chatId, 'userId': _userId});
+      emitEvent('typing:started', {'chatId': chatId, 'userId': _userId});
     } else {
         // print('SocketService: Cannot send typing:start, userId is null');
     }
@@ -498,7 +505,7 @@ class SocketService {
 
   void sendTypingStop(String chatId) {
     if (_userId != null) {
-      emitEvent('typing:stop', {'chatId': chatId, 'userId': _userId});
+      emitEvent('typing:stopped', {'chatId': chatId, 'userId': _userId});
     } else {
         // print('SocketService: Cannot send typing:stop, userId is null');
     }

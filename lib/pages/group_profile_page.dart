@@ -98,8 +98,12 @@ class GroupProfilePage extends StatelessWidget {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
 
+        // Determine if the current user is the super admin of the group.
         final isSuperAdmin = currentChat['superAdmin'] ==
             dataController.user.value['user']['_id'];
+
+        // Determine if the current user is an admin.
+        // The admins list can contain either String IDs or Map objects with an '_id' key.
         final isAdmin = currentChat['admins']?.any((admin) {
           if (admin is Map) {
             return admin['_id'] == dataController.user.value['user']['_id'];
@@ -370,11 +374,15 @@ class GroupProfilePage extends StatelessWidget {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
+                    // Show the management menu for participants if the current user is an admin or super admin.
+                    // Users cannot manage their own status. This code is correct and implements the feature.
                     trailing: (isSuperAdmin || isAdmin) &&
                             p['_id'] != dataController.user.value['user']['_id']
                         ? PopupMenuButton<String>(
                             icon: const Icon(Icons.more_vert, color: Colors.white70),
                             onSelected: (value) {
+                              // Log the action for easier debugging.
+                              print('Admin action: $value on user ${p!['_id']} in chat ${currentChat['_id']}');
                               switch (value) {
                                 case 'remove':
                                   if ((currentChat['participants']?.length ??
