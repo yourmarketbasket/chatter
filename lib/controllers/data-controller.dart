@@ -177,29 +177,8 @@ class DataController extends GetxController {
   }
 
   void handleNewChat(Map<String, dynamic> newChatData) {
-    final chatId = newChatData['_id'];
-    if (chatId == null) return;
-
-    // Add or update the chat in the main list
-    chats[chatId] = newChatData;
-
-    // If a new chat is created, it might be the one we are about to view,
-    // especially if we just sent the first message.
-    // This should only happen if we are not currently in a chat.
-    if (activeChatId.value == null) {
-      final currentUserId = getUserId();
-      final participants = (newChatData['participants'] as List?)
-          ?.map((p) => p['userId']?['_id'] ?? p['userId'])
-          .toList();
-      if (participants != null && participants.contains(currentUserId)) {
-        currentChat.value = newChatData;
-        activeChatId.value = chatId;
-      }
-    }
-
-    // Refresh both lists to ensure all UI components are updated
-    chats.refresh();
-    currentChat.refresh();
+    // All new and updated chat data should go through the same logic.
+    handleChatUpdated(newChatData);
   }
 
   String getMediaType(String extension) {
@@ -278,19 +257,13 @@ class DataController extends GetxController {
     final chatId = updatedChatData['_id'] as String?;
     if (chatId == null) return;
 
-    if (chats.containsKey(chatId)) {
-      // Replace the old chat object with the new, authoritative data from the server
-      chats[chatId] = updatedChatData;
+    // Add or replace the chat object. This handles both new chats and updates.
+    chats[chatId] = updatedChatData;
 
-      if (activeChatId.value == chatId) {
-        currentChat.value = Map<String, dynamic>.from(updatedChatData);
-      }
-      chats.refresh();
-    } else {
-      // If chat is not in the list, it might be a resurrected chat.
-      // Fetching all chats is a safe way to handle this.
-      fetchChats();
+    if (activeChatId.value == chatId) {
+      currentChat.value = Map<String, dynamic>.from(updatedChatData);
     }
+    chats.refresh();
   }
 
   void handleMessageStatusUpdate(Map<String, dynamic> data) {
