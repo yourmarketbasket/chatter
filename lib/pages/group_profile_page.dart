@@ -98,16 +98,20 @@ class GroupProfilePage extends StatelessWidget {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
 
-        final isSuperAdmin = currentChat['superAdmin'] ==
-            dataController.user.value['user']['_id'];
-        final isAdmin = currentChat['admins']?.any((admin) {
-          if (admin is Map) {
-            return admin['_id'] == dataController.user.value['user']['_id'];
-          } else if (admin is String) {
-            return admin == dataController.user.value['user']['_id'];
-          }
-          return false;
-        }) ?? false;
+        final currentUserId = dataController.user.value['user']['_id'];
+        final participants =
+            currentChat['participants'] as List<dynamic>? ?? [];
+        final currentUserParticipant = participants.firstWhere(
+          (p) => p['_id'] == currentUserId,
+          orElse: () => null,
+        );
+
+        final currentUserRank = currentUserParticipant != null
+            ? currentUserParticipant['rank'] as String?
+            : null;
+
+        final isSuperAdmin = currentUserRank == 'superadmin';
+        final isAdmin = currentUserRank == 'admin';
 
         return Scaffold(
           appBar: AppBar(
@@ -319,13 +323,11 @@ class GroupProfilePage extends StatelessWidget {
                     return const SizedBox.shrink();
                   }
 
-                  final isParticipantAdmin = (currentChat['admins'] as List<dynamic>?)?.any((admin) {
-                        final adminId = admin is Map ? admin['_id'] : admin;
-                        return adminId == p['_id'];
-                      }) ?? false;
-                  final isParticipantSuperAdmin = currentChat['superAdmin'] == p['_id'];
-                  final isMuted = p['isMuted'] as bool? ?? false;
                   final rank = p['rank'] as String?;
+                  final isParticipantAdmin = rank == 'admin';
+                  final isParticipantSuperAdmin = rank == 'superadmin';
+
+                  final isMuted = p['isMuted'] as bool? ?? false;
 
                   return ListTile(
                     contentPadding:
