@@ -326,7 +326,7 @@ class GroupProfilePage extends StatelessWidget {
                         return adminId == p!['_id'];
                       }) ?? false;
                   final isParticipantSuperAdmin = currentChat['superAdmin'] == p['_id'];
-                  final isMuted = participant['isMuted'] ?? false;
+                  final isMuted = p['isMuted'] as bool? ?? false;
 
                   return ListTile(
                     contentPadding:
@@ -362,7 +362,7 @@ class GroupProfilePage extends StatelessWidget {
                       ],
                     ),
                     subtitle: Text(
-                      (p['rank'] as String?)?.capitalize() ?? 'Member',
+                      (p['rank'] as String?)?.capitalizeFirst() ?? 'Member',
                       style: GoogleFonts.poppins(
                         color: p['rank'] == 'superadmin'
                             ? Colors.amber
@@ -559,7 +559,7 @@ class GroupProfilePage extends StatelessWidget {
 }
 
 extension StringExtension on String {
-  String capitalize() {
+  String capitalizeFirst() {
     if (isEmpty) {
       return "";
     }
