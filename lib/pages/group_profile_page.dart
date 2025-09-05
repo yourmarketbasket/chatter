@@ -362,7 +362,7 @@ class GroupProfilePage extends StatelessWidget {
                       ],
                     ),
                     subtitle: Text(
-                      (p['rank'] as String?)?.capitalizeFirst() ?? 'Member',
+                      (p['rank'] as String?)?.capitalizeFirst ?? 'Member',
                       style: GoogleFonts.poppins(
                         color: p['rank'] == 'superadmin'
                             ? Colors.amber
