@@ -2641,10 +2641,10 @@ class DataController extends GetxController {
     final newChats = Map<String, Map<String, dynamic>>.from(chats);
     final chat = Map<String, dynamic>.from(newChats[chatId]!);
     final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
-    final admins = List<Map<String, dynamic>>.from(chat['admins'] ?? []);
+    final admins = List<String>.from(chat['admins']?.map((e) => e.toString()) ?? []);
 
     participants.removeWhere((p) => p['userId']['_id'] == memberId);
-    admins.removeWhere((a) => a == memberId);
+    admins.remove(memberId);
 
     chat['participants'] = participants;
     chat['admins'] = admins;
@@ -2665,9 +2665,9 @@ class DataController extends GetxController {
     final newChats = Map<String, Map<String, dynamic>>.from(chats);
     final chat = Map<String, dynamic>.from(newChats[chatId]!);
     final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
-    final admins = List<Map<String, dynamic>>.from(chat['admins'] ?? []);
+    final admins = List<String>.from(chat['admins']?.map((e) => e.toString()) ?? []);
 
-    if (!admins.any((a) => a == memberId)) {
+    if (!admins.contains(memberId)) {
       admins.add(memberId);
       chat['admins'] = admins;
       newChats[chatId] = chat;
@@ -2687,9 +2687,9 @@ class DataController extends GetxController {
 
     final newChats = Map<String, Map<String, dynamic>>.from(chats);
     final chat = Map<String, dynamic>.from(newChats[chatId]!);
-    final admins = List<Map<String, dynamic>>.from(chat['admins'] ?? []);
+    final admins = List<String>.from(chat['admins']?.map((e) => e.toString()) ?? []);
 
-    admins.removeWhere((a) => a == memberId);
+    admins.remove(memberId);
 
     chat['admins'] = admins;
     newChats[chatId] = chat;
