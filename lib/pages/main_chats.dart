@@ -430,12 +430,20 @@ class _MainChatsPageState extends State<MainChatsPage> {
                                         radius: 22,
                                         backgroundColor: Colors.tealAccent.shade400.withOpacity(0.2),
                                         backgroundImage: avatarUrl.isNotEmpty ? CachedNetworkImageProvider(avatarUrl) : null,
-                                        child: isSelected
-                                            ? const Icon(Icons.check, color: Colors.white)
-                                            : (avatarUrl.isEmpty
+                                        child: avatarUrl.isEmpty
                                                 ? Text(avatarLetter, style: GoogleFonts.poppins(color: Colors.tealAccent.shade400, fontWeight: FontWeight.w600, fontSize: 16))
-                                                : null),
+                                                : null,
                                       ),
+                                      if (isSelected)
+                                        const Positioned(
+                                          bottom: 0,
+                                          right: 0,
+                                          child: Icon(
+                                            Icons.check_circle,
+                                            color: Colors.tealAccent,
+                                            size: 20,
+                                          ),
+                                        ),
                                       if (isGroup)
                                         Positioned(
                                           right: -4,

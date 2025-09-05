@@ -2578,12 +2578,14 @@ class DataController extends GetxController {
     if (chatId == null) return;
 
     if (chats.containsKey(chatId)) {
-      chats.remove(chatId);
+      final newChats = Map<String, Map<String, dynamic>>.from(chats);
+      newChats.remove(chatId);
+      chats.value = newChats;
+
       if (currentChat.value['_id'] == chatId) {
         currentChat.value = {};
         currentConversationMessages.clear();
       }
-      chats.refresh();
     }
   }
 
@@ -2603,12 +2605,14 @@ class DataController extends GetxController {
         participants.add(member);
         final newChat = Map<String, dynamic>.from(chat);
         newChat['participants'] = participants;
-        chats[chatId] = newChat;
+
+        final newChats = Map<String, Map<String, dynamic>>.from(chats);
+        newChats[chatId] = newChat;
+        chats.value = newChats;
 
         if (currentChat.value['_id'] == chatId) {
           currentChat.value = newChat;
         }
-        chats.refresh();
       }
     }
   }
@@ -2634,12 +2638,14 @@ class DataController extends GetxController {
       final newChat = Map<String, dynamic>.from(chat);
       newChat['participants'] = participants;
       newChat['admins'] = admins;
-      chats[chatId] = newChat;
+
+      final newChats = Map<String, Map<String, dynamic>>.from(chats);
+      newChats[chatId] = newChat;
+      chats.value = newChats;
 
       if (currentChat.value['_id'] == chatId) {
         currentChat.value = newChat;
       }
-      chats.refresh();
     }
   }
 

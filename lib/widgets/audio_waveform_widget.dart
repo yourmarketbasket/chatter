@@ -26,16 +26,17 @@ class _AudioWaveformWidgetState extends State<AudioWaveformWidget> {
     _preparePlayer();
     _playerController.onPlayerStateChanged.listen((state) {
       if (mounted) {
-        if (state == PlayerState.stopped) {
-          _playerController.seekTo(0);
-          setState(() {
-            _isPlaying = false;
-          });
-        } else {
-          setState(() {
-            _isPlaying = state == PlayerState.playing;
-          });
-        }
+        setState(() {
+          _isPlaying = state == PlayerState.playing;
+        });
+      }
+    });
+     _playerController.onCompletion.listen((_) async {
+      if (mounted) {
+        await _playerController.seekTo(0);
+        setState(() {
+          _isPlaying = false;
+        });
       }
     });
   }
