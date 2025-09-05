@@ -110,14 +110,19 @@ class _MessageBubbleState extends State<MessageBubble> {
   Widget _buildSystemMessageBubble() {
     return Center(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
+        margin: const EdgeInsets.symmetric(vertical: 10.0),
+        padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 12.0),
+        decoration: BoxDecoration(
+          color: const Color.fromARGB(255, 53, 53, 53),
+          borderRadius: BorderRadius.circular(15.0),
+        ),
         child: Text(
           widget.message['content'] ?? '',
           textAlign: TextAlign.center,
           style: TextStyle(
-            fontSize: 11.0,
-            fontWeight: FontWeight.normal,
-            color: Colors.grey[600],
+            fontSize: 12.0,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey[400],
           ),
         ),
       ),

@@ -2553,26 +2553,47 @@ class DataController extends GetxController {
     print('[DataController] Received confirmation for soft deletion of chats: $chatIds');
   }
 
-  void handleGroupUpdated(Map<String, dynamic> data) {
+  void handleChatAvatarUpdated(Map<String, dynamic> data) {
     final chatId = data['chatId'] as String?;
-    if (chatId == null) return;
+    final avatarUrl = data['avatarUrl'] as String?;
+    if (chatId == null || avatarUrl == null) return;
 
     if (chats.containsKey(chatId)) {
       final chat = chats[chatId]!;
-      data.forEach((key, value) {
-        if (key != 'chatId') {
-          chat[key] = value;
-        }
-      });
+      chat['groupAvatar'] = avatarUrl;
       chats[chatId] = chat;
       if (currentChat.value['_id'] == chatId) {
-        currentChat.value = chat;
+        currentChat.value = Map<String, dynamic>.from(chat);
       }
       chats.refresh();
-      if (currentChat.value['_id'] == chatId) {
-        currentChat.refresh();
-      }
     }
+  }
+
+  void handleGroupUpdated(Map<String, dynamic> data) {
+    final chatId = data['chatId'] as String?;
+    if (chatId == null || !chats.containsKey(chatId)) return;
+
+    final chat = chats[chatId]!;
+
+    // This event is for group detail updates (name, about)
+    if (data.containsKey('name')) {
+      chat['name'] = data['name'];
+    }
+    if (data.containsKey('about')) {
+      chat['about'] = data['about'];
+    }
+
+    chats[chatId] = chat;
+
+    if (activeChatId.value == chatId) {
+      currentChat.value = Map<String, dynamic>.from(chat);
+    }
+    chats.refresh();
+  }
+
+  void handleMemberLeft(Map<String, dynamic> data) {
+    // Functionally the same as a member being removed for the client.
+    handleMemberRemoved(data);
   }
 
   void handleGroupRemovedFrom(Map<String, dynamic> data) {

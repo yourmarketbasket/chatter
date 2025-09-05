@@ -93,6 +93,7 @@ class SocketService {
       'typing:stopped': (data) => _handleTyping(data, false),
       'user:verified': (data) => _handleUserVerified(data),
       'group:updated': (data) => _handleGroupUpdated(data),
+      'chat:avatar_updated': (data) => _handleChatAvatarUpdated(data),
       'group:removedFrom': (data) => _handleGroupRemovedFrom(data),
       'member:joined': (data) => _handleMemberJoined(data),
       'member:added': (data) => _handleMemberJoined(data),
@@ -101,18 +102,25 @@ class SocketService {
       'member:demoted': (data) => _handleMemberDemoted(data),
       'member:muted': (data) => _handleMemberMuted(data),
       'member:unmuted': (data) => _handleMemberUnmuted(data),
+      'group:member_left': (data) => _handleMemberLeft(data),
       'group:closed': (data) => _handleGroupClosed(data),
       'user:unsuspended': (data) => _handleUserUnsuspended(data),
       'post:unflagged': (data) => _handlePostUnflagged(data),
       'post:flagged': (data) => _handlePostFlagged(data),
       'app:update_nudge': (data) => _handleAppUpdateNudge(data),
     };
-// more canges
+
     eventHandlers.forEach((event, handler) {
       _socket!.on(event, handler);
     });
   }
-  // more changes
+
+  void _handleChatAvatarUpdated(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      _dataController.handleChatAvatarUpdated(data);
+      _eventController.add({'event': 'chat:avatar_updated', 'data': data});
+    }
+  }
 
   void _handleGroupUpdated(dynamic data) {
     if (data is Map<String, dynamic>) {
@@ -132,6 +140,13 @@ class SocketService {
     if (data is Map<String, dynamic>) {
       _dataController.handleMemberJoined(data);
       _eventController.add({'event': 'member:joined', 'data': data});
+    }
+  }
+
+  void _handleMemberLeft(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      _dataController.handleMemberLeft(data);
+      _eventController.add({'event': 'group:member_left', 'data': data});
     }
   }
 
