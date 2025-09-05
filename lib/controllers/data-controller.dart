@@ -489,8 +489,7 @@ class DataController extends GetxController {
               int followersCount = userData['followersCount'] as int? ?? 0;
               int followingCount = userData['followingCount'] as int? ?? 0;
 
-              // Fallback to calculating from array lengths if counts are not provided or zero,
-              // and the arrays themselves are provided.
+              
               if (followersCount == 0 && userData.containsKey('followers') && userData['followers'] is List) {
                 followersCount = (userData['followers'] as List).length;
               }
