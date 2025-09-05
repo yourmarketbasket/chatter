@@ -6,6 +6,7 @@ import 'package:chatter/controllers/data-controller.dart';
 import 'package:chatter/pages/group_profile_page.dart';
 import 'package:chatter/pages/profile_page.dart';
 import 'package:dotted_border/dotted_border.dart';
+import 'package:feather_icons/feather_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -1508,38 +1509,35 @@ class _ChatScreenState extends State<ChatScreen> {
                               color: _selectedMessages.contains(message['_id'] ?? message['clientMessageId'])
                                   ? Colors.teal.withOpacity(0.2)
                                   : Colors.transparent,
-                              child: Padding(
-                                padding: const EdgeInsets.only(bottom: 12.0),
-                                child: Align(
-                                  alignment: message['senderId']['_id'] == dataController.getUserId()
-                                      ? Alignment.centerRight
-                                      : Alignment.centerLeft,
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      if (message['senderId']['_id'] != dataController.getUserId() && _selectedMessages.contains(message['_id'] ?? message['clientMessageId']))
-                                        IconButton(
-                                          icon: const Icon(Icons.forward, color: Colors.white),
-                                          onPressed: _forwardSelectedMessages,
-                                        ),
-                                      Flexible(
-                                        child: MessageBubble(
-                                          message: message,
-                                          prevMessage: prevMessage,
-                                          dataController: dataController,
-                                          openMediaView: _openMediaView,
-                                          buildAttachment: _buildAttachment,
-                                          getReplyPreviewText: _getReplyPreviewText,
-                                          buildReactions: _buildReactions,
-                                        ),
+                              child: Align(
+                                alignment: message['senderId']['_id'] == dataController.getUserId()
+                                    ? Alignment.centerRight
+                                    : Alignment.centerLeft,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (message['senderId']['_id'] != dataController.getUserId() && _selectedMessages.contains(message['_id'] ?? message['clientMessageId']))
+                                      IconButton(
+                                        icon: const Icon(FeatherIcons.cornerUpRight, color: Colors.white, size:14),
+                                        onPressed: _forwardSelectedMessages,
                                       ),
-                                      if (message['senderId']['_id'] == dataController.getUserId() && _selectedMessages.contains(message['_id'] ?? message['clientMessageId']))
-                                        IconButton(
-                                          icon: const Icon(Icons.forward, color: Colors.white),
-                                          onPressed: _forwardSelectedMessages,
-                                        ),
-                                    ],
-                                  ),
+                                    Flexible(
+                                      child: MessageBubble(
+                                        message: message,
+                                        prevMessage: prevMessage,
+                                        dataController: dataController,
+                                        openMediaView: _openMediaView,
+                                        buildAttachment: _buildAttachment,
+                                        getReplyPreviewText: _getReplyPreviewText,
+                                        buildReactions: _buildReactions,
+                                      ),
+                                    ),
+                                    if (message['senderId']['_id'] == dataController.getUserId() && _selectedMessages.contains(message['_id'] ?? message['clientMessageId']))
+                                      IconButton(
+                                        icon: const Icon(FeatherIcons.cornerUpRight, color: Colors.white, size:14),
+                                        onPressed: _forwardSelectedMessages,
+                                      ),
+                                  ],
                                 ),
                               ),
                             ),

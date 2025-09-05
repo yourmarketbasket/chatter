@@ -144,7 +144,7 @@ class _MessageBubbleState extends State<MessageBubble> {
       children: [
         if (widget.dataController.currentChat.value['type'] == 'group' && !isYou)
           Padding(
-            padding: const EdgeInsets.only(bottom: 2.0),
+            padding: const EdgeInsets.only(bottom: 2.0, left: 8.0, top: 4.0, right: 8.0),
             child: Text(senderName, style: const TextStyle(color: Colors.tealAccent, fontWeight: FontWeight.bold, fontSize: 12)),
           ),
         if (widget.message['deletedForEveryone'] ?? false)
