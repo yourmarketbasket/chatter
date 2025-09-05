@@ -1155,7 +1155,7 @@ class _ChatScreenState extends State<ChatScreen> {
         } else {
           final currentUserId = dataController.user.value['user']['_id'];
           final otherParticipantRaw = (chat['participants'] as List<dynamic>).firstWhere(
-            (p) => p['userId']['_id'] != currentUserId,
+            (p) => p['userId'] != null && p['userId']['_id'] != currentUserId,
             orElse: () => null,
           );
 
@@ -1200,33 +1200,24 @@ class _ChatScreenState extends State<ChatScreen> {
             }
           }
         } else if (isGroup) {
-          final currentUserId = dataController.getUserId();
           final participants = (chat['participants'] as List<dynamic>?)
-              ?.map((p) => p is Map<String, dynamic> ? p : null)
+              ?.map((p) => p['userId'])
               .where((p) => p != null)
               .cast<Map<String, dynamic>>()
               .toList() ?? [];
 
-          final otherParticipants = participants.where((p) => p['_id'] != currentUserId).toList();
+          final onlineCount = participants.where((p) => p['online'] == true).length;
 
-          final onlineMembers = otherParticipants.where((p) {
-            final userFromAllUsers = dataController.allUsers.firstWhere(
-              (u) => u['_id'] == p['_id'],
-              orElse: () => <String, dynamic>{},
-            );
-            return userFromAllUsers['online'] == true;
-          }).toList();
-
-          if (onlineMembers.isNotEmpty) {
+          if (onlineCount > 0) {
             statusWidget = Text(
-              '${onlineMembers.length} online',
+              '$onlineCount online',
               style: const TextStyle(color: Colors.green, fontSize: 12),
             );
           } else {
-            final memberNames = otherParticipants.map((p) => p['name'] ?? 'User').toList();
+            final memberNames = participants.map((p) => p['name'] ?? 'User').toList();
             String subtitleText;
             if (memberNames.length > 3) {
-              subtitleText = memberNames.sublist(0, 3).join(', ') + '...';
+              subtitleText = '${memberNames.sublist(0, 3).join(', ')}...';
             } else {
               subtitleText = memberNames.join(', ');
             }

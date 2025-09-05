@@ -450,7 +450,10 @@ class _UsersListPageState extends State<UsersListPage> {
                             Get.to(() => const ChatScreen());
                           } else {
                             final tempChat = {
-                              'participants': [_dataController.user.value['user'], user],
+                              'participants': [
+                                {'userId': _dataController.user.value['user']},
+                                {'userId': user}
+                              ],
                               'type': 'dm',
                             };
                             _dataController.currentChat.value = tempChat;
