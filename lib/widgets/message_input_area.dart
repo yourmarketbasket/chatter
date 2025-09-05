@@ -233,63 +233,65 @@ class _MessageInputAreaState extends State<MessageInputArea> {
 
   @override
   Widget build(BuildContext context) {
-    final currentChat = _dataController.currentChat.value;
-    bool isMuted = false;
-    if (currentChat['type'] == 'group') {
-      final myId = _dataController.user.value['user']['_id'];
-      final participants = currentChat['participants'] as List<dynamic>?;
-      if (participants != null) {
-        for (var p in participants) {
-          if (p is Map && p['_id'] == myId) {
-            isMuted = p['isMuted'] ?? false;
-            break;
+    return Obx(() {
+      final currentChat = _dataController.currentChat.value;
+      bool isMuted = false;
+      if (currentChat['type'] == 'group') {
+        final myId = _dataController.user.value['user']['_id'];
+        final participants = currentChat['participants'] as List<dynamic>?;
+        if (participants != null) {
+          for (var p in participants) {
+            if (p is Map && p['_id'] == myId) {
+              isMuted = p['isMuted'] ?? false;
+              break;
+            }
           }
         }
       }
-    }
 
-    return Container(
-      padding: const EdgeInsets.all(8.0),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.attach_file, color: Colors.tealAccent),
-            onPressed: isMuted ? null : _pickAttachments,
-          ),
-          Expanded(
-            child: TextField(
-              controller: _messageController,
-              style: const TextStyle(color: Colors.white),
-              keyboardType: TextInputType.multiline,
-              maxLines: null,
-              decoration: InputDecoration(
-                hintText: isMuted ? 'You are muted' : 'Type a message...',
-                hintStyle: TextStyle(color: Colors.grey[400]),
-                filled: true,
-                fillColor: Colors.grey[800],
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              ),
-              enabled: !isMuted,
+      return Container(
+        padding: const EdgeInsets.all(8.0),
+        child: Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.attach_file, color: Colors.tealAccent),
+              onPressed: isMuted ? null : _pickAttachments,
             ),
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            icon: Icon(
-                _isTyping ? Icons.send : (_isRecording ? Icons.stop : Icons.mic),
-                color: Colors.tealAccent),
-            onPressed: isMuted
-                ? null
-                : (_isTyping
-                    ? _handleSend
-                    : (_isRecording ? _stopRecording : _startRecording)),
-          ),
-        ],
-      ),
-    );
+            Expanded(
+              child: TextField(
+                controller: _messageController,
+                style: const TextStyle(color: Colors.white),
+                keyboardType: TextInputType.multiline,
+                maxLines: null,
+                decoration: InputDecoration(
+                  hintText: isMuted ? 'You are muted' : 'Type a message...',
+                  hintStyle: TextStyle(color: Colors.grey[400]),
+                  filled: true,
+                  fillColor: Colors.grey[800],
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                ),
+                enabled: !isMuted,
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: Icon(
+                  _isTyping ? Icons.send : (_isRecording ? Icons.stop : Icons.mic),
+                  color: Colors.tealAccent),
+              onPressed: isMuted
+                  ? null
+                  : (_isTyping
+                      ? _handleSend
+                      : (_isRecording ? _stopRecording : _startRecording)),
+            ),
+          ],
+        ),
+      );
+    });
   }
 }
