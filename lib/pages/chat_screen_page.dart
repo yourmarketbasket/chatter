@@ -1163,18 +1163,7 @@ class _ChatScreenState extends State<ChatScreen> {
             return const Text('Error: User not found', style: TextStyle(color: Colors.red, fontSize: 14));
           }
 
-          final otherUserId = otherParticipantRaw['userId']['_id'];
-
-          final otherUser = dataController.allUsers.firstWhere(
-            (u) => u['_id'] == otherUserId,
-            orElse: () => {
-              '_id': otherUserId,
-              'name': 'Loading...',
-              'avatar': '',
-              'online': false,
-              'lastSeen': null,
-            },
-          );
+          final otherUser = otherParticipantRaw['userId'];
 
           userForProfile = otherUser;
           title = otherUser['name'] ?? 'User';
