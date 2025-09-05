@@ -230,17 +230,11 @@ class _MainChatsPageState extends State<MainChatsPage> {
                 title = chat['name'] ?? 'Group Chat';
               } else {
                 final currentUserId = _dataController.user.value['user']['_id'];
-                final otherUserRaw = (chat['participants'] as List<dynamic>).firstWhere(
-                  (p) => p['userId']['_id'] != currentUserId,
-                  orElse: () => (chat['participants'] as List<dynamic>).first,
+                final otherParticipant = (chat['participants'] as List<dynamic>).firstWhere(
+                  (p) => p['_id'] != currentUserId,
+                  orElse: () => null,
                 );
-                final otherUser = otherUserRaw is Map<String, dynamic>
-                    ? otherUserRaw
-                    : _dataController.allUsers.firstWhere(
-                        (u) => u['_id'] == otherUserRaw,
-                        orElse: () => {'name': 'Unknown', 'avatar': ''},
-                      );
-                title = otherUser['name'] ?? 'User';
+                title = otherParticipant?['name'] ?? 'User';
               }
               return title.toLowerCase().contains(_searchQuery.toLowerCase());
             }).toList();
@@ -352,30 +346,17 @@ class _MainChatsPageState extends State<MainChatsPage> {
                                 avatarLetter = title.isNotEmpty ? title[0].toUpperCase() : 'G';
                                 verificationData = chat['verification'] ?? {'entityType': null, 'level': null};
                               } else {
-                                final otherParticipantRaw = (chat['participants'] as List<dynamic>).firstWhere(
-                                  (p) => p['userId']['_id'] != currentUserId,
+                                final otherParticipant = (chat['participants'] as List<dynamic>).firstWhere(
+                                  (p) => p['_id'] != currentUserId,
                                   orElse: () => null,
                                 );
 
-                                if (otherParticipantRaw == null) {
-                                  return ListTile(title: Text("Invalid Chat", style: GoogleFonts.poppins(color: Colors.red)));
+                                if (otherParticipant == null) {
+                                  return const SizedBox.shrink(); // Should not happen with valid data, but safer
                                 }
 
-                                final otherUserId = otherParticipantRaw['userId']['_id'];
-
-                                otherUser = _dataController.allUsers.firstWhere(
-                                    (u) => u['_id'] == otherUserId,
-                                    orElse: () => {
-                                      '_id': otherUserId,
-                                      'name': otherParticipantRaw is Map ? otherParticipantRaw['name'] : 'User',
-                                      'avatar': otherParticipantRaw is Map ? otherParticipantRaw['avatar'] : '',
-                                      'online': false,
-                                      'lastSeen': null,
-                                      'verification': null,
-                                    },
-                                );
-
-                                title = otherUser['name'] ?? 'User';
+                                otherUser = otherParticipant;
+                                title = otherUser!['name'] ?? 'User';
                                 avatarUrl = otherUser['avatar'] ?? '';
                                 avatarLetter = title.isNotEmpty ? title[0].toUpperCase() : 'U';
                                 isUserOnline = otherUser['online'] ?? false;
