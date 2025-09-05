@@ -14,7 +14,10 @@ import '../models/feed_models.dart';
 import '../services/socket-service.dart';
 import '../services/notification_service.dart';
 import '../services/upload_service.dart'; 
+import 'package:chatter/firebase_options.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'dart:io' show Platform;
 
 class DataController extends GetxController {
   final UploadService _uploadService = UploadService(); // Instantiate UploadService
@@ -97,6 +100,10 @@ class DataController extends GetxController {
   // Observable to notify ProfilePage to refresh
   final RxString profileUpdateTrigger = ''.obs;
 
+  // For app updates
+  final Rxn<Map<String, dynamic>> appUpdateNudgeData = Rxn<Map<String, dynamic>>();
+  final Rxn<String> appVersion = Rxn<String>();
+
 
   @override
   void onInit() {
@@ -146,6 +153,11 @@ class DataController extends GetxController {
       // Initialize NotificationService after user data is loaded to ensure token is sent correctly
       final NotificationService notificationService = Get.find<NotificationService>();
       await notificationService.init();
+
+      // Report current app version to backend
+      updateUserAppVersion().catchError((e) {
+        print('[DataController] Error reporting user app version in init: $e');
+      });
     }
   }
 
@@ -5183,5 +5195,75 @@ void clearUserPosts() {
 
     final targetUser = allUsers.firstWhere((u) => u['_id'] == targetUserId, orElse: () => {'name': 'user'});
     Get.snackbar('Success', 'Message sent to ${targetUser['name']}');
+  }
+
+  // --- App Update Methods ---
+
+  Future<Map<String, dynamic>?> getLatestAppUpdate() async {
+    try {
+      final String? token = getAuthToken();
+      if (token == null) {
+        print('[DataController] getLatestAppUpdate: User not authenticated.');
+        return null;
+      }
+
+      String platform;
+      if (Platform.isAndroid) {
+        platform = 'android';
+      } else if (Platform.isIOS) {
+        platform = 'ios';
+      } else {
+        // For this app, web and other platforms are not targeted for this feature.
+        return null;
+      }
+
+      final response = await _dio.get(
+        'api/updates/latest',
+        queryParameters: {'platform': platform},
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return response.data['update'] as Map<String, dynamic>?;
+      } else {
+        print('[DataController] Failed to get latest app update: ${response.data?['message']}');
+        return null;
+      }
+    } catch (e) {
+      print('[DataController] Error fetching latest app update: $e');
+      return null;
+    }
+  }
+
+  Future<void> updateUserAppVersion() async {
+    try {
+      final String? token = getAuthToken();
+      if (token == null) {
+        print('[DataController] updateUserAppVersion: User not authenticated.');
+        return;
+      }
+
+      final PackageInfo packageInfo = await PackageInfo.fromPlatform();
+      final String version = packageInfo.version;
+      appVersion.value = version;
+
+      await _dio.post(
+        'api/users/app-version',
+        data: {'version': version},
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+      print('[DataController] User app version updated to $version');
+    } catch (e) {
+      print('[DataController] Error updating user app version: $e');
+    }
+  }
+
+  void handleAppUpdateNudge(Map<String, dynamic> data) {
+    print('[DataController] Received app update nudge: $data');
+    appUpdateNudgeData.value = data;
   }
 }

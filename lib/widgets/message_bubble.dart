@@ -107,8 +107,28 @@ class _MessageBubbleState extends State<MessageBubble> {
     return spans;
 }
 
+  Widget _buildSystemMessageBubble() {
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
+        child: Text(
+          widget.message['content'] ?? '',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 11.0,
+            fontWeight: FontWeight.normal,
+            color: Colors.grey[600],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (widget.message['type'] == 'system') {
+      return _buildSystemMessageBubble();
+    }
     final senderId = widget.message['senderId'] is Map ? widget.message['senderId']['_id'] : widget.message['senderId'];
     final isYou = senderId == widget.dataController.user.value['user']['_id'];
     final prevSenderId = widget.prevMessage != null ? (widget.prevMessage!['senderId'] is Map ? widget.prevMessage!['senderId']['_id'] : widget.prevMessage!['senderId']) : null;

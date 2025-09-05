@@ -24,6 +24,8 @@ import 'package:chatter/pages/users_list_page.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:share_handler/share_handler.dart';
 import 'package:upgrader/upgrader.dart';
+import 'package:chatter/services/api_upgrader_store.dart';
+import 'package:url_launcher/url_launcher.dart';
 // import 'package:device_info_plus/device_info_plus.dart'; // No longer needed for player selection
 import 'dart:io'; // No longer needed for player selection (Platform check)
 
@@ -97,6 +99,42 @@ class _ChatterAppState extends State<ChatterApp> {
     // Check initial screen after initialization
     _checkInitialScreen();
     _initShareHandler();
+    _listenForUpdateNudges();
+  }
+
+  void _listenForUpdateNudges() {
+    _dataController.appUpdateNudgeData.listen((nudgeData) {
+      if (nudgeData != null && mounted) {
+        final payload = nudgeData['data'];
+        final title = nudgeData['title'] ?? 'Update Required';
+        final body = nudgeData['body'] ?? 'A new version of the app is available. Please update to continue.';
+        final url = payload['url'] as String?;
+
+        if (url == null) {
+          print('Update nudge received without a URL. Cannot show dialog.');
+          return;
+        }
+
+        Get.dialog(
+          AlertDialog(
+            title: Text(title),
+            content: SingleChildScrollView(child: Text(body)),
+            actions: [
+              TextButton(
+                child: const Text('UPDATE NOW'),
+                onPressed: () async {
+                  final uri = Uri.parse(url);
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                },
+              ),
+            ],
+          ),
+          barrierDismissible: false,
+        );
+      }
+    });
   }
 
   Future<void> _initShareHandler() async {
@@ -172,7 +210,16 @@ class _ChatterAppState extends State<ChatterApp> {
 
   @override
   Widget build(BuildContext context) {
+    final upgrader = Upgrader(
+      storeController: UpgraderStoreController(
+        onAndroid: () => ApiUpgraderStore(),
+        oniOS: () => ApiUpgraderStore(),
+      ),
+      debugLogging: kDebugMode,
+    );
+
     return UpgradeAlert(
+      upgrader: upgrader,
       child: GetMaterialApp(
         routingCallback: (routing) {
           if (routing != null) {

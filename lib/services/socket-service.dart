@@ -104,6 +104,7 @@ class SocketService {
       'user:unsuspended': (data) => _handleUserUnsuspended(data),
       'post:unflagged': (data) => _handlePostUnflagged(data),
       'post:flagged': (data) => _handlePostFlagged(data),
+      'app:update_nudge': (data) => _handleAppUpdateNudge(data),
     };
 // more canges
     eventHandlers.forEach((event, handler) {
@@ -388,6 +389,15 @@ class SocketService {
   void _handlePostFlagged(dynamic data) {
     if (data is Map<String, dynamic>) {
       _dataController.handlePostFlagged(data);
+    }
+  }
+
+  void _handleAppUpdateNudge(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      _dataController.handleAppUpdateNudge(data);
+      _eventController.add({'event': 'app:update_nudge', 'data': data});
+    } else {
+      print('SocketService: Invalid app:update_nudge data format: ${data.runtimeType}');
     }
   }
 
