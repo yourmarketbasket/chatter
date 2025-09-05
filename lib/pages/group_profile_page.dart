@@ -314,18 +314,8 @@ class GroupProfilePage extends StatelessWidget {
                 const SizedBox(height: 2.4),
                 ...?(currentChat['participants'] as List<dynamic>?)
                     ?.map((participant) {
-                  final userIdValue = participant['userId'];
-                  Map<String, dynamic>? p;
-
-                  if (userIdValue is Map<String, dynamic>) {
-                    p = userIdValue;
-                  } else if (userIdValue is String) {
-                    try {
-                      p = dataController.allUsers.firstWhere((u) => u['_id'] == userIdValue);
-                    } catch (e) {
-                      p = null;
-                    }
-                  }
+                  // The participant object is now the user object itself.
+                  final p = participant as Map<String, dynamic>?;
 
                   if (p == null) {
                     return const SizedBox.shrink();
@@ -371,20 +361,15 @@ class GroupProfilePage extends StatelessWidget {
                           ),
                       ],
                     ),
-                    subtitle: Row(
-                      
-                      children: [
-                        if (isParticipantSuperAdmin)
-                                Text('Super Admin, ', style: GoogleFonts.poppins(color: Colors.tealAccent, fontSize: 8, fontStyle: FontStyle.italic)),
-                          
-                        if (isParticipantSuperAdmin || isParticipantAdmin)
-                                Text('Admin', style: GoogleFonts.poppins(color: Colors.tealAccent, fontSize: 8, fontStyle: FontStyle.italic)),
-                          
-                        if (!isParticipantSuperAdmin && !isParticipantAdmin)
-                            Text('Member', style: GoogleFonts.poppins(color: Colors.tealAccent, fontSize: 8, fontStyle: FontStyle.italic)),                          
-                        
-                          
-                      ],
+                    subtitle: Text(
+                      (p['rank'] as String?)?.capitalize() ?? 'Member',
+                      style: GoogleFonts.poppins(
+                        color: p['rank'] == 'superadmin'
+                            ? Colors.amber
+                            : Colors.tealAccent,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     trailing: (isSuperAdmin || isAdmin) &&
                             p['_id'] != dataController.user.value['user']['_id']
@@ -570,5 +555,14 @@ class GroupProfilePage extends StatelessWidget {
         );
       }),
     );
+  }
+}
+
+extension StringExtension on String {
+  String capitalize() {
+    if (isEmpty) {
+      return "";
+    }
+    return "${this[0].toUpperCase()}${substring(1).toLowerCase()}";
   }
 }
