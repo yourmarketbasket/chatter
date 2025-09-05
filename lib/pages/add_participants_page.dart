@@ -24,6 +24,7 @@ class _AddParticipantsPageState extends State<AddParticipantsPage> {
   final TextEditingController _searchController = TextEditingController();
   final RxList<Map<String, dynamic>> _filteredUsers =
       <Map<String, dynamic>>[].obs;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -73,7 +74,7 @@ class _AddParticipantsPageState extends State<AddParticipantsPage> {
     }
 
     final participantIds = (currentChat['participants'] as List)
-        .map((p) => (p is Map ? p['_id'] : p.toString()) as String)
+        .map<String>((p) => p['userId']['_id'] as String)
         .toSet();
 
     var availableUsers = _dataController.allUsers
@@ -140,13 +141,19 @@ class _AddParticipantsPageState extends State<AddParticipantsPage> {
   }
 
   void _addMembers() async {
+    setState(() {
+      _isLoading = true;
+    });
     final chatId = widget.chat['_id'];
     final usersToAdd = List<Map<String, dynamic>>.from(_selectedUsers);
     for (var user in usersToAdd) {
       await _dataController.addMember(chatId, user['_id']);
     }
     if (mounted) {
-      _selectedUsers.clear();
+      setState(() {
+        _isLoading = false;
+        _selectedUsers.clear();
+      });
       Get.back();
     }
   }
@@ -290,9 +297,13 @@ class _AddParticipantsPageState extends State<AddParticipantsPage> {
       ),
       floatingActionButton: _selectedUsers.isNotEmpty
           ? FloatingActionButton.extended(
-              onPressed: _addMembers,
-              label: const Text('Add to Group'),
-              icon: const Icon(Icons.check),
+              onPressed: _isLoading ? null : _addMembers,
+              label: _isLoading
+                  ? const CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
+                    )
+                  : const Text('Add to Group'),
+              icon: _isLoading ? null : const Icon(Icons.check),
               backgroundColor: Colors.tealAccent,
             )
           : null,
