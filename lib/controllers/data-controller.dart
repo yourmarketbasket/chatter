@@ -4663,35 +4663,6 @@ void clearUserPosts() {
   }
 
   Future<bool> addMember(String chatId, String memberId) async {
-    // 1. Find chat and user to add
-    if (!chats.containsKey(chatId)) return false;
-    final chat = chats[chatId]!;
-    final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
-    final originalParticipants = List<Map<String, dynamic>>.from(participants); // For rollback
-
-    Map<String, dynamic>? memberToAdd;
-    try {
-      memberToAdd = allUsers.firstWhere((u) => u['_id'] == memberId);
-    } catch (e) {
-      memberToAdd = null;
-    }
-
-    if (memberToAdd == null) return false; // User to add not found
-
-    // 2. Optimistic UI Update
-    if (memberToAdd != null && !participants.any((p) => p['_id'] == memberId)) {
-      final newParticipant = Map<String, dynamic>.from(memberToAdd);
-      newParticipant['rank'] = 'member'; // Assume default rank
-      participants.add(newParticipant);
-      chat['participants'] = participants;
-      chats[chatId] = chat;
-      if (currentChat.value['_id'] == chatId) {
-        currentChat.value = Map<String, dynamic>.from(chat);
-      }
-      chats.refresh();
-    }
-
-    // 3. Make API call
     try {
       final token = user.value['token'];
       if (token == null) {
@@ -4705,21 +4676,22 @@ void clearUserPosts() {
         ),
       );
 
-      // 4. Handle API response
       if (response.statusCode == 200 && response.data['success'] == true) {
-        // Success, the optimistic update is now confirmed.
-        // The backend might send a socket event, but our state is already correct.
+        // The response contains the updated group object. Use it to update the local state.
+        final updatedGroup = response.data['group'];
+        if (updatedGroup != null && chats.containsKey(chatId)) {
+          chats[chatId] = updatedGroup;
+          if (currentChat.value['_id'] == chatId) {
+            currentChat.value = Map<String, dynamic>.from(updatedGroup);
+          }
+          chats.refresh();
+        }
         return true;
       } else {
-        // API call failed, revert the change
         throw Exception('Failed to add member on server: ${response.data?['message']}');
       }
     } catch (e) {
-      // 5. Revert on error
-      // print('Error adding member, reverting: $e');
-      chat['participants'] = originalParticipants;
-      chats[chatId] = chat;
-      chats.refresh();
+      // print('Error adding member: $e');
       return false;
     }
   }
