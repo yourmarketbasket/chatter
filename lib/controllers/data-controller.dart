@@ -492,9 +492,7 @@ class DataController extends GetxController {
 
           List<Map<String, dynamic>> fetchedUsers = fetchedUsersDynamic.map((userData) {
             if (userData is Map<String, dynamic>) {
-              // Ensure required fields (avatar, username, followers, following)
-              // The backend should provide followersCount and followingCount directly.
-              // If not, try to calculate from 'followers' and 'following' arrays if they exist.
+              
               String userId = userData['_id']?.toString() ?? '';
               bool isFollowing = currentUserFollowingIds.contains(userId);
 
