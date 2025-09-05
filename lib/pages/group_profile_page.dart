@@ -100,9 +100,14 @@ class GroupProfilePage extends StatelessWidget {
 
         final isSuperAdmin = currentChat['superAdmin']?['_id'] ==
             dataController.user.value['user']['_id'];
-        final isAdmin = currentChat['admins']?.any((admin) =>
-                admin['_id'] == dataController.user.value['user']['_id']) ??
-            false;
+        final isAdmin = currentChat['admins']?.any((admin) {
+          if (admin is Map) {
+            return admin['_id'] == dataController.user.value['user']['_id'];
+          } else if (admin is String) {
+            return admin == dataController.user.value['user']['_id'];
+          }
+          return false;
+        }) ?? false;
 
         return Scaffold(
           appBar: AppBar(
