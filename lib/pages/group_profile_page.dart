@@ -434,37 +434,43 @@ class GroupProfilePage extends StatelessWidget {
                             itemBuilder: (BuildContext context) {
                               final List<PopupMenuEntry<String>> items = [];
 
-                              // Promote/Demote logic
+                              // If the current user is a super-admin, they have more power.
                               if (isSuperAdmin) {
-                                if (isParticipantAdmin && !isParticipantSuperAdmin) {
+                                // Super-admin cannot modify another super-admin
+                                if (!isParticipantSuperAdmin) {
+                                  if (isParticipantAdmin) {
+                                    items.add(const PopupMenuItem<String>(
+                                        value: 'demote',
+                                        child: Text('Demote from Admin')));
+                                  } else {
+                                    items.add(const PopupMenuItem<String>(
+                                        value: 'promote',
+                                        child: Text('Promote to Admin')));
+                                  }
+                                  items.add(PopupMenuItem<String>(
+                                      value: 'mute',
+                                      child: Text(isMuted ? 'Unmute' : 'Mute')));
                                   items.add(const PopupMenuItem<String>(
-                                    value: 'demote',
-                                    child: Text('Demote from Admin'),
-                                  ));
-                                } else if (!isParticipantAdmin) {
-                                  items.add(const PopupMenuItem<String>(
-                                    value: 'promote',
-                                    child: Text('Promote to Admin'),
-                                  ));
+                                      value: 'remove', child: Text('Remove')));
                                 }
-                              } else if (isAdmin && isParticipantAdmin && !isParticipantSuperAdmin) {
-                                // Admins can demote other admins (but not super-admin)
-                                items.add(const PopupMenuItem<String>(
-                                  value: 'demote',
-                                  child: Text('Demote from Admin'),
-                                ));
                               }
-
-                              // Mute/Unmute and Remove logic
-                              if (!isParticipantAdmin) {
-                                items.add(PopupMenuItem<String>(
-                                  value: 'mute',
-                                  child: Text(isMuted ? 'Unmute' : 'Mute'),
-                                ));
-                                items.add(const PopupMenuItem<String>(
-                                  value: 'remove',
-                                  child: Text('Remove'),
-                                ));
+                              // If the current user is a regular admin.
+                              else if (isAdmin) {
+                                // Admins can demote other non-super-admins.
+                                if (isParticipantAdmin &&
+                                    !isParticipantSuperAdmin) {
+                                  items.add(const PopupMenuItem<String>(
+                                      value: 'demote',
+                                      child: Text('Demote from Admin')));
+                                }
+                                // Admins can only mute/remove non-admins.
+                                if (!isParticipantAdmin) {
+                                  items.add(PopupMenuItem<String>(
+                                      value: 'mute',
+                                      child: Text(isMuted ? 'Unmute' : 'Mute')));
+                                  items.add(const PopupMenuItem<String>(
+                                      value: 'remove', child: Text('Remove')));
+                                }
                               }
 
                               return items;
