@@ -320,7 +320,7 @@ class GroupProfilePage extends StatelessWidget {
                           ?.any((admin) => admin == p['_id']) ??
                       false;
                   final isParticipantSuperAdmin =
-                      currentChat['superAdmin']?['_id'] == p['_id'];
+                      currentChat['superAdmin'] == p['_id'];
                   final isMuted = participant['isMuted'] ?? false;
             
                   return ListTile(
