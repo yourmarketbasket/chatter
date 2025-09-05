@@ -96,11 +96,11 @@ class _AudioWaveformWidgetState extends State<AudioWaveformWidget> {
                 : Icon(_isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.white),
             onPressed: _isPreparing
                 ? null
-                : () {
+                : () async {
                     if (_isPlaying) {
-                      _playerController.pausePlayer();
+                      await _playerController.pausePlayer();
                     } else {
-                      _playerController.startPlayer();
+                      await _playerController.startPlayer(finishMode: FinishMode.stop);
                     }
                   },
           ),

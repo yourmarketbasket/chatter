@@ -23,6 +23,7 @@ import 'package:chatter/pages/new-posts-page.dart';
 import 'package:chatter/pages/users_list_page.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:share_handler/share_handler.dart';
+import 'package:upgrader/upgrader.dart';
 // import 'package:device_info_plus/device_info_plus.dart'; // No longer needed for player selection
 import 'dart:io'; // No longer needed for player selection (Platform check)
 
@@ -171,55 +172,57 @@ class _ChatterAppState extends State<ChatterApp> {
 
   @override
   Widget build(BuildContext context) {
-    return GetMaterialApp(
-      routingCallback: (routing) {
-        if (routing != null) {
-          _dataController.currentRoute.value = routing.current;
-        }
-      },
-      title: 'Chatter',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark().copyWith(
-        primaryColor: Colors.tealAccent,
-        colorScheme: const ColorScheme.dark(
-          primary: Colors.tealAccent,
-          secondary: Colors.pinkAccent,
-        ),
-        scaffoldBackgroundColor: Colors.black,
-        textTheme: const TextTheme(
-          bodyLarge: TextStyle(color: Colors.white),
-          bodyMedium: TextStyle(color: Colors.white),
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.black,
-          foregroundColor: Colors.white,
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.tealAccent,
-            foregroundColor: Colors.black,
+    return UpgradeAlert(
+      child: GetMaterialApp(
+        routingCallback: (routing) {
+          if (routing != null) {
+            _dataController.currentRoute.value = routing.current;
+          }
+        },
+        title: 'Chatter',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData.dark().copyWith(
+          primaryColor: Colors.tealAccent,
+          colorScheme: const ColorScheme.dark(
+            primary: Colors.tealAccent,
+            secondary: Colors.pinkAccent,
+          ),
+          scaffoldBackgroundColor: Colors.black,
+          textTheme: const TextTheme(
+            bodyLarge: TextStyle(color: Colors.white),
+            bodyMedium: TextStyle(color: Colors.white),
+          ),
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Colors.black,
+            foregroundColor: Colors.white,
+          ),
+          elevatedButtonTheme: ElevatedButtonThemeData(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.tealAccent,
+              foregroundColor: Colors.black,
+            ),
           ),
         ),
+        navigatorObservers: [routeObserver],
+        home: const LandingPage(), // Show LandingPage while checking storage
+        getPages: [
+          GetPage(name: '/landing', page: () => const LandingPage()),
+          GetPage(name: '/login', page: () => const LoginPage()),
+          GetPage(name: '/register', page: () => const RegisterPage()),
+          GetPage(name: '/home', page: () => const HomeFeedScreen()),
+          GetPage(name: '/buy-me-a-coffee', page: () => const BuyMeACoffeePage()),
+          // main chats page
+          GetPage(name: '/chats', page: () =>  MainChatsPage()),
+          GetPage(name: '/admin', page: () => const AdminPage()),
+          GetPage(name: '/invites/:inviteCode', page: () {
+            final inviteCode = Get.parameters['inviteCode'];
+            if (inviteCode != null) {
+              return JoinGroupPage(inviteCode: inviteCode);
+            }
+            return const LandingPage();
+          }),
+        ],
       ),
-      navigatorObservers: [routeObserver],
-      home: const LandingPage(), // Show LandingPage while checking storage
-      getPages: [
-        GetPage(name: '/landing', page: () => const LandingPage()),
-        GetPage(name: '/login', page: () => const LoginPage()),
-        GetPage(name: '/register', page: () => const RegisterPage()),
-        GetPage(name: '/home', page: () => const HomeFeedScreen()),
-        GetPage(name: '/buy-me-a-coffee', page: () => const BuyMeACoffeePage()),
-        // main chats page
-        GetPage(name: '/chats', page: () =>  MainChatsPage()),
-        GetPage(name: '/admin', page: () => const AdminPage()),
-        GetPage(name: '/invites/:inviteCode', page: () {
-          final inviteCode = Get.parameters['inviteCode'];
-          if (inviteCode != null) {
-            return JoinGroupPage(inviteCode: inviteCode);
-          }
-          return const LandingPage();
-        }),
-      ],
     );
   }
 }

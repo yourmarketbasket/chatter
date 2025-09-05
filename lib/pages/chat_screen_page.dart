@@ -703,11 +703,18 @@ class _ChatScreenState extends State<ChatScreen> {
         ? message['senderId']['_id']
         : message['senderId'];
 
-    // Look up sender in the allUsers list to prevent crashes when participants are just IDs
-    final sender = dataController.allUsers.firstWhere(
-      (u) => u['_id'] == senderId,
-      orElse: () => {'_id': senderId, 'name': 'Unknown User', 'avatar': ''},
-    );
+    final currentUserId = dataController.getUserId();
+    Map<String, dynamic> sender;
+
+    if (senderId == currentUserId) {
+      sender = dataController.user.value['user'];
+    } else {
+      // Look up sender in the allUsers list
+      sender = dataController.allUsers.firstWhere(
+        (u) => u['_id'] == senderId,
+        orElse: () => {'_id': senderId, 'name': 'Unknown User', 'avatar': ''},
+      );
+    }
 
     Navigator.push(
       context,
@@ -743,7 +750,8 @@ class _ChatScreenState extends State<ChatScreen> {
       final hasMore = attachments.length > maxVisible;
       final gridItemCount = hasMore ? maxVisible : attachments.length;
       final crossAxisCount = attachments.length == 1 ? 1 : 2;
-      final aspectRatio = attachments.length == 1 ? 3 / 4 : 1.0;
+      final bool isSingleAudio = attachments.length == 1 && _mapToSimpleType(attachments[0]['type']) == 'audio';
+      final aspectRatio = isSingleAudio ? 4 / 1 : (attachments.length == 1 ? 3 / 4 : 1.0);
 
       return GridView.builder(
         shrinkWrap: true,

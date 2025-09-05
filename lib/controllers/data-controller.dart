@@ -2601,11 +2601,12 @@ class DataController extends GetxController {
       // Avoid adding duplicates
       if (!participants.any((p) => p['_id'] == member['_id'])) {
         participants.add(member);
-        chat['participants'] = participants;
-        chats[chatId] = chat;
+        final newChat = Map<String, dynamic>.from(chat);
+        newChat['participants'] = participants;
+        chats[chatId] = newChat;
 
         if (currentChat.value['_id'] == chatId) {
-          currentChat.value = chat;
+          currentChat.value = newChat;
         }
         chats.refresh();
       }
@@ -2617,8 +2618,6 @@ class DataController extends GetxController {
     final memberId = data['memberId'] as String?;
     if (chatId == null || memberId == null) return;
 
-    // If the removed member is the current user, they have been kicked.
-    // The entire chat should be removed from their list.
     if (memberId == getUserId()) {
       handleGroupRemovedFrom(data);
       return;
@@ -2626,20 +2625,19 @@ class DataController extends GetxController {
 
     if (chats.containsKey(chatId)) {
       final chat = chats[chatId]!;
-
-      // Remove from participants list
       final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
       participants.removeWhere((p) => p['_id'] == memberId);
-      chat['participants'] = participants;
 
-      // Also remove from admins list if they were an admin
       final admins = List<Map<String, dynamic>>.from(chat['admins'] ?? []);
       admins.removeWhere((a) => a['_id'] == memberId);
-      chat['admins'] = admins;
 
-      chats[chatId] = chat;
+      final newChat = Map<String, dynamic>.from(chat);
+      newChat['participants'] = participants;
+      newChat['admins'] = admins;
+      chats[chatId] = newChat;
+
       if (currentChat.value['_id'] == chatId) {
-        currentChat.value = chat;
+        currentChat.value = newChat;
       }
       chats.refresh();
     }
