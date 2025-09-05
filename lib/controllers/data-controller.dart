@@ -500,7 +500,7 @@ class DataController extends GetxController {
               return {
                 '_id': userId,
                 'avatar': userData['avatar']?.toString() ?? '',
-                'username': userData['name']?.toString(), // Assuming 'name' might be username or real name based on context
+                'username': userData['name']?.toString(), 
                 'name': userData['name']?.toString() ?? 'Unknown User',
                 'followersCount': followersCount,
                 'followingCount': followingCount,
