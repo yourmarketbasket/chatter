@@ -164,6 +164,16 @@ class _ChatScreenState extends State<ChatScreen> {
         if (otherParticipant != null && data['userId'] == otherParticipant['_id']) {
           setState(() {}); // Rebuild app bar
         }
+      },
+      'member:muted': () {
+        if (data['chatId'] == currentChatId) {
+          setState(() {}); // Rebuild to update message input area
+        }
+      },
+      'member:unmuted': () {
+        if (data['chatId'] == currentChatId) {
+          setState(() {}); // Rebuild to update message input area
+        }
       }
     };
 
