@@ -258,52 +258,17 @@ class DataController extends GetxController {
     final chatId = updatedChatData['_id'] as String?;
     if (chatId == null) return;
 
-    if (chats.containsKey(chatId)) {
-      final existingChat = chats[chatId]!;
+    // Per backend documentation, replace the entire chat object with the new data.
+    // This is the single source of truth.
+    chats[chatId] = updatedChatData;
 
-      // Separate the participants list to merge it intelligently
-      final newParticipantsData = updatedChatData.remove('participants');
-
-      // Update the rest of the chat details (name, about, lastMessage, etc.)
-      existingChat.addAll(updatedChatData);
-
-      // If the update contains a new participants list, merge it
-      if (newParticipantsData is List) {
-        final existingParticipants = List<Map<String, dynamic>>.from(existingChat['participants'] ?? []);
-        final mergedParticipants = <Map<String, dynamic>>[];
-        final existingParticipantsMap = { for (var p in existingParticipants) p['_id']: p };
-
-        for (final newParticipantMap in newParticipantsData) {
-          if (newParticipantMap is Map<String, dynamic>) {
-            final participantId = newParticipantMap['_id'];
-            if (existingParticipantsMap.containsKey(participantId)) {
-              // Participant exists, merge data, preserving local 'isMuted' state as priority
-              final existingParticipant = existingParticipantsMap[participantId]!;
-              final mergedParticipant = Map<String, dynamic>.from(newParticipantMap);
-              mergedParticipant['isMuted'] = existingParticipant['isMuted'] ?? newParticipantMap['isMuted'] ?? false;
-              mergedParticipants.add(mergedParticipant);
-            } else {
-              // This is a new participant, add them directly
-              mergedParticipants.add(newParticipantMap);
-            }
-          }
-        }
-        existingChat['participants'] = mergedParticipants;
-      }
-
-      // Put the fully updated chat object back into the main map
-      chats[chatId] = existingChat;
-
-      // Update the current chat if it's the one being viewed
-      if (activeChatId.value == chatId) {
-        currentChat.value = Map<String, dynamic>.from(existingChat);
-      }
-      chats.refresh();
-    } else {
-      // If the chat is not in the local list, add it. This happens on `chat:new`.
-      chats[chatId] = updatedChatData;
-      chats.refresh();
+    // If the updated chat is the one currently being viewed, update that state too.
+    if (activeChatId.value == chatId) {
+      currentChat.value = Map<String, dynamic>.from(updatedChatData);
     }
+
+    // Refresh the RxMap to ensure all listeners are notified.
+    chats.refresh();
   }
 
   void handleMessageStatusUpdate(Map<String, dynamic> data) {
@@ -2700,47 +2665,14 @@ class DataController extends GetxController {
 
   void handleMemberMuted(Map<String, dynamic> data) {
     print('[LOG] handleMemberMuted received: $data');
-    _updateMuteStatus(data, isMuted: true);
+    // Per documentation, this event is for notifications only.
+    // The actual state update is handled by the subsequent `chat:updated` event.
   }
 
   void handleMemberUnmuted(Map<String, dynamic> data) {
     print('[LOG] handleMemberUnmuted received: $data');
-    _updateMuteStatus(data, isMuted: false);
-  }
-
-  void _updateMuteStatus(Map<String, dynamic> data, {required bool isMuted}) {
-    final chatId = data['chatId'] as String?;
-    final userId = data['userId'] as String?;
-    if (chatId == null || userId == null || !chats.containsKey(chatId)) return;
-
-    final originalChat = chats[chatId]!;
-    final participants = List<Map<String, dynamic>>.from(originalChat['participants'] ?? []);
-    final memberIndex = participants.indexWhere((p) => p['_id'] == userId);
-
-    if (memberIndex != -1) {
-      // Create a new list of participants to ensure reactivity
-      final newParticipantsList = List<Map<String, dynamic>>.from(participants);
-
-      // Create a new map for the participant being updated
-      final updatedParticipant = Map<String, dynamic>.from(newParticipantsList[memberIndex]);
-      updatedParticipant['isMuted'] = isMuted;
-
-      // Replace the old participant map with the new one
-      newParticipantsList[memberIndex] = updatedParticipant;
-
-      // Create a new chat map with the updated participants list
-      final newChat = Map<String, dynamic>.from(originalChat);
-      newChat['participants'] = newParticipantsList;
-
-      // Update the main chats map and the current chat if active
-      chats[chatId] = newChat;
-      if (activeChatId.value == chatId) {
-        currentChat.value = newChat;
-      }
-
-      // Explicitly refresh the RxMap to notify listeners
-      chats.refresh();
-    }
+    // Per documentation, this event is for notifications only.
+    // The actual state update is handled by the subsequent `chat:updated` event.
   }
 
   // --- Attachment Download Logic ---
