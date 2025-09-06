@@ -254,16 +254,28 @@ class DataController extends GetxController {
   }
 
   void handleChatUpdated(Map<String, dynamic> updatedChatData) {
+    print('[LOG] handleChatUpdated received: $updatedChatData');
     final chatId = updatedChatData['_id'] as String?;
     if (chatId == null) return;
 
-    final newChats = Map<String, Map<String, dynamic>>.from(chats);
-    newChats[chatId] = updatedChatData;
-    chats.value = newChats;
-
-    if (activeChatId.value == chatId) {
-      currentChat.value = Map<String, dynamic>.from(updatedChatData);
+    // Deep copy the participants list to ensure it's a new object for GetX reactivity.
+    if (updatedChatData.containsKey('participants') && updatedChatData['participants'] is List) {
+      // Create a new list from the old one, ensuring each participant map is also a new instance.
+      updatedChatData['participants'] = List<Map<String, dynamic>>.from(
+        (updatedChatData['participants'] as List).map((p) => Map<String, dynamic>.from(p as Map))
+      );
     }
+
+    // Now, update the RxMap. This assignment will trigger listeners.
+    chats[chatId] = updatedChatData;
+
+    // If the updated chat is the one currently being viewed, update that state as well.
+    if (activeChatId.value == chatId) {
+      currentChat.value = updatedChatData;
+    }
+
+    // A single refresh on the map can help ensure all listeners are notified.
+    chats.refresh();
   }
 
   void handleMessageStatusUpdate(Map<String, dynamic> data) {
@@ -274,22 +286,40 @@ class DataController extends GetxController {
     if (messageId == null || status == null || userId == null) return;
 
     void updateReceipts(Map<String, dynamic> message) {
-        var receipts = List<Map<String, dynamic>>.from(message['readReceipts'] ?? []);
-        final receiptIndex = receipts.indexWhere((r) => r['userId'] == userId);
+      // Defensively handle the receipts list, which may contain non-map elements.
+      if (message['readReceipts'] == null || message['readReceipts'] is! List) {
+        message['readReceipts'] = [];
+      }
 
-        final newReceipt = {
-            'userId': userId,
-            'status': status,
-            'timestamp': data['timestamp'] ?? DateTime.now().toUtc().toIso8601String(),
-        };
+      var receipts = List<dynamic>.from(message['readReceipts']);
 
-        if (receiptIndex != -1) {
-            if(receipts[receiptIndex]['status'] == 'read' && status == 'delivered') return;
-            receipts[receiptIndex] = newReceipt;
-        } else {
-            receipts.add(newReceipt);
+      int receiptIndex = -1;
+      for (int i = 0; i < receipts.length; i++) {
+        final r = receipts[i];
+        if (r is Map && r.containsKey('userId') && r['userId'] == userId) {
+          receiptIndex = i;
+          break;
         }
-        message['readReceipts'] = receipts;
+      }
+
+      final newReceipt = {
+        'userId': userId,
+        'status': status,
+        'timestamp': data['timestamp'] ?? DateTime.now().toUtc().toIso8601String(),
+      };
+
+      if (receiptIndex != -1) {
+        final existingReceipt = receipts[receiptIndex];
+        if (existingReceipt is Map &&
+            existingReceipt['status'] == 'read' &&
+            status == 'delivered') {
+          return; // Do not downgrade from read to delivered
+        }
+        receipts[receiptIndex] = newReceipt;
+      } else {
+        receipts.add(newReceipt);
+      }
+      message['readReceipts'] = receipts;
     }
 
     final index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
@@ -2659,6 +2689,7 @@ class DataController extends GetxController {
   }
 
   void handleMemberMuted(Map<String, dynamic> data) {
+    print('[LOG] handleMemberMuted received: $data');
     final userId = data['userId'] as String?;
     if (userId == null) return;
 
@@ -2671,6 +2702,7 @@ class DataController extends GetxController {
   }
 
   void handleMemberUnmuted(Map<String, dynamic> data) {
+    print('[LOG] handleMemberUnmuted received: $data');
     final userId = data['userId'] as String?;
     if (userId == null) return;
 
