@@ -258,23 +258,16 @@ class DataController extends GetxController {
     final chatId = updatedChatData['_id'] as String?;
     if (chatId == null) return;
 
-    // Deep copy the participants list to ensure it's a new object for GetX reactivity.
-    if (updatedChatData.containsKey('participants') && updatedChatData['participants'] is List) {
-      // Create a new list from the old one, ensuring each participant map is also a new instance.
-      updatedChatData['participants'] = List<Map<String, dynamic>>.from(
-        (updatedChatData['participants'] as List).map((p) => Map<String, dynamic>.from(p as Map))
-      );
-    }
-
-    // Now, update the RxMap. This assignment will trigger listeners.
+    // Per backend documentation, replace the entire chat object with the new data.
+    // This is the single source of truth.
     chats[chatId] = updatedChatData;
 
-    // If the updated chat is the one currently being viewed, update that state as well.
+    // If the updated chat is the one currently being viewed, update that state too.
     if (activeChatId.value == chatId) {
-      currentChat.value = updatedChatData;
+      currentChat.value = Map<String, dynamic>.from(updatedChatData);
     }
 
-    // A single refresh on the map can help ensure all listeners are notified.
+    // Refresh the RxMap to ensure all listeners are notified.
     chats.refresh();
   }
 
@@ -2688,30 +2681,45 @@ class DataController extends GetxController {
     }
   }
 
+  void _updateMuteStatus(Map<String, dynamic> data) {
+    final chatId = data['chatId'] as String?;
+    final userId = data['userId'] as String?;
+    final muted = data['muted'] as bool?;
+
+    if (chatId == null || userId == null || muted == null) return;
+
+    if (chats.containsKey(chatId)) {
+      // Create a deep copy to ensure reactivity
+      final chat = Map<String, dynamic>.from(chats[chatId]!);
+      final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
+      final memberIndex = participants.indexWhere((p) => p['_id'] == userId);
+
+      if (memberIndex != -1) {
+        participants[memberIndex]['isMuted'] = muted;
+        chat['participants'] = participants;
+
+        // Update the main chats list
+        chats[chatId] = chat;
+
+        // If the updated chat is the one being viewed, update its state as well
+        if (activeChatId.value == chatId) {
+          currentChat.value = chat;
+        }
+
+        // Refresh the entire map to ensure all listeners are notified
+        chats.refresh();
+      }
+    }
+  }
+
   void handleMemberMuted(Map<String, dynamic> data) {
     print('[LOG] handleMemberMuted received: $data');
-    final userId = data['userId'] as String?;
-    if (userId == null) return;
-
-    final user = allUsers.firstWhere((u) => u['_id'] == userId, orElse: () => {'name': 'A user'});
-    Get.snackbar(
-      'User Muted',
-      '${user['name']} has been muted in this chat.',
-      snackPosition: SnackPosition.BOTTOM,
-    );
+    _updateMuteStatus(data);
   }
 
   void handleMemberUnmuted(Map<String, dynamic> data) {
     print('[LOG] handleMemberUnmuted received: $data');
-    final userId = data['userId'] as String?;
-    if (userId == null) return;
-
-    final user = allUsers.firstWhere((u) => u['_id'] == userId, orElse: () => {'name': 'A user'});
-    Get.snackbar(
-      'User Unmuted',
-      '${user['name']} has been unmuted in this chat.',
-      snackPosition: SnackPosition.BOTTOM,
-    );
+    _updateMuteStatus(data);
   }
 
   // --- Attachment Download Logic ---
