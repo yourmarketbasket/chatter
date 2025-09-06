@@ -254,21 +254,53 @@ class DataController extends GetxController {
   }
 
   void handleChatUpdated(Map<String, dynamic> updatedChatData) {
+    print('[LOG] handleChatUpdated received: $updatedChatData');
     final chatId = updatedChatData['_id'] as String?;
     if (chatId == null) return;
 
     if (chats.containsKey(chatId)) {
-      final chat = chats[chatId]!;
-      // Merge the updated data into the existing chat object
-      chat.addAll(updatedChatData);
-      chats[chatId] = chat;
+      final existingChat = chats[chatId]!;
 
+      // Separate the participants list to merge it intelligently
+      final newParticipantsData = updatedChatData.remove('participants');
+
+      // Update the rest of the chat details (name, about, lastMessage, etc.)
+      existingChat.addAll(updatedChatData);
+
+      // If the update contains a new participants list, merge it
+      if (newParticipantsData is List) {
+        final existingParticipants = List<Map<String, dynamic>>.from(existingChat['participants'] ?? []);
+        final mergedParticipants = <Map<String, dynamic>>[];
+        final existingParticipantsMap = { for (var p in existingParticipants) p['_id']: p };
+
+        for (final newParticipantMap in newParticipantsData) {
+          if (newParticipantMap is Map<String, dynamic>) {
+            final participantId = newParticipantMap['_id'];
+            if (existingParticipantsMap.containsKey(participantId)) {
+              // Participant exists, merge data, preserving local 'isMuted' state as priority
+              final existingParticipant = existingParticipantsMap[participantId]!;
+              final mergedParticipant = Map<String, dynamic>.from(newParticipantMap);
+              mergedParticipant['isMuted'] = existingParticipant['isMuted'] ?? newParticipantMap['isMuted'] ?? false;
+              mergedParticipants.add(mergedParticipant);
+            } else {
+              // This is a new participant, add them directly
+              mergedParticipants.add(newParticipantMap);
+            }
+          }
+        }
+        existingChat['participants'] = mergedParticipants;
+      }
+
+      // Put the fully updated chat object back into the main map
+      chats[chatId] = existingChat;
+
+      // Update the current chat if it's the one being viewed
       if (activeChatId.value == chatId) {
-        currentChat.value = Map<String, dynamic>.from(chat);
+        currentChat.value = Map<String, dynamic>.from(existingChat);
       }
       chats.refresh();
     } else {
-      // If the chat is not in the local list, add it.
+      // If the chat is not in the local list, add it. This happens on `chat:new`.
       chats[chatId] = updatedChatData;
       chats.refresh();
     }
@@ -2667,6 +2699,7 @@ class DataController extends GetxController {
   }
 
   void handleMemberMuted(Map<String, dynamic> data) {
+    print('[LOG] handleMemberMuted received: $data');
     final chatId = data['chatId'] as String?;
     final userId = data['userId'] as String?; // Corrected from memberId to userId
     if (chatId == null || userId == null || !chats.containsKey(chatId)) return;
@@ -2690,10 +2723,12 @@ class DataController extends GetxController {
       if (activeChatId.value == chatId) {
         currentChat.value = chat;
       }
+      chats.refresh();
     }
   }
 
   void handleMemberUnmuted(Map<String, dynamic> data) {
+    print('[LOG] handleMemberUnmuted received: $data');
     final chatId = data['chatId'] as String?;
     final userId = data['userId'] as String?; // Corrected from memberId to userId
     if (chatId == null || userId == null || !chats.containsKey(chatId)) return;
@@ -2717,6 +2752,7 @@ class DataController extends GetxController {
       if (activeChatId.value == chatId) {
         currentChat.value = chat;
       }
+      chats.refresh();
     }
   }
 
@@ -4743,6 +4779,7 @@ void clearUserPosts() {
   }
 
   Future<bool> muteMember(String chatId, String memberId) async {
+    print('[LOG] muteMember called for member $memberId in chat $chatId');
     try {
       final token = user.value['token'];
       if (token == null) {
@@ -4755,14 +4792,16 @@ void clearUserPosts() {
           headers: {'Authorization': 'Bearer $token'},
         ),
       );
+      print('[LOG] muteMember API response: ${response.data}');
       return response.statusCode == 200 && response.data['success'] == true;
     } catch (e) {
-      // print('Error muting member: $e');
+      print('[LOG] Error muting member: $e');
       return false;
     }
   }
 
   Future<bool> unmuteMember(String chatId, String memberId) async {
+    print('[LOG] unmuteMember called for member $memberId in chat $chatId');
     try {
       final token = user.value['token'];
       if (token == null) {
@@ -4775,9 +4814,10 @@ void clearUserPosts() {
           headers: {'Authorization': 'Bearer $token'},
         ),
       );
+      print('[LOG] unmuteMember API response: ${response.data}');
       return response.statusCode == 200 && response.data['success'] == true;
     } catch (e) {
-      // print('Error unmuting member: $e');
+      print('[LOG] Error unmuting member: $e');
       return false;
     }
   }

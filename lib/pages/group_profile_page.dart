@@ -412,10 +412,11 @@ class GroupProfilePage extends StatelessWidget {
                               }
                             },
                             itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-                              const PopupMenuItem<String>(
-                                value: 'remove',
-                                child: Text('Remove'),
-                              ),
+                              if ((isSuperAdmin && !isParticipantSuperAdmin) || (isAdmin && !isParticipantAdmin && !isParticipantSuperAdmin))
+                                const PopupMenuItem<String>(
+                                  value: 'remove',
+                                  child: Text('Remove'),
+                                ),
                               if (isSuperAdmin && !isParticipantSuperAdmin)
                                 PopupMenuItem<String>(
                                   value: isParticipantAdmin ? 'demote' : 'promote',
@@ -428,10 +429,11 @@ class GroupProfilePage extends StatelessWidget {
                                   value: 'promote',
                                   child: Text('Promote to Admin'),
                                 ),
-                              PopupMenuItem<String>(
-                                value: 'mute',
-                                child: Text(isMuted ? 'Unmute' : 'Mute'),
-                              ),
+                              if ((isSuperAdmin && !isParticipantSuperAdmin) || (isAdmin && !isParticipantAdmin && !isParticipantSuperAdmin))
+                                PopupMenuItem<String>(
+                                  value: 'mute',
+                                  child: Text(isMuted ? 'Unmute' : 'Mute'),
+                                ),
                             ],
                           )
                         : null,
