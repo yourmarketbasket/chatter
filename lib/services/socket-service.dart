@@ -170,7 +170,7 @@ class SocketService {
 
   void _handleChatClosed(dynamic data) {
     if (data is Map<String, dynamic>) {
-      _dataController.handleGroupClosed(data);
+      _dataController.handleChatClosed(data);
       _eventController.add({'event': 'chat:closed', 'data': data});
     }
   }
