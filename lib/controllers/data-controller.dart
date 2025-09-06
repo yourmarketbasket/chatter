@@ -4786,21 +4786,13 @@ void clearUserPosts() {
         throw Exception('User not authenticated');
       }
       final response = await _dio.post(
-        'api/chats/$chatId/mute-member',
-        data: {'memberId': memberId},
+        'api/chats/$chatId/members/$memberId/mute',
         options: dio.Options(
           headers: {'Authorization': 'Bearer $token'},
         ),
       );
       print('[LOG] muteMember API response: ${response.data}');
-      if (response.statusCode == 200 && response.data['success'] == true) {
-        // Assuming the API returns the full chat object, as other endpoints do.
-        if (response.data['chat'] is Map<String, dynamic>) {
-          handleChatUpdated(response.data['chat']);
-        }
-        return true;
-      }
-      return false;
+      return response.statusCode == 200 && response.data['success'] == true;
     } catch (e) {
       print('[LOG] Error muting member: $e');
       return false;
@@ -4815,21 +4807,13 @@ void clearUserPosts() {
         throw Exception('User not authenticated');
       }
       final response = await _dio.post(
-        'api/chats/$chatId/unmute-member',
-        data: {'memberId': memberId},
+        'api/chats/$chatId/members/$memberId/unmute',
         options: dio.Options(
           headers: {'Authorization': 'Bearer $token'},
         ),
       );
       print('[LOG] unmuteMember API response: ${response.data}');
-      if (response.statusCode == 200 && response.data['success'] == true) {
-        // Assuming the API returns the full chat object, as other endpoints do.
-        if (response.data['chat'] is Map<String, dynamic>) {
-          handleChatUpdated(response.data['chat']);
-        }
-        return true;
-      }
-      return false;
+      return response.statusCode == 200 && response.data['success'] == true;
     } catch (e) {
       print('[LOG] Error unmuting member: $e');
       return false;
