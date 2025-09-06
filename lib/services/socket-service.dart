@@ -88,11 +88,9 @@ class SocketService {
       'message:reaction': (data) => _handleMessageReaction(data),
       'message:reaction:removed': (data) => _handleMessageReactionRemoved(data),
       'chats:deletedForMe': (data) => _handleChatsDeletedForMe(data),
-      'chat:hardDeleted': (data) => _handleChatDeleted(data, 'chat:hardDeleted'),
       'typing:started': (data) => _handleTyping(data, true),
       'typing:stopped': (data) => _handleTyping(data, false),
       'user:verified': (data) => _handleUserVerified(data),
-      'group:updated': (data) => _handleGroupUpdated(data),
       'chat:avatar_updated': (data) => _handleChatAvatarUpdated(data),
       'group:removedFrom': (data) => _handleGroupRemovedFrom(data),
       'member:joined': (data) => _handleMemberJoined(data),
@@ -102,8 +100,7 @@ class SocketService {
       'member:demoted': (data) => _handleMemberDemoted(data),
       'member:muted': (data) => _handleMemberMuted(data),
       'member:unmuted': (data) => _handleMemberUnmuted(data),
-      'group:member_left': (data) => _handleMemberLeft(data),
-      'group:closed': (data) => _handleGroupClosed(data),
+      'chat:closed': (data) => _handleChatClosed(data),
       'user:unsuspended': (data) => _handleUserUnsuspended(data),
       'post:unflagged': (data) => _handlePostUnflagged(data),
       'post:flagged': (data) => _handlePostFlagged(data),
@@ -122,13 +119,6 @@ class SocketService {
     }
   }
 
-  void _handleGroupUpdated(dynamic data) {
-    if (data is Map<String, dynamic>) {
-      _dataController.handleGroupUpdated(data);
-      _eventController.add({'event': 'group:updated', 'data': data});
-    }
-  }
-
   void _handleGroupRemovedFrom(dynamic data) {
     if (data is Map<String, dynamic>) {
       _dataController.handleGroupRemovedFrom(data);
@@ -140,13 +130,6 @@ class SocketService {
     if (data is Map<String, dynamic>) {
       _dataController.handleMemberJoined(data);
       _eventController.add({'event': 'member:joined', 'data': data});
-    }
-  }
-
-  void _handleMemberLeft(dynamic data) {
-    if (data is Map<String, dynamic>) {
-      _dataController.handleMemberLeft(data);
-      _eventController.add({'event': 'group:member_left', 'data': data});
     }
   }
 
@@ -185,10 +168,10 @@ class SocketService {
     }
   }
 
-  void _handleGroupClosed(dynamic data) {
+  void _handleChatClosed(dynamic data) {
     if (data is Map<String, dynamic>) {
       _dataController.handleGroupClosed(data);
-      _eventController.add({'event': 'group:closed', 'data': data});
+      _eventController.add({'event': 'chat:closed', 'data': data});
     }
   }
 
@@ -357,19 +340,6 @@ class SocketService {
     }
   }
 
-  void _handleChatDeleted(dynamic data, String event) {
-    print('[SocketService] Received event $event with data: $data');
-    // The payload for chat deletion is the chat object itself. Its ID is in the '_id' field.
-    if (data is Map<String, dynamic> && data['_id'] is String) {
-      final chatId = data['_id'] as String;
-      print('[SocketService] Extracted chatId from _id key: $chatId. Calling handleChatDeleted in DataController.');
-      _dataController.handleChatDeleted(chatId);
-      _eventController.add({'event': event, 'data': data});
-    } else {
-      print('[SocketService] Invalid $event data format: data is not a map or _id is not a string. Full data: $data');
-    }
-  }
-
   void _handleTyping(dynamic data, bool isStart) {
     if (data is Map<String, dynamic> &&
         data['chatId'] is String &&
@@ -465,41 +435,6 @@ class SocketService {
       _socket!.emit(event, data);
     } else {
         // print('SocketService: Cannot emit event: Socket not connected or data is null');
-    }
-  }
-
-  void sendMessage(String chatId, String message, String clientMessageId) {
-    if (_userId != null) {
-      emitEvent('message:new', {
-        'chatId': chatId,
-        'content': message,
-        'userId': _userId,
-        'clientMessageId': clientMessageId, // Include clientMessageId for correlation
-      });
-    } else {
-        // print('SocketService: Cannot send message, userId is null');
-    }
-  }
-
-  void sendMessageDelivered(String messageId) {
-    if (_userId != null) {
-      emitEvent('message:delivered', {
-        'messageId': messageId,
-        'userId': _userId,
-      });
-    } else {
-        // print('SocketService: Cannot send message:delivered, userId is null');
-    }
-  }
-
-  void sendMessageRead(String messageId) {
-    if (_userId != null) {
-      emitEvent('message:read', {
-        'messageId': messageId,
-        'userId': _userId,
-      });
-    } else {
-        // print('SocketService: Cannot send message:read, userId is null');
     }
   }
 

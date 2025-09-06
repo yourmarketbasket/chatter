@@ -428,7 +428,6 @@ class DataController extends GetxController {
     // We can just send the event to the server. The server will then broadcast
     // the message:statusUpdate event, which will be handled by handleMessageStatusUpdate.
     // This assumes handleMessageStatusUpdate is correctly implemented.
-    Get.find<SocketService>().sendMessageRead(messageId);
     // print('[DataController] Sent mark as read event for message $messageId');
   }
 
@@ -2567,33 +2566,6 @@ class DataController extends GetxController {
       }
       chats.refresh();
     }
-  }
-
-  void handleGroupUpdated(Map<String, dynamic> data) {
-    final chatId = data['chatId'] as String?;
-    if (chatId == null || !chats.containsKey(chatId)) return;
-
-    final chat = chats[chatId]!;
-
-    // This event is for group detail updates (name, about)
-    if (data.containsKey('name')) {
-      chat['name'] = data['name'];
-    }
-    if (data.containsKey('about')) {
-      chat['about'] = data['about'];
-    }
-
-    chats[chatId] = chat;
-
-    if (activeChatId.value == chatId) {
-      currentChat.value = Map<String, dynamic>.from(chat);
-    }
-    chats.refresh();
-  }
-
-  void handleMemberLeft(Map<String, dynamic> data) {
-    // Functionally the same as a member being removed for the client.
-    handleMemberRemoved(data);
   }
 
   void handleGroupRemovedFrom(Map<String, dynamic> data) {
@@ -4850,7 +4822,7 @@ void clearUserPosts() {
     }
   }
 
-  void handleGroupClosed(Map<String, dynamic> data) {
+  void handleChatClosed(Map<String, dynamic> data) {
     final chatId = data['chatId'] as String?;
     if (chatId == null) return;
 
