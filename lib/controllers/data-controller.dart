@@ -2700,58 +2700,45 @@ class DataController extends GetxController {
 
   void handleMemberMuted(Map<String, dynamic> data) {
     print('[LOG] handleMemberMuted received: $data');
-    final chatId = data['chatId'] as String?;
-    final userId = data['userId'] as String?; // Corrected from memberId to userId
-    if (chatId == null || userId == null || !chats.containsKey(chatId)) return;
-
-    // Create a new map from the existing chat to ensure immutability
-    final chat = Map<String, dynamic>.from(chats[chatId]!);
-    final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
-    final memberIndex = participants.indexWhere((p) => p['_id'] == userId);
-
-    if (memberIndex != -1) {
-      // Create a new map for the participant being updated
-      var updatedParticipant = Map<String, dynamic>.from(participants[memberIndex]);
-      updatedParticipant['isMuted'] = true;
-      participants[memberIndex] = updatedParticipant;
-
-      // Assign the new list to the new chat map
-      chat['participants'] = participants;
-
-      // Update the main chats list and the current chat if it's active
-      chats[chatId] = chat;
-      if (activeChatId.value == chatId) {
-        currentChat.value = chat;
-      }
-      chats.refresh();
-    }
+    _updateMuteStatus(data, isMuted: true);
   }
 
   void handleMemberUnmuted(Map<String, dynamic> data) {
     print('[LOG] handleMemberUnmuted received: $data');
+    _updateMuteStatus(data, isMuted: false);
+  }
+
+  void _updateMuteStatus(Map<String, dynamic> data, {required bool isMuted}) {
     final chatId = data['chatId'] as String?;
-    final userId = data['userId'] as String?; // Corrected from memberId to userId
+    final userId = data['userId'] as String?;
     if (chatId == null || userId == null || !chats.containsKey(chatId)) return;
 
-    // Create a new map from the existing chat to ensure immutability
-    final chat = Map<String, dynamic>.from(chats[chatId]!);
-    final participants = List<Map<String, dynamic>>.from(chat['participants'] ?? []);
+    final originalChat = chats[chatId]!;
+    final participants = List<Map<String, dynamic>>.from(originalChat['participants'] ?? []);
     final memberIndex = participants.indexWhere((p) => p['_id'] == userId);
 
     if (memberIndex != -1) {
+      // Create a new list of participants to ensure reactivity
+      final newParticipantsList = List<Map<String, dynamic>>.from(participants);
+
       // Create a new map for the participant being updated
-      var updatedParticipant = Map<String, dynamic>.from(participants[memberIndex]);
-      updatedParticipant['isMuted'] = false;
-      participants[memberIndex] = updatedParticipant;
+      final updatedParticipant = Map<String, dynamic>.from(newParticipantsList[memberIndex]);
+      updatedParticipant['isMuted'] = isMuted;
 
-      // Assign the new list to the new chat map
-      chat['participants'] = participants;
+      // Replace the old participant map with the new one
+      newParticipantsList[memberIndex] = updatedParticipant;
 
-      // Update the main chats list and the current chat if it's active
-      chats[chatId] = chat;
+      // Create a new chat map with the updated participants list
+      final newChat = Map<String, dynamic>.from(originalChat);
+      newChat['participants'] = newParticipantsList;
+
+      // Update the main chats map and the current chat if active
+      chats[chatId] = newChat;
       if (activeChatId.value == chatId) {
-        currentChat.value = chat;
+        currentChat.value = newChat;
       }
+
+      // Explicitly refresh the RxMap to notify listeners
       chats.refresh();
     }
   }
@@ -4779,7 +4766,7 @@ void clearUserPosts() {
   }
 
   Future<bool> muteMember(String chatId, String memberId) async {
-    print('[LOG] muteMember called for member $memberId in chat $chatId');
+    print('[LOG] muteMember API call sent for member $memberId');
     try {
       final token = user.value['token'];
       if (token == null) {
@@ -4791,7 +4778,7 @@ void clearUserPosts() {
           headers: {'Authorization': 'Bearer $token'},
         ),
       );
-      print('[LOG] muteMember API response: ${response.data}');
+      // Don't process response, rely on socket event.
       return response.statusCode == 200 && response.data['success'] == true;
     } catch (e) {
       print('[LOG] Error muting member: $e');
@@ -4800,7 +4787,7 @@ void clearUserPosts() {
   }
 
   Future<bool> unmuteMember(String chatId, String memberId) async {
-    print('[LOG] unmuteMember called for member $memberId in chat $chatId');
+    print('[LOG] unmuteMember API call sent for member $memberId');
     try {
       final token = user.value['token'];
       if (token == null) {
@@ -4812,7 +4799,7 @@ void clearUserPosts() {
           headers: {'Authorization': 'Bearer $token'},
         ),
       );
-      print('[LOG] unmuteMember API response: ${response.data}');
+      // Don't process response, rely on socket event.
       return response.statusCode == 200 && response.data['success'] == true;
     } catch (e) {
       print('[LOG] Error unmuting member: $e');
