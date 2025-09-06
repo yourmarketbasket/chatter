@@ -254,7 +254,7 @@ class DataController extends GetxController {
   }
 
   void handleChatUpdated(Map<String, dynamic> updatedChatData) {
-    print('[LOG] handleChatUpdated received: $updatedChatData');
+    // print('[LOG] handleChatUpdated received: $updatedChatData');
     final chatId = updatedChatData['_id'] as String?;
     if (chatId == null) return;
 
@@ -2713,12 +2713,12 @@ class DataController extends GetxController {
   }
 
   void handleMemberMuted(Map<String, dynamic> data) {
-    print('[LOG] handleMemberMuted received: $data');
+    // print('[LOG] handleMemberMuted received: $data');
     _updateMuteStatus(data);
   }
 
   void handleMemberUnmuted(Map<String, dynamic> data) {
-    print('[LOG] handleMemberUnmuted received: $data');
+    // print('[LOG] handleMemberUnmuted received: $data');
     _updateMuteStatus(data);
   }
 
@@ -4745,7 +4745,7 @@ void clearUserPosts() {
   }
 
   Future<bool> muteMember(String chatId, String memberId) async {
-    print('[LOG] muteMember API call sent for member $memberId');
+    // print('[LOG] muteMember API call sent for member $memberId');
     try {
       final token = user.value['token'];
       if (token == null) {
@@ -4760,13 +4760,13 @@ void clearUserPosts() {
       // Don't process response, rely on socket event.
       return response.statusCode == 200 && response.data['success'] == true;
     } catch (e) {
-      print('[LOG] Error muting member: $e');
+      // print('[LOG] Error muting member: $e');
       return false;
     }
   }
 
   Future<bool> unmuteMember(String chatId, String memberId) async {
-    print('[LOG] unmuteMember API call sent for member $memberId');
+    // print('[LOG] unmuteMember API call sent for member $memberId');
     try {
       final token = user.value['token'];
       if (token == null) {
@@ -4781,7 +4781,7 @@ void clearUserPosts() {
       // Don't process response, rely on socket event.
       return response.statusCode == 200 && response.data['success'] == true;
     } catch (e) {
-      print('[LOG] Error unmuting member: $e');
+      // print('[LOG] Error unmuting member: $e');
       return false;
     }
   }

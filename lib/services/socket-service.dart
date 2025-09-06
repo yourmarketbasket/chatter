@@ -248,12 +248,12 @@ class SocketService {
   }
 
   void _handleChatUpdated(dynamic data) {
-    print('[SocketService] Received chat:updated with data: $data');
+    // print('[SocketService] Received chat:updated with data: $data');
     if (data is Map<String, dynamic> && data['_id'] is String) {
       _dataController.handleChatUpdated(data);
       _eventController.add({'event': 'chat:updated', 'data': data});
     } else {
-        print('SocketService: Invalid chat:updated data format: ${data.runtimeType}');
+        // print('SocketService: Invalid chat:updated data format: ${data.runtimeType}');
     }
   }
 
@@ -326,7 +326,7 @@ class SocketService {
       _dataController.handleMessagesDeleted(data);
       _eventController.add({'event': 'messages:deleted', 'data': data});
     } else {
-      print('SocketService: Invalid messages:deleted data format: ${data.runtimeType}');
+      // print('SocketService: Invalid messages:deleted data format: ${data.runtimeType}');
     }
   }
 
@@ -336,7 +336,7 @@ class SocketService {
       _dataController.handleChatsDeletedForMe(chatIds);
       _eventController.add({'event': 'chats:deletedForMe', 'data': chatIds});
     } else {
-        print('SocketService: Invalid chats:deletedForMe data format: ${data.runtimeType}');
+        // print('SocketService: Invalid chats:deletedForMe data format: ${data.runtimeType}');
     }
   }
 
@@ -384,7 +384,7 @@ class SocketService {
       _dataController.handleAppUpdateNudge(data);
       _eventController.add({'event': 'app:update_nudge', 'data': data});
     } else {
-      print('SocketService: Invalid app:update_nudge data format: ${data.runtimeType}');
+      // print('SocketService: Invalid app:update_nudge data format: ${data.runtimeType}');
     }
   }
 
