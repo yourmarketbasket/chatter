@@ -254,21 +254,16 @@ class DataController extends GetxController {
   }
 
   void handleChatUpdated(Map<String, dynamic> updatedChatData) {
-    print('[LOG] handleChatUpdated received: $updatedChatData');
     final chatId = updatedChatData['_id'] as String?;
     if (chatId == null) return;
 
-    // Per backend documentation, replace the entire chat object with the new data.
-    // This is the single source of truth.
-    chats[chatId] = updatedChatData;
+    final newChats = Map<String, Map<String, dynamic>>.from(chats);
+    newChats[chatId] = updatedChatData;
+    chats.value = newChats;
 
-    // If the updated chat is the one currently being viewed, update that state too.
     if (activeChatId.value == chatId) {
       currentChat.value = Map<String, dynamic>.from(updatedChatData);
     }
-
-    // Refresh the RxMap to ensure all listeners are notified.
-    chats.refresh();
   }
 
   void handleMessageStatusUpdate(Map<String, dynamic> data) {
@@ -2664,15 +2659,27 @@ class DataController extends GetxController {
   }
 
   void handleMemberMuted(Map<String, dynamic> data) {
-    print('[LOG] handleMemberMuted received: $data');
-    // Per documentation, this event is for notifications only.
-    // The actual state update is handled by the subsequent `chat:updated` event.
+    final userId = data['userId'] as String?;
+    if (userId == null) return;
+
+    final user = allUsers.firstWhere((u) => u['_id'] == userId, orElse: () => {'name': 'A user'});
+    Get.snackbar(
+      'User Muted',
+      '${user['name']} has been muted in this chat.',
+      snackPosition: SnackPosition.BOTTOM,
+    );
   }
 
   void handleMemberUnmuted(Map<String, dynamic> data) {
-    print('[LOG] handleMemberUnmuted received: $data');
-    // Per documentation, this event is for notifications only.
-    // The actual state update is handled by the subsequent `chat:updated` event.
+    final userId = data['userId'] as String?;
+    if (userId == null) return;
+
+    final user = allUsers.firstWhere((u) => u['_id'] == userId, orElse: () => {'name': 'A user'});
+    Get.snackbar(
+      'User Unmuted',
+      '${user['name']} has been unmuted in this chat.',
+      snackPosition: SnackPosition.BOTTOM,
+    );
   }
 
   // --- Attachment Download Logic ---
