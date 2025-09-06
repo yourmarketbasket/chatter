@@ -156,7 +156,7 @@ class DataController extends GetxController {
 
       // Report current app version to backend
       updateUserAppVersion().catchError((e) {
-        print('[DataController] Error reporting user app version in init: $e');
+        // print('[DataController] Error reporting user app version in init: $e');
       });
     }
   }
@@ -2297,7 +2297,7 @@ class DataController extends GetxController {
           validateStatus: (status) => status != null && status < 500,
         ),
       );
-      print('[DataController.sendChatMessage] Received response: ${response.data}');
+      // print('[DataController.sendChatMessage] Received response: ${response.data}');
 
       if (response.statusCode == 201 && response.data['success'] == true) {
         final serverMessage = response.data['message'];
@@ -2306,10 +2306,10 @@ class DataController extends GetxController {
         // --- NEW/RESURRECTED CHAT HANDLING ---
         // If the server returns a full 'chat' object, that's the best case.
         if (response.data.containsKey('chat')) {
-          print('[DataController.sendChatMessage] Response contains full chat object.');
+          // print('[DataController.sendChatMessage] Response contains full chat object.');
           final newChat = response.data['chat'];
           final newChatId = newChat['_id'];
-          print('[DataController.sendChatMessage] Chat ID is $newChatId. Updating state.');
+          // print('[DataController.sendChatMessage] Chat ID is $newChatId. Updating state.');
 
           chats[newChatId] = newChat;
           currentChat.value = newChat; // This updates the whole object
@@ -2321,7 +2321,7 @@ class DataController extends GetxController {
           // If our currentChat doesn't have an ID yet, but the returned message does,
           // it means this is the first message of a new/resurrected chat.
           if (messageChatId != null && currentChat.value['_id'] == null) {
-            print('[DataController.sendChatMessage] New/resurrected chat detected via message. Chat ID: $messageChatId.');
+            // print('[DataController.sendChatMessage] New/resurrected chat detected via message. Chat ID: $messageChatId.');
 
             // We don't have the full chat object, but we have the ID.
             // Update the currentChat object with the ID.
@@ -2549,30 +2549,30 @@ class DataController extends GetxController {
   }
 
   void handleChatDeleted(String chatId) {
-    print('[DataController] handleChatDeleted called for chatId: $chatId');
+    // print('[DataController] handleChatDeleted called for chatId: $chatId');
     if (chatId.isEmpty) {
-      print('[DataController] ChatId is empty, returning.');
+      // print('[DataController] ChatId is empty, returning.');
       return;
     }
 
-    print('[DataController] Chats count before deletion attempt: ${chats.length}');
+    // print('[DataController] Chats count before deletion attempt: ${chats.length}');
     if (chats.containsKey(chatId)) {
-      print('[DataController] Chat found in map. Proceeding with removal.');
+      // print('[DataController] Chat found in map. Proceeding with removal.');
       final newChats = Map<String, Map<String, dynamic>>.from(chats);
       newChats.remove(chatId);
       chats.value = newChats; // Forcefully replace the map to ensure reactivity
-      print('[DataController] Chats count after deletion attempt: ${chats.length}');
+      // print('[DataController] Chats count after deletion attempt: ${chats.length}');
 
 
       // If the deleted chat is the current one, clear it.
       // The UI (ChatScreen) will be responsible for listening to this state change and popping itself.
       if (currentChat.value['_id'] == chatId) {
-        print('[DataController] Deleted chat is the current chat. Clearing state.');
+        // print('[DataController] Deleted chat is the current chat. Clearing state.');
         currentChat.value = {};
         currentConversationMessages.clear();
       }
     } else {
-      print('[DataController] Chat with ID $chatId not found in the local chats map.');
+      // print('[DataController] Chat with ID $chatId not found in the local chats map.');
     }
   }
 
@@ -2581,7 +2581,7 @@ class DataController extends GetxController {
     // for the current user. Since we already optimistically removed them from the UI,
     // we don't need to do anything here other than maybe log it for debugging.
     // If the API call in `deleteMultipleChats` had failed, the UI would have already been reverted.
-    print('[DataController] Received confirmation for soft deletion of chats: $chatIds');
+    // print('[DataController] Received confirmation for soft deletion of chats: $chatIds');
   }
 
   void handleChatAvatarUpdated(Map<String, dynamic> data) {
@@ -4565,7 +4565,7 @@ void clearUserPosts() {
       }
       return null;
     } catch (e) {
-      print('Error getting group details from invite: $e');
+      // print('Error getting group details from invite: $e');
       return null;
     }
   }
@@ -4586,7 +4586,7 @@ void clearUserPosts() {
       }
       return false;
     } catch (e) {
-      print('Error joining group from invite: $e');
+      // print('Error joining group from invite: $e');
       return false;
     }
   }
@@ -4632,7 +4632,7 @@ void clearUserPosts() {
       }
       return null;
     } catch (e) {
-      print('Error generating group invite link: $e');
+      // print('Error generating group invite link: $e');
       return null;
     }
   }
@@ -4683,7 +4683,7 @@ void clearUserPosts() {
         throw Exception('Failed to add member on server: ${response.data?['message']}');
       }
     } catch (e) {
-      print('Error adding member: $e');
+      // print('Error adding member: $e');
       return false;
     }
   }
@@ -4713,7 +4713,7 @@ void clearUserPosts() {
         throw Exception('Failed to remove member on server: ${response.data?['message']}');
       }
     } catch (e) {
-      print('Error removing member: $e');
+      // print('Error removing member: $e');
       return false;
     }
   }
@@ -4743,7 +4743,7 @@ void clearUserPosts() {
         throw Exception('Failed to promote admin on server: ${response.data?['message']}');
       }
     } catch (e) {
-      print('Error promoting admin: $e');
+      // print('Error promoting admin: $e');
       return false;
     }
   }
@@ -4773,7 +4773,7 @@ void clearUserPosts() {
         throw Exception('Failed to demote admin on server: ${response.data?['message']}');
       }
     } catch (e) {
-      print('Error demoting admin: $e');
+      // print('Error demoting admin: $e');
       return false;
     }
   }
@@ -4793,7 +4793,14 @@ void clearUserPosts() {
         ),
       );
       print('[LOG] muteMember API response: ${response.data}');
-      return response.statusCode == 200 && response.data['success'] == true;
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        // Assuming the API returns the full chat object, as other endpoints do.
+        if (response.data['chat'] is Map<String, dynamic>) {
+          handleChatUpdated(response.data['chat']);
+        }
+        return true;
+      }
+      return false;
     } catch (e) {
       print('[LOG] Error muting member: $e');
       return false;
@@ -4815,7 +4822,14 @@ void clearUserPosts() {
         ),
       );
       print('[LOG] unmuteMember API response: ${response.data}');
-      return response.statusCode == 200 && response.data['success'] == true;
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        // Assuming the API returns the full chat object, as other endpoints do.
+        if (response.data['chat'] is Map<String, dynamic>) {
+          handleChatUpdated(response.data['chat']);
+        }
+        return true;
+      }
+      return false;
     } catch (e) {
       print('[LOG] Error unmuting member: $e');
       return false;
@@ -5038,14 +5052,14 @@ void clearUserPosts() {
 
       if (response.statusCode != 200 || response.data['success'] != true) {
         // If the API call fails, revert the change by adding the chats back.
-        print('Failed to delete chats on the server. Reverting local changes.');
+        // print('Failed to delete chats on the server. Reverting local changes.');
         chats.addAll(removedChats);
         chats.refresh();
       }
       // If successful, the optimistic update is correct.
       // The socket event `chats:deletedForMe` will be the final confirmation.
     } catch (e) {
-      print('Error deleting multiple chats: $e. Reverting local changes.');
+      // print('Error deleting multiple chats: $e. Reverting local changes.');
       // Revert UI on error
       chats.addAll(removedChats);
       chats.refresh();
@@ -5098,7 +5112,7 @@ void clearUserPosts() {
       );
 
       if (response.statusCode != 200 || response.data['success'] != true) {
-        print('Failed to delete messages on the server. Reverting local changes.');
+        // print('Failed to delete messages on the server. Reverting local changes.');
         // Revert the optimistic UI update
         if (deleteFor == 'me') {
           currentConversationMessages.addAll(removedMessages);
@@ -5114,7 +5128,7 @@ void clearUserPosts() {
         currentConversationMessages.refresh();
       }
     } catch (e) {
-      print('Error deleting multiple messages: $e. Reverting local changes.');
+      // print('Error deleting multiple messages: $e. Reverting local changes.');
       // Revert the optimistic UI update on error
       if (deleteFor == 'me') {
         currentConversationMessages.addAll(removedMessages);
@@ -5218,7 +5232,7 @@ void clearUserPosts() {
     try {
       final String? token = getAuthToken();
       if (token == null) {
-        print('[DataController] getLatestAppUpdate: User not authenticated.');
+        // print('[DataController] getLatestAppUpdate: User not authenticated.');
         return null;
       }
 
@@ -5243,11 +5257,11 @@ void clearUserPosts() {
       if (response.statusCode == 200 && response.data['success'] == true) {
         return response.data['update'] as Map<String, dynamic>?;
       } else {
-        print('[DataController] Failed to get latest app update: ${response.data?['message']}');
+        // print('[DataController] Failed to get latest app update: ${response.data?['message']}');
         return null;
       }
     } catch (e) {
-      print('[DataController] Error fetching latest app update: $e');
+      // print('[DataController] Error fetching latest app update: $e');
       return null;
     }
   }
@@ -5256,7 +5270,7 @@ void clearUserPosts() {
     try {
       final String? token = getAuthToken();
       if (token == null) {
-        print('[DataController] updateUserAppVersion: User not authenticated.');
+        // print('[DataController] updateUserAppVersion: User not authenticated.');
         return;
       }
 
@@ -5271,14 +5285,14 @@ void clearUserPosts() {
           headers: {'Authorization': 'Bearer $token'},
         ),
       );
-      print('[DataController] User app version updated to $version');
+      // print('[DataController] User app version updated to $version');
     } catch (e) {
-      print('[DataController] Error updating user app version: $e');
+      // print('[DataController] Error updating user app version: $e');
     }
   }
 
   void handleAppUpdateNudge(Map<String, dynamic> data) {
-    print('[DataController] Received app update nudge: $data');
+    // print('[DataController] Received app update nudge: $data');
     appUpdateNudgeData.value = data;
   }
 }
