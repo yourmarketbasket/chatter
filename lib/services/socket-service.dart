@@ -236,7 +236,7 @@ class SocketService {
       _dataController.fetchSinglePost(data['postId']);
       _eventController.add({'event': event, 'data': data});
     } else {
-        // print('SocketService: Invalid $event data format: ${data.runtimeType}');
+        
     }
   }
 
