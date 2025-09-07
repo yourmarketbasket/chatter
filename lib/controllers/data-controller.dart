@@ -4984,9 +4984,10 @@ void clearUserPosts() {
     final List<Map<String, dynamic>> removedMessages = [];
     final Map<String, Map<String, dynamic>> originalMessages = {};
     bool lastMessageChanged = false;
+    String? lastMessageId;
 
     if (chatId != null && chats.containsKey(chatId)) {
-      final lastMessageId = chats[chatId]!['lastMessage']?['_id'];
+      lastMessageId = chats[chatId]!['lastMessage']?['_id'];
       if (messageIds.contains(lastMessageId)) {
         lastMessageChanged = true;
       }
@@ -5015,23 +5016,23 @@ void clearUserPosts() {
 
     // After deletion, if the last message was affected, update the chat list
     if (lastMessageChanged && chatId != null && chats.containsKey(chatId)) {
-        final chat = chats[chatId]!;
-        if (deleteFor == 'everyone') {
-            // Create a tombstone for the last message preview
-            final tombstone = Map<String, dynamic>.from(chats[chatId]!['lastMessage']);
-            tombstone['content'] = 'Message deleted';
-            tombstone['deletedForEveryone'] = true;
-            tombstone['files'] = [];
-            chat['lastMessage'] = tombstone;
+      final chat = chats[chatId]!;
+      if (deleteFor == 'everyone') {
+        // Create a tombstone for the last message preview
+        final tombstone = Map<String, dynamic>.from(chats[chatId]!['lastMessage']);
+        tombstone['content'] = 'Message deleted';
+        tombstone['deletedForEveryone'] = true;
+        tombstone['files'] = [];
+        chat['lastMessage'] = tombstone;
+      } else {
+        // Deleting for me, so update to the new last message
+        if (currentConversationMessages.isNotEmpty) {
+            chat['lastMessage'] = currentConversationMessages.last;
         } else {
-            // Deleting for me, so update to the new last message
-            if (currentConversationMessages.isNotEmpty) {
-                chat['lastMessage'] = currentConversationMessages.last;
-            } else {
-                chat['lastMessage'] = null;
-            }
+            chat['lastMessage'] = null;
         }
-        chats.refresh();
+      }
+      chats.refresh();
     }
 
     try {
