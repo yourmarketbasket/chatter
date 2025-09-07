@@ -397,14 +397,12 @@ class DataController extends GetxController {
     // Also update the lastMessage in the chat list if it was the one deleted
     if (chats.containsKey(chatId) && chats[chatId]!['lastMessage']?['_id'] == messageId) {
       final chat = chats[chatId]!;
-      // Create a tombstone for the last message preview
-      chat['lastMessage'] = {
-        '_id': messageId,
-        'content': 'Message deleted',
-        'senderId': chats[chatId]!['lastMessage']['senderId'],
-        'createdAt': chats[chatId]!['lastMessage']['createdAt'],
-        'deletedForEveryone': true,
-      };
+      // Create a tombstone for the last message preview by modifying the existing lastMessage
+      final lastMessage = Map<String, dynamic>.from(chat['lastMessage']);
+      lastMessage['content'] = 'Message deleted';
+      lastMessage['deletedForEveryone'] = true;
+      lastMessage['files'] = []; // Also clear files to hide attachments preview
+      chat['lastMessage'] = lastMessage;
       chats.refresh();
     }
   }
