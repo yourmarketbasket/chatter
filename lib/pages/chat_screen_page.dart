@@ -35,6 +35,7 @@ import 'package:chatter/pages/users_list_page.dart';
 import 'package:flutter/services.dart';
 import 'package:chatter/widgets/message_bubble.dart';
 import 'package:chatter/widgets/pdf_thumbnail_widget.dart';
+import 'package:chatter/helpers/verification_helper.dart';
 
 
 class ChatScreen extends StatefulWidget {
@@ -1309,10 +1310,26 @@ class _ChatScreenState extends State<ChatScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      _capitalizeFirstLetter(title),
-                      style: const TextStyle(color: Colors.white, fontSize: 16),
-                      overflow: TextOverflow.ellipsis,
+                    Row(
+                      children: [
+                        Text(
+                          _capitalizeFirstLetter(title),
+                          style: const TextStyle(color: Colors.white, fontSize: 16),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (userForProfile != null && userForProfile['verification'] != null)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 4.0),
+                            child: Icon(
+                              Icons.verified,
+                              color: getVerificationBadgeColor(
+                                userForProfile['verification']?['entityType'],
+                                userForProfile['verification']?['level'],
+                              ),
+                              size: 16,
+                            ),
+                          ),
+                      ],
                     ),
                     statusWidget,
                   ],
