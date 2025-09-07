@@ -192,14 +192,30 @@ class _ChatScreenState extends State<ChatScreen> {
     if (chat['type'] != 'dm') return null;
 
     final currentUserId = dataController.getUserId();
-    final otherParticipantRaw = (chat['participants'] as List<dynamic>).firstWhere(
-      (p) => p['userId']['_id'] != currentUserId,
-      orElse: () => null,
-    );
+    String? otherUserId;
 
-    if (otherParticipantRaw == null) return null;
+    final participants = chat['participants'] as List<dynamic>;
 
-    final otherUserId = otherParticipantRaw['userId']['_id'];
+    for (final p in participants) {
+      String? participantId;
+      if (p is Map<String, dynamic>) {
+        if (p.containsKey('userId') && p['userId'] is Map<String, dynamic>) {
+          participantId = p['userId']['_id'];
+        } else if (p.containsKey('_id')) {
+          participantId = p['_id'];
+        }
+      } else if (p is String) {
+        participantId = p;
+      }
+
+      if (participantId != null && participantId != currentUserId) {
+        otherUserId = participantId;
+        break;
+      }
+    }
+
+    if (otherUserId == null) return null;
+
     try {
       return dataController.allUsers.firstWhere(
         (u) => u['_id'] == otherUserId,
