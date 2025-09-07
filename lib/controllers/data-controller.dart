@@ -16,11 +16,13 @@ import '../services/notification_service.dart';
 import '../services/upload_service.dart'; 
 import 'package:chatter/firebase_options.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'dart:io' show Platform;
 
 class DataController extends GetxController {
   final UploadService _uploadService = UploadService(); // Instantiate UploadService
+  final GetStorage _box = GetStorage('ChatCache');
 
   final RxBool isLoading = false.obs;
   final Uuid _uuid = const Uuid();
@@ -123,41 +125,35 @@ class DataController extends GetxController {
     if (userJson != null) {
       user.value = jsonDecode(userJson);
     }
-    // force
 
     // Only proceed with network calls if user is logged in
     if (user.value['token'] != null) {
+      // Load chats from cache first
+      _loadChatsFromCache();
+
       // Fetch non-essential data in parallel (fire and forget)
       fetchFeeds().catchError((e) {
-          // print('Error fetching initial feeds: $e');
-        posts.clear(); // Clear posts on error
+        posts.clear();
       });
       final String? currentUserId = user.value['user']?['_id'];
       if (currentUserId != null && currentUserId.isNotEmpty) {
-        // print('[DataController.init] User loaded from storage. Fetching initial network data for $currentUserId');
-        fetchFollowers(currentUserId).catchError((e) {
-          // print('Error fetching followers in init: $e');
-        });
-        fetchFollowing(currentUserId).catchError((e) {
-          // print('Error fetching following in init: $e');
-        });
+        fetchFollowers(currentUserId).catchError((e) {});
+        fetchFollowing(currentUserId).catchError((e) {});
       }
 
       // Initialize socket service after user data is loaded
       Get.find<SocketService>().initSocket();
-      // For chat functionality, we need all users before we can correctly display chats.
-      // So we await these calls in sequence.
+
+      // Fetch fresh data from network
       await fetchAllUsers();
       await fetchChats();
 
-      // Initialize NotificationService after user data is loaded to ensure token is sent correctly
+      // Initialize NotificationService
       final NotificationService notificationService = Get.find<NotificationService>();
       await notificationService.init();
 
-      // Report current app version to backend
-      updateUserAppVersion().catchError((e) {
-        // print('[DataController] Error reporting user app version in init: $e');
-      });
+      // Report app version
+      updateUserAppVersion().catchError((e) {});
     }
   }
 
@@ -209,33 +205,24 @@ class DataController extends GetxController {
     final chatId = newMessage['chatId'] as String?;
     if (chatId == null || newMessage['_id'] == null) return;
 
-    // --- Update Chat List First ---
     if (chats.containsKey(chatId)) {
       final chat = chats[chatId]!;
       chat['lastMessage'] = newMessage;
       final senderId = newMessage['senderId'] is Map ? newMessage['senderId']['_id'] : newMessage['senderId'];
-      if (senderId != null && senderId != getUserId()) {
-        // Only increment unread count if the chat is not the active one
-        if (activeChatId.value != chatId) {
-          chat['unreadCount'] = (chat['unreadCount'] ?? 0) + 1;
-        }
+      if (senderId != null && senderId != getUserId() && activeChatId.value != chatId) {
+        chat['unreadCount'] = (chat['unreadCount'] ?? 0) + 1;
       }
       chats[chatId] = chat;
-      chats.refresh();
+      _saveChatsToCache();
     } else {
-      // If chat is not in the list, fetch all chats again to get the new one.
       fetchChats();
     }
 
-    // --- Update Conversation View ---
     if (activeChatId.value == chatId) {
       final newMsgId = newMessage['_id'] as String;
       final clientMsgId = newMessage['clientMessageId'] as String?;
-
-      // Check for and replace optimistic message
-      final existingMsgIndex = currentConversationMessages.indexWhere((m) {
-        return (clientMsgId != null && m['clientMessageId'] == clientMsgId) || m['_id'] == newMsgId;
-      });
+      final existingMsgIndex = currentConversationMessages.indexWhere((m) =>
+          (clientMsgId != null && m['clientMessageId'] == clientMsgId) || m['_id'] == newMsgId);
 
       if (existingMsgIndex != -1) {
         currentConversationMessages[existingMsgIndex] = newMessage;
@@ -243,31 +230,26 @@ class DataController extends GetxController {
         currentConversationMessages.add(newMessage);
       }
 
-      // Mark as delivered
       final senderId = newMessage['senderId'] is Map ? newMessage['senderId']['_id'] : newMessage['senderId'];
       if (senderId != null && senderId != getUserId()) {
         markMessageAsDelivered(newMessage);
       }
 
+      _saveMessagesToCache(chatId);
       currentConversationMessages.refresh();
     }
   }
 
   void handleChatUpdated(Map<String, dynamic> updatedChatData) {
-    // print('[LOG] handleChatUpdated received: $updatedChatData');
     final chatId = updatedChatData['_id'] as String?;
     if (chatId == null) return;
 
-    // Per backend documentation, replace the entire chat object with the new data.
-    // This is the single source of truth.
     chats[chatId] = updatedChatData;
-
-    // If the updated chat is the one currently being viewed, update that state too.
     if (activeChatId.value == chatId) {
       currentChat.value = Map<String, dynamic>.from(updatedChatData);
     }
 
-    // Refresh the RxMap to ensure all listeners are notified.
+    _saveChatsToCache();
     chats.refresh();
   }
 
@@ -343,86 +325,79 @@ class DataController extends GetxController {
     final messageId = data['_id'] as String?;
     final chatId = data['chatId'] as String?;
 
-    if (messageId == null || chatId == null) {
-      // print('[DataController] Invalid message:updated data received: $data');
-      return;
-    }
+    if (messageId == null || chatId == null) return;
 
-    // Update the message in the current conversation if it's open
-    if (currentChat.value['_id'] == chatId) {
+    if (activeChatId.value == chatId) {
       final index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
       if (index != -1) {
-        // Merge new data into the existing message map to preserve details like sender info
         final existingMessage = Map<String, dynamic>.from(currentConversationMessages[index]);
         existingMessage.addAll(data);
         currentConversationMessages[index] = existingMessage;
-        currentConversationMessages.refresh(); // Use refresh for nested changes
+        _saveMessagesToCache(chatId);
+        currentConversationMessages.refresh();
       }
     }
 
-    // Update the lastMessage in the chats list if this message is the last one
     if (chats.containsKey(chatId) && chats[chatId]!['lastMessage']?['_id'] == messageId) {
       final chat = chats[chatId]!;
-      // Also merge for the lastMessage to preserve details there too
       final existingLastMessage = Map<String, dynamic>.from(chat['lastMessage'] ?? {});
       existingLastMessage.addAll(data);
       chat['lastMessage'] = existingLastMessage;
       chats[chatId] = chat;
-      chats.refresh();
+      _saveChatsToCache();
     }
   }
 
   void handleMessageDelete(Map<String, dynamic> data) {
     final messageId = data['messageId'] as String?;
-    final chatId = data['chatId'] as String?; // Assuming chatId is also sent
+    final chatId = data['chatId'] as String?;
     final deletedForEveryone = data['deletedForEveryone'] as bool? ?? false;
 
     if (messageId == null || chatId == null) return;
 
-    // Find the message in the conversation list and update it
-    final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
-    if (messageIndex != -1) {
-      final message = currentConversationMessages[messageIndex];
-      if (deletedForEveryone) {
-        message['deletedForEveryone'] = true;
-        message['content'] = ''; // Clear content and files
-        message['files'] = [];
-      } else {
-        // If delete is only for the current user, we can just remove it from the list
-        currentConversationMessages.removeAt(messageIndex);
+    if (activeChatId.value == chatId) {
+      final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
+      if (messageIndex != -1) {
+        if (deletedForEveryone) {
+          final message = currentConversationMessages[messageIndex];
+          message['deletedForEveryone'] = true;
+          message['content'] = '';
+          message['files'] = [];
+          currentConversationMessages[messageIndex] = message;
+        } else {
+          currentConversationMessages.removeAt(messageIndex);
+        }
+        _saveMessagesToCache(chatId);
+        currentConversationMessages.refresh();
       }
-      currentConversationMessages.refresh();
     }
 
-    // Also update the lastMessage in the chat list if it was the one deleted
-    if (chats.containsKey(chatId) && chats[chatId]!['lastMessage']?['_id'] == messageId) {
-      final chat = chats[chatId]!;
-      // Create a tombstone for the last message preview
+    if (deletedForEveryone && chats.containsKey(chatId) && chats[chatId]!['lastMessage']?['_id'] == messageId) {
+      final chat = Map<String, dynamic>.from(chats[chatId]!);
       chat['lastMessage'] = {
         '_id': messageId,
         'content': 'Message deleted',
-        'senderId': chats[chatId]!['lastMessage']['senderId'],
-        'createdAt': chats[chatId]!['lastMessage']['createdAt'],
+        'senderId': chat['lastMessage']['senderId'],
+        'createdAt': chat['lastMessage']['createdAt'],
         'deletedForEveryone': true,
       };
-      chats.refresh();
+      chats[chatId] = chat;
+      _saveChatsToCache();
     }
   }
 
   void handleMessagesDeleted(Map<String, dynamic> data) {
     final messageIds = List<String>.from(data['messageIds'] ?? []);
     final deleteFor = data['deleteFor'] as String?;
+    final chatId = data['chatId'] as String?; // Assuming chatId is sent with this event
 
-    if (messageIds.isEmpty || deleteFor == null) {
-      return;
-    }
+    if (messageIds.isEmpty || deleteFor == null || chatId == null) return;
 
-    if (deleteFor == 'everyone') {
+    if (deleteFor == 'everyone' && activeChatId.value == chatId) {
       bool changed = false;
       for (final messageId in messageIds) {
         final index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
         if (index != -1) {
-          // Mark as deleted for everyone
           currentConversationMessages[index]['deletedForEveryone'] = true;
           currentConversationMessages[index]['content'] = '';
           currentConversationMessages[index]['files'] = [];
@@ -430,11 +405,10 @@ class DataController extends GetxController {
         }
       }
       if (changed) {
+        _saveMessagesToCache(chatId);
         currentConversationMessages.refresh();
       }
     }
-    // No action needed for deleteFor: "me" as it only affects the sender,
-    // who has already handled it optimistically.
   }
 
   void markMessageAsReadById(String messageId) {
@@ -517,6 +491,7 @@ class DataController extends GetxController {
                 'followingCount': followingCount,
                 'isFollowingCurrentUser': isFollowing,
                 'suspended': userData['suspended'],
+                'verification': userData['verification'], // Add this line
                 // Include the raw followers/following arrays if present, might be useful for other operations
                 // or if socket events need to modify these specific users locally.
                 'followers': userData['followers'] ?? [], // Store the array if available
@@ -2178,7 +2153,27 @@ class DataController extends GetxController {
     return uploadResults;
   }
 
-  // Add these placeholder methods inside DataController class
+  void _loadChatsFromCache() {
+    final cachedChats = _box.read<Map<String, dynamic>>('chats');
+    if (cachedChats != null) {
+      chats.value = cachedChats.map((key, value) => MapEntry(key, Map<String, dynamic>.from(value)));
+    }
+  }
+
+  void _saveChatsToCache() {
+    _box.write('chats', chats);
+  }
+
+  void loadMessagesFromCache(String chatId) {
+    final cachedMessages = _box.read<List<dynamic>>('messages_$chatId');
+    if (cachedMessages != null) {
+      currentConversationMessages.value = cachedMessages.map((m) => Map<String, dynamic>.from(m)).toList();
+    }
+  }
+
+  void _saveMessagesToCache(String chatId) {
+    _box.write('messages_$chatId', currentConversationMessages.toList());
+  }
 
   Future<void> fetchChats() async {
     isLoadingChats.value = true;
@@ -2197,6 +2192,7 @@ class DataController extends GetxController {
       if (response.statusCode == 200 && response.data['success'] == true) {
         final List<dynamic> chatData = response.data['chats'];
         final blockedUsers = user.value['user']?['blockedUsers'] ?? [];
+        chats.clear(); // Clear before repopulating
         for (var chat in chatData) {
           if (chat['type'] == 'dm') {
             final otherParticipant = (chat['participants'] as List).firstWhere(
@@ -2210,14 +2206,12 @@ class DataController extends GetxController {
             chats[chat['_id']] = chat;
           }
         }
-        // After successfully fetching chats, the backend will have already
-        // joined the socket to all necessary rooms.
+        _saveChatsToCache();
       } else {
         throw Exception('Failed to fetch chats');
       }
     } catch (e) {
-        // print('Error fetching chats: $e');
-      // Optionally, show a snackbar or some error message to the user
+      // print('Error fetching chats: $e');
     } finally {
       isLoadingChats.value = false;
     }
@@ -2241,6 +2235,7 @@ class DataController extends GetxController {
         final messages = List<Map<String, dynamic>>.from(messageData);
         messages.sort((a, b) => DateTime.parse(a['createdAt']).compareTo(DateTime.parse(b['createdAt'])));
         currentConversationMessages.value = messages;
+        _saveMessagesToCache(conversationId);
       } else {
         throw Exception('Failed to fetch messages');
       }
@@ -2532,30 +2527,19 @@ class DataController extends GetxController {
   }
 
   void handleChatDeleted(String chatId) {
-    // print('[DataController] handleChatDeleted called for chatId: $chatId');
-    if (chatId.isEmpty) {
-      // print('[DataController] ChatId is empty, returning.');
-      return;
-    }
+    if (chatId.isEmpty) return;
 
-    // print('[DataController] Chats count before deletion attempt: ${chats.length}');
     if (chats.containsKey(chatId)) {
-      // print('[DataController] Chat found in map. Proceeding with removal.');
       final newChats = Map<String, Map<String, dynamic>>.from(chats);
       newChats.remove(chatId);
-      chats.value = newChats; // Forcefully replace the map to ensure reactivity
-      // print('[DataController] Chats count after deletion attempt: ${chats.length}');
+      chats.value = newChats;
+      _saveChatsToCache();
+      _box.remove('messages_$chatId'); // Also remove message cache
 
-
-      // If the deleted chat is the current one, clear it.
-      // The UI (ChatScreen) will be responsible for listening to this state change and popping itself.
       if (currentChat.value['_id'] == chatId) {
-        // print('[DataController] Deleted chat is the current chat. Clearing state.');
         currentChat.value = {};
         currentConversationMessages.clear();
       }
-    } else {
-      // print('[DataController] Chat with ID $chatId not found in the local chats map.');
     }
   }
 
@@ -3020,38 +3004,10 @@ class DataController extends GetxController {
 
   Future<void> logoutUser() async {
     try {
-      // 1. Clear data from FlutterSecureStorage
       await _storage.delete(key: 'token');
       await _storage.delete(key: 'user');
-        // print('[DataController] Token and user data deleted from secure storage.');
+      await _box.erase(); // Clear all cached data
 
-      // 2. Reset reactive variables to initial states
-      user.value = {};
-      posts.clear();
-      allUsers.clear(); // If you want to clear this list on logout
-      chats.clear();
-      currentConversationMessages.clear();
-      followers.clear();
-      following.clear();
-        // print('[DataController] In-memory user state cleared.');
-
-      // 3. Optionally, disconnect other services
-      // Example: If SocketService is managed or accessible here
-      // final SocketService socketService = Get.find<SocketService>();
-      // socketService.disconnect();
-      //   // print('[DataController] SocketService disconnected.');
-      // Note: Ensure SocketService handles multiple disconnect calls gracefully if also called in app dispose.
-
-      // Any other cleanup specific to your application's state
-      isLoading.value = false;
-      isLoadingChats.value = false;
-      isLoadingMessages.value = false;
-      isLoadingFollowers.value = false;
-      isLoadingFollowing.value = false;
-
-    } catch (e) {
-        // print('[DataController] Error during logout: ${e.toString()}');
-      // Even if an error occurs, try to clear in-memory data as a fallback
       user.value = {};
       posts.clear();
       allUsers.clear();
@@ -3059,7 +3015,24 @@ class DataController extends GetxController {
       currentConversationMessages.clear();
       followers.clear();
       following.clear();
-      // Potentially rethrow or handle error in a way that UI can respond if needed
+
+      Get.find<SocketService>().disconnect();
+
+      isLoading.value = false;
+      isLoadingChats.value = false;
+      isLoadingMessages.value = false;
+      isLoadingFollowers.value = false;
+      isLoadingFollowing.value = false;
+
+    } catch (e) {
+      // print('[DataController] Error during logout: ${e.toString()}');
+      user.value = {};
+      posts.clear();
+      allUsers.clear();
+      chats.clear();
+      currentConversationMessages.clear();
+      followers.clear();
+      following.clear();
     }
   }
 

@@ -422,7 +422,7 @@ class _MainChatsPageState extends State<MainChatsPage> {
                           selectedTileColor: Colors.teal.withOpacity(0.2),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                           leading: Stack(
-                            clipBehavior: Clip.none,
+                            alignment: Alignment.center,
                             children: [
                               CircleAvatar(
                                 radius: 22,
@@ -433,13 +433,17 @@ class _MainChatsPageState extends State<MainChatsPage> {
                                         : null,
                               ),
                               if (isSelected)
-                                const Positioned(
-                                  bottom: 0,
-                                  right: 0,
-                                  child: Icon(
-                                    Icons.check_circle,
+                                Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.5),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.check,
                                     color: Colors.tealAccent,
-                                    size: 20,
+                                    size: 24,
                                   ),
                                 ),
                               if (isGroup)
@@ -450,20 +454,6 @@ class _MainChatsPageState extends State<MainChatsPage> {
                                     radius: 10,
                                     backgroundColor: Colors.black,
                                     child: Icon(Icons.group, size: 14, color: Colors.tealAccent.shade400),
-                                  ),
-                                ),
-                              if (!isGroup && isUserOnline)
-                                Positioned(
-                                  right: 0,
-                                  bottom: 0,
-                                  child: Container(
-                                    width: 12,
-                                    height: 12,
-                                    decoration: BoxDecoration(
-                                      color: Colors.green,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(color: Colors.black, width: 2),
-                                    ),
                                   ),
                                 ),
                             ],

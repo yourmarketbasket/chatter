@@ -1,11 +1,9 @@
 import 'package:chatter/pages/admin/post_management_page.dart';
 import 'package:chatter/pages/admin/user_management_page.dart';
 import 'package:chatter/pages/admin/update_verification_page.dart';
+import 'package:chatter/pages/admin/nudge_page.dart'; // Import the new page
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:chatter/pages/admin/user_management_page.dart';
-import 'package:chatter/pages/admin/post_management_page.dart';
-import 'package:chatter/pages/admin/update_verification_page.dart';
 
 class AdminActionsPage extends StatefulWidget {
   const AdminActionsPage({Key? key}) : super(key: key);
@@ -22,6 +20,7 @@ class _AdminActionsPageState extends State<AdminActionsPage> {
     const UserManagementPage(),
     const PostManagementPage(),
     const UpdateVerificationPage(),
+    const NudgePage(), // Add the new page
   ];
 
   @override
@@ -56,15 +55,19 @@ class _AdminActionsPageState extends State<AdminActionsPage> {
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.person),
-            label: 'User Management',
+            label: 'Users',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.article),
-            label: 'Post Management',
+            label: 'Posts',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.verified_user),
-            label: 'Update Verification',
+            label: 'Verify',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.campaign), // Add icon for the new page
+            label: 'Nudge', // Add label for the new page
           ),
         ],
         backgroundColor: Colors.black,

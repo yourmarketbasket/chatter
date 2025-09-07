@@ -78,11 +78,12 @@ class _ChatScreenState extends State<ChatScreen> {
     dataController.activeChatId.value = chatId;
 
     if (chatId != null) {
-      _loadMessages();
+      // Load from cache first for instant UI, then fetch from network
+      dataController.loadMessagesFromCache(chatId);
+      dataController.fetchMessages(chatId);
     } else {
-      Future.delayed(Duration.zero, () {
-        dataController.currentConversationMessages.clear();
-      });
+      // This is a new chat, clear any previous conversation messages
+      dataController.currentConversationMessages.clear();
     }
 
     // Listen for socket events

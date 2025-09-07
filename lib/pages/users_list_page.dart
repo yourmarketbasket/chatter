@@ -116,17 +116,20 @@ class _UsersListPageState extends State<UsersListPage> {
       StatefulBuilder(
         builder: (context, setState) {
           return AlertDialog(
-            title: const Text('New Group'),
-            content: isCreating
-                ? const Center(child: CircularProgressIndicator())
-                : TextField(
-                    controller: groupNameController,
-                    decoration: const InputDecoration(hintText: 'Group Name'),
-                  ),
+            backgroundColor: Colors.grey.shade900,
+            title: Text('New Group', style: GoogleFonts.poppins(color: Colors.white)),
+            content: TextField(
+              controller: groupNameController,
+              style: GoogleFonts.poppins(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Group Name',
+                hintStyle: GoogleFonts.poppins(color: Colors.grey.shade500),
+              ),
+            ),
             actions: [
               TextButton(
                 onPressed: isCreating ? null : () => Get.back(),
-                child: const Text('Cancel'),
+                child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.white70)),
               ),
               TextButton(
                 onPressed: isCreating ? null : () async {
@@ -136,25 +139,46 @@ class _UsersListPageState extends State<UsersListPage> {
                     });
 
                     final participantIds = _selectedUsers.map((u) => u['_id'] as String).toList();
-                    final currentUserId = _dataController.user.value['user']['_id'];
-                    participantIds.add(currentUserId);
+                    // No need to manually add the current user; the backend should handle it.
 
                     final newChat = await _dataController.createGroupChat(
                       participantIds,
                       groupNameController.text,
                     );
 
-                    Get.back();
+                    if (mounted) {
+                      // Close the dialog FIRST
+                      Get.back();
 
-                    if (newChat != null) {
-                      _dataController.currentChat.value = newChat;
-                      Get.off(() => const ChatScreen());
-                    } else {
-                      Get.snackbar('Error', 'Could not create group chat.');
+                      if (newChat != null) {
+                        _dataController.currentChat.value = newChat;
+                        // Use Get.offAll to clear the selection pages from the stack
+                        Get.offAll(() => const ChatScreen());
+                      } else {
+                        Get.snackbar(
+                          'Error',
+                          'Could not create group chat. Please try again.',
+                          snackPosition: SnackPosition.BOTTOM,
+                          backgroundColor: Colors.red.shade800,
+                          colorText: Colors.white
+                        );
+                      }
                     }
                   }
                 },
-                child: const Text('Create'),
+                child: isCreating
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.0,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.tealAccent),
+                        ),
+                      )
+                    : Text(
+                        'Create',
+                        style: GoogleFonts.poppins(color: Colors.tealAccent),
+                      ),
               ),
             ],
           );
