@@ -2526,41 +2526,6 @@ class DataController extends GetxController {
   }
 
   Future<void> deleteChatMessage(String messageId, {bool forEveryone = false}) async {
-    final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
-    if (messageIndex == -1) return;
-
-    final message = currentConversationMessages[messageIndex];
-    final chatId = message['chatId'] as String;
-    final originalMessage = Map<String, dynamic>.from(message);
-    Map<String, dynamic>? originalLastMessage;
-
-    // Optimistic UI Update
-    if (forEveryone) {
-      message['deletedForEveryone'] = true;
-      message['content'] = 'Message deleted';
-      message['files'] = [];
-      message['type'] = 'system';
-      currentConversationMessages[messageIndex] = message;
-    } else {
-      currentConversationMessages.removeAt(messageIndex);
-    }
-    currentConversationMessages.refresh();
-
-    if (forEveryone && chats.containsKey(chatId) && chats[chatId]!['lastMessage']?['_id'] == messageId) {
-      final chat = chats[chatId]!;
-      originalLastMessage = Map<String, dynamic>.from(chat['lastMessage']);
-      chat['lastMessage'] = {
-        '_id': messageId,
-        'content': 'Message deleted',
-        'senderId': originalLastMessage['senderId'],
-        'createdAt': originalLastMessage['createdAt'],
-        'deletedForEveryone': true,
-        'type': 'system',
-      };
-      chats[chatId] = chat;
-      chats.refresh();
-    }
-
     try {
       final token = user.value['token'];
       if (token == null) {
@@ -2575,23 +2540,13 @@ class DataController extends GetxController {
       );
 
       if (response.statusCode != 200 || response.data['success'] != true) {
-        throw Exception('Failed to delete message on the server');
+        // Optionally show a snackbar or log the error for the user
+        print('Failed to delete message: ${response.data?['message']}');
       }
+      // No UI update here. The socket event will handle it.
     } catch (e) {
-      // Rollback on error
-      if (forEveryone) {
-        currentConversationMessages[messageIndex] = originalMessage;
-      } else {
-        currentConversationMessages.insert(messageIndex, originalMessage);
-      }
-      currentConversationMessages.refresh();
-
-      if (originalLastMessage != null) {
-        final chat = chats[chatId]!;
-        chat['lastMessage'] = originalLastMessage;
-        chats[chatId] = chat;
-        chats.refresh();
-      }
+      // Optionally show a snackbar or log the error for the user
+      print('Error deleting message: $e');
     }
   }
 
@@ -2942,6 +2897,7 @@ class DataController extends GetxController {
                   'isFollowingCurrentUser': isFollowingThisFollower,
                   'followersCount': followerData['followersCount'] ?? 0,
                   'followingCount': followerData['followingCount'] ?? 0,
+                  'verification': followerData['verification'],
                 };
               }
               return <String, dynamic>{};
@@ -3020,6 +2976,7 @@ class DataController extends GetxController {
                   'isFollowingCurrentUser': isFollowingThisUser,
                   'followersCount': followingUserData['followersCount'] ?? 0,
                   'followingCount': followingUserData['followingCount'] ?? 0,
+                  'verification': followingUserData['verification'],
                 };
               }
               return <String, dynamic>{};
@@ -5091,55 +5048,6 @@ void clearUserPosts() {
   }
 
   Future<void> deleteMultipleMessages(List<String> messageIds, {required String deleteFor}) async {
-    final List<Map<String, dynamic>> removedMessages = [];
-    final Map<String, Map<String, dynamic>> originalMessages = {};
-    String? chatId;
-    if (currentConversationMessages.isNotEmpty) {
-      chatId = currentConversationMessages.first['chatId'];
-    }
-    Map<String, dynamic>? originalLastMessage;
-
-    // Optimistic UI Update
-    if (deleteFor == 'me') {
-      currentConversationMessages.removeWhere((message) {
-        if (messageIds.contains(message['_id'])) {
-          removedMessages.add(message);
-          return true;
-        }
-        return false;
-      });
-    } else { // for 'everyone'
-      for (var i = 0; i < currentConversationMessages.length; i++) {
-        final message = currentConversationMessages[i];
-        if (messageIds.contains(message['_id'])) {
-          originalMessages[message['_id']] = Map<String, dynamic>.from(message);
-          currentConversationMessages[i]['deletedForEveryone'] = true;
-          currentConversationMessages[i]['content'] = 'Message deleted';
-          currentConversationMessages[i]['files'] = [];
-          currentConversationMessages[i]['type'] = 'system';
-        }
-      }
-    }
-    currentConversationMessages.refresh();
-
-    if (chatId != null && deleteFor == 'everyone' && chats.containsKey(chatId)) {
-      final chat = chats[chatId]!;
-      if (chat['lastMessage'] != null && messageIds.contains(chat['lastMessage']['_id'])) {
-        originalLastMessage = Map<String, dynamic>.from(chat['lastMessage']);
-        final lastMessage = chat['lastMessage'];
-        chat['lastMessage'] = {
-          '_id': lastMessage['_id'],
-          'content': 'Message deleted',
-          'senderId': lastMessage['senderId'],
-          'createdAt': lastMessage['createdAt'],
-          'deletedForEveryone': true,
-          'type': 'system',
-        };
-        chats[chatId] = chat;
-        chats.refresh();
-      }
-    }
-
     try {
       final token = user.value['token'];
       if (token == null) throw Exception('User not authenticated');
@@ -5154,27 +5062,13 @@ void clearUserPosts() {
       );
 
       if (response.statusCode != 200 || response.data['success'] != true) {
-        throw Exception('Failed to delete messages on server');
+        // Optionally show a snackbar or log the error for the user
+        print('Failed to delete messages: ${response.data?['message']}');
       }
+      // No UI update here. The socket event will handle it.
     } catch (e) {
-      // Rollback on error
-      if (deleteFor == 'me') {
-        currentConversationMessages.addAll(removedMessages);
-        currentConversationMessages.sort((a, b) => DateTime.parse(a['createdAt']).compareTo(DateTime.parse(b['createdAt'])));
-      } else {
-        for (var i = 0; i < currentConversationMessages.length; i++) {
-          final message = currentConversationMessages[i];
-          if (originalMessages.containsKey(message['_id'])) {
-            currentConversationMessages[i] = originalMessages[message['_id']]!;
-          }
-        }
-      }
-      currentConversationMessages.refresh();
-
-      if (chatId != null && originalLastMessage != null) {
-        chats[chatId]!['lastMessage'] = originalLastMessage;
-        chats.refresh();
-      }
+      // Optionally show a snackbar or log the error for the user
+      print('Error deleting messages: $e');
     }
   }
 

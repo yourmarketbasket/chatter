@@ -77,14 +77,17 @@ class _ChatScreenState extends State<ChatScreen> {
     final chatId = dataController.currentChat.value['_id'] as String?;
     dataController.activeChatId.value = chatId;
 
+    // IMPORTANT: Clear previous messages immediately to prevent flash of stale content.
+    dataController.currentConversationMessages.clear();
+
     if (chatId != null) {
-      // Load from cache first for instant UI, then fetch from network
-      dataController.loadMessagesFromCache(chatId);
+      // The new strategy is to prioritize fresh data from the network.
+      // The DataController's fetchMessages will handle updating the UI and the cache.
+      // loadMessagesFromCache can be used for a true offline-first experience,
+      // but for now, clearing and fetching is safer to prevent stale data.
       dataController.fetchMessages(chatId);
-    } else {
-      // This is a new chat, clear any previous conversation messages
-      dataController.currentConversationMessages.clear();
     }
+    // No need for an else block, as messages are already cleared.
 
     // Listen for socket events
     _socketSubscription = socketService.events.listen(_handleSocketEvent);
@@ -235,10 +238,9 @@ class _ChatScreenState extends State<ChatScreen> {
       // Find the full user object from the allUsers list
       return dataController.allUsers.firstWhere(
         (u) => u['_id'] == otherUserId,
-        orElse: () => null, // Return null if user not found, don't throw.
       );
     } catch (e) {
-      // This catch block might be redundant with orElse, but it's safe.
+      // firstWhere throws if no element is found. This catch handles it.
       return null;
     }
   }

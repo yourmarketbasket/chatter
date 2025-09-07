@@ -139,7 +139,11 @@ class _UsersListPageState extends State<UsersListPage> {
                     });
 
                     final participantIds = _selectedUsers.map((u) => u['_id'] as String).toList();
-                    // No need to manually add the current user; the backend should handle it.
+                    // Manually add the current user ID to the participants list.
+                    final currentUserId = _dataController.getUserId();
+                    if (currentUserId != null && !participantIds.contains(currentUserId)) {
+                      participantIds.add(currentUserId);
+                    }
 
                     final newChat = await _dataController.createGroupChat(
                       participantIds,
