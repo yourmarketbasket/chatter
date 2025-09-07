@@ -245,12 +245,38 @@ class DataController extends GetxController {
     final chatId = updatedChatData['_id'] as String?;
     if (chatId == null) return;
 
+    // Always update the chat in the main list. This is the source of truth for the chat list UI.
     chats[chatId] = updatedChatData;
+    _saveChatsToCache(); // Persist the change
+
+    // If this update is for the currently active chat, we need to update its state and potentially the message list.
     if (activeChatId.value == chatId) {
       currentChat.value = Map<String, dynamic>.from(updatedChatData);
+
+      // Check if the update is due to a message deletion.
+      final lastMessage = updatedChatData['lastMessage'] as Map<String, dynamic>?;
+      if (lastMessage != null && lastMessage['deletedForEveryone'] == true) {
+        final deletedMessageId = lastMessage['_id'] as String?;
+        if (deletedMessageId != null) {
+          // Find the message in the active conversation and update it.
+          final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == deletedMessageId);
+          if (messageIndex != -1) {
+            final message = currentConversationMessages[messageIndex];
+            // Avoid overwriting an already optimistically updated message by checking its state.
+            if (message['type'] != 'system' && message['deletedForEveryone'] != true) {
+               message['deletedForEveryone'] = true;
+               message['content'] = 'Message deleted';
+               message['files'] = [];
+               message['type'] = 'system';
+               currentConversationMessages[messageIndex] = message;
+               _saveMessagesToCache(chatId);
+               currentConversationMessages.refresh();
+            }
+          }
+        }
+      }
     }
 
-    _saveChatsToCache();
     chats.refresh();
   }
 
@@ -5100,8 +5126,15 @@ void clearUserPosts() {
       final chat = chats[chatId]!;
       if (chat['lastMessage'] != null && messageIds.contains(chat['lastMessage']['_id'])) {
         originalLastMessage = Map<String, dynamic>.from(chat['lastMessage']);
-        chat['lastMessage']['content'] = 'Message deleted';
-        chat['lastMessage']['type'] = 'system';
+        final lastMessage = chat['lastMessage'];
+        chat['lastMessage'] = {
+          '_id': lastMessage['_id'],
+          'content': 'Message deleted',
+          'senderId': lastMessage['senderId'],
+          'createdAt': lastMessage['createdAt'],
+          'deletedForEveryone': true,
+          'type': 'system',
+        };
         chats[chatId] = chat;
         chats.refresh();
       }

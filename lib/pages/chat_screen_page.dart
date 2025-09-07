@@ -190,22 +190,55 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Map<String, dynamic>? _getOtherParticipant() {
     final chat = dataController.currentChat.value;
-    if (chat['type'] != 'dm') return null;
+    if (chat['type'] != 'dm' || chat['participants'] == null) return null;
 
     final currentUserId = dataController.getUserId();
-    final otherParticipantRaw = (chat['participants'] as List<dynamic>).firstWhere(
-      (p) => p['userId']['_id'] != currentUserId,
+    final participants = chat['participants'] as List<dynamic>;
+
+    if (participants.isEmpty) return null;
+
+    final otherParticipantRaw = participants.firstWhere(
+      (p) {
+        if (p is Map<String, dynamic>) {
+          if (p.containsKey('userId') && p['userId'] is Map<String, dynamic> && p['userId'].containsKey('_id')) {
+            // Structure: { userId: { _id: '...' } }
+            return p['userId']['_id'] != currentUserId;
+          } else if (p.containsKey('_id')) {
+            // Structure: { _id: '...' }
+            return p['_id'] != currentUserId;
+          }
+        } else if (p is String) {
+          // Structure: '...'
+          return p != currentUserId;
+        }
+        return false;
+      },
       orElse: () => null,
     );
 
     if (otherParticipantRaw == null) return null;
 
-    final otherUserId = otherParticipantRaw['userId']['_id'];
+    String? otherUserId;
+    if (otherParticipantRaw is Map<String, dynamic>) {
+      if (otherParticipantRaw.containsKey('userId') && otherParticipantRaw['userId'] is Map<String, dynamic> && otherParticipantRaw['userId'].containsKey('_id')) {
+        otherUserId = otherParticipantRaw['userId']['_id'];
+      } else if (otherParticipantRaw.containsKey('_id')) {
+        otherUserId = otherParticipantRaw['_id'];
+      }
+    } else if (otherParticipantRaw is String) {
+      otherUserId = otherParticipantRaw;
+    }
+
+    if (otherUserId == null) return null;
+
     try {
+      // Find the full user object from the allUsers list
       return dataController.allUsers.firstWhere(
         (u) => u['_id'] == otherUserId,
+        orElse: () => null, // Return null if user not found, don't throw.
       );
     } catch (e) {
+      // This catch block might be redundant with orElse, but it's safe.
       return null;
     }
   }
@@ -1166,18 +1199,13 @@ class _ChatScreenState extends State<ChatScreen> {
           avatarUrl = chat['groupAvatar'] ?? '';
           avatarLetter = title.isNotEmpty ? title[0].toUpperCase() : 'G';
         } else {
-          final currentUserId = dataController.user.value['user']['_id'];
-          final otherParticipant = (chat['participants'] as List<dynamic>).firstWhere(
-            (p) => p['_id'] != currentUserId,
-            orElse: () => null,
-          );
+          userForProfile = _getOtherParticipant();
 
-          if (otherParticipant == null) {
-            // This can happen briefly if a chat is being created. A loading state is better.
-            return const Text('Loading...', style: TextStyle(color: Colors.white, fontSize: 14));
+          if (userForProfile == null) {
+            // This can happen if user is deleted or if data is still loading.
+            return const Text('User unavailable', style: TextStyle(color: Colors.white, fontSize: 14));
           }
 
-          userForProfile = otherParticipant;
           title = userForProfile!['name'] ?? 'User';
           avatarUrl = userForProfile['avatar'] ?? '';
           avatarLetter = title.isNotEmpty ? title[0].toUpperCase() : 'U';
