@@ -9,8 +9,8 @@ Color getColorFromHex(String hexColor) {
 }
 
 Color getVerificationBadgeColor(String? entityType, String? level) {
-  if (entityType == null || entityType == 'N/A') {
-    return getColorFromHex("#069494"); // Light Slate Blue
+  if (entityType == null || level == null || entityType == 'N/A') {
+    return Colors.transparent;
   }
 
   switch (entityType) {

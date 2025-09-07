@@ -106,6 +106,9 @@ class DataController extends GetxController {
   final Rxn<Map<String, dynamic>> appUpdateNudgeData = Rxn<Map<String, dynamic>>();
   final Rxn<String> appVersion = Rxn<String>();
 
+  // To prevent race condition when deleting the last message
+  final Map<String, bool> _ignoreNextLastMessageUpdate = {};
+
 
   @override
   void onInit() {
@@ -243,6 +246,21 @@ class DataController extends GetxController {
   void handleChatUpdated(Map<String, dynamic> updatedChatData) {
     final chatId = updatedChatData['_id'] as String?;
     if (chatId == null) return;
+
+    // Check if we should ignore the lastMessage update due to a recent deletion.
+    if (_ignoreNextLastMessageUpdate[chatId] == true) {
+      final existingChat = chats[chatId];
+      if (existingChat != null && existingChat['lastMessage'] != null && updatedChatData['lastMessage'] != null) {
+        final existingTimestamp = DateTime.tryParse(existingChat['lastMessage']['createdAt'] ?? '');
+        final newTimestamp = DateTime.tryParse(updatedChatData['lastMessage']['createdAt'] ?? '');
+
+        // Only ignore if the incoming message is older than our tombstone.
+        if (existingTimestamp != null && newTimestamp != null && newTimestamp.isBefore(existingTimestamp)) {
+          updatedChatData['lastMessage'] = existingChat['lastMessage'];
+        }
+      }
+      _ignoreNextLastMessageUpdate.remove(chatId); // Consume the flag
+    }
 
     chats[chatId] = updatedChatData;
     if (activeChatId.value == chatId) {
@@ -383,30 +401,81 @@ class DataController extends GetxController {
       };
       chats[chatId] = chat;
       _saveChatsToCache();
+      // Set a flag to ignore the next chat:updated event for this chat, which might be a race condition.
+      _ignoreNextLastMessageUpdate[chatId] = true;
     }
   }
 
   void handleMessagesDeleted(Map<String, dynamic> data) {
     final messageIds = List<String>.from(data['messageIds'] ?? []);
     final deleteFor = data['deleteFor'] as String?;
-    final chatId = data['chatId'] as String?; // Assuming chatId is sent with this event
+    final chatId = data['chatId'] as String?;
 
     if (messageIds.isEmpty || deleteFor == null || chatId == null) return;
 
-    if (deleteFor == 'everyone' && activeChatId.value == chatId) {
-      bool changed = false;
+    List<Map<String, dynamic>> messageList;
+    bool isActiveChat = activeChatId.value == chatId;
+
+    if (isActiveChat) {
+      messageList = currentConversationMessages;
+    } else {
+      final cachedMessages = _box.read<List<dynamic>>('messages_$chatId');
+      if (cachedMessages == null) {
+        // If no cache, we can't do anything for this inactive chat.
+        // The next time it's opened, it will fetch fresh from the server.
+        return;
+      }
+      messageList = cachedMessages.map((m) => Map<String, dynamic>.from(m)).toList();
+    }
+
+    bool changed = false;
+    if (deleteFor == 'everyone') {
       for (final messageId in messageIds) {
-        final index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
+        final index = messageList.indexWhere((m) => m['_id'] == messageId);
         if (index != -1) {
-          currentConversationMessages[index]['deletedForEveryone'] = true;
-          currentConversationMessages[index]['content'] = '';
-          currentConversationMessages[index]['files'] = [];
+          messageList[index]['deletedForEveryone'] = true;
+          messageList[index]['content'] = '';
+          messageList[index]['files'] = [];
           changed = true;
         }
       }
-      if (changed) {
+    } else { // 'me'
+      messageList.removeWhere((m) {
+        if (messageIds.contains(m['_id'])) {
+          changed = true;
+          return true;
+        }
+        return false;
+      });
+    }
+
+    if (changed) {
+      if (isActiveChat) {
+        currentConversationMessages.assignAll(messageList);
         _saveMessagesToCache(chatId);
         currentConversationMessages.refresh();
+      } else {
+        _box.write('messages_$chatId', messageList);
+      }
+    }
+
+    // Update the last message in the chats list if necessary
+    if (deleteFor == 'everyone' && chats.containsKey(chatId)) {
+      final chat = Map<String, dynamic>.from(chats[chatId]!);
+      if (chat['lastMessage'] != null && messageIds.contains(chat['lastMessage']['_id'])) {
+        final lastMessage = chat['lastMessage'];
+        chat['lastMessage'] = {
+          '_id': lastMessage['_id'],
+          'content': 'Message deleted',
+          'senderId': lastMessage['senderId'],
+          'createdAt': lastMessage['createdAt'],
+          'deletedForEveryone': true,
+        };
+        chats[chatId] = chat;
+        _saveChatsToCache();
+
+        // Set flag to handle race condition with chat:updated event
+        _ignoreNextLastMessageUpdate[chatId] = true;
       }
     }
   }
@@ -2168,6 +2237,8 @@ class DataController extends GetxController {
     final cachedMessages = _box.read<List<dynamic>>('messages_$chatId');
     if (cachedMessages != null) {
       currentConversationMessages.value = cachedMessages.map((m) => Map<String, dynamic>.from(m)).toList();
+    } else {
+      currentConversationMessages.clear();
     }
   }
 

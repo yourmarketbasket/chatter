@@ -1370,10 +1370,12 @@ class _ChatScreenState extends State<ChatScreen> {
             } else if (value == 'delete_everyone') {
               dataController.deleteMultipleMessages(_selectedMessages.toList(), deleteFor: "everyone");
             }
-            setState(() {
-              _isSelectionMode = false;
-              _selectedMessages.clear();
-            });
+            if (mounted) {
+              setState(() {
+                _isSelectionMode = false;
+                _selectedMessages.clear();
+              });
+            }
           },
           itemBuilder: (BuildContext context) {
             final currentUserId = dataController.getUserId();
