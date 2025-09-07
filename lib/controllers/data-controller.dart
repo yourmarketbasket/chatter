@@ -106,8 +106,6 @@ class DataController extends GetxController {
   final Rxn<Map<String, dynamic>> appUpdateNudgeData = Rxn<Map<String, dynamic>>();
   final Rxn<String> appVersion = Rxn<String>();
 
-  // To prevent race condition when deleting the last message
-  final Map<String, bool> _ignoreNextLastMessageUpdate = {};
 
 
   @override
@@ -246,21 +244,6 @@ class DataController extends GetxController {
   void handleChatUpdated(Map<String, dynamic> updatedChatData) {
     final chatId = updatedChatData['_id'] as String?;
     if (chatId == null) return;
-
-    // Check if we should ignore the lastMessage update due to a recent deletion.
-    if (_ignoreNextLastMessageUpdate[chatId] == true) {
-      final existingChat = chats[chatId];
-      if (existingChat != null && existingChat['lastMessage'] != null && updatedChatData['lastMessage'] != null) {
-        final existingTimestamp = DateTime.tryParse(existingChat['lastMessage']['createdAt'] ?? '');
-        final newTimestamp = DateTime.tryParse(updatedChatData['lastMessage']['createdAt'] ?? '');
-
-        // Only ignore if the incoming message is older than our tombstone.
-        if (existingTimestamp != null && newTimestamp != null && newTimestamp.isBefore(existingTimestamp)) {
-          updatedChatData['lastMessage'] = existingChat['lastMessage'];
-        }
-      }
-      _ignoreNextLastMessageUpdate.remove(chatId); // Consume the flag
-    }
 
     chats[chatId] = updatedChatData;
     if (activeChatId.value == chatId) {
@@ -401,8 +384,6 @@ class DataController extends GetxController {
       };
       chats[chatId] = chat;
       _saveChatsToCache();
-      // Set a flag to ignore the next chat:updated event for this chat, which might be a race condition.
-      _ignoreNextLastMessageUpdate[chatId] = true;
     }
   }
 
@@ -473,9 +454,6 @@ class DataController extends GetxController {
         };
         chats[chatId] = chat;
         _saveChatsToCache();
-
-        // Set flag to handle race condition with chat:updated event
-        _ignoreNextLastMessageUpdate[chatId] = true;
       }
     }
   }
@@ -2522,7 +2500,41 @@ class DataController extends GetxController {
   }
 
   Future<void> deleteChatMessage(String messageId, {bool forEveryone = false}) async {
-    // print('[DataController] Deleting message $messageId with forEveryone=$forEveryone');
+    final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
+    if (messageIndex == -1) return;
+
+    final message = currentConversationMessages[messageIndex];
+    final chatId = message['chatId'] as String;
+    final originalMessage = Map<String, dynamic>.from(message);
+    Map<String, dynamic>? originalLastMessage;
+
+    // Optimistic UI Update
+    if (forEveryone) {
+      message['deletedForEveryone'] = true;
+      message['content'] = 'Message deleted';
+      message['files'] = [];
+      message['type'] = 'system';
+      currentConversationMessages[messageIndex] = message;
+    } else {
+      currentConversationMessages.removeAt(messageIndex);
+    }
+    currentConversationMessages.refresh();
+
+    if (forEveryone && chats.containsKey(chatId) && chats[chatId]!['lastMessage']?['_id'] == messageId) {
+      final chat = chats[chatId]!;
+      originalLastMessage = Map<String, dynamic>.from(chat['lastMessage']);
+      chat['lastMessage'] = {
+        '_id': messageId,
+        'content': 'Message deleted',
+        'senderId': originalLastMessage['senderId'],
+        'createdAt': originalLastMessage['createdAt'],
+        'deletedForEveryone': true,
+        'type': 'system',
+      };
+      chats[chatId] = chat;
+      chats.refresh();
+    }
+
     try {
       final token = user.value['token'];
       if (token == null) {
@@ -2536,32 +2548,24 @@ class DataController extends GetxController {
         ),
       );
 
-      if (response.statusCode == 200 && response.data['success'] == true) {
-        // print('[DataController] API call to delete message $messageId successful.');
-
-        // UI update for the user who performed the action.
-        // We use the `forEveryone` parameter for an immediate optimistic update,
-        // rather than waiting for the socket event or relying on the API response body.
-        final index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
-        if (index != -1) {
-          if (forEveryone) {
-            // For "Delete for everyone", show a tombstone message.
-            var message = Map<String, dynamic>.from(currentConversationMessages[index]);
-            message['deletedForEveryone'] = true;
-            message['content'] = ''; // Clear content
-            message['files'] = []; // Clear files
-            currentConversationMessages[index] = message;
-          } else {
-            // For "Delete for me", just remove it from the local list.
-            currentConversationMessages.removeAt(index);
-          }
-        }
-      } else {
-        // print('[DataController] Failed to delete message $messageId on the server.');
+      if (response.statusCode != 200 || response.data['success'] != true) {
         throw Exception('Failed to delete message on the server');
       }
     } catch (e) {
-      // print('[DataController] Error deleting message $messageId: $e');
+      // Rollback on error
+      if (forEveryone) {
+        currentConversationMessages[messageIndex] = originalMessage;
+      } else {
+        currentConversationMessages.insert(messageIndex, originalMessage);
+      }
+      currentConversationMessages.refresh();
+
+      if (originalLastMessage != null) {
+        final chat = chats[chatId]!;
+        chat['lastMessage'] = originalLastMessage;
+        chats[chatId] = chat;
+        chats.refresh();
+      }
     }
   }
 
@@ -5061,12 +5065,16 @@ void clearUserPosts() {
   }
 
   Future<void> deleteMultipleMessages(List<String> messageIds, {required String deleteFor}) async {
-    // Optimistic UI update
     final List<Map<String, dynamic>> removedMessages = [];
     final Map<String, Map<String, dynamic>> originalMessages = {};
+    String? chatId;
+    if (currentConversationMessages.isNotEmpty) {
+      chatId = currentConversationMessages.first['chatId'];
+    }
+    Map<String, dynamic>? originalLastMessage;
 
+    // Optimistic UI Update
     if (deleteFor == 'me') {
-      // For "delete for me", we remove the messages from the list
       currentConversationMessages.removeWhere((message) {
         if (messageIds.contains(message['_id'])) {
           removedMessages.add(message);
@@ -5075,30 +5083,37 @@ void clearUserPosts() {
         return false;
       });
     } else { // for 'everyone'
-      // For "delete for everyone", we mark them as deleted
       for (var i = 0; i < currentConversationMessages.length; i++) {
         final message = currentConversationMessages[i];
         if (messageIds.contains(message['_id'])) {
           originalMessages[message['_id']] = Map<String, dynamic>.from(message);
           currentConversationMessages[i]['deletedForEveryone'] = true;
-          currentConversationMessages[i]['content'] = '';
+          currentConversationMessages[i]['content'] = 'Message deleted';
           currentConversationMessages[i]['files'] = [];
+          currentConversationMessages[i]['type'] = 'system';
         }
       }
     }
     currentConversationMessages.refresh();
 
+    if (chatId != null && deleteFor == 'everyone' && chats.containsKey(chatId)) {
+      final chat = chats[chatId]!;
+      if (chat['lastMessage'] != null && messageIds.contains(chat['lastMessage']['_id'])) {
+        originalLastMessage = Map<String, dynamic>.from(chat['lastMessage']);
+        chat['lastMessage']['content'] = 'Message deleted';
+        chat['lastMessage']['type'] = 'system';
+        chats[chatId] = chat;
+        chats.refresh();
+      }
+    }
+
     try {
       final token = user.value['token'];
-      if (token == null) {
-        throw Exception('User not authenticated');
-      }
+      if (token == null) throw Exception('User not authenticated');
+
       final response = await _dio.delete(
         'api/messages',
-        data: {
-          'messageIds': messageIds,
-          'deleteFor': deleteFor,
-        },
+        data: {'messageIds': messageIds, 'deleteFor': deleteFor},
         options: dio.Options(
           headers: {'Authorization': 'Bearer $token'},
           validateStatus: (status) => status != null && status < 500,
@@ -5106,24 +5121,10 @@ void clearUserPosts() {
       );
 
       if (response.statusCode != 200 || response.data['success'] != true) {
-        // print('Failed to delete messages on the server. Reverting local changes.');
-        // Revert the optimistic UI update
-        if (deleteFor == 'me') {
-          currentConversationMessages.addAll(removedMessages);
-          currentConversationMessages.sort((a, b) => DateTime.parse(a['createdAt']).compareTo(DateTime.parse(b['createdAt'])));
-        } else {
-          for (var i = 0; i < currentConversationMessages.length; i++) {
-            final message = currentConversationMessages[i];
-            if (originalMessages.containsKey(message['_id'])) {
-              currentConversationMessages[i] = originalMessages[message['_id']]!;
-            }
-          }
-        }
-        currentConversationMessages.refresh();
+        throw Exception('Failed to delete messages on server');
       }
     } catch (e) {
-      // print('Error deleting multiple messages: $e. Reverting local changes.');
-      // Revert the optimistic UI update on error
+      // Rollback on error
       if (deleteFor == 'me') {
         currentConversationMessages.addAll(removedMessages);
         currentConversationMessages.sort((a, b) => DateTime.parse(a['createdAt']).compareTo(DateTime.parse(b['createdAt'])));
@@ -5136,6 +5137,11 @@ void clearUserPosts() {
         }
       }
       currentConversationMessages.refresh();
+
+      if (chatId != null && originalLastMessage != null) {
+        chats[chatId]!['lastMessage'] = originalLastMessage;
+        chats.refresh();
+      }
     }
   }
 
