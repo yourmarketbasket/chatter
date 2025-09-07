@@ -5275,4 +5275,35 @@ void clearUserPosts() {
     // print('[DataController] Received app update nudge: $data');
     appUpdateNudgeData.value = data;
   }
+
+  Future<Map<String, dynamic>> issueAppUpgradeNudge(String version, List<String> changelog, String platform) async {
+    try {
+      final String? token = getAuthToken();
+      if (token == null) {
+        return {'success': false, 'message': 'Admin not authenticated.'};
+      }
+
+      final response = await _dio.post(
+        'api/updates/create',
+        data: {
+          'version': version,
+          'notes': changelog,
+          'platform': platform,
+          'url': 'https://chatter.dev/upgrade', // Assuming a generic URL
+        },
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+
+      if (response.statusCode == 201 && response.data['success'] == true) {
+        return {'success': true, 'message': 'App upgrade nudge issued successfully.'};
+      } else {
+        return {'success': false, 'message': response.data['message'] ?? 'Failed to issue nudge.'};
+      }
+    } catch (e) {
+      // print('[DataController] Error issuing app upgrade nudge: $e');
+      return {'success': false, 'message': 'An error occurred: $e'};
+    }
+  }
 }
