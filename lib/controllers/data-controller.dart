@@ -145,8 +145,6 @@ class DataController extends GetxController {
 
       // Initialize socket service after user data is loaded
       Get.find<SocketService>().initSocket();
-      // For chat functionality, we need all users before we can correctly display chats.
-      // So we await these calls in sequence.
       await fetchAllUsers();
       await fetchChats();
 
