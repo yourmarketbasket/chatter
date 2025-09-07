@@ -239,7 +239,7 @@ class SocketService {
         
     }
   }
-
+// yolo
   void _handleNewChat(dynamic data) {
     if (data is Map<String, dynamic> && data['_id'] is String) {
       _dataController.handleNewChat(data);
