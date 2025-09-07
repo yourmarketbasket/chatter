@@ -5306,4 +5306,29 @@ void clearUserPosts() {
       return {'success': false, 'message': 'An error occurred: $e'};
     }
   }
+
+  Future<Map<String, dynamic>> sendGeneralUpgradeNudge() async {
+    try {
+      final String? token = getAuthToken();
+      if (token == null) {
+        return {'success': false, 'message': 'Admin not authenticated.'};
+      }
+
+      final response = await _dio.post(
+        'api/updates/nudge',
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return {'success': true, 'message': 'General nudge sent successfully.'};
+      } else {
+        return {'success': false, 'message': response.data['message'] ?? 'Failed to send nudge.'};
+      }
+    } catch (e) {
+      // print('[DataController] Error sending general nudge: $e');
+      return {'success': false, 'message': 'An error occurred: $e'};
+    }
+  }
 }

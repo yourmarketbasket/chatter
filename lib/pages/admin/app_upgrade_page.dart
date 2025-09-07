@@ -15,6 +15,7 @@ class _AppUpgradePageState extends State<AppUpgradePage> {
   final _changelogController = TextEditingController();
   final DataController _dataController = Get.find<DataController>();
   bool _isLoading = false;
+  bool _isLoadingGeneralNudge = false;
 
   void _issueUpgradeNudge() async {
     if (_formKey.currentState!.validate()) {
@@ -53,94 +54,155 @@ class _AppUpgradePageState extends State<AppUpgradePage> {
     }
   }
 
+  void _sendGeneralNudge() async {
+    setState(() {
+      _isLoadingGeneralNudge = true;
+    });
+
+    final result = await _dataController.sendGeneralUpgradeNudge();
+
+    setState(() {
+      _isLoadingGeneralNudge = false;
+    });
+
+    if (result['success']) {
+      Get.snackbar(
+        'Success',
+        result['message'],
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
+    } else {
+      Get.snackbar(
+        'Error',
+        result['message'],
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Issue App Upgrade Nudge',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
-              ),
-              const SizedBox(height: 20),
-              TextFormField(
-                controller: _versionController,
-                style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  labelText: 'App Version (e.g., 1.2.3)',
-                  labelStyle: TextStyle(color: Colors.grey),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.grey),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.tealAccent),
-                  ),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Issue App Upgrade Nudge',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a version number';
-                  }
-                  // Basic version format check
-                  if (!RegExp(r'^\d+\.\d+\.\d+$').hasMatch(value)) {
-                    return 'Please use format X.Y.Z (e.g., 1.2.3)';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 20),
-              TextFormField(
-                controller: _changelogController,
-                style: const TextStyle(color: Colors.white),
-                maxLines: 10,
-                decoration: const InputDecoration(
-                  labelText: 'Changelog (one item per line)',
-                  labelStyle: TextStyle(color: Colors.grey),
-                  alignLabelWithHint: true,
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.grey),
+                const SizedBox(height: 20),
+                TextFormField(
+                  controller: _versionController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    labelText: 'App Version (e.g., 1.2.3)',
+                    labelStyle: TextStyle(color: Colors.grey),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.grey),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.tealAccent),
+                    ),
                   ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.tealAccent),
-                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter a version number';
+                    }
+                    // Basic version format check
+                    if (!RegExp(r'^\d+\.\d+\.\d+$').hasMatch(value)) {
+                      return 'Please use format X.Y.Z (e.g., 1.2.3)';
+                    }
+                    return null;
+                  },
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter the changelog';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 30),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _issueUpgradeNudge,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.tealAccent,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                const SizedBox(height: 20),
+                TextFormField(
+                  controller: _changelogController,
+                  style: const TextStyle(color: Colors.white),
+                  maxLines: 10,
+                  decoration: const InputDecoration(
+                    labelText: 'Changelog (one item per line)',
+                    labelStyle: TextStyle(color: Colors.grey),
+                    alignLabelWithHint: true,
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.grey),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.tealAccent),
+                    ),
                   ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            color: Colors.black,
-                            strokeWidth: 2,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter the changelog';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 30),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _issueUpgradeNudge,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.tealAccent,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              color: Colors.black,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Text(
+                            'Issue Nudge with Details',
+                            style: TextStyle(color: Colors.black, fontSize: 16),
                           ),
-                        )
-                      : const Text(
-                          'Issue Nudge',
-                          style: TextStyle(color: Colors.black, fontSize: 16),
-                        ),
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 20),
+                const Divider(color: Colors.grey),
+                const SizedBox(height: 20),
+                const Text(
+                  'Or, re-issue the latest nudge to all users without new details.',
+                  style: TextStyle(color: Colors.grey),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.notifications_active),
+                    onPressed: _isLoadingGeneralNudge ? null : _sendGeneralNudge,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 16),
+                      side: const BorderSide(color: Colors.grey),
+                    ),
+                    label: _isLoadingGeneralNudge
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Text('Send General Nudge'),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
