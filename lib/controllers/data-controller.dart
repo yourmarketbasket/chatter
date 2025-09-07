@@ -528,6 +528,7 @@ class DataController extends GetxController {
                 'followingCount': followingCount,
                 'isFollowingCurrentUser': isFollowing,
                 'suspended': userData['suspended'],
+                'verification': userData['verification'],
                 // Include the raw followers/following arrays if present, might be useful for other operations
                 // or if socket events need to modify these specific users locally.
                 'followers': userData['followers'] ?? [], // Store the array if available
@@ -2868,6 +2869,7 @@ class DataController extends GetxController {
                   'isFollowingCurrentUser': isFollowingThisFollower,
                   'followersCount': followerData['followersCount'] ?? 0,
                   'followingCount': followerData['followingCount'] ?? 0,
+                  'verification': followerData['verification'],
                 };
               }
               return <String, dynamic>{};
@@ -2946,6 +2948,7 @@ class DataController extends GetxController {
                   'isFollowingCurrentUser': isFollowingThisUser,
                   'followersCount': followingUserData['followersCount'] ?? 0,
                   'followingCount': followingUserData['followingCount'] ?? 0,
+                  'verification': followingUserData['verification'],
                 };
               }
               return <String, dynamic>{};
