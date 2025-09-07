@@ -399,11 +399,16 @@ class _ChatScreenState extends State<ChatScreen> {
         .map((id) => dataController.currentConversationMessages.firstWhere((m) => (m['_id'] ?? m['clientMessageId']) == id))
         .toList();
 
+    // Get the other participant's ID to prevent forwarding to them
+    final otherParticipant = _getOtherParticipant();
+    final otherParticipantId = otherParticipant?['_id'];
+
 
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => UsersListPage(
+          currentChatParticipantId: otherParticipantId,
           onUserSelected: (user) async {
             final targetUserId = user['_id'];
             final targetUserName = user['name'];

@@ -12,8 +12,10 @@ import 'package:chatter/widgets/app_drawer.dart';
 class UsersListPage extends StatefulWidget {
   final Function(Map<String, dynamic>)? onUserSelected;
   final bool isGroupCreationMode;
+  final String? currentChatParticipantId;
 
-  const UsersListPage({Key? key, this.onUserSelected, this.isGroupCreationMode = false}) : super(key: key);
+
+  const UsersListPage({Key? key, this.onUserSelected, this.isGroupCreationMode = false, this.currentChatParticipantId}) : super(key: key);
 
   @override
   _UsersListPageState createState() => _UsersListPageState();
@@ -49,10 +51,15 @@ class _UsersListPageState extends State<UsersListPage> {
 
   void _filterUsers() {
     final query = _searchController.text.toLowerCase();
+    var users = _dataController.allUsers.where((user) {
+      // Exclude the current chat participant
+      return user['_id'] != widget.currentChatParticipantId;
+    }).toList();
+
     if (query.isEmpty) {
-      _filteredUsers.assignAll(_dataController.allUsers); // Revert to original list
+      _filteredUsers.assignAll(users);
     } else {
-      _filteredUsers.assignAll(_dataController.allUsers.where((user) {
+      _filteredUsers.assignAll(users.where((user) {
         final name = (user['name'] ?? '').toLowerCase();
         final username = (user['username'] ?? '').toLowerCase();
         return name.contains(query) || username.contains(query);
