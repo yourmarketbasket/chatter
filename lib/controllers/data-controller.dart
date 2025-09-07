@@ -397,12 +397,14 @@ class DataController extends GetxController {
     // Also update the lastMessage in the chat list if it was the one deleted
     if (chats.containsKey(chatId) && chats[chatId]!['lastMessage']?['_id'] == messageId) {
       final chat = chats[chatId]!;
-      // Create a tombstone for the last message preview by modifying the existing lastMessage
-      final lastMessage = Map<String, dynamic>.from(chat['lastMessage']);
-      lastMessage['content'] = 'Message deleted';
-      lastMessage['deletedForEveryone'] = true;
-      lastMessage['files'] = []; // Also clear files to hide attachments preview
-      chat['lastMessage'] = lastMessage;
+      // Create a tombstone for the last message preview
+      chat['lastMessage'] = {
+        '_id': messageId,
+        'content': 'Message deleted',
+        'senderId': chats[chatId]!['lastMessage']['senderId'],
+        'createdAt': chats[chatId]!['lastMessage']['createdAt'],
+        'deletedForEveryone': true,
+      };
       chats.refresh();
     }
   }
@@ -416,20 +418,33 @@ class DataController extends GetxController {
     }
 
     if (deleteFor == 'everyone') {
-      bool changed = false;
+      bool conversationChanged = false;
       for (final messageId in messageIds) {
+        // Update the message in the conversation view if it's open
         final index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
         if (index != -1) {
-          // Mark as deleted for everyone
           currentConversationMessages[index]['deletedForEveryone'] = true;
           currentConversationMessages[index]['content'] = '';
           currentConversationMessages[index]['files'] = [];
-          changed = true;
+          conversationChanged = true;
+        }
+
+        // Check if the deleted message was a last message in any chat and update it to a tombstone.
+        for (var chat in chats.values) {
+          if (chat['lastMessage'] != null && chat['lastMessage']['_id'] == messageId) {
+            final tombstone = Map<String, dynamic>.from(chat['lastMessage']);
+            tombstone['content'] = 'Message deleted';
+            tombstone['deletedForEveryone'] = true;
+            tombstone['files'] = [];
+            chat['lastMessage'] = tombstone;
+          }
         }
       }
-      if (changed) {
+
+      if (conversationChanged) {
         currentConversationMessages.refresh();
       }
+      chats.refresh();
     }
     // No action needed for deleteFor: "me" as it only affects the sender,
     // who has already handled it optimistically.
@@ -2454,7 +2469,47 @@ class DataController extends GetxController {
   }
 
   Future<void> deleteChatMessage(String messageId, {bool forEveryone = false}) async {
-    await deleteMultipleMessages([messageId], deleteFor: forEveryone ? 'everyone' : 'me');
+    // print('[DataController] Deleting message $messageId with forEveryone=$forEveryone');
+    try {
+      final token = user.value['token'];
+      if (token == null) {
+        throw Exception('User not authenticated');
+      }
+      final response = await _dio.delete(
+        'api/messages/$messageId',
+        queryParameters: forEveryone ? {'for': 'everyone'} : null,
+        options: dio.Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        // print('[DataController] API call to delete message $messageId successful.');
+
+        // UI update for the user who performed the action.
+        // We use the `forEveryone` parameter for an immediate optimistic update,
+        // rather than waiting for the socket event or relying on the API response body.
+        final index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
+        if (index != -1) {
+          if (forEveryone) {
+            // For "Delete for everyone", show a tombstone message.
+            var message = Map<String, dynamic>.from(currentConversationMessages[index]);
+            message['deletedForEveryone'] = true;
+            message['content'] = ''; // Clear content
+            message['files'] = []; // Clear files
+            currentConversationMessages[index] = message;
+          } else {
+            // For "Delete for me", just remove it from the local list.
+            currentConversationMessages.removeAt(index);
+          }
+        }
+      } else {
+        // print('[DataController] Failed to delete message $messageId on the server.');
+        throw Exception('Failed to delete message on the server');
+      }
+    } catch (e) {
+      // print('[DataController] Error deleting message $messageId: $e');
+    }
   }
 
   Future<Map<String, dynamic>> deleteChat(String chatId) async {
@@ -4975,21 +5030,26 @@ void clearUserPosts() {
   }
 
   Future<void> deleteMultipleMessages(List<String> messageIds, {required String deleteFor}) async {
-    // Get the chat ID from the first message, assuming all are from the same chat
-    if (messageIds.isEmpty) return;
-    final firstMessage = currentConversationMessages.firstWhere((m) => messageIds.contains(m['_id']), orElse: () => {});
-    final chatId = firstMessage['chatId'] as String?;
+    final chatId = currentConversationMessages.isNotEmpty ? currentConversationMessages.first['chatId'] : null;
 
     // Optimistic UI update
     final List<Map<String, dynamic>> removedMessages = [];
     final Map<String, Map<String, dynamic>> originalMessages = {};
-    bool lastMessageChanged = false;
-    String? lastMessageId;
 
+    // Check if the last message of the chat is being deleted and create a tombstone if so.
     if (chatId != null && chats.containsKey(chatId)) {
-      lastMessageId = chats[chatId]!['lastMessage']?['_id'];
-      if (messageIds.contains(lastMessageId)) {
-        lastMessageChanged = true;
+      final lastMessageId = chats[chatId]!['lastMessage']?['_id'];
+      if (lastMessageId != null && messageIds.contains(lastMessageId)) {
+        // This logic now applies to both 'me' and 'everyone' for consistency.
+        // The user deleting for 'me' will see the tombstone, and then the chat
+        // will update to the next message when the list is eventually re-fetched or refreshed.
+        // This is a consistent and simple approach.
+        final chat = chats[chatId]!;
+        final tombstone = Map<String, dynamic>.from(chat['lastMessage']);
+        tombstone['content'] = 'Message deleted';
+        tombstone['deletedForEveryone'] = true; // Use a consistent tombstone state
+        tombstone['files'] = [];
+        chat['lastMessage'] = tombstone;
       }
     }
 
@@ -5012,28 +5072,9 @@ void clearUserPosts() {
         }
       }
     }
-    currentConversationMessages.refresh();
 
-    // After deletion, if the last message was affected, update the chat list
-    if (lastMessageChanged && chatId != null && chats.containsKey(chatId)) {
-      final chat = chats[chatId]!;
-      if (deleteFor == 'everyone') {
-        // Create a tombstone for the last message preview
-        final tombstone = Map<String, dynamic>.from(chats[chatId]!['lastMessage']);
-        tombstone['content'] = 'Message deleted';
-        tombstone['deletedForEveryone'] = true;
-        tombstone['files'] = [];
-        chat['lastMessage'] = tombstone;
-      } else {
-        // Deleting for me, so update to the new last message
-        if (currentConversationMessages.isNotEmpty) {
-            chat['lastMessage'] = currentConversationMessages.last;
-        } else {
-            chat['lastMessage'] = null;
-        }
-      }
-      chats.refresh();
-    }
+    currentConversationMessages.refresh();
+    chats.refresh();
 
     try {
       final token = user.value['token'];
