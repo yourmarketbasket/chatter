@@ -773,59 +773,6 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Future<void> _downloadFile(String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      // Optionally, show a snackbar or dialog on failure
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not download file.')),
-        );
-      }
-    }
-  }
-
-  Widget _buildOctetStreamAttachment(Map<String, dynamic> attachment) {
-    return Container(
-      padding: const EdgeInsets.all(8.0),
-      decoration: BoxDecoration(
-        color: Colors.grey[800],
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.insert_drive_file, color: Colors.white, size: 30),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  attachment['filename'] ?? 'File',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'File',
-                  style: TextStyle(color: Colors.grey[400], fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: Icon(Icons.download, color: Colors.tealAccent),
-            onPressed: () => _downloadFile(attachment['url']),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildAttachment(Map<String, dynamic> message) {
     return Obx(() {
       final updatedMessage = dataController.currentConversationMessages.firstWhere(
@@ -838,12 +785,6 @@ class _ChatScreenState extends State<ChatScreen> {
       }
 
       final attachments = updatedMessage['files'] as List;
-
-      // Handle single octet-stream attachment
-      if (attachments.length == 1 && attachments[0]['type'] == 'application/octet-stream') {
-        return _buildOctetStreamAttachment(attachments[0]);
-      }
-
       const maxVisible = 4;
       final hasMore = attachments.length > maxVisible;
       final gridItemCount = hasMore ? maxVisible : attachments.length;
@@ -864,7 +805,7 @@ class _ChatScreenState extends State<ChatScreen> {
         itemBuilder: (context, index) {
           final attachment = attachments[index];
           final isLocalFile = !(attachment['url'] as String).startsWith('http');
-          final attachmentKey = ValueKey('${updatedMessage['clientMessageId']}_$index');
+        final attachmentKey = ValueKey('${updatedMessage['clientMessageId']}_$index');
 
           if (hasMore && index == maxVisible - 1) {
             final remainingCount = attachments.length - maxVisible + 1;
@@ -882,7 +823,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 alignment: Alignment.center,
                 fit: StackFit.expand,
                 children: [
-                  _buildAttachmentContent(attachment, isLocalFile, key: attachmentKey),
+                _buildAttachmentContent(attachment, isLocalFile, key: attachmentKey),
                   Container(
                     color: Colors.black.withOpacity(0.6),
                     child: Center(
@@ -901,14 +842,9 @@ class _ChatScreenState extends State<ChatScreen> {
             );
           }
 
-          // Do not open media view for octet-stream
-          if (attachment['type'] == 'application/octet-stream') {
-            return _buildAttachmentContent(attachment, isLocalFile, key: attachmentKey);
-          }
-
           return GestureDetector(
             onTap: () => _openMediaView(updatedMessage, index),
-            child: _buildAttachmentContent(attachment, isLocalFile, key: attachmentKey),
+          child: _buildAttachmentContent(attachment, isLocalFile, key: attachmentKey),
           );
         },
       );
@@ -1008,9 +944,6 @@ class _ChatScreenState extends State<ChatScreen> {
           url: attachment['url'],
           isLocal: isLocalFile,
         );
-        break;
-      case 'application/octet-stream':
-        content = _buildOctetStreamAttachment(attachment);
         break;
       default:
         content = Container(

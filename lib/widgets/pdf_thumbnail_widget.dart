@@ -63,12 +63,21 @@ class _PdfThumbnailWidgetState extends State<PdfThumbnailWidget> {
         return null;
       }
 
-      // Create image from BGRA bytes
+      // Convert BGRA to RGBA
+      final bgraPixels = pageImage.pixels;
+      final rgbaPixels = Uint8List(bgraPixels.length);
+      for (var i = 0; i < bgraPixels.length; i += 4) {
+        rgbaPixels[i] = bgraPixels[i + 2]; // R
+        rgbaPixels[i + 1] = bgraPixels[i + 1]; // G
+        rgbaPixels[i + 2] = bgraPixels[i]; // B
+        rgbaPixels[i + 3] = bgraPixels[i + 3]; // A
+      }
+
+      // Create image from RGBA bytes
       final image = img.Image.fromBytes(
         width: pageImage.width,
         height: pageImage.height,
-        bytes: pageImage.pixels.buffer,
-        format: img.Format.bgra,
+        bytes: rgbaPixels.buffer,
       );
 
       return img.encodePng(image);
