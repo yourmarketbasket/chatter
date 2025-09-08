@@ -390,7 +390,8 @@ void _handleDoubleTap(Offset tapPosition, double displayWidth, double displayHei
       final Uri pdfUri = optimizedUrl?.isNotEmpty == true ? Uri.parse(optimizedUrl!) : Uri.file(file!.path);
       return PdfViewer.uri(
         pdfUri,
-        params: const PdfViewerParams(
+        params:  PdfViewerParams(
+          errorBannerBuilder: (context, error, stackTrace, documentRef) => buildError(context, message: 'Oops! Could not load document'),
           margin: 0,
           backgroundColor: Colors.transparent,
           maxScale: 2.0,
