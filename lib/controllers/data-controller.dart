@@ -102,6 +102,7 @@ class DataController extends GetxController {
 
   // For app updates
   final Rxn<Map<String, dynamic>> appUpdateNudgeData = Rxn<Map<String, dynamic>>();
+  final Rxn<Map<String, dynamic>> _cachedUpdateInfo = Rxn<Map<String, dynamic>>();
   final Rxn<String> appVersion = Rxn<String>();
 
 
@@ -5216,6 +5217,11 @@ void clearUserPosts() {
   // --- App Update Methods ---
 
   Future<Map<String, dynamic>?> getLatestAppUpdate() async {
+    if (_cachedUpdateInfo.value != null) {
+      // print('[DataController] Returning cached app update info.');
+      return _cachedUpdateInfo.value;
+    }
+
     try {
       final String? token = getAuthToken();
       if (token == null) {
@@ -5281,6 +5287,7 @@ void clearUserPosts() {
   void handleAppUpdateNudge(Map<String, dynamic> data) {
     // print('[DataController] Received app update nudge: $data');
     appUpdateNudgeData.value = data;
+    _cachedUpdateInfo.value = data;
   }
 
   Future<Map<String, dynamic>> issueAppUpgradeNudge(String version, List<String> changelog, String platform) async {

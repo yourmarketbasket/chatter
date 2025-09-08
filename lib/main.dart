@@ -120,42 +120,11 @@ class _ChatterAppState extends State<ChatterApp> {
   void _listenForUpdateNudges() {
     _dataController.appUpdateNudgeData.listen((nudgeData) {
       if (nudgeData != null && mounted) {
-        final version = nudgeData['version'] as String?;
-        final notes = nudgeData['notes'] as List<dynamic>?;
-        final url = nudgeData['url'] as String?;
-
-        if (url == null || version == null) {
-          // print('Update nudge received without a URL or version. Cannot show dialog.');
-          return;
-        }
-
-        final title = 'Update to version $version';
-        final changelog = notes?.map((note) => '• $note').join('\n') ?? 'Bug fixes and performance improvements.';
-
-        Get.dialog(
-          AlertDialog(
-            title: Text(title),
-            content: SingleChildScrollView(
-              child: Text(changelog),
-            ),
-            actions: [
-              TextButton(
-                child: const Text('LATER'),
-                onPressed: () => Get.back(),
-              ),
-              TextButton(
-                child: const Text('UPDATE NOW'),
-                onPressed: () async {
-                  final uri = Uri.parse(url);
-                  if (await canLaunchUrl(uri)) {
-                    await launchUrl(uri, mode: LaunchMode.externalApplication);
-                  }
-                },
-              ),
-            ],
-          ),
-          barrierDismissible: false,
-        );
+        // A nudge has been received. The nudge data is now cached in the DataController.
+        // We can now force the Upgrader to re-check for an update.
+        // The Upgrader, via ApiUpgraderStore, will use the cached data.
+        // This will cause the UpgradeAlert widget to display its dialog.
+        upgrader.initialize();
       }
     });
   }
@@ -233,58 +202,58 @@ class _ChatterAppState extends State<ChatterApp> {
 
   @override
   Widget build(BuildContext context) {
-    return UpgradeAlert(
-      upgrader: upgrader,
-      child: GetMaterialApp(
-        routingCallback: (routing) {
-          if (routing != null) {
-            _dataController.currentRoute.value = routing.current;
-          }
-        },
-        title: 'Chatter',
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData.dark().copyWith(
-          primaryColor: Colors.tealAccent,
-          colorScheme: const ColorScheme.dark(
-            primary: Colors.tealAccent,
-            secondary: Colors.pinkAccent,
-          ),
-          scaffoldBackgroundColor: Colors.black,
-          textTheme: const TextTheme(
-            bodyLarge: TextStyle(color: Colors.white),
-            bodyMedium: TextStyle(color: Colors.white),
-          ),
-          appBarTheme: const AppBarTheme(
-            backgroundColor: Colors.black,
-            foregroundColor: Colors.white,
-          ),
-          elevatedButtonTheme: ElevatedButtonThemeData(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.tealAccent,
-              foregroundColor: Colors.black,
-            ),
+    return GetMaterialApp(
+      routingCallback: (routing) {
+        if (routing != null) {
+          _dataController.currentRoute.value = routing.current;
+        }
+      },
+      title: 'Chatter',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData.dark().copyWith(
+        primaryColor: Colors.tealAccent,
+        colorScheme: const ColorScheme.dark(
+          primary: Colors.tealAccent,
+          secondary: Colors.pinkAccent,
+        ),
+        scaffoldBackgroundColor: Colors.black,
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(color: Colors.white),
+          bodyMedium: TextStyle(color: Colors.white),
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.black,
+          foregroundColor: Colors.white,
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.tealAccent,
+            foregroundColor: Colors.black,
           ),
         ),
-        navigatorObservers: [routeObserver],
-        home: const LandingPage(), // Show LandingPage while checking storage
-        getPages: [
-          GetPage(name: '/landing', page: () => const LandingPage()),
-          GetPage(name: '/login', page: () => const LoginPage()),
-          GetPage(name: '/register', page: () => const RegisterPage()),
-          GetPage(name: '/home', page: () => const HomeFeedScreen()),
-          GetPage(name: '/buy-me-a-coffee', page: () => const BuyMeACoffeePage()),
-          // main chats page
-          GetPage(name: '/chats', page: () =>  MainChatsPage()),
-          GetPage(name: '/admin', page: () => const AdminPage()),
-          GetPage(name: '/invites/:inviteCode', page: () {
-            final inviteCode = Get.parameters['inviteCode'];
-            if (inviteCode != null) {
-              return JoinGroupPage(inviteCode: inviteCode);
-            }
-            return const LandingPage();
-          }),
-        ],
       ),
+      navigatorObservers: [routeObserver],
+      home: UpgradeAlert(
+        upgrader: upgrader,
+        child: const LandingPage(),
+      ), // Show LandingPage while checking storage
+      getPages: [
+        GetPage(name: '/landing', page: () => const LandingPage()),
+        GetPage(name: '/login', page: () => const LoginPage()),
+        GetPage(name: '/register', page: () => const RegisterPage()),
+        GetPage(name: '/home', page: () => const HomeFeedScreen()),
+        GetPage(name: '/buy-me-a-coffee', page: () => const BuyMeACoffeePage()),
+        // main chats page
+        GetPage(name: '/chats', page: () =>  MainChatsPage()),
+        GetPage(name: '/admin', page: () => const AdminPage()),
+        GetPage(name: '/invites/:inviteCode', page: () {
+          final inviteCode = Get.parameters['inviteCode'];
+          if (inviteCode != null) {
+            return JoinGroupPage(inviteCode: inviteCode);
+          }
+          return const LandingPage();
+        }),
+      ],
     );
   }
 }
