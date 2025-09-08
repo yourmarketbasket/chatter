@@ -454,21 +454,20 @@ class _MainChatsPageState extends State<MainChatsPage> {
                                       shape: BoxShape.circle,
                                       border: Border.all(color: Colors.black, width: 2),
                                     ),
-                                    ),
                                   ),
                                 ),
                               if (isSelected)
-                                Positioned.fill(
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: Colors.black.withOpacity(0.5),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.check_circle,
-                                      color: Colors.tealAccent,
-                                      size: 24,
-                                    ),
+                                Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.5),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.check_circle,
+                                    color: Colors.tealAccent,
+                                    size: 24,
                                   ),
                                 ),
                             ],
