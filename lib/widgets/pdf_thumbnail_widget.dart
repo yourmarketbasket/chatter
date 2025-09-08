@@ -63,24 +63,7 @@ class _PdfThumbnailWidgetState extends State<PdfThumbnailWidget> {
         return null;
       }
 
-      // Convert BGRA to RGBA
-      final pixels = pageImage.pixels;
-      for (var i = 0; i < pixels.length; i += 4) {
-        final b = pixels[i];
-        final r = pixels[i + 2];
-        pixels[i] = r;
-        pixels[i + 2] = b;
-      }
-
-      // Create image from RGBA bytes
-      final image = img.Image.fromBytes(
-        width: pageImage.width,
-        height: pageImage.height,
-        bytes: pixels.buffer,
-        order: img.ChannelOrder.rgba,
-      );
-
-      return img.encodePng(image);
+      return await pageImage.createPng();
     } catch (e) {
       print('Error generating PDF thumbnail: $e');
       return null;
