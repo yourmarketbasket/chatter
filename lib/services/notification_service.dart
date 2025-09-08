@@ -138,7 +138,9 @@ class NotificationService {
         }
       } else if (response.actionId == 'MARK_AS_READ') {
         if (messageId != null && chatId != null) {
+          await _showProgressNotification('Marking as read...', '');
           final bool success = await dataController.markMessageAsReadFromNotification(chatId, messageId);
+          await _flutterLocalNotificationsPlugin.cancel(0); // Dismiss the progress notification
           if (success) {
             await _flutterLocalNotificationsPlugin.cancel(response.id!);
 
@@ -550,5 +552,27 @@ class NotificationService {
       return true;
     }
     return true;
+  }
+
+  Future<void> _showProgressNotification(String title, String body) async {
+    final androidDetails = AndroidNotificationDetails(
+      _channelId,
+      _channelName,
+      channelDescription: _channelDescription,
+      importance: Importance.max,
+      priority: Priority.high,
+      icon: 'ic_status_16px',
+      showProgress: true,
+      maxProgress: 0,
+      indeterminate: true,
+      ongoing: true,
+    );
+    final notificationDetails = NotificationDetails(android: androidDetails);
+    await _flutterLocalNotificationsPlugin.show(
+      0, // Use a fixed ID for the progress notification
+      title,
+      body,
+      notificationDetails,
+    );
   }
 }
