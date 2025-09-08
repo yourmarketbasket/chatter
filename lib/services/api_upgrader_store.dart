@@ -21,7 +21,8 @@ class ApiUpgraderStore extends UpgraderStore {
 
     if (updateData != null) {
       final versionStr = updateData['version'] as String?;
-      final notes = updateData['notes'] as String?;
+      final notesList = updateData['notes'] as List<dynamic>?;
+      final notes = notesList?.join('\n');
       final url = updateData['url'] as String?;
       if (versionStr != null && url != null) {
         print('[ApiUpgraderStore] Found update: $versionStr, URL: $url');
