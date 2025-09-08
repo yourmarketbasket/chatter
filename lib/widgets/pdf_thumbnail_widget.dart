@@ -33,7 +33,7 @@ class _PdfThumbnailWidgetState extends State<PdfThumbnailWidget> {
             ? PdfViewer.file(
                 widget.url,
                 params: const PdfViewerParams(
-                  pageNumber: 1,
+                  initialPageNumber: 1,
                   maxScale: 1.0,
                   minScale: 1.0,
                   panEnabled: false,
@@ -44,7 +44,7 @@ class _PdfThumbnailWidgetState extends State<PdfThumbnailWidget> {
             : PdfViewer.uri(
                 Uri.parse(widget.url),
                 params: const PdfViewerParams(
-                  pageNumber: 1,
+                  initialPageNumber: 1,
                   maxScale: 1.0,
                   minScale: 1.0,
                   panEnabled: false,
