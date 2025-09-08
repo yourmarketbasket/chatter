@@ -22,6 +22,8 @@ import 'package:uuid/uuid.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  print('[FCM] Handling a background message: ${message.messageId}');
+  print('[FCM] Background message data: ${message.data}');
   await Firebase.initializeApp();
   await NotificationService().showNotification(message);
 }
@@ -47,7 +49,10 @@ class NotificationService {
 
     await _requestPermissions();
     final fcmToken = await _firebaseMessaging.getToken();
-        _dataController.updateFcmToken(fcmToken!);
+    print('[FCM] Token: $fcmToken');
+    if (fcmToken != null) {
+      _dataController.updateFcmToken(fcmToken);
+    }
     
 
     const AndroidInitializationSettings initializationSettingsAndroid =
@@ -67,6 +72,11 @@ class NotificationService {
     await _createAndroidNotificationChannel();
 
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      print('[FCM] Got a message whilst in the foreground!');
+      print('[FCM] Message data: ${message.data}');
+      if (message.notification != null) {
+        print('[FCM] Message also contained a notification: ${message.notification}');
+      }
       showNotification(message);
     });
 
@@ -74,8 +84,13 @@ class NotificationService {
   }
 
   void onDidReceiveNotificationResponse(NotificationResponse response) async {
+    print('[FCM] Notification tapped. Action ID: ${response.actionId}');
     final payloadString = response.payload;
-    if (payloadString == null) return;
+    if (payloadString == null) {
+      print('[FCM] Notification response payload was null.');
+      return;
+    }
+    print('[FCM] Notification response payload: $payloadString');
 
     final payload = jsonDecode(payloadString);
     final type = payload['type'] as String?;
@@ -208,7 +223,10 @@ class NotificationService {
   }
 
   Future<void> showNotification(RemoteMessage message) async {
+    print('[FCM] showNotification called. Message ID: ${message.messageId}');
+    print('[FCM] showNotification data: ${message.data}');
     final type = message.data['type'] as String?;
+    print('[FCM] Notification type: $type');
     switch (type) {
       case 'new_message':
         await _handleNewMessageNotification(message);
