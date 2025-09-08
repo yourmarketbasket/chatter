@@ -206,6 +206,9 @@ class UploadService {
           ),
           'upload_preset': 'testpreset1',
           'resource_type': resourceType,
+          'use_filename': true,
+          'unique_filename': false,
+          'overwrite': true,
         });
 
         // This local 'uploadProgress' variable is not used for the callback, so it can be removed.

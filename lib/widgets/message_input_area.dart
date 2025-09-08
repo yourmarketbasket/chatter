@@ -229,6 +229,37 @@ class _MessageInputAreaState extends State<MessageInputArea> {
   }
 
   Future<void> _pickFromCamera() async {
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        title: const Text('Select Media Type', style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera, color: Colors.white),
+              title: const Text('Take Photo', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.of(context).pop();
+                _takePhotoAndCrop();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.videocam, color: Colors.white),
+              title: const Text('Record Video', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.of(context).pop();
+                _recordVideo();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _takePhotoAndCrop() async {
     try {
       final imageFile = await ImagePicker().pickImage(source: ImageSource.camera);
       if (imageFile == null) return;
@@ -260,6 +291,23 @@ class _MessageInputAreaState extends State<MessageInputArea> {
       _handleFiles([platformFile]);
     } catch (e) {
       print('Error taking photo: $e');
+    }
+  }
+
+  Future<void> _recordVideo() async {
+    try {
+      final videoFile = await ImagePicker().pickVideo(source: ImageSource.camera);
+      if (videoFile == null) return;
+
+      final platformFile = PlatformFile(
+        name: videoFile.path.split('/').last,
+        path: videoFile.path,
+        size: await File(videoFile.path).length(),
+      );
+
+      _handleFiles([platformFile]);
+    } catch (e) {
+      print('Error recording video: $e');
     }
   }
 
