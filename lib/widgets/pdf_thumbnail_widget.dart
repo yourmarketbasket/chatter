@@ -8,11 +8,13 @@ import 'package:image/image.dart' as img;
 
 class PdfThumbnailWidget extends StatefulWidget {
   final String url;
+  final bool isLocal;
   final int? fileSize; // Optional file size in bytes
 
   const PdfThumbnailWidget({
     Key? key,
     required this.url,
+    this.isLocal = false,
     this.fileSize,
   }) : super(key: key);
 
@@ -34,11 +36,15 @@ class _PdfThumbnailWidgetState extends State<PdfThumbnailWidget> {
     PdfPage? page;
     PdfImage? pageImage;
     try {
-      final response = await http.get(Uri.parse(widget.url));
-      if (response.statusCode == 200) {
-        doc = await PdfDocument.openData(response.bodyBytes);
+      if (widget.isLocal) {
+        doc = await PdfDocument.openFile(widget.url);
       } else {
-        throw Exception('Failed to download PDF: ${response.statusCode}');
+        final response = await http.get(Uri.parse(widget.url));
+        if (response.statusCode == 200) {
+          doc = await PdfDocument.openData(response.bodyBytes);
+        } else {
+          throw Exception('Failed to download PDF: ${response.statusCode}');
+        }
       }
 
       if (doc == null || doc.pages.isEmpty) {
