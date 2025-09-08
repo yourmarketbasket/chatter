@@ -12,6 +12,8 @@ import 'package:chatter/services/socket-service.dart';
 import 'package:chatter/controllers/data-controller.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:chatter/widgets/pulsing_icon.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
 
 class MessageInputArea extends StatefulWidget {
   final Function(String text, List<PlatformFile> files) onSend;
@@ -188,48 +190,158 @@ class _MessageInputAreaState extends State<MessageInputArea> {
     );
   }
 
-  Future<void> _pickAttachments() async {
+  Future<void> _handleFiles(List<PlatformFile> files) async {
+    if (files.isEmpty) return;
+
+    const int maxSizeInBytes = 20 * 1024 * 1024; // 20 MB
+    final List<PlatformFile> validFiles = [];
+    final List<PlatformFile> oversizedFiles = [];
+
+    for (final file in files) {
+      if (file.size > maxSizeInBytes) {
+        oversizedFiles.add(file);
+      } else {
+        validFiles.add(file);
+      }
+    }
+
+    if (oversizedFiles.isNotEmpty) {
+      _showOversizedFileDialog(oversizedFiles);
+    }
+
+    if (validFiles.isEmpty) return;
+
+    final dialogResult = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => AttachmentPreviewDialog(
+        files: validFiles,
+      ),
+    );
+
+    if (dialogResult != null) {
+      final List<PlatformFile> resultingFiles = dialogResult['files'];
+      final String caption = dialogResult['caption'];
+      if (resultingFiles.isNotEmpty || caption.isNotEmpty) {
+        widget.onSend(caption, resultingFiles);
+        _messageController.clear();
+      }
+    }
+  }
+
+  Future<void> _pickFromCamera() async {
     try {
-      final result = await FilePicker.platform.pickFiles(allowMultiple: true);
-      if (result == null || result.files.isEmpty) return;
+      final imageFile = await ImagePicker().pickImage(source: ImageSource.camera);
+      if (imageFile == null) return;
 
-      const int maxSizeInBytes = 20 * 1024 * 1024; // 20 MB
-      final List<PlatformFile> validFiles = [];
-      final List<PlatformFile> oversizedFiles = [];
-
-      for (final file in result.files) {
-        if (file.size > maxSizeInBytes) {
-          oversizedFiles.add(file);
-        } else {
-          validFiles.add(file);
-        }
-      }
-
-      if (oversizedFiles.isNotEmpty) {
-        _showOversizedFileDialog(oversizedFiles);
-      }
-
-      if (validFiles.isEmpty) return;
-
-      final dialogResult = await showDialog<Map<String, dynamic>>(
-        context: context,
-        builder: (context) => AttachmentPreviewDialog(
-          files: validFiles,
-        ),
+      final croppedFile = await ImageCropper().cropImage(
+        sourcePath: imageFile.path,
+        aspectRatioPresets: [
+          CropAspectRatioPreset.square,
+          CropAspectRatioPreset.ratio3x2,
+          CropAspectRatioPreset.original,
+          CropAspectRatioPreset.ratio4x3,
+          CropAspectRatioPreset.ratio16x9
+        ],
       );
 
-      if (dialogResult != null) {
-        final List<PlatformFile> files = dialogResult['files'];
-        final String caption = dialogResult['caption'];
-        if (files.isNotEmpty || caption.isNotEmpty) {
-          widget.onSend(caption, files);
-          _messageController.clear();
-        }
-      }
+      if (croppedFile == null) return;
+
+      final platformFile = PlatformFile(
+        name: croppedFile.path.split('/').last,
+        path: croppedFile.path,
+        size: await File(croppedFile.path).length(),
+      );
+
+      _handleFiles([platformFile]);
     } catch (e) {
-      // Handle exceptions
-      print('Error picking files: $e');
+      print('Error taking photo: $e');
     }
+  }
+
+  Future<void> _pickFromGallery() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: true,
+        type: FileType.media,
+      );
+      if (result == null || result.files.isEmpty) return;
+      _handleFiles(result.files);
+    } catch (e) {
+      print('Error picking from gallery: $e');
+    }
+  }
+
+  Future<void> _pickAudio() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: true,
+        type: FileType.audio,
+      );
+      if (result == null || result.files.isEmpty) return;
+      _handleFiles(result.files);
+    } catch (e) {
+      print('Error picking audio: $e');
+    }
+  }
+
+  Future<void> _pickDocument() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: true,
+        type: FileType.any,
+      );
+      if (result == null || result.files.isEmpty) return;
+      _handleFiles(result.files);
+    } catch (e) {
+      print('Error picking document: $e');
+    }
+  }
+
+  Future<void> _pickAttachments() async {
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.grey[900],
+      builder: (context) {
+        return SafeArea(
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 20.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: <Widget>[
+                _buildAttachmentOption(Icons.photo_camera, 'Camera', _pickFromCamera),
+                _buildAttachmentOption(Icons.photo_library, 'Gallery', _pickFromGallery),
+                _buildAttachmentOption(Icons.headset, 'Audio', _pickAudio),
+                _buildAttachmentOption(Icons.insert_drive_file, 'Document', _pickDocument),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAttachmentOption(IconData icon, String label, VoidCallback onTap) {
+    return InkWell(
+      onTap: () {
+        Navigator.of(context).pop();
+        onTap();
+      },
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircleAvatar(
+              radius: 30,
+              backgroundColor: Colors.grey[800],
+              child: Icon(icon, size: 28, color: Colors.white),
+            ),
+            const SizedBox(height: 8),
+            Text(label, style: const TextStyle(color: Colors.white, fontSize: 12)),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
