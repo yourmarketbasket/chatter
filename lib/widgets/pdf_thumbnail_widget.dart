@@ -22,6 +22,10 @@ class PdfThumbnailWidget extends StatefulWidget {
 class _PdfThumbnailWidgetState extends State<PdfThumbnailWidget> {
   @override
   Widget build(BuildContext context) {
+    final documentBuilder = widget.isLocal
+        ? PdfDocumentViewBuilder.file(widget.url)
+        : PdfDocumentViewBuilder.network(widget.url);
+
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8.0),
@@ -29,29 +33,17 @@ class _PdfThumbnailWidgetState extends State<PdfThumbnailWidget> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(8.0),
-        child: widget.isLocal
-            ? PdfViewer.file(
-                widget.url,
-                params: const PdfViewerParams(
-                  initialPageNumber: 1,
-                  maxScale: 1.0,
-                  minScale: 1.0,
-                  panEnabled: false,
-                  scrollEnabled: false,
-                  layoutPages: null,
-                ),
-              )
-            : PdfViewer.uri(
-                Uri.parse(widget.url),
-                params: const PdfViewerParams(
-                  initialPageNumber: 1,
-                  maxScale: 1.0,
-                  minScale: 1.0,
-                  panEnabled: false,
-                  scrollEnabled: false,
-                  layoutPages: null,
-                ),
-              ),
+        child: documentBuilder(
+          builder: (context, document) {
+            if (document == null) {
+              return Center(child: CircularProgressIndicator());
+            }
+            return PdfPageView(
+              pdfPage: document.pages.first,
+              // You can add other parameters here if needed
+            );
+          },
+        ),
       ),
     );
   }
