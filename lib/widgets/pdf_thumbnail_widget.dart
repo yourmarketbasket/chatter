@@ -199,6 +199,7 @@ class _PdfThumbnailWidgetState extends State<PdfThumbnailWidget> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
+                        // force
                         const SizedBox(height: 4),
                         Text(
                           _formatFileSize(widget.fileSize),
