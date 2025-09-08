@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:get_storage/get_storage.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:better_player_enhanced/better_player.dart';
 import 'package:flutter/material.dart';
@@ -45,8 +44,6 @@ class DataController extends GetxController {
     receiveTimeout: const Duration(seconds: 30),
     sendTimeout: const Duration(seconds: 30),
   ));
-  final _messageStore = GetStorage();
-  final Map<String, String> _messageIdToChatId = {};
   final user = {}.obs;
   final RxList<Map<String, dynamic>> posts = <Map<String, dynamic>>[].obs;
   final RxInt _currentPage = 1.obs;
@@ -162,77 +159,11 @@ class DataController extends GetxController {
     }
   }
 
-  Future<void> _cacheMessagesForChat(String chatId) async {
-    // This method only fetches from network and saves to cache.
-    // It does NOT modify currentConversationMessages.
-    try {
-      final token = user.value['token'];
-      if (token == null) return;
-
-      final response = await _dio.get(
-        'api/messages/$chatId',
-        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
-      );
-
-      if (response.statusCode == 200 && response.data['success'] == true) {
-        final List<dynamic> serverMessageData = response.data['messages'];
-        final serverMessages = List<Map<String, dynamic>>.from(serverMessageData);
-        serverMessages.sort((a, b) => DateTime.parse(a['createdAt']).compareTo(DateTime.parse(b['createdAt'])));
-
-        // Save to local storage and update the map
-        _saveMessagesToLocal(chatId, serverMessages);
-        for (final msg in serverMessages) {
-          if (msg['_id'] != null) {
-            _messageIdToChatId[msg['_id']] = chatId;
-          }
-        }
-      }
-    } catch (e) {
-      // print('Error pre-caching messages for chat $chatId: $e');
-    }
-  }
-
   String? getAuthToken() {
     if (user.value.containsKey('token')) {
       return user.value['token'] as String?;
     }
     return null;
-  }
-
-  // New methods for local message storage
-  void _saveMessagesToLocal(String chatId, List<Map<String, dynamic>> messages) {
-    // GetStorage works with primitive types, so we need to ensure our map is compatible.
-    // The maps should already be JSON-serializable, but this is a good place to double-check if issues arise.
-    _messageStore.write('messages_$chatId', messages);
-  }
-
-  List<Map<String, dynamic>> _loadMessagesFromLocal(String chatId) {
-    final messages = _messageStore.read<List>('messages_$chatId');
-    if (messages != null) {
-      // Ensure that the list is correctly typed.
-      return List<Map<String, dynamic>>.from(messages.map((item) => Map<String, dynamic>.from(item as Map)));
-    }
-    return [];
-  }
-
-  void _saveChatsToLocal() {
-    // GetStorage works well with lists of maps.
-    final chatList = chats.values.toList();
-    _messageStore.write('chats_list', chatList);
-  }
-
-  void _loadChatsFromLocal() {
-    final chatList = _messageStore.read<List>('chats_list');
-    if (chatList != null && chatList.isNotEmpty) {
-      final newChats = <String, Map<String, dynamic>>{};
-      for (final chat in chatList) {
-        final chatMap = Map<String, dynamic>.from(chat as Map);
-        if (chatMap['_id'] != null) {
-          newChats[chatMap['_id']] = chatMap;
-        }
-      }
-      chats.value = newChats;
-    }
   }
 
   Future<List<String>> getActiveChatIds() async {
@@ -276,25 +207,6 @@ class DataController extends GetxController {
     final chatId = newMessage['chatId'] as String?;
     if (chatId == null || newMessage['_id'] == null) return;
 
-    // --- Update Local Storage & ID Map ---
-    if (newMessage['_id'] != null) {
-      _messageIdToChatId[newMessage['_id']] = chatId;
-    }
-    final cachedMessages = _loadMessagesFromLocal(chatId);
-    final newMsgId = newMessage['_id'] as String;
-    final clientMsgId = newMessage['clientMessageId'] as String?;
-
-    final existingMsgIndex = cachedMessages.indexWhere((m) {
-      return (clientMsgId != null && m['clientMessageId'] == clientMsgId) || m['_id'] == newMsgId;
-    });
-
-    if (existingMsgIndex != -1) {
-      cachedMessages[existingMsgIndex] = newMessage;
-    } else {
-      cachedMessages.add(newMessage);
-    }
-    _saveMessagesToLocal(chatId, cachedMessages);
-
     // --- Update Chat List First ---
     if (chats.containsKey(chatId)) {
       final chat = chats[chatId]!;
@@ -308,7 +220,6 @@ class DataController extends GetxController {
       }
       chats[chatId] = chat;
       chats.refresh();
-      _saveChatsToLocal();
     } else {
       // If chat is not in the list, fetch all chats again to get the new one.
       fetchChats();
@@ -316,14 +227,27 @@ class DataController extends GetxController {
 
     // --- Update Conversation View ---
     if (activeChatId.value == chatId) {
-      // The conversation view should now reflect the updated cache
-      currentConversationMessages.value = cachedMessages;
+      final newMsgId = newMessage['_id'] as String;
+      final clientMsgId = newMessage['clientMessageId'] as String?;
+
+      // Check for and replace optimistic message
+      final existingMsgIndex = currentConversationMessages.indexWhere((m) {
+        return (clientMsgId != null && m['clientMessageId'] == clientMsgId) || m['_id'] == newMsgId;
+      });
+
+      if (existingMsgIndex != -1) {
+        currentConversationMessages[existingMsgIndex] = newMessage;
+      } else {
+        currentConversationMessages.add(newMessage);
+      }
 
       // Mark as delivered
       final senderId = newMessage['senderId'] is Map ? newMessage['senderId']['_id'] : newMessage['senderId'];
       if (senderId != null && senderId != getUserId()) {
         markMessageAsDelivered(newMessage);
       }
+
+      currentConversationMessages.refresh();
     }
   }
 
@@ -343,16 +267,14 @@ class DataController extends GetxController {
 
     // Refresh the RxMap to ensure all listeners are notified.
     chats.refresh();
-    _saveChatsToLocal();
   }
 
   void handleMessageStatusUpdate(Map<String, dynamic> data) {
     final messageId = data['messageId'] as String?;
     final status = data['status'] as String?;
     final userId = data['userId'] as String?;
-    final chatId = _messageIdToChatId[messageId];
 
-    if (messageId == null || status == null || userId == null || chatId == null) return;
+    if (messageId == null || status == null || userId == null) return;
 
     void updateReceipts(Map<String, dynamic> message) {
       // Defensively handle the receipts list, which may contain non-map elements.
@@ -391,19 +313,15 @@ class DataController extends GetxController {
       message['readReceipts'] = receipts;
     }
 
-    // Update local storage
-    final cachedMessages = _loadMessagesFromLocal(chatId);
-    final index = cachedMessages.indexWhere((m) => m['_id'] == messageId);
+    final index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
     if (index != -1) {
-      final message = cachedMessages[index];
-      updateReceipts(message);
-      _saveMessagesToLocal(chatId, cachedMessages);
+        final message = Map<String, dynamic>.from(currentConversationMessages[index]);
+        updateReceipts(message);
 
-      if (activeChatId.value == chatId) {
-        currentConversationMessages.value = cachedMessages;
-      }
+        var newList = List<Map<String, dynamic>>.from(currentConversationMessages);
+        newList[index] = message;
+        currentConversationMessages.assignAll(newList);
     }
-
 
     for (var chat in chats.values) {
         if (chat['lastMessage'] != null && chat['lastMessage']['_id'] == messageId) {
@@ -415,6 +333,7 @@ class DataController extends GetxController {
         }
     }
 
+    currentConversationMessages.refresh();
     chats.refresh();
   }
 
@@ -427,25 +346,16 @@ class DataController extends GetxController {
       return;
     }
 
-    // --- Update Local Storage ---
-    final cachedMessages = _loadMessagesFromLocal(chatId);
-    final index = cachedMessages.indexWhere((m) => m['_id'] == messageId);
-    if (index != -1) {
-      // Merge new data into the existing message map to preserve details like sender info
-      final existingMessage = Map<String, dynamic>.from(cachedMessages[index]);
-      existingMessage.addAll(data);
-      cachedMessages[index] = existingMessage;
-      _saveMessagesToLocal(chatId, cachedMessages);
-    } else {
-      // If the message is not in the cache, it might be a new message that arrived out of order.
-      // We can add it to the cache.
-      cachedMessages.add(data);
-      _saveMessagesToLocal(chatId, cachedMessages);
-    }
-
     // Update the message in the current conversation if it's open
-    if (activeChatId.value == chatId) {
-      currentConversationMessages.value = cachedMessages;
+    if (currentChat.value['_id'] == chatId) {
+      final index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
+      if (index != -1) {
+        // Merge new data into the existing message map to preserve details like sender info
+        final existingMessage = Map<String, dynamic>.from(currentConversationMessages[index]);
+        existingMessage.addAll(data);
+        currentConversationMessages[index] = existingMessage;
+        currentConversationMessages.refresh(); // Use refresh for nested changes
+      }
     }
 
     // Update the lastMessage in the chats list if this message is the last one
@@ -457,7 +367,6 @@ class DataController extends GetxController {
       chat['lastMessage'] = existingLastMessage;
       chats[chatId] = chat;
       chats.refresh();
-      _saveChatsToLocal();
     }
   }
 
@@ -468,26 +377,19 @@ class DataController extends GetxController {
 
     if (messageId == null || chatId == null) return;
 
-    // --- Update Local Storage ---
-    final cachedMessages = _loadMessagesFromLocal(chatId);
-    final messageIndex = cachedMessages.indexWhere((m) => m['_id'] == messageId);
-
+    // Find the message in the conversation list and update it
+    final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
     if (messageIndex != -1) {
+      final message = currentConversationMessages[messageIndex];
       if (deletedForEveryone) {
-        final message = cachedMessages[messageIndex];
         message['deletedForEveryone'] = true;
         message['content'] = ''; // Clear content and files
         message['files'] = [];
       } else {
         // If delete is only for the current user, we can just remove it from the list
-        cachedMessages.removeAt(messageIndex);
+        currentConversationMessages.removeAt(messageIndex);
       }
-      _saveMessagesToLocal(chatId, cachedMessages);
-    }
-
-    // --- Update Conversation View ---
-    if (activeChatId.value == chatId) {
-      currentConversationMessages.value = cachedMessages;
+      currentConversationMessages.refresh();
     }
 
     // Also update the lastMessage in the chat list if it was the one deleted
@@ -502,7 +404,6 @@ class DataController extends GetxController {
         'deletedForEveryone': true,
       };
       chats.refresh();
-      _saveChatsToLocal();
     }
   }
 
@@ -514,42 +415,34 @@ class DataController extends GetxController {
       return;
     }
 
-    // Find the chatId from the first messageId. Assume all messages are in the same chat.
-    final chatId = _messageIdToChatId[messageIds.first];
-    if (chatId == null) return;
-
     if (deleteFor == 'everyone') {
-      final cachedMessages = _loadMessagesFromLocal(chatId);
-      bool changed = false;
-
+      bool conversationChanged = false;
       for (final messageId in messageIds) {
-        final index = cachedMessages.indexWhere((m) => m['_id'] == messageId);
+        // Update the message in the conversation view if it's open
+        final index = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
         if (index != -1) {
-          cachedMessages[index]['deletedForEveryone'] = true;
-          cachedMessages[index]['content'] = '';
-          cachedMessages[index]['files'] = [];
-          changed = true;
+          currentConversationMessages[index]['deletedForEveryone'] = true;
+          currentConversationMessages[index]['content'] = '';
+          currentConversationMessages[index]['files'] = [];
+          conversationChanged = true;
         }
 
         // Check if the deleted message was a last message in any chat and update it to a tombstone.
-        if (chats.containsKey(chatId) && chats[chatId]!['lastMessage']?['_id'] == messageId) {
-          final chat = chats[chatId]!;
-          final tombstone = Map<String, dynamic>.from(chat['lastMessage']);
-          tombstone['content'] = 'Message deleted';
-          tombstone['deletedForEveryone'] = true;
-          tombstone['files'] = [];
-          chat['lastMessage'] = tombstone;
+        for (var chat in chats.values) {
+          if (chat['lastMessage'] != null && chat['lastMessage']['_id'] == messageId) {
+            final tombstone = Map<String, dynamic>.from(chat['lastMessage']);
+            tombstone['content'] = 'Message deleted';
+            tombstone['deletedForEveryone'] = true;
+            tombstone['files'] = [];
+            chat['lastMessage'] = tombstone;
+          }
         }
       }
 
-      if (changed) {
-        _saveMessagesToLocal(chatId, cachedMessages);
-        if (activeChatId.value == chatId) {
-          currentConversationMessages.value = cachedMessages;
-        }
+      if (conversationChanged) {
+        currentConversationMessages.refresh();
       }
       chats.refresh();
-      _saveChatsToLocal();
     }
     // No action needed for deleteFor: "me" as it only affects the sender,
     // who has already handled it optimistically.
@@ -2301,10 +2194,6 @@ class DataController extends GetxController {
 
   Future<void> fetchChats() async {
     isLoadingChats.value = true;
-    // 1. Load chats from local storage first for an instant UI update.
-    _loadChatsFromLocal();
-
-    // 2. Fetch latest chats from the server.
     try {
       final token = user.value['token'];
       if (token == null) {
@@ -2320,7 +2209,6 @@ class DataController extends GetxController {
       if (response.statusCode == 200 && response.data['success'] == true) {
         final List<dynamic> chatData = response.data['chats'];
         final blockedUsers = user.value['user']?['blockedUsers'] ?? [];
-        final newChats = <String, Map<String, dynamic>>{};
         for (var chat in chatData) {
           if (chat['type'] == 'dm') {
             final otherParticipant = (chat['participants'] as List).firstWhere(
@@ -2328,25 +2216,20 @@ class DataController extends GetxController {
               orElse: () => null
             );
             if (otherParticipant != null && !blockedUsers.contains(otherParticipant['_id'])) {
-              newChats[chat['_id']] = chat;
+              chats[chat['_id']] = chat;
             }
           } else {
-            newChats[chat['_id']] = chat;
+            chats[chat['_id']] = chat;
           }
         }
-        // 3. Update the UI with server data and save to local storage.
-        chats.value = newChats;
-        _saveChatsToLocal();
-
-        // 4. Pre-cache messages for all chats in the background.
-        for (final chatId in chats.keys) {
-          _cacheMessagesForChat(chatId); // No await, let it run in the background
-        }
+        // After successfully fetching chats, the backend will have already
+        // joined the socket to all necessary rooms.
       } else {
         throw Exception('Failed to fetch chats');
       }
     } catch (e) {
         // print('Error fetching chats: $e');
+      // Optionally, show a snackbar or some error message to the user
     } finally {
       isLoadingChats.value = false;
     }
@@ -2354,22 +2237,6 @@ class DataController extends GetxController {
 
   Future<void> fetchMessages(String conversationId) async {
     isLoadingMessages.value = true;
-    // Clear previous conversation data to prevent showing stale messages
-    currentConversationMessages.clear();
-
-    // 1. Load messages from local storage first for an instant UI update.
-    final cachedMessages = _loadMessagesFromLocal(conversationId);
-    if (cachedMessages.isNotEmpty) {
-      currentConversationMessages.value = cachedMessages;
-      // Populate the map from the cache so real-time events work after restart.
-      for (final msg in cachedMessages) {
-        if (msg['_id'] != null) {
-          _messageIdToChatId[msg['_id']] = conversationId;
-        }
-      }
-    }
-
-    // 2. Fetch latest messages from the server.
     try {
       final token = user.value['token'];
       if (token == null) {
@@ -2381,33 +2248,16 @@ class DataController extends GetxController {
           headers: {'Authorization': 'Bearer $token'},
         ),
       );
-
       if (response.statusCode == 200 && response.data['success'] == true) {
-        final List<dynamic> serverMessageData = response.data['messages'];
-        final serverMessages = List<Map<String, dynamic>>.from(serverMessageData);
-
-        // 3. Merge server messages with cached messages.
-        // A simple approach is to replace the cache with the server's data,
-        // as the server is the source of truth. A more complex merge could be implemented
-        // to handle potential offline-created messages. For now, we'll replace.
-        serverMessages.sort((a, b) => DateTime.parse(a['createdAt']).compareTo(DateTime.parse(b['createdAt'])));
-
-        // 4. Save the updated list to local storage and update the message-to-chat map.
-        _saveMessagesToLocal(conversationId, serverMessages);
-        for (final msg in serverMessages) {
-          if (msg['_id'] != null) {
-            _messageIdToChatId[msg['_id']] = conversationId;
-          }
-        }
-
-        // 5. Update the UI.
-        currentConversationMessages.value = serverMessages;
+        final List<dynamic> messageData = response.data['messages'];
+        final messages = List<Map<String, dynamic>>.from(messageData);
+        messages.sort((a, b) => DateTime.parse(a['createdAt']).compareTo(DateTime.parse(b['createdAt'])));
+        currentConversationMessages.value = messages;
       } else {
-        // If fetching from server fails, we've already loaded from cache, so the user sees something.
-        // print('Failed to fetch messages from server, using cached version.');
+        throw Exception('Failed to fetch messages');
       }
     } catch (e) {
-      // print('Error fetching messages: $e. Displaying cached messages if available.');
+        // print('Error fetching messages: $e');
     } finally {
       isLoadingMessages.value = false;
     }
@@ -2706,7 +2556,6 @@ class DataController extends GetxController {
       final newChats = Map<String, Map<String, dynamic>>.from(chats);
       newChats.remove(chatId);
       chats.value = newChats; // Forcefully replace the map to ensure reactivity
-      _saveChatsToLocal();
       // print('[DataController] Chats count after deletion attempt: ${chats.length}');
 
 
@@ -2743,7 +2592,6 @@ class DataController extends GetxController {
         currentChat.value = Map<String, dynamic>.from(chat);
       }
       chats.refresh();
-      _saveChatsToLocal();
     }
   }
 
@@ -2755,7 +2603,6 @@ class DataController extends GetxController {
       final newChats = Map<String, Map<String, dynamic>>.from(chats);
       newChats.remove(chatId);
       chats.value = newChats;
-      _saveChatsToLocal();
 
       if (currentChat.value['_id'] == chatId) {
         currentChat.value = {};
@@ -2782,7 +2629,6 @@ class DataController extends GetxController {
       currentChat.value = Map<String, dynamic>.from(chat);
     }
     chats.refresh();
-    _saveChatsToLocal();
   }
 
   void handleMemberRemoved(Map<String, dynamic> data) {
@@ -2805,7 +2651,6 @@ class DataController extends GetxController {
       currentChat.value = Map<String, dynamic>.from(chat);
     }
     chats.refresh();
-    _saveChatsToLocal();
   }
 
   void handleMemberPromoted(Map<String, dynamic> data) {
@@ -2825,7 +2670,6 @@ class DataController extends GetxController {
         currentChat.value = Map<String, dynamic>.from(chat);
       }
       chats.refresh();
-      _saveChatsToLocal();
     }
   }
 
@@ -2846,7 +2690,6 @@ class DataController extends GetxController {
         currentChat.value = Map<String, dynamic>.from(chat);
       }
       chats.refresh();
-      _saveChatsToLocal();
     }
   }
 
@@ -2877,7 +2720,6 @@ class DataController extends GetxController {
 
         // Refresh the entire map to ensure all listeners are notified
         chats.refresh();
-        _saveChatsToLocal();
       }
     }
   }
@@ -5009,7 +4851,6 @@ void clearUserPosts() {
         currentConversationMessages.clear();
       }
       chats.refresh();
-      _saveChatsToLocal();
     }
   }
 
@@ -5121,44 +4962,30 @@ void clearUserPosts() {
   void handleMessageReaction(Map<String, dynamic> data) {
     final messageId = data['messageId'] as String?;
     final reactions = data['reactions'] as List<dynamic>?;
-    final chatId = _messageIdToChatId[messageId];
 
-    if (messageId == null || reactions == null || chatId == null) return;
+    if (messageId == null || reactions == null) return;
 
-    final cachedMessages = _loadMessagesFromLocal(chatId);
-    final messageIndex = cachedMessages.indexWhere((m) => m['_id'] == messageId);
-
+    final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
     if (messageIndex != -1) {
-      final message = cachedMessages[messageIndex];
+      final message = currentConversationMessages[messageIndex];
       message['reactions'] = reactions;
-      cachedMessages[messageIndex] = message;
-      _saveMessagesToLocal(chatId, cachedMessages);
-
-      if (activeChatId.value == chatId) {
-        currentConversationMessages.value = cachedMessages;
-      }
+      currentConversationMessages[messageIndex] = message;
+      currentConversationMessages.refresh();
     }
   }
 
   void handleMessageReactionRemoved(Map<String, dynamic> data) {
     final messageId = data['messageId'] as String?;
     final reactions = data['reactions'] as List<dynamic>?;
-    final chatId = _messageIdToChatId[messageId];
 
-    if (messageId == null || reactions == null || chatId == null) return;
+    if (messageId == null || reactions == null) return;
 
-    final cachedMessages = _loadMessagesFromLocal(chatId);
-    final messageIndex = cachedMessages.indexWhere((m) => m['_id'] == messageId);
-
+    final messageIndex = currentConversationMessages.indexWhere((m) => m['_id'] == messageId);
     if (messageIndex != -1) {
-      final message = cachedMessages[messageIndex];
+      final message = currentConversationMessages[messageIndex];
       message['reactions'] = reactions;
-      cachedMessages[messageIndex] = message;
-      _saveMessagesToLocal(chatId, cachedMessages);
-
-      if (activeChatId.value == chatId) {
-        currentConversationMessages.value = cachedMessages;
-      }
+      currentConversationMessages[messageIndex] = message;
+      currentConversationMessages.refresh();
     }
   }
 
