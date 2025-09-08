@@ -366,7 +366,7 @@ class _MessageInputAreaState extends State<MessageInputArea> {
               ),
               child: Icon(icon, size: 20, color: Colors.tealAccent),
             ),
-            
+            // force
             const SizedBox(height: 8),
             Text(label, style: const TextStyle(color: Colors.white, fontSize: 12)),
           ],
