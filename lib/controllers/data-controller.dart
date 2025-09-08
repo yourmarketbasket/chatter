@@ -1740,20 +1740,20 @@ class DataController extends GetxController {
   }
 
   // Method to fetch a single post by its ID and update it in the local list
-  Future<void> fetchSinglePost(String postId) async {
+  Future<Map<String, dynamic>?> fetchSinglePost(String postId) async {
     if (postId.isEmpty) {
-        // print('[DataController] fetchSinglePost: postId is empty. Cannot fetch.');
-      return;
+      // print('[DataController] fetchSinglePost: postId is empty. Cannot fetch.');
+      return null;
     }
     // Optional: Add a loading state for this specific post if needed for UI
     // isLoadingPost[postId] = true; (would require managing a map of loading states)
-      // print('[DataController] Fetching single post: $postId');
+    // print('[DataController] Fetching single post: $postId');
 
     try {
       var token = user.value['token'];
       if (token == null) {
-          // print('[DataController] fetchSinglePost: User token not found. Cannot fetch post $postId.');
-        throw Exception('User token not found');
+        // print('[DataController] fetchSinglePost: User token not found. Cannot fetch post $postId.');
+        return null;
       }
 
       // Assuming an endpoint like /api/posts/get-post/:postId
@@ -1767,22 +1767,23 @@ class DataController extends GetxController {
         ),
       );
 
-      if (response.statusCode == 200 && response.data['success'] == true && response.data['post'] != null) {
-        Map<String, dynamic> fetchedPostData = Map<String, dynamic>.from(response.data['post']);
+      if (response.statusCode == 200 &&
+          response.data['success'] == true &&
+          response.data['post'] != null) {
+        Map<String, dynamic> fetchedPostData =
+            Map<String, dynamic>.from(response.data['post']);
         // Use the existing updatePostFromSocket logic to process and replace the post
         // This ensures consistent handling of post data and derived counts.
         updatePostFromSocket(fetchedPostData);
-          // print('[DataController] Successfully fetched and updated post $postId.');
+        // print('[DataController] Successfully fetched and updated post $postId.');
+        return fetchedPostData;
       } else {
-          // print('[DataController] Failed to fetch post $postId. Status: ${response.statusCode}, Message: ${response.data['message']}');
-        throw Exception('Failed to fetch post $postId: ${response.data['message'] ?? "Unknown server error"}');
+        // print('[DataController] Failed to fetch post $postId. Status: ${response.statusCode}, Message: ${response.data['message']}');
+        return null;
       }
     } catch (e) {
-        // print('[DataController] Error fetching single post $postId: $e');
-      // Optional: Set an error state for this specific post if needed for UI
-      // postErrors[postId] = e.toString();
-      // Rethrow if the caller needs to handle it, or handle silently here.
-      // For now, just logging.
+      // print('[DataController] Error fetching single post $postId: $e');
+      return null;
     } finally {
       // Optional: Clear loading state for this specific post
       // isLoadingPost[postId] = false;

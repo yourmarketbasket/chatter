@@ -171,7 +171,7 @@ class NotificationService {
   }
 
   void navigateToPost(String postId, DataController dataController) async {
-    final post = await dataController.fetchSinglePost(postId);
+    final Map<String, dynamic>? post = await dataController.fetchSinglePost(postId);
     if (post != null) {
       Get.to(() => ReplyPage(post: post, postDepth: 0));
     }
