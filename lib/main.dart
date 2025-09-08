@@ -12,6 +12,7 @@ import 'package:chatter/services/notification_service.dart'; // Import Notificat
 import 'package:chatter/controllers/data-controller.dart'; // Added import
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:flutter/foundation.dart'; // For kDebugMode
 import 'package:get/get.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -34,6 +35,9 @@ final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<v
 void main() async {
   // Ensure Flutter bindings are initialized
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize GetStorage
+  await GetStorage.init();
 
   // Set timeago locale
   timeago.setLocaleMessages('en_short_hr_ago', EnShortHrAgoMessages());
