@@ -210,13 +210,13 @@ class NotificationService {
     final data = message.data;
     final notification = message.notification;
 
-    if (notification == null) {
-      return;
-    }
-
     final type = data['type'] as String?;
 
     if (type == 'new_message') {
+      // This notification type requires the `notification` object.
+      if (notification == null) {
+        return;
+      }
       final String chatId = data['chatId'];
 
       if ((_dataController.currentRoute.value == '/ChatScreen' &&
@@ -353,6 +353,10 @@ class NotificationService {
     } else if (type == 'new_post') {
       return;
     } else if (data['type'] == 'group_invitation') {
+      // This notification type requires the `notification` object.
+      if (notification == null) {
+        return;
+      }
       final largeIconPath =
           await _generateAvatar(data['adderAvatar'], data['addedBy'] ?? '?');
       final androidDetails = AndroidNotificationDetails(
