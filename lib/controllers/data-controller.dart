@@ -162,6 +162,36 @@ class DataController extends GetxController {
     }
   }
 
+  Future<void> _cacheMessagesForChat(String chatId) async {
+    // This method only fetches from network and saves to cache.
+    // It does NOT modify currentConversationMessages.
+    try {
+      final token = user.value['token'];
+      if (token == null) return;
+
+      final response = await _dio.get(
+        'api/messages/$chatId',
+        options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        final List<dynamic> serverMessageData = response.data['messages'];
+        final serverMessages = List<Map<String, dynamic>>.from(serverMessageData);
+        serverMessages.sort((a, b) => DateTime.parse(a['createdAt']).compareTo(DateTime.parse(b['createdAt'])));
+
+        // Save to local storage and update the map
+        _saveMessagesToLocal(chatId, serverMessages);
+        for (final msg in serverMessages) {
+          if (msg['_id'] != null) {
+            _messageIdToChatId[msg['_id']] = chatId;
+          }
+        }
+      }
+    } catch (e) {
+      // print('Error pre-caching messages for chat $chatId: $e');
+    }
+  }
+
   String? getAuthToken() {
     if (user.value.containsKey('token')) {
       return user.value['token'] as String?;
@@ -183,6 +213,26 @@ class DataController extends GetxController {
       return List<Map<String, dynamic>>.from(messages.map((item) => Map<String, dynamic>.from(item as Map)));
     }
     return [];
+  }
+
+  void _saveChatsToLocal() {
+    // GetStorage works well with lists of maps.
+    final chatList = chats.values.toList();
+    _messageStore.write('chats_list', chatList);
+  }
+
+  void _loadChatsFromLocal() {
+    final chatList = _messageStore.read<List>('chats_list');
+    if (chatList != null && chatList.isNotEmpty) {
+      final newChats = <String, Map<String, dynamic>>{};
+      for (final chat in chatList) {
+        final chatMap = Map<String, dynamic>.from(chat as Map);
+        if (chatMap['_id'] != null) {
+          newChats[chatMap['_id']] = chatMap;
+        }
+      }
+      chats.value = newChats;
+    }
   }
 
   Future<List<String>> getActiveChatIds() async {
@@ -258,6 +308,7 @@ class DataController extends GetxController {
       }
       chats[chatId] = chat;
       chats.refresh();
+      _saveChatsToLocal();
     } else {
       // If chat is not in the list, fetch all chats again to get the new one.
       fetchChats();
@@ -292,6 +343,7 @@ class DataController extends GetxController {
 
     // Refresh the RxMap to ensure all listeners are notified.
     chats.refresh();
+    _saveChatsToLocal();
   }
 
   void handleMessageStatusUpdate(Map<String, dynamic> data) {
@@ -405,6 +457,7 @@ class DataController extends GetxController {
       chat['lastMessage'] = existingLastMessage;
       chats[chatId] = chat;
       chats.refresh();
+      _saveChatsToLocal();
     }
   }
 
@@ -449,6 +502,7 @@ class DataController extends GetxController {
         'deletedForEveryone': true,
       };
       chats.refresh();
+      _saveChatsToLocal();
     }
   }
 
@@ -495,6 +549,7 @@ class DataController extends GetxController {
         }
       }
       chats.refresh();
+      _saveChatsToLocal();
     }
     // No action needed for deleteFor: "me" as it only affects the sender,
     // who has already handled it optimistically.
@@ -2246,6 +2301,10 @@ class DataController extends GetxController {
 
   Future<void> fetchChats() async {
     isLoadingChats.value = true;
+    // 1. Load chats from local storage first for an instant UI update.
+    _loadChatsFromLocal();
+
+    // 2. Fetch latest chats from the server.
     try {
       final token = user.value['token'];
       if (token == null) {
@@ -2275,20 +2334,19 @@ class DataController extends GetxController {
             newChats[chat['_id']] = chat;
           }
         }
+        // 3. Update the UI with server data and save to local storage.
         chats.value = newChats;
+        _saveChatsToLocal();
 
-        // Pre-cache messages for all chats in the background
+        // 4. Pre-cache messages for all chats in the background.
         for (final chatId in chats.keys) {
-          fetchMessages(chatId); // No await, let it run in the background
+          _cacheMessagesForChat(chatId); // No await, let it run in the background
         }
-        // After successfully fetching chats, the backend will have already
-        // joined the socket to all necessary rooms.
       } else {
         throw Exception('Failed to fetch chats');
       }
     } catch (e) {
         // print('Error fetching chats: $e');
-      // Optionally, show a snackbar or some error message to the user
     } finally {
       isLoadingChats.value = false;
     }
@@ -2303,6 +2361,12 @@ class DataController extends GetxController {
     final cachedMessages = _loadMessagesFromLocal(conversationId);
     if (cachedMessages.isNotEmpty) {
       currentConversationMessages.value = cachedMessages;
+      // Populate the map from the cache so real-time events work after restart.
+      for (final msg in cachedMessages) {
+        if (msg['_id'] != null) {
+          _messageIdToChatId[msg['_id']] = conversationId;
+        }
+      }
     }
 
     // 2. Fetch latest messages from the server.
@@ -2642,6 +2706,7 @@ class DataController extends GetxController {
       final newChats = Map<String, Map<String, dynamic>>.from(chats);
       newChats.remove(chatId);
       chats.value = newChats; // Forcefully replace the map to ensure reactivity
+      _saveChatsToLocal();
       // print('[DataController] Chats count after deletion attempt: ${chats.length}');
 
 
@@ -2678,6 +2743,7 @@ class DataController extends GetxController {
         currentChat.value = Map<String, dynamic>.from(chat);
       }
       chats.refresh();
+      _saveChatsToLocal();
     }
   }
 
@@ -2689,6 +2755,7 @@ class DataController extends GetxController {
       final newChats = Map<String, Map<String, dynamic>>.from(chats);
       newChats.remove(chatId);
       chats.value = newChats;
+      _saveChatsToLocal();
 
       if (currentChat.value['_id'] == chatId) {
         currentChat.value = {};
@@ -2715,6 +2782,7 @@ class DataController extends GetxController {
       currentChat.value = Map<String, dynamic>.from(chat);
     }
     chats.refresh();
+    _saveChatsToLocal();
   }
 
   void handleMemberRemoved(Map<String, dynamic> data) {
@@ -2737,6 +2805,7 @@ class DataController extends GetxController {
       currentChat.value = Map<String, dynamic>.from(chat);
     }
     chats.refresh();
+    _saveChatsToLocal();
   }
 
   void handleMemberPromoted(Map<String, dynamic> data) {
@@ -2756,6 +2825,7 @@ class DataController extends GetxController {
         currentChat.value = Map<String, dynamic>.from(chat);
       }
       chats.refresh();
+      _saveChatsToLocal();
     }
   }
 
@@ -2776,6 +2846,7 @@ class DataController extends GetxController {
         currentChat.value = Map<String, dynamic>.from(chat);
       }
       chats.refresh();
+      _saveChatsToLocal();
     }
   }
 
@@ -2806,6 +2877,7 @@ class DataController extends GetxController {
 
         // Refresh the entire map to ensure all listeners are notified
         chats.refresh();
+        _saveChatsToLocal();
       }
     }
   }
@@ -4937,6 +5009,7 @@ void clearUserPosts() {
         currentConversationMessages.clear();
       }
       chats.refresh();
+      _saveChatsToLocal();
     }
   }
 
