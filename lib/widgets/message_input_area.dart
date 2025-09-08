@@ -11,7 +11,6 @@ import 'package:chatter/widgets/attachment_preview_dialog.dart';
 import 'package:chatter/services/socket-service.dart';
 import 'package:chatter/controllers/data-controller.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter_keyboard_content/flutter_keyboard_content.dart';
 
 class MessageInputArea extends StatefulWidget {
   final Function(String text, List<PlatformFile> files) onSend;
@@ -259,36 +258,45 @@ class _MessageInputAreaState extends State<MessageInputArea> {
               onPressed: isMuted ? null : _pickAttachments,
             ),
             Expanded(
-              child: KeyboardContent(
-                child: TextField(
-                  controller: _messageController,
-                  style: const TextStyle(color: Colors.white),
-                  keyboardType: TextInputType.multiline,
-                  maxLines: null,
-                  decoration: InputDecoration(
-                    hintText: isMuted ? 'You are muted' : 'Type a message...',
-                    hintStyle: TextStyle(color: Colors.grey[400]),
-                    filled: true,
-                    fillColor: Colors.grey[800],
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(20),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: TextField(
+                controller: _messageController,
+                style: const TextStyle(color: Colors.white),
+                keyboardType: TextInputType.multiline,
+                maxLines: null,
+                decoration: InputDecoration(
+                  hintText: isMuted ? 'You are muted' : 'Type a message...',
+                  hintStyle: TextStyle(color: Colors.grey[400]),
+                  filled: true,
+                  fillColor: Colors.grey[800],
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: BorderSide.none,
                   ),
-                  enabled: !isMuted,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 ),
-                onContentReceived: (KeyboardContentItem item) {
-                  if (item.file != null && item.mimeType == 'image/gif') {
-                    final gifFile = PlatformFile(
-                      name: item.file!.path.split('/').last,
-                      path: item.file!.path,
-                      size: item.file!.lengthSync(),
-                    );
-                    widget.onSend('', [gifFile]);
-                  }
-                },
+                enabled: !isMuted,
+                contentInsertionConfiguration: ContentInsertionConfiguration(
+                  onContentInserted: (KeyboardInsertedContent content) async {
+                    if (content.mimeType == 'image/gif' && content.data != null) {
+                      try {
+                        final tempDir = await getTemporaryDirectory();
+                        final tempFile = await File('${tempDir.path}/${DateTime.now().millisecondsSinceEpoch}.gif').create();
+                        await tempFile.writeAsBytes(content.data!);
+
+                        final gifFile = PlatformFile(
+                          name: tempFile.path.split('/').last,
+                          path: tempFile.path,
+                          size: await tempFile.length(),
+                        );
+
+                        widget.onSend('', [gifFile]);
+                      } catch (e) {
+                        print('Error handling inserted GIF: $e');
+                      }
+                    }
+                  },
+                ),
               ),
             ),
             const SizedBox(width: 8),
