@@ -432,16 +432,6 @@ class _MainChatsPageState extends State<MainChatsPage> {
                                         ? Text(avatarLetter, style: GoogleFonts.poppins(color: Colors.tealAccent.shade400, fontWeight: FontWeight.w600, fontSize: 16))
                                         : null,
                               ),
-                              if (isSelected)
-                                const Positioned(
-                                  bottom: 0,
-                                  right: 0,
-                                  child: Icon(
-                                    Icons.check_circle,
-                                    color: Colors.tealAccent,
-                                    size: 20,
-                                  ),
-                                ),
                               if (isGroup)
                                 Positioned(
                                   right: -4,
@@ -464,6 +454,20 @@ class _MainChatsPageState extends State<MainChatsPage> {
                                       shape: BoxShape.circle,
                                       border: Border.all(color: Colors.black, width: 2),
                                     ),
+                                  ),
+                                ),
+                              if (isSelected)
+                                Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.5),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.check_circle,
+                                    color: Colors.tealAccent,
+                                    size: 24,
                                   ),
                                 ),
                             ],
