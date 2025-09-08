@@ -63,7 +63,24 @@ class _PdfThumbnailWidgetState extends State<PdfThumbnailWidget> {
         return null;
       }
 
-      return await pageImage.createPng();
+      final pixels = pageImage.pixels;
+      if (pageImage.format == PdfPageImageFormat.bgra) {
+        for (var i = 0; i < pixels.length; i += 4) {
+          final b = pixels[i];
+          final r = pixels[i + 2];
+          pixels[i] = r;
+          pixels[i + 2] = b;
+        }
+      }
+
+      final image = img.Image.fromBytes(
+        width: pageImage.width,
+        height: pageImage.height,
+        bytes: pixels.buffer,
+        order: img.ChannelOrder.rgba,
+      );
+
+      return img.encodePng(image);
     } catch (e) {
       print('Error generating PDF thumbnail: $e');
       return null;
