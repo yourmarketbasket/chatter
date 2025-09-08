@@ -29,12 +29,14 @@ import 'package:chatter/services/api_upgrader_store.dart';
 import 'package:url_launcher/url_launcher.dart';
 // import 'package:device_info_plus/device_info_plus.dart'; // No longer needed for player selection
 import 'dart:io'; // No longer needed for player selection (Platform check)
+import 'package:pdfrx/pdfrx.dart';
 
 final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
 
 void main() async {
   // Ensure Flutter bindings are initialized
   WidgetsFlutterBinding.ensureInitialized();
+  await PdfRx.ensureInitialized();
 
   // Initialize GetStorage
   await GetStorage.init();

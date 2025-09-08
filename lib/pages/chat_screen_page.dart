@@ -36,8 +36,6 @@ import 'package:flutter/services.dart';
 import 'package:chatter/widgets/message_bubble.dart';
 import 'package:chatter/widgets/pdf_thumbnail_widget.dart';
 import 'package:chatter/helpers/verification_helper.dart';
-import 'package:pdfrx/pdfrx.dart';
-import 'package:image/image.dart' as img;
 
 
 class ChatScreen extends StatefulWidget {
@@ -56,7 +54,6 @@ class _ChatScreenState extends State<ChatScreen> {
   Map<String, dynamic>? _replyingTo;
   int _sdkInt = 0;
   final Map<String, Uint8List?> _localVideoThumbnails = {};
-  final Map<String, Uint8List?> _localPdfThumbnails = {};
   bool _isSelectionMode = false;
   final Set<String> _selectedMessages = {};
 
@@ -276,37 +273,6 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  Future<void> _generatePdfThumbnail(PlatformFile file) async {
-    if (file.path == null) return;
-    try {
-      final doc = await PdfDocument.openFile(file.path!);
-      final page = doc.pages.first;
-      final pageImage = await page.render(
-        width: 200, // Define a reasonable width for the thumbnail
-        height: (200 * page.height / page.width).round(),
-      );
-
-      if (pageImage != null) {
-        final image = img.Image.fromBytes(
-          width: pageImage.width,
-          height: pageImage.height,
-          bytes: pageImage.pixels.buffer,
-          order: img.ChannelOrder.bgra,
-        );
-        final png = img.encodePng(image);
-        if (mounted) {
-          setState(() {
-            _localPdfThumbnails[file.path!] = png;
-          });
-        }
-      }
-      pageImage?.dispose();
-      doc.dispose();
-    } catch (e) {
-      print('Error generating PDF thumbnail: $e');
-    }
-  }
-
   void _sendMessage(String? text, List<PlatformFile>? files, {bool isVoiceNote = false}) async {
     if ((text?.trim().isEmpty ?? true) && (files?.isEmpty ?? true)) {
       return;
@@ -314,11 +280,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
     if (files != null) {
       for (var file in files) {
-        final mediaType = _getMediaType(file.extension ?? '');
-        if (mediaType.startsWith('video')) {
+        if (_getMediaType(file.extension ?? '').startsWith('video')) {
           _generateVideoThumbnail(file.path!);
-        } else if (mediaType == 'application/pdf') {
-          _generatePdfThumbnail(file);
         }
       }
     }
@@ -1041,27 +1004,10 @@ class _ChatScreenState extends State<ChatScreen> {
         );
         break;
       case 'application/pdf':
-        if (isLocalFile) {
-          final thumbnailUrl = attachment['url'];
-          final thumbnailData = _localPdfThumbnails[thumbnailUrl];
-          if (thumbnailData != null) {
-            content = Image.memory(thumbnailData, fit: BoxFit.cover, key: key);
-          } else {
-            content = Container(
-              key: key,
-              color: Colors.black,
-              child: const Center(
-                child: Icon(Icons.picture_as_pdf, color: Colors.white, size: 40),
-              ),
-            );
-          }
-        } else {
-          content = PdfThumbnailWidget(
-            url: attachment['url'],
-            isLocal: false, // It's a network URL
-            fileSize: attachment['size'],
-          );
-        }
+        content = PdfThumbnailWidget(
+          url: attachment['url'],
+          isLocal: isLocalFile,
+        );
         break;
       case 'application/octet-stream':
         content = _buildOctetStreamAttachment(attachment);
