@@ -228,6 +228,7 @@ class _ChatterAppState extends State<ChatterApp> {
         oniOS: () => ApiUpgraderStore(),
       ),
       debugLogging: kDebugMode,
+      debugDisplayAlways: true,
     );
 
     return UpgradeAlert(
