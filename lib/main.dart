@@ -86,11 +86,22 @@ class _ChatterAppState extends State<ChatterApp> {
   final  DataController _dataController = Get.put(DataController());
   late StreamSubscription _shareSubscription;
   SharedMedia? _sharedMedia;
+  late Upgrader upgrader;
 
   @override
   void initState() {
     super.initState();
     _dataController.init(); // Initialize DataController
+
+    upgrader = Upgrader(
+      storeController: UpgraderStoreController(
+        onAndroid: () => ApiUpgraderStore(),
+        oniOS: () => ApiUpgraderStore(),
+      ),
+      debugLogging: kDebugMode,
+      debugDisplayAlways: true,
+    );
+
     // Initialize secure storage with platform-specific options
     _storage = const FlutterSecureStorage(
       aOptions: AndroidOptions(
@@ -222,15 +233,6 @@ class _ChatterAppState extends State<ChatterApp> {
 
   @override
   Widget build(BuildContext context) {
-    final upgrader = Upgrader(
-      storeController: UpgraderStoreController(
-        onAndroid: () => ApiUpgraderStore(),
-        oniOS: () => ApiUpgraderStore(),
-      ),
-      debugLogging: kDebugMode,
-      debugDisplayAlways: true,
-    );
-
     return UpgradeAlert(
       upgrader: upgrader,
       child: GetMaterialApp(
