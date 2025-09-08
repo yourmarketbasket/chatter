@@ -213,7 +213,7 @@ class NotificationService {
     final type = data['type'] as String?;
 
     if (type == 'new_message') {
-      // This notification type requires the `notification` object.
+      
       if (notification == null) {
         return;
       }
