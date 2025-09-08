@@ -1006,6 +1006,7 @@ class _ChatScreenState extends State<ChatScreen> {
       case 'application/pdf':
         content = PdfThumbnailWidget(
           url: attachment['url'],
+          fileSize: attachment['size'],
           isLocal: isLocalFile,
         );
         break;
