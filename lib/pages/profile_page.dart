@@ -320,21 +320,43 @@ class _ProfilePageState extends State<ProfilePage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    CircleAvatar(
-                      radius: 50,
-                      backgroundColor: Colors.tealAccent.withOpacity(0.2),
-                      backgroundImage:
-                          avatarUrl.isNotEmpty ? CachedNetworkImageProvider(avatarUrl) : null,
-                      child: avatarUrl.isEmpty
-                          ? Text(
-                              avatarInitial,
-                              style: GoogleFonts.poppins(
-                                color: Colors.tealAccent,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 40,
+                    GestureDetector(
+                      onTap: () {
+                        if (avatarUrl.isNotEmpty) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => MediaViewPage(
+                                attachments: [{'type': 'image', 'url': avatarUrl}],
+                                initialIndex: 0,
+                                message: '',
+                                userName: name,
+                                userAvatarUrl: avatarUrl,
+                                timestamp: DateTime.now().toUtc(),
+                                viewsCount: 0,
+                                likesCount: 0,
+                                repostsCount: 0,
                               ),
-                            )
-                          : null,
+                            ),
+                          );
+                        }
+                      },
+                      child: CircleAvatar(
+                        radius: 50,
+                        backgroundColor: Colors.tealAccent.withOpacity(0.2),
+                        backgroundImage:
+                            avatarUrl.isNotEmpty ? CachedNetworkImageProvider(avatarUrl) : null,
+                        child: avatarUrl.isEmpty
+                            ? Text(
+                                avatarInitial,
+                                style: GoogleFonts.poppins(
+                                  color: Colors.tealAccent,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 40,
+                                ),
+                              )
+                            : null,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     Row(
