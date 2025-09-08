@@ -36,6 +36,7 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
+  final AudioPlayer _audioPlayer = AudioPlayer();
   DataController _dataController = Get.put(DataController());
   bool _isInitialized = false;
 
@@ -246,6 +247,15 @@ class NotificationService {
     }
   }
 
+  Future<void> _playNotificationSound() async {
+    try {
+      print('[FCM] Playing notification sound.');
+      await _audioPlayer.play(AssetSource('notification-sounds/new-message-audio.mp3'));
+    } catch (e) {
+      print('[FCM] Error playing notification sound: $e');
+    }
+  }
+
   Future<void> _handleNewMessageNotification(RemoteMessage message) async {
     final data = message.data;
     final notification = message.notification;
@@ -255,8 +265,7 @@ class NotificationService {
     if ((_dataController.currentRoute.value == '/ChatScreen' &&
             _dataController.activeChatId.value == chatId) ||
         _dataController.isMainChatsActive.value) {
-      AudioPlayer()
-          .play(AssetSource('notification-sounds/new-message-audio.mp3'));
+      await _playNotificationSound();
       return;
     }
 
@@ -347,6 +356,12 @@ class NotificationService {
   }
 
   Future<void> _handleNewPostNotification(RemoteMessage message) async {
+    // Suppress notification if user is on the home feed screen
+    if (_dataController.currentRoute.value == '/home') {
+      print('[FCM] Suppressing new post notification because user is on the home feed.');
+      return;
+    }
+
     final data = message.data;
     final notification = message.notification;
     if (notification == null) return;
@@ -476,11 +491,15 @@ class NotificationService {
     if (Platform.isAndroid) {
       final deviceInfo = await DeviceInfoPlugin().androidInfo;
       if (deviceInfo.version.sdkInt >= 33) {
+        print('[FCM] Requesting notification permission on Android 13+');
         PermissionStatus status = await Permission.notification.request();
+        print('[FCM] Notification permission status: ${status.name}');
         return status.isGranted;
       }
+      print('[FCM] Skipping notification permission request on older Android version.');
       return true;
     }
+    print('[FCM] Skipping notification permission request on non-Android platform.');
     return true;
   }
 }
