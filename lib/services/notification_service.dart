@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:audioplayers/audioplayers.dart';
 import 'package:chatter/controllers/data-controller.dart';
 import 'package:chatter/pages/chat_screen_page.dart';
+import 'package:chatter/pages/reply_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -139,9 +140,21 @@ class NotificationService {
         if (messageId != null) {
           dataController.markMessageAsReadById(messageId);
         }
+      } else if (type == 'new_post') {
+        final postId = payload['postId'] as String?;
+        if (postId != null) {
+          navigateToPost(postId, dataController);
+        }
       } else {
         navigateToChat(chatId, dataController);
       }
+    }
+  }
+
+  void navigateToPost(String postId, DataController dataController) async {
+    final post = await dataController.fetchSinglePost(postId);
+    if (post != null) {
+      Get.to(() => ReplyPage(post: post, postDepth: 0));
     }
   }
 
@@ -351,7 +364,78 @@ class NotificationService {
         );
       }
     } else if (type == 'new_post') {
-      return;
+      if (notification == null) {
+        return;
+      }
+
+      final String? title = notification.title;
+      final String? body = notification.body;
+      final String? postId = data['postId'];
+      final String? authorAvatar = data['authorAvatar'];
+
+      if (postId == null) {
+        return;
+      }
+
+      final String? attachmentsJson = data['attachments'];
+      String? imagePath;
+
+      if (attachmentsJson != null && attachmentsJson.isNotEmpty) {
+        try {
+          final List<dynamic> attachments = jsonDecode(attachmentsJson);
+          final imageAttachment = attachments.firstWhere(
+            (attachment) => attachment['type'] == 'image',
+            orElse: () => null,
+          );
+          if (imageAttachment != null) {
+            imagePath = await _downloadImage(imageAttachment['url']);
+          }
+        } catch (e) {
+          // print('Error processing post attachments: $e');
+        }
+      }
+
+      final largeIconPath = await _generateAvatar(authorAvatar, title ?? '?');
+
+      StyleInformation? styleInformation;
+      if (imagePath != null) {
+        styleInformation = BigPictureStyleInformation(
+          FilePathAndroidBitmap(imagePath),
+          largeIcon: largeIconPath != null ? FilePathAndroidBitmap(largeIconPath) : null,
+          contentTitle: title,
+          summaryText: body,
+          htmlFormatContentTitle: true,
+          htmlFormatSummaryText: true,
+        );
+      } else {
+        styleInformation = BigTextStyleInformation(
+          body ?? '',
+          contentTitle: title,
+          htmlFormatContentTitle: true,
+          htmlFormatSummaryText: true,
+        );
+      }
+
+      final androidDetails = AndroidNotificationDetails(
+        _channelId,
+        _channelName,
+        channelDescription: _channelDescription,
+        importance: Importance.max,
+        priority: Priority.high,
+        largeIcon: largeIconPath != null ? FilePathAndroidBitmap(largeIconPath) : null,
+        styleInformation: styleInformation,
+      );
+
+      final notificationDetails = NotificationDetails(android: androidDetails);
+      final payload = jsonEncode({'type': 'new_post', 'postId': postId});
+
+      await _flutterLocalNotificationsPlugin.show(
+        Random().nextInt(2147483647),
+        title,
+        body,
+        notificationDetails,
+        payload: payload,
+      );
     } else if (data['type'] == 'group_invitation') {
       // This notification type requires the `notification` object.
       if (notification == null) {
@@ -381,8 +465,8 @@ class NotificationService {
         payload: payload,
       );
     } else if (type == 'app_update') {
-      final title = data['title'] as String? ?? 'Update Available';
-      final body = data['body'] as String? ?? 'A new version is available. Tap to update.';
+      final title = notification?.title ?? data['title'] as String? ?? 'Update Available';
+      final body = notification?.body ?? data['body'] as String? ?? 'A new version is available. Tap to update.';
       final updateUrl = data['update_url'] as String?;
       final actionButtonTitle = data['action_button_title'] as String? ?? 'Update Now';
 

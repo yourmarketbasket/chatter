@@ -1735,10 +1735,10 @@ class DataController extends GetxController {
   }
 
   // Method to fetch a single post by its ID and update it in the local list
-  Future<void> fetchSinglePost(String postId) async {
+  Future<Map<String, dynamic>?> fetchSinglePost(String postId) async {
     if (postId.isEmpty) {
         // print('[DataController] fetchSinglePost: postId is empty. Cannot fetch.');
-      return;
+      return null;
     }
     // Optional: Add a loading state for this specific post if needed for UI
     // isLoadingPost[postId] = true; (would require managing a map of loading states)
@@ -1768,6 +1768,7 @@ class DataController extends GetxController {
         // This ensures consistent handling of post data and derived counts.
         updatePostFromSocket(fetchedPostData);
           // print('[DataController] Successfully fetched and updated post $postId.');
+        return fetchedPostData;
       } else {
           // print('[DataController] Failed to fetch post $postId. Status: ${response.statusCode}, Message: ${response.data['message']}');
         throw Exception('Failed to fetch post $postId: ${response.data['message'] ?? "Unknown server error"}');
@@ -1782,6 +1783,7 @@ class DataController extends GetxController {
       // Optional: Clear loading state for this specific post
       // isLoadingPost[postId] = false;
     }
+    return null;
   }
 
   // repost a post
