@@ -1004,10 +1004,33 @@ class _ChatScreenState extends State<ChatScreen> {
         );
         break;
       case 'application/pdf':
-        content = PdfThumbnailWidget(
-          url: attachment['url'],
-          isLocal: isLocalFile,
-        );
+        if (isLocalFile) {
+          content = Container(
+            padding: const EdgeInsets.all(8.0),
+            decoration: BoxDecoration(
+              color: Colors.grey[700],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.picture_as_pdf, color: Colors.white, size: 40),
+                const SizedBox(height: 8),
+                Text(
+                  attachment['filename'] ?? 'PDF',
+                  style: const TextStyle(color: Colors.white),
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          );
+        } else {
+          content = PdfThumbnailWidget(
+            url: attachment['url'],
+            fileSize: attachment['size'],
+          );
+        }
         break;
       case 'application/octet-stream':
         content = _buildOctetStreamAttachment(attachment);
