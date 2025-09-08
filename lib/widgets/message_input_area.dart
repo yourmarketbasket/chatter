@@ -323,15 +323,14 @@ class _MessageInputAreaState extends State<MessageInputArea> {
   Future<void> _pickAttachments() async {
     await showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.grey[900],
+      backgroundColor: const Color.fromARGB(255, 19, 19, 19),
       builder: (context) {
         return SafeArea(
           child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 20.0),
-            child: Wrap(
-              alignment: WrapAlignment.spaceAround,
-              spacing: 16.0,
-              runSpacing: 16.0,
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 15.0, vertical: 15),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: <Widget>[
                 _buildAttachmentOption(Icons.photo_camera, 'Photo', _takePhotoAndCrop),
                 _buildAttachmentOption(Icons.videocam, 'Video', _recordVideo),
@@ -357,11 +356,17 @@ class _MessageInputAreaState extends State<MessageInputArea> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircleAvatar(
-              radius: 30,
-              backgroundColor: Colors.grey[800],
-              child: Icon(icon, size: 28, color: Colors.white),
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.teal.withOpacity(0.5),
+                border: Border.all(color: Colors.tealAccent, width: 1),
+              ),
+              child: Icon(icon, size: 20, color: Colors.tealAccent),
             ),
+            
             const SizedBox(height: 8),
             Text(label, style: const TextStyle(color: Colors.white, fontSize: 12)),
           ],
