@@ -39,6 +39,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'package:chatter/main.dart'; // Import for routeObserver
 import 'package:share_handler/share_handler.dart';
+import 'package:upgrader/upgrader.dart';
+import 'package:chatter/services/api_upgrader_store.dart';
 
 class HomeFeedScreen extends StatefulWidget {
   const HomeFeedScreen({Key? key}) : super(key: key);
@@ -1195,8 +1197,18 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF000000),
+    final upgrader = Upgrader(
+      storeController: UpgraderStoreController(
+        onAndroid: () => ApiUpgraderStore(),
+        oniOS: () => ApiUpgraderStore(),
+      ),
+      debugLogging: kDebugMode,
+    );
+
+    return UpgradeAlert(
+      upgrader: upgrader,
+      child: Scaffold(
+        backgroundColor: const Color(0xFF000000),
       appBar: AppBar(
         title: Image.asset(
           'images/logo.png',
