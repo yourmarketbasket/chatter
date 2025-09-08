@@ -300,8 +300,8 @@ class _ChatScreenState extends State<ChatScreen> {
           });
         }
       }
-      await pageImage?.dispose();
-      await doc.dispose();
+      pageImage?.dispose();
+      doc.dispose();
     } catch (e) {
       print('Error generating PDF thumbnail: $e');
     }
