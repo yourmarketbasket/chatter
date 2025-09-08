@@ -18,6 +18,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:image/image.dart' as img;
 import 'dart:convert';
 import 'package:uuid/uuid.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -76,6 +77,23 @@ class NotificationService {
     final payloadString = response.payload;
     if (payloadString != null) {
       final payload = jsonDecode(payloadString);
+      final type = payload['type'] as String?;
+
+      // Handle app update notifications first
+      if (type == 'app_update') {
+        final updateUrl = payload['update_url'] as String?;
+        if (updateUrl != null) {
+          final uri = Uri.parse(updateUrl);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          } else {
+            // print('Could not launch $updateUrl');
+          }
+        }
+        return; // Stop further processing
+      }
+
+      // Existing chat notification logic
       final chatId = payload['chatId'];
       final messageId = payload['messageId'];
 
@@ -355,6 +373,46 @@ class NotificationService {
         Random().nextInt(2147483647),
         notification.title,
         notification.body,
+        notificationDetails,
+        payload: payload,
+      );
+    } else if (type == 'app_update') {
+      final title = data['title'] as String? ?? 'Update Available';
+      final body = data['body'] as String? ?? 'A new version is available. Tap to update.';
+      final updateUrl = data['update_url'] as String?;
+      final actionButtonTitle = data['action_button_title'] as String? ?? 'Update Now';
+
+      if (updateUrl == null) {
+        // print('App update notification received without update_url.');
+        return;
+      }
+
+      final androidDetails = AndroidNotificationDetails(
+        _channelId,
+        _channelName,
+        channelDescription: _channelDescription,
+        importance: Importance.max,
+        priority: Priority.high,
+        icon: 'ic_status_16px',
+        actions: [
+          AndroidNotificationAction(
+            'UPDATE_NOW_ACTION', // An ID for the action
+            actionButtonTitle,
+            showsUserInterface: false,
+          ),
+        ],
+      );
+
+      final notificationDetails = NotificationDetails(android: androidDetails);
+      final payload = jsonEncode({
+        'type': 'app_update',
+        'update_url': updateUrl,
+      });
+
+      await _flutterLocalNotificationsPlugin.show(
+        Random().nextInt(2147483647), // A unique ID for the notification
+        title,
+        body,
         notificationDetails,
         payload: payload,
       );

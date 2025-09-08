@@ -5296,7 +5296,7 @@ void clearUserPosts() {
           'version': version,
           'notes': changelog,
           'platform': platform,
-          'url': 'https://chatter.dev/upgrade', // Assuming a generic URL
+          'url': 'https://codethelabs.com/assets/files/chatter.apk', // Assuming a generic URL
         },
         options: dio.Options(
           headers: {'Authorization': 'Bearer $token'},

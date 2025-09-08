@@ -109,21 +109,29 @@ class _ChatterAppState extends State<ChatterApp> {
   void _listenForUpdateNudges() {
     _dataController.appUpdateNudgeData.listen((nudgeData) {
       if (nudgeData != null && mounted) {
-        final payload = nudgeData['data'];
-        final title = nudgeData['title'] ?? 'Update Required';
-        final body = nudgeData['body'] ?? 'A new version of the app is available. Please update to continue.';
-        final url = payload['url'] as String?;
+        final version = nudgeData['version'] as String?;
+        final notes = nudgeData['notes'] as List<dynamic>?;
+        final url = nudgeData['url'] as String?;
 
-        if (url == null) {
-          print('Update nudge received without a URL. Cannot show dialog.');
+        if (url == null || version == null) {
+          // print('Update nudge received without a URL or version. Cannot show dialog.');
           return;
         }
+
+        final title = 'Update to version $version';
+        final changelog = notes?.map((note) => '• $note').join('\n') ?? 'Bug fixes and performance improvements.';
 
         Get.dialog(
           AlertDialog(
             title: Text(title),
-            content: SingleChildScrollView(child: Text(body)),
+            content: SingleChildScrollView(
+              child: Text(changelog),
+            ),
             actions: [
+              TextButton(
+                child: const Text('LATER'),
+                onPressed: () => Get.back(),
+              ),
               TextButton(
                 child: const Text('UPDATE NOW'),
                 onPressed: () async {
