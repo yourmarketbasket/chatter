@@ -137,8 +137,27 @@ class NotificationService {
           await dataController.sendChatMessage(finalMessage, clientMessageId);
         }
       } else if (response.actionId == 'MARK_AS_READ') {
-        if (messageId != null) {
-          dataController.markMessageAsReadById(messageId);
+        if (messageId != null && chatId != null) {
+          final bool success = await dataController.markMessageAsReadFromNotification(chatId, messageId);
+          if (success) {
+            await _flutterLocalNotificationsPlugin.cancel(response.id!);
+
+            // Also cancel the summary notification if this was the last one
+            final List<ActiveNotification> activeNotifications =
+                await _flutterLocalNotificationsPlugin
+                        .resolvePlatformSpecificImplementation<
+                            AndroidFlutterLocalNotificationsPlugin>()
+                        ?.getActiveNotifications() ??
+                    [];
+
+            final List<ActiveNotification> chatNotifications = activeNotifications
+                .where((n) => n.groupKey == chatId && n.id != response.id)
+                .toList();
+
+            if (chatNotifications.isEmpty) {
+              await _flutterLocalNotificationsPlugin.cancel(chatId.hashCode);
+            }
+          }
         }
       } else if (type == 'new_post') {
         final postId = payload['postId'] as String?;

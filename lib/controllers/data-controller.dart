@@ -458,6 +458,11 @@ class DataController extends GetxController {
     // print('[DataController] Sent mark as read event for message $messageId');
   }
 
+  Future<bool> markMessageAsReadFromNotification(String chatId, String messageId) async {
+    if (messageId.isEmpty || chatId.isEmpty) return false;
+    return await _updateMessageStatusOnBackend(messageId, chatId, 'read');
+  }
+
   String? getUserId() {
     if (user.value.containsKey('user') && user.value['user'] is Map) {
       final userMap = user.value['user'] as Map<String, dynamic>;
@@ -1735,10 +1740,10 @@ class DataController extends GetxController {
   }
 
   // Method to fetch a single post by its ID and update it in the local list
-  Future<Map<String, dynamic>?> fetchSinglePost(String postId) async {
+  Future<void> fetchSinglePost(String postId) async {
     if (postId.isEmpty) {
         // print('[DataController] fetchSinglePost: postId is empty. Cannot fetch.');
-      return null;
+      return;
     }
     // Optional: Add a loading state for this specific post if needed for UI
     // isLoadingPost[postId] = true; (would require managing a map of loading states)
@@ -1768,7 +1773,6 @@ class DataController extends GetxController {
         // This ensures consistent handling of post data and derived counts.
         updatePostFromSocket(fetchedPostData);
           // print('[DataController] Successfully fetched and updated post $postId.');
-        return fetchedPostData;
       } else {
           // print('[DataController] Failed to fetch post $postId. Status: ${response.statusCode}, Message: ${response.data['message']}');
         throw Exception('Failed to fetch post $postId: ${response.data['message'] ?? "Unknown server error"}');
@@ -1783,7 +1787,6 @@ class DataController extends GetxController {
       // Optional: Clear loading state for this specific post
       // isLoadingPost[postId] = false;
     }
-    return null;
   }
 
   // repost a post
@@ -4413,12 +4416,12 @@ void clearUserPosts() {
     }
   }
 
-  Future<void> _updateMessageStatusOnBackend(String messageId, String chatId, String status) async {
+  Future<bool> _updateMessageStatusOnBackend(String messageId, String chatId, String status) async {
     try {
       final token = getAuthToken();
       if (token == null) throw Exception('User not authenticated');
 
-      await _dio.post(
+      final response = await _dio.post(
         'api/messages/status',
         data: {
           'messageId': messageId,
@@ -4427,8 +4430,10 @@ void clearUserPosts() {
         },
         options: dio.Options(headers: {'Authorization': 'Bearer $token'}),
       );
+      return response.statusCode == 200 && response.data['success'] == true;
     } catch (e) {
       // print('Error updating message status on backend: $e');
+      return false;
     }
   }
 
