@@ -9,6 +9,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -74,56 +75,74 @@ class NotificationService {
 
   void onDidReceiveNotificationResponse(NotificationResponse response) async {
     final payloadString = response.payload;
-    if (payloadString != null) {
-      final payload = jsonDecode(payloadString);
-      final chatId = payload['chatId'];
-      final messageId = payload['messageId'];
+    if (payloadString == null) return;
 
-      if (!Get.isRegistered<DataController>()) {
-        return;
-      }
-      final dataController = Get.find<DataController>();
+    final payload = jsonDecode(payloadString);
+    final type = payload['type'] as String?;
 
-      if (response.actionId == 'REPLY') {
-        final repliedText = response.input;
-        if (repliedText != null && repliedText.isNotEmpty) {
-          final clientMessageId = const Uuid().v4();
-          final currentUser = dataController.user.value['user'];
+    if (!Get.isRegistered<DataController>()) {
+      return;
+    }
+    final dataController = Get.find<DataController>();
 
-          final tempMessage = {
-            'clientMessageId': clientMessageId,
-            'chatId': chatId,
-            'senderId': {
-              '_id': currentUser['_id'],
-              'name': currentUser['name'],
-              'avatar': currentUser['avatar'],
-            },
-            'content': repliedText,
-            'type': 'text',
-            'files': [],
-            'replyTo': messageId,
-            'viewOnce': false,
-            'createdAt': DateTime.now().toUtc().toIso8601String(),
-            'status': 'sending',
-          };
-          dataController.addTemporaryMessage(tempMessage);
-
-          final finalMessage = {
-            'clientMessageId': clientMessageId,
-            'chatId': chatId,
-            'content': repliedText,
-            'type': 'text',
-            'replyTo': messageId,
-          };
-          await dataController.sendChatMessage(finalMessage, clientMessageId);
+    switch (type) {
+      case 'new_message':
+        final chatId = payload['chatId'];
+        final messageId = payload['messageId'];
+        if (response.actionId == 'REPLY') {
+          final repliedText = response.input;
+          if (repliedText != null && repliedText.isNotEmpty) {
+            final clientMessageId = const Uuid().v4();
+            final currentUser = dataController.user.value['user'];
+            final tempMessage = {
+              'clientMessageId': clientMessageId,
+              'chatId': chatId,
+              'senderId': {'_id': currentUser['_id'], 'name': currentUser['name'], 'avatar': currentUser['avatar']},
+              'content': repliedText,
+              'type': 'text',
+              'files': [],
+              'replyTo': messageId,
+              'viewOnce': false,
+              'createdAt': DateTime.now().toUtc().toIso8601String(),
+              'status': 'sending',
+            };
+            dataController.addTemporaryMessage(tempMessage);
+            final finalMessage = {'clientMessageId': clientMessageId, 'chatId': chatId, 'content': repliedText, 'type': 'text', 'replyTo': messageId};
+            await dataController.sendChatMessage(finalMessage, clientMessageId);
+          }
+        } else if (response.actionId == 'MARK_AS_READ') {
+          if (messageId != null) {
+            dataController.markMessageAsReadById(messageId);
+          }
+        } else {
+          navigateToChat(chatId, dataController);
         }
-      } else if (response.actionId == 'MARK_AS_READ') {
-        if (messageId != null) {
-          dataController.markMessageAsReadById(messageId);
+        break;
+      case 'new_post':
+        // Navigate to post screen, assuming a route '/post/:id' exists
+        final postId = payload['postId'];
+        if (postId != null) {
+          Get.toNamed('/post/$postId');
         }
-      } else {
-        navigateToChat(chatId, dataController);
-      }
+        break;
+      case 'app_update':
+        if (response.actionId == 'UPDATE_NOW' || response.actionId == null) {
+          final url = payload['url'] as String?;
+          if (url != null) {
+            // Using url_launcher to open the update URL
+            final uri = Uri.parse(url);
+            if (await canLaunchUrl(uri)) {
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
+            }
+          }
+        }
+        break;
+      case 'group_invitation':
+        final chatId = payload['chatId'];
+        if (chatId != null) {
+          navigateToChat(chatId, dataController);
+        }
+        break;
     }
   }
 
@@ -189,184 +208,244 @@ class NotificationService {
   }
 
   Future<void> showNotification(RemoteMessage message) async {
-    final data = message.data;
-    final notification = message.notification;
-
-    if (notification == null) {
-      return;
-    }
-
-    final type = data['type'] as String?;
-
-    if (type == 'new_message') {
-      final String chatId = data['chatId'];
-
-      if ((_dataController.currentRoute.value == '/ChatScreen' &&
-              _dataController.activeChatId.value == chatId) ||
-          _dataController.isMainChatsActive.value) {
-        AudioPlayer()
-            .play(AssetSource('notification-sounds/new-message-audio.mp3'));
-        return;
-      }
-      final String groupKey = chatId;
-      final String? messageBody = notification.body;
-      final String? messageTitle = notification.title;
-      final String? files = data['files'];
-      List<dynamic>? fileList;
-      String? imagePath;
-
-      if (files != null && files.isNotEmpty) {
-        try {
-          fileList = jsonDecode(files);
-          if (fileList!.isNotEmpty) {
-            imagePath = await _downloadImage(fileList[0]['url']);
-          }
-        } catch (e) {
-          // Handle JSON parsing or download error
-        }
-      }
-
-      final largeIconPath =
-          await _generateAvatar(data['senderAvatar'], messageTitle ?? '?');
-
-      StyleInformation? styleInformation;
-      if (imagePath != null && messageBody != null) {
-        styleInformation = BigPictureStyleInformation(
-          FilePathAndroidBitmap(imagePath),
-          largeIcon:
-              largeIconPath != null ? FilePathAndroidBitmap(largeIconPath) : null,
-          contentTitle: messageTitle,
-          summaryText: messageBody,
-          htmlFormatContentTitle: true,
-          htmlFormatSummaryText: true,
-        );
-      } else if (imagePath != null) {
-        styleInformation = BigPictureStyleInformation(
-          FilePathAndroidBitmap(imagePath),
-          largeIcon:
-              largeIconPath != null ? FilePathAndroidBitmap(largeIconPath) : null,
-          contentTitle: messageTitle,
-          htmlFormatContentTitle: true,
-        );
-      } else if (messageBody != null) {
-        styleInformation = BigTextStyleInformation(
-          messageBody,
-          contentTitle: messageTitle,
-          htmlFormatContentTitle: true,
-          htmlFormatSummaryText: true,
-        );
-      }
-
-      final androidDetails = AndroidNotificationDetails(
-        _channelId,
-        _channelName,
-        channelDescription: _channelDescription,
-        groupKey: groupKey,
-        icon: 'ic_status_16px',
-        importance: Importance.max,
-        priority: Priority.high,
-        largeIcon:
-            largeIconPath != null ? FilePathAndroidBitmap(largeIconPath) : null,
-        styleInformation: styleInformation,
-        actions: [
-          AndroidNotificationAction(
-            'REPLY',
-            'Reply',
-            showsUserInterface: true,
-            inputs: [AndroidNotificationActionInput(label: 'Your reply...')],
-          ),
-          const AndroidNotificationAction('MARK_AS_READ', 'Mark as Read'),
-        ],
-      );
-
-      final notificationDetails = NotificationDetails(android: androidDetails);
-      final payload =
-          jsonEncode({'chatId': chatId, 'messageId': data['messageId']});
-
-      await _flutterLocalNotificationsPlugin.show(
-        Random().nextInt(2147483647),
-        messageTitle,
-        messageBody,
-        notificationDetails,
-        payload: payload,
-      );
-
-      final List<ActiveNotification> activeNotifications =
-          await _flutterLocalNotificationsPlugin
-                  .resolvePlatformSpecificImplementation<
-                      AndroidFlutterLocalNotificationsPlugin>()
-                  ?.getActiveNotifications() ??
-              [];
-
-      final List<ActiveNotification> chatNotifications = activeNotifications
-          .where((n) => n.groupKey == groupKey && n.id != 0)
-          .toList();
-
-      if (chatNotifications.length > 1) {
-        final List<String> lines =
-            chatNotifications.map((n) => n.body ?? '').toList();
-        final InboxStyleInformation inboxStyleInformation = InboxStyleInformation(
-          lines,
-          contentTitle: messageTitle,
-          summaryText: '${chatNotifications.length} new messages',
-        );
-
-        final AndroidNotificationDetails summaryAndroidDetails =
-            AndroidNotificationDetails(
-          _channelId,
-          _channelName,
-          channelDescription: _channelDescription,
-          groupKey: groupKey,
-          setAsGroupSummary: true,
-          styleInformation: inboxStyleInformation,
-        );
-
-        final NotificationDetails summaryNotificationDetails =
-            NotificationDetails(android: summaryAndroidDetails);
-
-        final int summaryId = chatId.hashCode;
-        await _flutterLocalNotificationsPlugin.show(
-          summaryId,
-          messageTitle,
-          '${chatNotifications.length} new messages',
-          summaryNotificationDetails,
-        );
-      }
-    } else if (type == 'new_post') {
-      return;
-    } else if (data['type'] == 'group_invitation') {
-      final largeIconPath =
-          await _generateAvatar(data['adderAvatar'], data['addedBy'] ?? '?');
-      final androidDetails = AndroidNotificationDetails(
-        _channelId,
-        _channelName,
-        channelDescription: _channelDescription,
-        icon: 'ic_status_16px',
-        importance: Importance.max,
-        priority: Priority.high,
-        largeIcon:
-            largeIconPath != null ? FilePathAndroidBitmap(largeIconPath) : null,
-        styleInformation: BigTextStyleInformation(notification.body ?? ''),
-      );
-      final notificationDetails = NotificationDetails(android: androidDetails);
-      final payload = jsonEncode({'chatId': data['chatId']});
-
-      await _flutterLocalNotificationsPlugin.show(
-        Random().nextInt(2147483647),
-        notification.title,
-        notification.body,
-        notificationDetails,
-        payload: payload,
-      );
+    final type = message.data['type'] as String?;
+    switch (type) {
+      case 'new_message':
+        await _handleNewMessageNotification(message);
+        break;
+      case 'new_post':
+        await _handleNewPostNotification(message);
+        break;
+      case 'app_update':
+        await _handleAppUpdateNotification(message);
+        break;
+      case 'group_invitation':
+        await _handleGroupInvitationNotification(message);
+        break;
+      default:
+        // Generic handling for unknown types
+        await _handleGenericNotification(message);
     }
   }
 
+  Future<void> _handleNewMessageNotification(RemoteMessage message) async {
+    final data = message.data;
+    final notification = message.notification;
+    if (notification == null) return;
+
+    final String chatId = data['chatId'];
+    if ((_dataController.currentRoute.value == '/ChatScreen' &&
+            _dataController.activeChatId.value == chatId) ||
+        _dataController.isMainChatsActive.value) {
+      AudioPlayer()
+          .play(AssetSource('notification-sounds/new-message-audio.mp3'));
+      return;
+    }
+
+    final String groupKey = chatId;
+    final String? messageBody = notification.body;
+    final String? messageTitle = notification.title;
+    final String? files = data['files'];
+    List<dynamic>? fileList;
+    String? imagePath;
+
+    if (files != null && files.isNotEmpty) {
+      try {
+        fileList = jsonDecode(files);
+        if (fileList!.isNotEmpty) {
+          imagePath = await _downloadImage(fileList[0]['url']);
+        }
+      } catch (e) {
+        // Handle JSON parsing or download error
+      }
+    }
+
+    final largeIconPath =
+        await _generateAvatar(data['senderAvatar'], messageTitle ?? '?');
+
+    StyleInformation? styleInformation;
+    if (imagePath != null && messageBody != null) {
+      styleInformation = BigPictureStyleInformation(
+        FilePathAndroidBitmap(imagePath),
+        largeIcon:
+            largeIconPath != null ? FilePathAndroidBitmap(largeIconPath) : null,
+        contentTitle: messageTitle,
+        summaryText: messageBody,
+        htmlFormatContentTitle: true,
+        htmlFormatSummaryText: true,
+      );
+    } else if (imagePath != null) {
+      styleInformation = BigPictureStyleInformation(
+        FilePathAndroidBitmap(imagePath),
+        largeIcon:
+            largeIconPath != null ? FilePathAndroidBitmap(largeIconPath) : null,
+        contentTitle: messageTitle,
+        htmlFormatContentTitle: true,
+      );
+    } else if (messageBody != null) {
+      styleInformation = BigTextStyleInformation(
+        messageBody,
+        contentTitle: messageTitle,
+        htmlFormatContentTitle: true,
+        htmlFormatSummaryText: true,
+      );
+    }
+
+    final androidDetails = AndroidNotificationDetails(
+      _channelId,
+      _channelName,
+      channelDescription: _channelDescription,
+      groupKey: groupKey,
+      tag: chatId, // Use chatId as tag to avoid duplicates
+      icon: 'ic_status_16px',
+      importance: Importance.max,
+      priority: Priority.high,
+      sound: RawResourceAndroidNotificationSound('new-message-audio'),
+      largeIcon:
+          largeIconPath != null ? FilePathAndroidBitmap(largeIconPath) : null,
+      styleInformation: styleInformation,
+      actions: [
+        AndroidNotificationAction(
+          'REPLY',
+          'Reply',
+          showsUserInterface: true,
+          inputs: [AndroidNotificationActionInput(label: 'Your reply...')],
+        ),
+        const AndroidNotificationAction('MARK_AS_READ', 'Mark as Read'),
+      ],
+    );
+
+    final notificationDetails = NotificationDetails(android: androidDetails);
+    final payload =
+        jsonEncode({'type': 'new_message', 'chatId': chatId, 'messageId': data['messageId']});
+
+    await _flutterLocalNotificationsPlugin.show(
+      chatId.hashCode, // Use a consistent ID for the chat
+      messageTitle,
+      messageBody,
+      notificationDetails,
+      payload: payload,
+    );
+  }
+
+  Future<void> _handleNewPostNotification(RemoteMessage message) async {
+    final data = message.data;
+    final notification = message.notification;
+    if (notification == null) return;
+
+    final androidDetails = AndroidNotificationDetails(
+      _channelId,
+      _channelName,
+      channelDescription: _channelDescription,
+      importance: Importance.max,
+      priority: Priority.high,
+      styleInformation: BigTextStyleInformation(notification.body ?? ''),
+    );
+
+    final notificationDetails = NotificationDetails(android: androidDetails);
+    final payload = jsonEncode({'type': 'new_post', 'postId': data['postId']});
+
+    await _flutterLocalNotificationsPlugin.show(
+      data['postId'].hashCode,
+      notification.title,
+      notification.body,
+      notificationDetails,
+      payload: payload,
+    );
+  }
+
+  Future<void> _handleAppUpdateNotification(RemoteMessage message) async {
+    final data = message.data;
+    final notification = message.notification;
+    if (notification == null) return;
+
+    final androidDetails = AndroidNotificationDetails(
+      _channelId,
+      _channelName,
+      channelDescription: _channelDescription,
+      importance: Importance.max,
+      priority: Priority.high,
+      styleInformation: BigTextStyleInformation(notification.body ?? ''),
+      actions: [
+        AndroidNotificationAction(
+          'UPDATE_NOW',
+          data['action_button_title'] ?? 'Update Now',
+        ),
+      ],
+    );
+
+    final notificationDetails = NotificationDetails(android: androidDetails);
+    final payload = jsonEncode({'type': 'app_update', 'url': data['update_url']});
+
+    await _flutterLocalNotificationsPlugin.show(
+      'app_update'.hashCode,
+      notification.title,
+      notification.body,
+      notificationDetails,
+      payload: payload,
+    );
+  }
+
+  Future<void> _handleGroupInvitationNotification(RemoteMessage message) async {
+    final data = message.data;
+    final notification = message.notification;
+    if (notification == null) return;
+
+    final largeIconPath =
+        await _generateAvatar(data['adderAvatar'], data['addedBy'] ?? '?');
+    final androidDetails = AndroidNotificationDetails(
+      _channelId,
+      _channelName,
+      channelDescription: _channelDescription,
+      icon: 'ic_status_16px',
+      importance: Importance.max,
+      priority: Priority.high,
+      largeIcon:
+          largeIconPath != null ? FilePathAndroidBitmap(largeIconPath) : null,
+      styleInformation: BigTextStyleInformation(notification.body ?? ''),
+    );
+    final notificationDetails = NotificationDetails(android: androidDetails);
+    final payload = jsonEncode({'type': 'group_invitation', 'chatId': data['chatId']});
+
+    await _flutterLocalNotificationsPlugin.show(
+      Random().nextInt(2147483647),
+      notification.title,
+      notification.body,
+      notificationDetails,
+      payload: payload,
+    );
+  }
+
+  Future<void> _handleGenericNotification(RemoteMessage message) async {
+    final notification = message.notification;
+    if (notification == null) return;
+
+    final androidDetails = AndroidNotificationDetails(
+      _channelId,
+      _channelName,
+      channelDescription: _channelDescription,
+      importance: Importance.max,
+      priority: Priority.high,
+    );
+
+    final notificationDetails = NotificationDetails(android: androidDetails);
+
+    await _flutterLocalNotificationsPlugin.show(
+      Random().nextInt(2147483647),
+      notification.title,
+      notification.body,
+      notificationDetails,
+      payload: message.data.isNotEmpty ? jsonEncode(message.data) : null,
+    );
+  }
+
   Future<void> _createAndroidNotificationChannel() async {
-    const AndroidNotificationChannel channel = AndroidNotificationChannel(
+    final AndroidNotificationChannel channel = AndroidNotificationChannel(
       _channelId,
       _channelName,
       description: _channelDescription,
       importance: Importance.max,
+      sound: RawResourceAndroidNotificationSound('new-message-audio'),
     );
 
     await _flutterLocalNotificationsPlugin
