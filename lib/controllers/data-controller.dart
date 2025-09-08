@@ -2265,6 +2265,7 @@ class DataController extends GetxController {
 
   
   Future<void> sendChatMessage(Map<String, dynamic> message, String? clientMessageId) async {
+    print('[DEBUG] sendChatMessage called with message: $message');
     try {
       final token = user.value['token'];
       if (token == null) {
@@ -2431,7 +2432,10 @@ class DataController extends GetxController {
     List<Map<String, dynamic>> attachmentsData,
     Function(int sentBytes, int totalBytes) onProgress,
   ) async {
-    return await _uploadService.uploadFilesToCloudinary(attachmentsData, onProgress);
+    print('[DEBUG] uploadChatFiles called with attachmentsData: $attachmentsData');
+    final results = await _uploadService.uploadFilesToCloudinary(attachmentsData, onProgress);
+    print('[DEBUG] uploadChatFiles received results: $results');
+    return results;
   }
 
   Future<void> editChatMessage(String messageId, String newText) async {

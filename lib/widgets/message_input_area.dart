@@ -228,36 +228,6 @@ class _MessageInputAreaState extends State<MessageInputArea> {
     }
   }
 
-  Future<void> _pickFromCamera() async {
-    await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.grey[900],
-        title: const Text('Select Media Type', style: TextStyle(color: Colors.white)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_camera, color: Colors.white),
-              title: const Text('Take Photo', style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Navigator.of(context).pop();
-                _takePhotoAndCrop();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.videocam, color: Colors.white),
-              title: const Text('Record Video', style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Navigator.of(context).pop();
-                _recordVideo();
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Future<void> _takePhotoAndCrop() async {
     try {
@@ -358,10 +328,13 @@ class _MessageInputAreaState extends State<MessageInputArea> {
         return SafeArea(
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 20.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
+            child: Wrap(
+              alignment: WrapAlignment.spaceAround,
+              spacing: 16.0,
+              runSpacing: 16.0,
               children: <Widget>[
-                _buildAttachmentOption(Icons.photo_camera, 'Camera', _pickFromCamera),
+                _buildAttachmentOption(Icons.photo_camera, 'Photo', _takePhotoAndCrop),
+                _buildAttachmentOption(Icons.videocam, 'Video', _recordVideo),
                 _buildAttachmentOption(Icons.photo_library, 'Gallery', _pickFromGallery),
                 _buildAttachmentOption(Icons.headset, 'Audio', _pickAudio),
                 _buildAttachmentOption(Icons.insert_drive_file, 'Document', _pickDocument),

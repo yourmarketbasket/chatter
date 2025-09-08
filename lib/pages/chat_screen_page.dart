@@ -346,6 +346,8 @@ class _ChatScreenState extends State<ChatScreen> {
         return;
       }
 
+      print('[ChatScreen] Upload results: $uploadResults');
+
       uploadedFiles = uploadResults.map((result) => {
         'url': result['url'],
         'type': result['type'],
@@ -372,6 +374,7 @@ class _ChatScreenState extends State<ChatScreen> {
     };
 
     // Send the final message to the backend
+    print('[ChatScreen] Sending final message: $finalMessage');
     await dataController.sendChatMessage(finalMessage, clientMessageId);
     setState(() {
       _replyingTo = null;
