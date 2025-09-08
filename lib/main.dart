@@ -71,7 +71,20 @@ void main() async {
   Get.put(NotificationService());
 
 
-  runApp(const ChatterApp());
+  final upgrader = Upgrader(
+    storeController: UpgraderStoreController(
+      onAndroid: () => ApiUpgraderStore(),
+      oniOS: () => ApiUpgraderStore(),
+    ),
+    debugLogging: kDebugMode,
+  );
+
+  runApp(
+    UpgradeAlert(
+      upgrader: upgrader,
+      child: const ChatterApp(),
+    ),
+  );
 }
 
 class ChatterApp extends StatefulWidget {
