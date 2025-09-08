@@ -11,6 +11,7 @@ import 'package:chatter/widgets/attachment_preview_dialog.dart';
 import 'package:chatter/services/socket-service.dart';
 import 'package:chatter/controllers/data-controller.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:chatter/widgets/pulsing_icon.dart';
 
 class MessageInputArea extends StatefulWidget {
   final Function(String text, List<PlatformFile> files) onSend;
@@ -301,9 +302,12 @@ class _MessageInputAreaState extends State<MessageInputArea> {
             ),
             const SizedBox(width: 8),
             IconButton(
-              icon: Icon(
-                  _isTyping ? Icons.send : (_isRecording ? Icons.stop : Icons.mic),
-                  color: Colors.tealAccent),
+              icon: _isRecording
+                  ? const PulsingIcon(icon: Icons.stop, color: Colors.red)
+                  : Icon(
+                      _isTyping ? Icons.send : Icons.mic,
+                      color: Colors.tealAccent,
+                    ),
               onPressed: isMuted
                   ? null
                   : (_isTyping
