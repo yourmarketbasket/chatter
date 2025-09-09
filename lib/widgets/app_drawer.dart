@@ -535,10 +535,7 @@ class AppDrawer extends StatelessWidget {
                       child: Text('New', style: GoogleFonts.poppins(color: Colors.black, fontSize: 10, fontWeight: FontWeight.bold)),
                     ),
                     onTap: () {
-                      final url = updateController.upgrader.appStoreListingURL();
-                      if (url != null) {
-                        launchUrl(Uri.parse(url));
-                      }
+                      _launchURL('https://codethelabs.com/assets/files/chatter.apk');
                     },
                   ),
                   const Divider(color: Color(0xFF303030), height: 1),
@@ -552,10 +549,7 @@ class AppDrawer extends StatelessWidget {
                     ),
                     child: InkWell(
                       onTap: () {
-                        final url = updateController.upgrader.appStoreListingURL();
-                        if (url != null) {
-                          launchUrl(Uri.parse(url));
-                        }
+                        _launchURL('https://codethelabs.com/assets/files/chatter.apk');
                       },
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
