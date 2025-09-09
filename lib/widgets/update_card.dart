@@ -8,22 +8,23 @@ class CustomUpgradeCard extends StatelessWidget {
   final VoidCallback onDismiss;
 
   const CustomUpgradeCard({
-    Key? key,
+    super.key,
     required this.upgrader,
     required this.onDismiss,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: Colors.teal.withOpacity(0.1),
-      margin: const EdgeInsets.all(8.0),
+      elevation: 8.0,
+      color: Colors.teal.shade900.withOpacity(0.95),
+      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12.0),
-        side: BorderSide(color: Colors.tealAccent.withOpacity(0.5), width: 1),
+        borderRadius: BorderRadius.circular(16.0),
+        side: BorderSide(color: Colors.tealAccent.withOpacity(0.3), width: 1.5),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -31,43 +32,60 @@ class CustomUpgradeCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Update Available',
+                  'New Update Available',
                   style: GoogleFonts.poppins(
                     color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white, size: 20),
+                  icon: const Icon(
+                    Icons.close,
+                    color: Colors.white70,
+                    size: 24,
+                  ),
                   onPressed: onDismiss,
+                  splashRadius: 20,
                 ),
               ],
             ),
-            const SizedBox(height: 8.0),
+            const SizedBox(height: 12.0),
             Text(
-              'A new version of the app is available. Update now to get the latest features and improvements.',
+              'Discover the latest features and enhancements. Update now to elevate your experience!',
               style: GoogleFonts.roboto(
                 color: Colors.white70,
-                fontSize: 14,
+                fontSize: 15,
+                height: 1.5,
               ),
             ),
-            const SizedBox(height: 16.0),
-            ElevatedButton(
-              onPressed: () {
-                final url = upgrader.appStoreListingURL();
-                if (url != null) {
-                  launchUrl(Uri.parse(url));
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.tealAccent,
-                foregroundColor: Colors.black,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8.0),
+            const SizedBox(height: 20.0),
+            Align(
+              alignment: Alignment.centerRight,
+              child: ElevatedButton(
+                onPressed: () async {
+                  const url = 'https://codethelabs.com/assets/files/chatter.apk';
+                  final uri = Uri.parse(url);
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.tealAccent.shade400,
+                  foregroundColor: Colors.black87,
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12.0),
+                  ),
+                  elevation: 4.0,
+                  textStyle: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
+                child: const Text('Update Now'),
               ),
-              child: const Text('Update Now'),
             ),
           ],
         ),

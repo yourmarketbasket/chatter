@@ -24,17 +24,40 @@ class _RealtimeTimeagoTextState extends State<RealtimeTimeagoText> {
   void initState() {
     super.initState();
     _updateTime();
-    // Update every 30 seconds. This can be optimized later.
-    _timer = Timer.periodic(const Duration(seconds: 30), (Timer t) {
-      if (mounted) { // Check if the widget is still in the tree
+    _startTimer();
+  }
+
+  void _startTimer() {
+    _timer?.cancel();
+    final now = DateTime.now();
+    final difference = now.difference(widget.timestamp);
+
+    Duration period = const Duration(minutes: 1); // Default update interval
+    if (difference.inSeconds < 60) {
+      period = const Duration(seconds: 1);
+    } else if (difference.inMinutes < 60) {
+      period = const Duration(seconds: 30);
+    }
+
+    _timer = Timer.periodic(period, (Timer t) {
+      if (mounted) {
         _updateTime();
+        // Check if we need to adjust the timer interval
+        final newDifference = DateTime.now().difference(widget.timestamp);
+        if (newDifference.inSeconds >= 60 && period.inSeconds < 30) {
+          _startTimer(); // Reschedule with a new interval
+        } else if (newDifference.inMinutes >= 60 && period.inSeconds < 60) {
+          _startTimer(); // Reschedule with a new interval
+        }
+      } else {
+        t.cancel();
       }
     });
   }
 
   void _updateTime() {
     setState(() {
-      _relativeTime = timeago.format(widget.timestamp, locale: 'en_short');
+      _relativeTime = timeago.format(widget.timestamp);
     });
   }
 
