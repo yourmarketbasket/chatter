@@ -1263,7 +1263,7 @@ class _ChatScreenState extends State<ChatScreen> {
           final currentUserId = dataController.user.value['user']['_id'];
           final otherParticipant = (chat['participants'] as List<dynamic>).firstWhere(
             (p) => p['_id'] != currentUserId,
-            orElse: () => null,
+            orElse: () => {'_id': '', 'name': 'Unknown User', 'avatar': '', 'online': false},
           );
 
           if (otherParticipant == null) {
