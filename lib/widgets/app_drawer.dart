@@ -535,7 +535,10 @@ class AppDrawer extends StatelessWidget {
                       child: Text('New', style: GoogleFonts.poppins(color: Colors.black, fontSize: 10, fontWeight: FontWeight.bold)),
                     ),
                     onTap: () {
-                      updateController.upgrader.onUpdate();
+                      final url = updateController.upgrader.appStoreListingURL();
+                      if (url != null) {
+                        launchUrl(Uri.parse(url));
+                      }
                     },
                   ),
                   const Divider(color: Color(0xFF303030), height: 1),
@@ -548,7 +551,12 @@ class AppDrawer extends StatelessWidget {
                       border: Border.all(color: Colors.tealAccent.withOpacity(0.5), width: 1),
                     ),
                     child: InkWell(
-                      onTap: () => updateController.upgrader.onUpdate(),
+                      onTap: () {
+                        final url = updateController.upgrader.appStoreListingURL();
+                        if (url != null) {
+                          launchUrl(Uri.parse(url));
+                        }
+                      },
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [

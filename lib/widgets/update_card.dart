@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:upgrader/upgrader.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class CustomUpgradeCard extends StatelessWidget {
   final Upgrader upgrader;
@@ -54,7 +55,10 @@ class CustomUpgradeCard extends StatelessWidget {
             const SizedBox(height: 16.0),
             ElevatedButton(
               onPressed: () {
-                upgrader.onUpdate();
+                final url = upgrader.appStoreListingURL();
+                if (url != null) {
+                  launchUrl(Uri.parse(url));
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.tealAccent,
