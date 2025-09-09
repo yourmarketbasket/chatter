@@ -36,7 +36,6 @@ import 'package:flutter/services.dart';
 import 'package:chatter/widgets/message_bubble.dart';
 import 'package:chatter/widgets/pdf_thumbnail_widget.dart';
 import 'package:chatter/helpers/verification_helper.dart';
-import 'package:chatter/widgets/realtime_timeago_text.dart';
 
 
 class ChatScreen extends StatefulWidget {
@@ -1264,7 +1263,7 @@ class _ChatScreenState extends State<ChatScreen> {
           final currentUserId = dataController.user.value['user']['_id'];
           final otherParticipant = (chat['participants'] as List<dynamic>).firstWhere(
             (p) => p['_id'] != currentUserId,
-            orElse: () => {'_id': '', 'name': 'Unknown User', 'avatar': '', 'online': false},
+            orElse: () => null,
           );
 
           if (otherParticipant == null) {
@@ -1297,14 +1296,10 @@ class _ChatScreenState extends State<ChatScreen> {
             if (userForProfile['online'] == true) {
               statusWidget = const Text('online', style: TextStyle(color: Colors.green, fontSize: 10));
             } else if (userForProfile['lastSeen'] != null) {
-              statusWidget = Row(
-                children: [
-                  const Text('Seen ', style: TextStyle(color: Colors.grey, fontSize: 10)),
-                  RealtimeTimeagoText(
-                    timestamp: DateTime.parse(userForProfile['lastSeen']),
-                    style: const TextStyle(color: Colors.grey, fontSize: 10),
-                  ),
-                ],
+              statusWidget = Text(
+                'Seen ${formatLastSeen(DateTime.parse(userForProfile['lastSeen']))}',
+                style: const TextStyle(color: Colors.grey, fontSize: 10),
+                overflow: TextOverflow.ellipsis,
               );
             } else {
               statusWidget = const Text('offline', style: TextStyle(color: Colors.grey, fontSize: 10));
@@ -1611,76 +1606,77 @@ class _ChatScreenState extends State<ChatScreen> {
                             child: Dismissible(
                               key: Key(message['_id'] ?? message['clientMessageId']),
                               direction: DismissDirection.startToEnd,
-                          confirmDismiss: (direction) async {
-                            setState(() {
-                              _replyingTo = message;
-                            });
-                            return false; // This prevents the widget from being dismissed
-                          },
-                          background: Container(
-                            color: Colors.teal.withOpacity(0.2),
-                            alignment: Alignment.centerLeft,
-                            padding: const EdgeInsets.only(left: 20.0),
-                            child: const Icon(Icons.reply, color: Colors.white),
-                          ),
-                          child: GestureDetector(
-                            onLongPressStart: (details) {
-                              final messageId = message['_id'] ?? message['clientMessageId'];
-                              if (messageId != null) {
-                                _toggleSelection(messageId);
-                              }
-                              WidgetsBinding.instance.addPostFrameCallback((_) {
-                                if (mounted) {
-                                  _showReactionDialog(context, message, details.globalPosition);
-                                }
-                              });
-                            },
-                            onTap: () {
-                              if (_isSelectionMode) {
-                                final messageId = message['_id'] ?? message['clientMessageId'];
-                                if (messageId != null) {
-                                  _toggleSelection(messageId);
-                                }
-                              }
-                            },
-                            child: Container(
-                              color: _selectedMessages.contains(message['_id'] ?? message['clientMessageId'])
-                                  ? Colors.teal.withOpacity(0.2)
-                                  : Colors.transparent,
-                              child: Align(
-                                alignment: message['senderId']['_id'] == dataController.getUserId()
-                                    ? Alignment.centerRight
-                                    : Alignment.centerLeft,
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (message['senderId']['_id'] != dataController.getUserId() && _selectedMessages.contains(message['_id'] ?? message['clientMessageId']))
-                                      IconButton(
-                                        icon: const Icon(FeatherIcons.cornerUpRight, color: Colors.white, size:14),
-                                        onPressed: _forwardSelectedMessages,
-                                      ),
-                                    Flexible(
-                                      child: MessageBubble(
-                                        message: message,
-                                        prevMessage: prevMessage,
-                                        dataController: dataController,
-                                        openMediaView: _openMediaView,
-                                        buildAttachment: _buildAttachment,
-                                        getReplyPreviewText: _getReplyPreviewText,
-                                        buildReactions: _buildReactions,
-                                      ),
+                              confirmDismiss: (direction) async {
+                                setState(() {
+                                  _replyingTo = message;
+                                });
+                                return false; // This prevents the widget from being dismissed
+                              },
+                              background: Container(
+                                color: Colors.teal.withOpacity(0.2),
+                                alignment: Alignment.centerLeft,
+                                padding: const EdgeInsets.only(left: 20.0),
+                                child: const Icon(Icons.reply, color: Colors.white),
+                              ),
+                              child: GestureDetector(
+                                onLongPressStart: (details) {
+                                  final messageId = message['_id'] ?? message['clientMessageId'];
+                                  if (messageId != null) {
+                                    _toggleSelection(messageId);
+                                  }
+                                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                                    if (mounted) {
+                                      _showReactionDialog(context, message, details.globalPosition);
+                                    }
+                                  });
+                                },
+                                onTap: () {
+                                  if (_isSelectionMode) {
+                                    final messageId = message['_id'] ?? message['clientMessageId'];
+                                    if (messageId != null) {
+                                      _toggleSelection(messageId);
+                                    }
+                                  }
+                                },
+                                child: Container(
+                                  color: _selectedMessages.contains(message['_id'] ?? message['clientMessageId'])
+                                      ? Colors.teal.withOpacity(0.2)
+                                      : Colors.transparent,
+                                  child: Align(
+                                    alignment: message['senderId']['_id'] == dataController.getUserId()
+                                        ? Alignment.centerRight
+                                        : Alignment.centerLeft,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        if (message['senderId']['_id'] != dataController.getUserId() && _selectedMessages.contains(message['_id'] ?? message['clientMessageId']))
+                                          IconButton(
+                                            icon: const Icon(FeatherIcons.cornerUpRight, color: Colors.white, size:14),
+                                            onPressed: _forwardSelectedMessages,
+                                          ),
+                                        Flexible(
+                                          child: MessageBubble(
+                                            message: message,
+                                            prevMessage: prevMessage,
+                                            dataController: dataController,
+                                            openMediaView: _openMediaView,
+                                            buildAttachment: _buildAttachment,
+                                            getReplyPreviewText: _getReplyPreviewText,
+                                            buildReactions: _buildReactions,
+                                          ),
+                                        ),
+                                        if (message['senderId']['_id'] == dataController.getUserId() && _selectedMessages.contains(message['_id'] ?? message['clientMessageId']))
+                                          IconButton(
+                                            icon: const Icon(FeatherIcons.cornerUpRight, color: Colors.white, size:14),
+                                            onPressed: _forwardSelectedMessages,
+                                          ),
+                                      ],
                                     ),
-                                    if (message['senderId']['_id'] == dataController.getUserId() && _selectedMessages.contains(message['_id'] ?? message['clientMessageId']))
-                                      IconButton(
-                                        icon: const Icon(FeatherIcons.cornerUpRight, color: Colors.white, size:14),
-                                        onPressed: _forwardSelectedMessages,
-                                      ),
-                                  ],
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
                         ],
                       );
                     }
