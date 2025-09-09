@@ -241,6 +241,8 @@ class _ChatterAppState extends State<ChatterApp> {
       navigatorObservers: [routeObserver],
       builder: (context, child) {
         return UpgradeAlert(
+          showIgnore: false,
+          showLater: false,
           upgrader: upgrader,
           navigatorKey: navigatorKey,
           shouldPopScope: () => false,

@@ -446,38 +446,7 @@ class _UsersListPageState extends State<UsersListPage> {
                             }
                           });
                         } else {
-                          final currentUserId = _dataController.user.value['user']['_id'];
-                          Map<String, dynamic>? existingChat;
-                          try {
-                            existingChat = _dataController.chats.values.firstWhere(
-                              (chat) {
-                                if (chat['isGroup'] == true) return false;
-                                final participantIds = (chat['participants'] as List).map((p) {
-                                  if (p is Map<String, dynamic>) return p['_id'] as String;
-                                  return p as String;
-                                }).toSet();
-                                return participantIds.contains(currentUserId) &&
-                                    participantIds.contains(userId);
-                              },
-                            );
-                          } catch (e) {
-                            existingChat = null;
-                          }
-
-                          if (existingChat != null) {
-                            _dataController.currentChat.value = existingChat;
-                            Get.to(() => const ChatScreen());
-                          } else {
-                            final tempChat = {
-                              'participants': [
-                                {'userId': _dataController.user.value['user']},
-                                {'userId': user}
-                              ],
-                              'type': 'dm',
-                            };
-                            _dataController.currentChat.value = tempChat;
-                            Get.to(() => const ChatScreen());
-                          }
+                          Get.to(() => ProfilePage(userId: userId, username: username, userAvatarUrl: avatarUrl));
                         }
                       },
                       selected: _isGroupCreationMode && _selectedUsers.any((u) => u['_id'] == userId),
