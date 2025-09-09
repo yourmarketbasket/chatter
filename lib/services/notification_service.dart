@@ -458,7 +458,7 @@ class NotificationService {
         payload: payload,
       );
     } else if (data['type'] == 'group_invitation') {
-      // This notification type requires the `notification` object.
+      
       if (notification == null) {
         return;
       }
