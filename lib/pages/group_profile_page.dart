@@ -517,9 +517,21 @@ class GroupProfilePage extends StatelessWidget {
                           ),
                           TextButton(
                             onPressed: () async {
-                              await dataController.leaveGroup(currentChat['_id']);
-                              Get.back();
-                              Get.back();
+                              final success = await dataController.leaveGroup(currentChat['_id']);
+                              if (Get.context != null && Get.context!.mounted) {
+                                if (success) {
+                                  await dataController.deleteChat(currentChat['_id']);
+                                  Get.offAllNamed('/main-chats');
+                                } else {
+                                  Get.back(); // Close the dialog
+                                  Get.snackbar(
+                                    'Error', 'Failed to leave group.',
+                                    snackPosition: SnackPosition.BOTTOM,
+                                    backgroundColor: Colors.redAccent,
+                                    colorText: Colors.white
+                                  );
+                                }
+                              }
                             },
                             child: const Text('Leave',
                                 style: TextStyle(color: Colors.redAccent)),

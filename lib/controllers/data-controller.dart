@@ -2555,30 +2555,21 @@ class DataController extends GetxController {
   }
 
   void handleChatDeleted(String chatId) {
-    // print('[DataController] handleChatDeleted called for chatId: $chatId');
     if (chatId.isEmpty) {
-      // print('[DataController] ChatId is empty, returning.');
       return;
     }
 
-    // print('[DataController] Chats count before deletion attempt: ${chats.length}');
     if (chats.containsKey(chatId)) {
-      // print('[DataController] Chat found in map. Proceeding with removal.');
-      final newChats = Map<String, Map<String, dynamic>>.from(chats);
-      newChats.remove(chatId);
-      chats.value = newChats; // Forcefully replace the map to ensure reactivity
-      // print('[DataController] Chats count after deletion attempt: ${chats.length}');
+      chats.remove(chatId);
 
-
-      // If the deleted chat is the current one, clear it.
-      // The UI (ChatScreen) will be responsible for listening to this state change and popping itself.
-      if (currentChat.value['_id'] == chatId) {
-        // print('[DataController] Deleted chat is the current chat. Clearing state.');
+      // If the deleted chat is the one the user is currently viewing, navigate away.
+      if (activeChatId.value == chatId) {
+        Get.offAllNamed('/main-chats');
+        // Also clear the state for the now-closed screen
         currentChat.value = {};
         currentConversationMessages.clear();
+        activeChatId.value = null;
       }
-    } else {
-      // print('[DataController] Chat with ID $chatId not found in the local chats map.');
     }
   }
 
@@ -4247,47 +4238,59 @@ void clearUserPosts() {
   }
 
   void handleUserOnlineStatus(String userId, bool isOnline, {String? lastSeen}) {
-    final index = allUsers.indexWhere((user) => user['_id'] == userId);
-    if (index != -1) {
-      final user = allUsers[index];
+    // Update in allUsers list
+    final userIndex = allUsers.indexWhere((user) => user['_id'] == userId);
+    if (userIndex != -1) {
+      final user = Map<String, dynamic>.from(allUsers[userIndex]);
       user['online'] = isOnline;
       if (lastSeen != null) {
         user['lastSeen'] = lastSeen;
       }
-      allUsers[index] = user;
-      allUsers.refresh();
+      allUsers[userIndex] = user;
     }
 
-    // Also update the participant in all chats
-    for (var chat in chats.values) {
-      final participants = chat['participants'] as List<dynamic>;
-      final participantIndex = participants.indexWhere((p) => p['_id'] == userId);
+    // Update user in the chats map
+    final chatKeys = chats.keys.toList();
+    for (var key in chatKeys) {
+      final chat = chats[key]!;
+      if (chat['participants'] == null || chat['participants'] is! List) continue;
+
+      final participants = List<dynamic>.from(chat['participants'] as List);
+      final participantIndex = participants.indexWhere((p) => p is Map && p['_id'] == userId);
+
       if (participantIndex != -1) {
-        final participant = participants[participantIndex];
-        participant['online'] = isOnline;
+        // Deep copy and update
+        final newParticipants = List<Map<String, dynamic>>.from(
+            participants.map((p) => Map<String, dynamic>.from(p as Map))
+        );
+        newParticipants[participantIndex]['online'] = isOnline;
         if (lastSeen != null) {
-          participant['lastSeen'] = lastSeen;
+          newParticipants[participantIndex]['lastSeen'] = lastSeen;
         }
-        participants[participantIndex] = participant;
-        chat['participants'] = participants;
+
+        final newChat = Map<String, dynamic>.from(chat);
+        newChat['participants'] = newParticipants;
+        chats[key] = newChat; // This assignment triggers the update for this chat
       }
     }
-    chats.refresh();
 
-    // Also update the participant in the current chat if they are the user who went online/offline
-    final chat = currentChat.value;
-    final participants = chat['participants'] as List<dynamic>?;
-    if (participants != null) {
-      final otherParticipantIndex = participants.indexWhere((p) => p['_id'] == userId);
-      if (otherParticipantIndex != -1) {
-        final otherParticipant = participants[otherParticipantIndex];
-        otherParticipant['online'] = isOnline;
+    // Update currentChat if it's affected
+    if (currentChat.value.isNotEmpty && currentChat.value['participants'] != null) {
+      final participants = List<dynamic>.from(currentChat.value['participants'] as List);
+      final participantIndex = participants.indexWhere((p) => p is Map && p['_id'] == userId);
+
+      if (participantIndex != -1) {
+        final newParticipants = List<Map<String, dynamic>>.from(
+            participants.map((p) => Map<String, dynamic>.from(p as Map))
+        );
+        newParticipants[participantIndex]['online'] = isOnline;
         if (lastSeen != null) {
-          otherParticipant['lastSeen'] = lastSeen;
+          newParticipants[participantIndex]['lastSeen'] = lastSeen;
         }
-        participants[otherParticipantIndex] = otherParticipant;
-        chat['participants'] = participants;
-        currentChat.value = Map<String, dynamic>.from(chat);
+
+        final newChat = Map<String, dynamic>.from(currentChat.value);
+        newChat['participants'] = newParticipants;
+        currentChat.value = newChat; // This assignment triggers the update
       }
     }
   }
