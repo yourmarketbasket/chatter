@@ -100,7 +100,6 @@ class _ChatterAppState extends State<ChatterApp> {
       ),
       debugLogging: kDebugMode,
       debugDisplayAlways: true,
-      willPopScope: () => false,
       showIgnoreButton: false,
       showLaterButton: false,
     );
@@ -236,10 +235,15 @@ class _ChatterAppState extends State<ChatterApp> {
         ),
       ),
       navigatorObservers: [routeObserver],
-      home: UpgradeAlert(
-        upgrader: upgrader,
-        child: const LandingPage(),
-      ), // Show LandingPage while checking storage
+      builder: (context, child) {
+        return UpgradeAlert(
+          upgrader: upgrader,
+          shouldPopScope: () => false,
+          barrierDismissible: false,
+          child: child ?? const SizedBox(),
+        );
+      },
+      home: const LandingPage(), // Show LandingPage while checking storage
       getPages: [
         GetPage(name: '/landing', page: () => const LandingPage()),
         GetPage(name: '/login', page: () => const LoginPage()),
