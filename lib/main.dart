@@ -84,6 +84,7 @@ class ChatterApp extends StatefulWidget {
 }
 
 class _ChatterAppState extends State<ChatterApp> {
+  final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
   late FlutterSecureStorage _storage;
   final  DataController _dataController = Get.put(DataController());
   late StreamSubscription _shareSubscription;
@@ -236,10 +237,12 @@ class _ChatterAppState extends State<ChatterApp> {
           ),
         ),
       ),
+      navigatorKey: navigatorKey,
       navigatorObservers: [routeObserver],
       builder: (context, child) {
         return UpgradeAlert(
           upgrader: upgrader,
+          navigatorKey: navigatorKey,
           shouldPopScope: () => false,
           barrierDismissible: false,
           child: child ?? const SizedBox(),

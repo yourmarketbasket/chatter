@@ -1264,7 +1264,7 @@ class _ChatScreenState extends State<ChatScreen> {
           final currentUserId = dataController.user.value['user']['_id'];
           final otherParticipant = (chat['participants'] as List<dynamic>).firstWhere(
             (p) => p['_id'] != currentUserId,
-            orElse: () => null,
+            orElse: () => {'_id': '', 'name': 'Unknown User', 'avatar': '', 'online': false},
           );
 
           if (otherParticipant == null) {
@@ -1596,16 +1596,21 @@ class _ChatScreenState extends State<ChatScreen> {
                         }
                       }
 
-                      return VisibilityDetector(
-                        key: Key(message['_id'] ?? message['clientMessageId']),
-                        onVisibilityChanged: (visibilityInfo) {
-                          if (visibilityInfo.visibleFraction > 0.5) {
-                            dataController.markMessageAsRead(message);
-                          }
-                        },
-                        child: Dismissible(
-                          key: Key(message['_id'] ?? message['clientMessageId']),
-                          direction: DismissDirection.startToEnd,
+                      final bool hasReactions = prevMessage?['reactions'] != null && (prevMessage!['reactions'] as List).isNotEmpty;
+
+                      return Column(
+                        children: [
+                          if (hasReactions) const SizedBox(height: 10.0),
+                          VisibilityDetector(
+                            key: Key(message['_id'] ?? message['clientMessageId']),
+                            onVisibilityChanged: (visibilityInfo) {
+                              if (visibilityInfo.visibleFraction > 0.5) {
+                                dataController.markMessageAsRead(message);
+                              }
+                            },
+                            child: Dismissible(
+                              key: Key(message['_id'] ?? message['clientMessageId']),
+                              direction: DismissDirection.startToEnd,
                           confirmDismiss: (direction) async {
                             setState(() {
                               _replyingTo = message;
@@ -1676,6 +1681,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             ),
                           ),
                         ),
+                        ],
                       );
                     }
                   },
