@@ -390,10 +390,10 @@ class _MainChatsPageState extends State<MainChatsPage> {
                                   final participants = chat['participants'] as List<dynamic>? ?? [];
                                   otherUser = participants.firstWhere(
                                     (p) => p is Map && p['_id'] != currentUserId,
-                                    orElse: () => {},
+                                    orElse: () => <String, dynamic>{}, // Fix: Explicitly define map type
                                   );
 
-                                  if (otherUser.isEmpty) {
+                                  if (otherUser!.isEmpty) {
                                     // This can happen if a chat is corrupted or a user was removed.
                                     // We'll just show a placeholder and not crash.
                                     return const SizedBox.shrink();
