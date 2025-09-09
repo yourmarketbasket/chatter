@@ -365,6 +365,7 @@ class _MainChatsPageState extends State<MainChatsPage> {
                                 style: GoogleFonts.poppins(color: Colors.grey.shade500, fontSize: 14),
                               ),
                             )
+                            // force
                           : ListView.builder(
                               physics: const AlwaysScrollableScrollPhysics(),
                               itemCount: allChats.length,
