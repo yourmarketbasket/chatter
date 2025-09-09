@@ -1265,6 +1265,7 @@ class _ChatScreenState extends State<ChatScreen> {
             (p) => p['_id'] != currentUserId,
             orElse: () => {'_id': '', 'name': 'Unknown User', 'avatar': '', 'online': false},
           );
+          // force
 
           if (otherParticipant == null) {
             
