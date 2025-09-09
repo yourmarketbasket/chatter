@@ -36,6 +36,7 @@ import 'package:flutter/services.dart';
 import 'package:chatter/widgets/message_bubble.dart';
 import 'package:chatter/widgets/pdf_thumbnail_widget.dart';
 import 'package:chatter/helpers/verification_helper.dart';
+import 'package:chatter/widgets/realtime_timeago_text.dart';
 
 
 class ChatScreen extends StatefulWidget {
@@ -1296,10 +1297,14 @@ class _ChatScreenState extends State<ChatScreen> {
             if (userForProfile['online'] == true) {
               statusWidget = const Text('online', style: TextStyle(color: Colors.green, fontSize: 10));
             } else if (userForProfile['lastSeen'] != null) {
-              statusWidget = Text(
-                'Seen ${formatLastSeen(DateTime.parse(userForProfile['lastSeen']))}',
-                style: const TextStyle(color: Colors.grey, fontSize: 10),
-                overflow: TextOverflow.ellipsis,
+              statusWidget = Row(
+                children: [
+                  const Text('Seen ', style: TextStyle(color: Colors.grey, fontSize: 10)),
+                  RealtimeTimeagoText(
+                    timestamp: DateTime.parse(userForProfile['lastSeen']),
+                    style: const TextStyle(color: Colors.grey, fontSize: 10),
+                  ),
+                ],
               );
             } else {
               statusWidget = const Text('offline', style: TextStyle(color: Colors.grey, fontSize: 10));

@@ -11,6 +11,7 @@ import 'package:image_cropper/image_cropper.dart';
 import 'dart:io';
 import 'package:get/get.dart';
 import 'package:chatter/controllers/data-controller.dart';
+import 'package:chatter/controllers/update_controller.dart';
 import 'package:chatter/helpers/verification_helper.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:feather_icons/feather_icons.dart';
@@ -260,6 +261,7 @@ class AppDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final DataController dataController = Get.find<DataController>();
+    final UpdateController updateController = Get.find<UpdateController>();
 
     return Drawer(
       shape: const RoundedRectangleBorder(
@@ -517,22 +519,55 @@ class AppDrawer extends StatelessWidget {
             ),
           ),
           const Divider(color: Color(0xFF303030), height: 1),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
-            child: InkWell(
-              onTap: () => _launchURL('https://codethelabs.com/assets/files/chatter.apk'),
-              child: RichText(
-                textAlign: TextAlign.center,
-                text: TextSpan(
-                  style: GoogleFonts.roboto(color: Colors.grey[500], fontSize: 13),
-                  children: <TextSpan>[
-                    const TextSpan(text: 'Tap to update to the latest version'),
-                    const TextSpan(text: '.'),
-                  ],
-                ),
-              ),
-            ),
-          ),
+          Obx(() {
+            if (updateController.isUpdateAvailable.value) {
+              return Column(
+                children: [
+                  ListTile(
+                    leading: Icon(FeatherIcons.gift, color: Colors.tealAccent),
+                    title: Text('Update Available', style: GoogleFonts.roboto(color: Colors.tealAccent, fontSize: 16)),
+                    trailing: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.tealAccent,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text('New', style: GoogleFonts.poppins(color: Colors.black, fontSize: 10, fontWeight: FontWeight.bold)),
+                    ),
+                    onTap: () {
+                      updateController.upgrader.onUpdate();
+                    },
+                  ),
+                  const Divider(color: Color(0xFF303030), height: 1),
+                  Container(
+                    margin: const EdgeInsets.all(16.0),
+                    padding: const EdgeInsets.all(12.0),
+                    decoration: BoxDecoration(
+                      color: Colors.teal.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12.0),
+                      border: Border.all(color: Colors.tealAccent.withOpacity(0.5), width: 1),
+                    ),
+                    child: InkWell(
+                      onTap: () => updateController.upgrader.onUpdate(),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(FeatherIcons.gift, color: Colors.tealAccent, size: 16),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Tap to update to the latest version',
+                            style: GoogleFonts.roboto(color: Colors.tealAccent, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            } else {
+              return const SizedBox.shrink();
+            }
+          }),
         ],
       ),
     );

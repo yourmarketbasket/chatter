@@ -10,6 +10,7 @@ import 'package:chatter/services/socket-service.dart';
 import 'package:chatter/services/media_visibility_service.dart'; // Import MediaVisibilityService
 import 'package:chatter/services/notification_service.dart'; // Import NotificationService
 import 'package:chatter/controllers/data-controller.dart'; // Added import
+import 'package:chatter/controllers/update_controller.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:get_storage/get_storage.dart';
@@ -69,6 +70,7 @@ void main() async {
 
   // Initialize NotificationService
   Get.put(NotificationService());
+  Get.put(UpdateController());
 
 
   runApp(const ChatterApp());

@@ -39,6 +39,9 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'package:chatter/main.dart'; // Import for routeObserver
 import 'package:share_handler/share_handler.dart';
+import 'package:upgrader/upgrader.dart';
+import 'package:chatter/controllers/update_controller.dart';
+import 'package:chatter/widgets/update_card.dart';
 
 class HomeFeedScreen extends StatefulWidget {
   const HomeFeedScreen({Key? key}) : super(key: key);
@@ -49,6 +52,7 @@ class HomeFeedScreen extends StatefulWidget {
 
 class _HomeFeedScreenState extends State<HomeFeedScreen> with RouteAware {
   final DataController dataController = Get.find<DataController>();
+  final UpdateController updateController = Get.find<UpdateController>();
   final MediaVisibilityService mediaVisibilityService = Get.find<MediaVisibilityService>();
   final ScrollController _scrollController = ScrollController();
   final GlobalKey<ExpandableFabState> _fabKey = GlobalKey<ExpandableFabState>(); // Declare the key
@@ -1220,24 +1224,42 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> with RouteAware {
                 ),
             );
         }
-        return RefreshIndicator(
-          onRefresh: () => dataController.fetchFeeds(isRefresh: true),
-          child: ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            controller: _scrollController,
-            itemCount: dataController.posts.length + 1,
-            separatorBuilder: (context, index) => Divider(color: Colors.grey[850], height: 1),
-            itemBuilder: (context, index) {
-              if (index < dataController.posts.length) {
-                final postMap = dataController.posts[index] as Map<String, dynamic>;
-                return _buildPostContent(postMap, isReply: false);
+        return Column(
+          children: [
+            Obx(() {
+              if (updateController.isUpdateAvailable.value && !updateController.hasBeenDismissed.value) {
+                return CustomUpgradeCard(
+                  upgrader: updateController.upgrader,
+                  onDismiss: () {
+                    updateController.dismissUpdateCard();
+                  },
+                );
               } else {
-                return Obx(() => dataController.isLoading.value
-                    ? const Center(child: CircularProgressIndicator())
-                    : const SizedBox.shrink());
+                return const SizedBox.shrink();
               }
-            },
-          ),
+            }),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: () => dataController.fetchFeeds(isRefresh: true),
+                child: ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  controller: _scrollController,
+                  itemCount: dataController.posts.length + 1,
+                  separatorBuilder: (context, index) => Divider(color: Colors.grey[850], height: 1),
+                  itemBuilder: (context, index) {
+                    if (index < dataController.posts.length) {
+                      final postMap = dataController.posts[index] as Map<String, dynamic>;
+                      return _buildPostContent(postMap, isReply: false);
+                    } else {
+                      return Obx(() => dataController.isLoading.value
+                          ? const Center(child: CircularProgressIndicator())
+                          : const SizedBox.shrink());
+                    }
+                  },
+                ),
+              ),
+            ),
+          ],
         );
       }),
       floatingActionButtonLocation: ExpandableFab.location,

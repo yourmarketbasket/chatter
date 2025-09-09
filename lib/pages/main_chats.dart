@@ -5,6 +5,7 @@ import 'package:chatter/helpers/verification_helper.dart';
 import 'package:chatter/pages/chat_screen_page.dart';
 import 'package:chatter/pages/followers_page.dart';
 import 'package:chatter/pages/users_list_page.dart';
+import 'package:chatter/widgets/realtime_timeago_text.dart';
 import 'package:flutter_expandable_fab/flutter_expandable_fab.dart';
 import 'package:feather_icons/feather_icons.dart';
 import 'package:flutter/material.dart';
@@ -548,21 +549,36 @@ class _MainChatsPageState extends State<MainChatsPage> {
                                       crossAxisAlignment: CrossAxisAlignment.end,
                                       children: [
                                         if (!isGroup && otherUser != null)
-                                          Text(
-                                            isUserOnline
-                                                ? 'online'
-                                                : (otherUser['lastSeen'] != null
-                                                    ? 'seen ${formatLastSeen(DateTime.parse(otherUser['lastSeen']))}'
-                                                    : 'offline'),
-                                            style: GoogleFonts.poppins(
-                                              color: isUserOnline ? Colors.tealAccent.shade400 : Colors.grey.shade500,
-                                              fontSize: 9,
-                                              fontWeight: isUserOnline ? FontWeight.w600 : FontWeight.normal,
-                                            ),
-                                          ),
+                                          isUserOnline
+                                              ? Text(
+                                                  'online',
+                                                  style: GoogleFonts.poppins(
+                                                    color: Colors.tealAccent.shade400,
+                                                    fontSize: 9,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                )
+                                              : (otherUser['lastSeen'] != null
+                                                  ? Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Text('seen ', style: GoogleFonts.poppins(color: Colors.grey.shade500, fontSize: 9)),
+                                                        RealtimeTimeagoText(
+                                                          timestamp: DateTime.parse(otherUser['lastSeen']),
+                                                          style: GoogleFonts.poppins(color: Colors.grey.shade500, fontSize: 9),
+                                                        ),
+                                                      ],
+                                                    )
+                                                  : Text(
+                                                      'offline',
+                                                      style: GoogleFonts.poppins(
+                                                        color: Colors.grey.shade500,
+                                                        fontSize: 9,
+                                                      ),
+                                                    )),
                                         if (lastMessageTimestamp.isNotEmpty)
-                                          Text(
-                                            formatLastSeen(DateTime.parse(lastMessageTimestamp).toLocal()),
+                                          RealtimeTimeagoText(
+                                            timestamp: DateTime.parse(lastMessageTimestamp).toLocal(),
                                             style: GoogleFonts.poppins(color: Colors.grey.shade500, fontSize: 9),
                                           ),
                                         const SizedBox(height: 4),
