@@ -270,7 +270,7 @@ class _MainChatsPageState extends State<MainChatsPage> {
                   final currentUserId = _dataController.getUserId() ?? '';
                   final otherParticipant = (chat['participants'] as List<dynamic>?)?.firstWhere(
                     (p) => p is Map && p['_id'] != currentUserId,
-                    orElse: () => null,
+                    orElse: () => {},
                   );
                   title = (otherParticipant as Map<String, dynamic>?)?['name'] ?? 'User';
                 }
@@ -390,11 +390,13 @@ class _MainChatsPageState extends State<MainChatsPage> {
                                   final participants = chat['participants'] as List<dynamic>? ?? [];
                                   otherUser = participants.firstWhere(
                                     (p) => p is Map && p['_id'] != currentUserId,
-                                    orElse: () => null,
+                                    orElse: () => {},
                                   );
 
-                                  if (otherUser == null) {
-                                    return ListTile(title: Text("Loading Chat...", style: GoogleFonts.poppins(color: Colors.grey)));
+                                  if (otherUser.isEmpty) {
+                                    // This can happen if a chat is corrupted or a user was removed.
+                                    // We'll just show a placeholder and not crash.
+                                    return const SizedBox.shrink();
                                   }
 
                                   title = otherUser['name'] ?? 'User';
