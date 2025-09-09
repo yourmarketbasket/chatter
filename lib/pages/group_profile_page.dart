@@ -517,12 +517,7 @@ class GroupProfilePage extends StatelessWidget {
                           ),
                           TextButton(
                             onPressed: () async {
-                              final success = await dataController
-                                  .leaveGroup(currentChat['_id']);
-                              if (success) {
-                                await dataController
-                                    .deleteChat(currentChat['_id']);
-                              }
+                              await dataController.leaveGroup(currentChat['_id']);
                               Get.back();
                               Get.back();
                             },

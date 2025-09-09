@@ -90,8 +90,9 @@ class _ChatScreenState extends State<ChatScreen> {
     _socketSubscription = socketService.events.listen(_handleSocketEvent);
 
     // Add a listener to the chats map to detect if the current chat is deleted.
-    dataController.currentChat.listen((chat) {
-      if (chat.isEmpty && mounted) {
+    dataController.chats.listen((chatsMap) {
+      final currentChatId = dataController.currentChat.value['_id'];
+      if (currentChatId != null && !chatsMap.containsKey(currentChatId) && mounted) {
         Navigator.of(context).pop();
       }
     });
@@ -1373,6 +1374,20 @@ class _ChatScreenState extends State<ChatScreen> {
                       child: avatarUrl.isEmpty ? Text(avatarLetter, style: const TextStyle(color: Colors.black)) : null,
                     ),
                   ),
+                  if (isOnline)
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: Colors.green,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.black, width: 2),
+                        ),
+                      ),
+                    ),
                 ],
               ),
               const SizedBox(width: 10),

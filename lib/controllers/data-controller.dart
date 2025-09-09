@@ -2610,16 +2610,7 @@ class DataController extends GetxController {
     final chatId = data['chatId'] as String?;
     if (chatId == null) return;
 
-    if (chats.containsKey(chatId)) {
-      final newChats = Map<String, Map<String, dynamic>>.from(chats);
-      newChats.remove(chatId);
-      chats.value = newChats;
-
-      if (currentChat.value['_id'] == chatId) {
-        currentChat.value = {};
-        currentConversationMessages.clear();
-      }
-    }
+    deleteChat(chatId);
   }
 
   void handleMemberJoined(Map<String, dynamic> data) {
