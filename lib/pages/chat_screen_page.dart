@@ -1290,19 +1290,19 @@ class _ChatScreenState extends State<ChatScreen> {
           if (typingUserId != null && typingUserId == userForProfile['_id']) {
             statusWidget = const Text(
               'typing...',
-              style: TextStyle(color: Colors.tealAccent, fontSize: 12, fontStyle: FontStyle.italic),
+              style: TextStyle(color: Colors.tealAccent, fontSize: 10, fontStyle: FontStyle.italic),
             );
           } else {
             if (userForProfile['online'] == true) {
-              statusWidget = const Text('online', style: TextStyle(color: Colors.green, fontSize: 12));
+              statusWidget = const Text('online', style: TextStyle(color: Colors.green, fontSize: 10));
             } else if (userForProfile['lastSeen'] != null) {
               statusWidget = Text(
-                'last seen ${formatLastSeen(DateTime.parse(userForProfile['lastSeen']))}',
-                style: const TextStyle(color: Colors.grey, fontSize: 12),
+                'Seen ${formatLastSeen(DateTime.parse(userForProfile['lastSeen']))}',
+                style: const TextStyle(color: Colors.grey, fontSize: 10),
                 overflow: TextOverflow.ellipsis,
               );
             } else {
-              statusWidget = const Text('offline', style: TextStyle(color: Colors.grey, fontSize: 12));
+              statusWidget = const Text('offline', style: TextStyle(color: Colors.grey, fontSize: 10));
             }
           }
         } else if (isGroup) {
@@ -1315,7 +1315,7 @@ class _ChatScreenState extends State<ChatScreen> {
           if (onlineCount > 0) {
             statusWidget = Text(
               '$onlineCount online',
-              style: const TextStyle(color: Colors.green, fontSize: 12),
+              style: const TextStyle(color: Colors.green, fontSize: 10),
             );
           } else {
             final memberNames = participants.map((p) => p['name'] ?? 'User').toList();
@@ -1327,7 +1327,7 @@ class _ChatScreenState extends State<ChatScreen> {
             }
             statusWidget = Text(
               subtitleText,
-              style: const TextStyle(color: Colors.grey, fontSize: 12),
+              style: const TextStyle(color: Colors.grey, fontSize: 10),
               overflow: TextOverflow.ellipsis,
             );
           }
@@ -1359,20 +1359,10 @@ class _ChatScreenState extends State<ChatScreen> {
             children: [
               Stack(
                 children: [
-                  DottedBorder(
-                    options: CircularDottedBorderOptions(
-                      gradient: LinearGradient(
-                        colors: [isOnline ? Colors.teal : const BorderType.Color.fromARGB(255, 161, 161, 161), Colors.black],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      strokeWidth: 1.5,
-                    ),
-                    child: CircleAvatar(
-                      backgroundColor: Colors.tealAccent,
-                      backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
-                      child: avatarUrl.isEmpty ? Text(avatarLetter, style: const TextStyle(color: Colors.black)) : null,
-                    ),
+                  CircleAvatar(
+                    backgroundColor: Colors.tealAccent,
+                    backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+                    child: avatarUrl.isEmpty ? Text(avatarLetter, style: const TextStyle(color: Colors.black)) : null,
                   ),
                   if (isOnline)
                     Positioned(
