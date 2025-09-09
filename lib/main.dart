@@ -100,6 +100,9 @@ class _ChatterAppState extends State<ChatterApp> {
       ),
       debugLogging: kDebugMode,
       debugDisplayAlways: true,
+      willPopScope: () => false,
+      showIgnoreButton: false,
+      showLaterButton: false,
     );
 
     // Initialize secure storage with platform-specific options

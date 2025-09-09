@@ -90,9 +90,8 @@ class _ChatScreenState extends State<ChatScreen> {
     _socketSubscription = socketService.events.listen(_handleSocketEvent);
 
     // Add a listener to the chats map to detect if the current chat is deleted.
-    dataController.chats.listen((chatsMap) {
-      final currentChatId = dataController.currentChat.value['_id'];
-      if (currentChatId != null && !chatsMap.containsKey(currentChatId) && mounted) {
+    dataController.currentChat.listen((chat) {
+      if (chat.isEmpty && mounted) {
         Navigator.of(context).pop();
       }
     });

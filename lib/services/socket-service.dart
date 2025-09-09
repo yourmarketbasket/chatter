@@ -62,6 +62,7 @@ class SocketService {
 
     // Core event handlers (retained all existing handlers)
     final eventHandlers = {
+      'ping': (_) => _socket!.emit('pong'),
       'user:online': (data) => _handleUserAction(data, 'user:online'),
       'user:offline': (data) => _handleUserAction(data, 'user:offline'),
       'user:new': (data) => _handleUserAction(data, 'user:new'),

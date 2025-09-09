@@ -4264,6 +4264,40 @@ void clearUserPosts() {
         user['lastSeen'] = lastSeen;
       }
       allUsers[index] = user;
+      allUsers.refresh();
+    }
+
+    // Also update the participant in all chats
+    for (var chat in chats.values) {
+      final participants = chat['participants'] as List<dynamic>;
+      final participantIndex = participants.indexWhere((p) => p['_id'] == userId);
+      if (participantIndex != -1) {
+        final participant = participants[participantIndex];
+        participant['online'] = isOnline;
+        if (lastSeen != null) {
+          participant['lastSeen'] = lastSeen;
+        }
+        participants[participantIndex] = participant;
+        chat['participants'] = participants;
+      }
+    }
+    chats.refresh();
+
+    // Also update the participant in the current chat if they are the user who went online/offline
+    final chat = currentChat.value;
+    final participants = chat['participants'] as List<dynamic>?;
+    if (participants != null) {
+      final otherParticipantIndex = participants.indexWhere((p) => p['_id'] == userId);
+      if (otherParticipantIndex != -1) {
+        final otherParticipant = participants[otherParticipantIndex];
+        otherParticipant['online'] = isOnline;
+        if (lastSeen != null) {
+          otherParticipant['lastSeen'] = lastSeen;
+        }
+        participants[otherParticipantIndex] = otherParticipant;
+        chat['participants'] = participants;
+        currentChat.value = Map<String, dynamic>.from(chat);
+      }
     }
   }
 
