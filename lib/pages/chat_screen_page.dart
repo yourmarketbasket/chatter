@@ -1267,7 +1267,7 @@ class _ChatScreenState extends State<ChatScreen> {
           );
 
           if (otherParticipant == null) {
-            // This can happen briefly if a chat is being created. A loading state is better.
+            
             return const Text('Loading...', style: TextStyle(color: Colors.white, fontSize: 14));
           }
 
